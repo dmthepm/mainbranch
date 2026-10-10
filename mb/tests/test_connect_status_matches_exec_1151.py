@@ -61,16 +61,24 @@ class FakeKeychain:
         self.clock = clock
         self.cost = cost
         self.modes: dict[str, str] = {}
+        self.costs: dict[str, float] = {}
+        # Refs whose first read answers "prompt-pending" after using its time.
+        self.pending_first: set[str] = set()
         self.calls: list[tuple[str, str, float]] = []
 
     def __call__(self, args: list[str], stdin: str, timeout: float) -> tuple[int, str]:
         action = args[-1]
         ref = json.loads(stdin)["ref"]
         self.calls.append((action, ref, timeout))
-        if timeout < self.cost:
+        cost = self.costs.get(ref, self.cost)
+        if timeout < cost:
             self.clock.now += timeout
             raise subprocess.TimeoutExpired(args, timeout)
-        self.clock.now += self.cost
+        if ref in self.pending_first:
+            self.pending_first.discard(ref)
+            self.clock.now += timeout
+            return 1, json.dumps({"state": "prompt-pending"})
+        self.clock.now += cost
         assert action == "get"
         mode = self.modes.get(ref, "ready")
         if mode == "ready":
@@ -203,7 +211,7 @@ def test_cli_status_and_list_do_not_report_a_broken_backend(world: Any) -> None:
 
 def test_single_provider_status_has_its_own_budget(world: Any) -> None:
     repo, _refs, _keychain = world(IDS, cost=3.0)
-    last = IDS[-1]
+    last = "orbit-books"  # sorted last: the retry of the one before it spent the budget
     assert _by_id(connect_mod.status_all(repo))[last]["state"] == "credential_not_checked"
 
     result = runner.invoke(app, ["connect", "status", last, "--repo", str(repo), "--json"])
@@ -318,7 +326,7 @@ class _NoBudgetAdapter:
     health = get
 
 
-def test_helper_reports_spent_budget_as_not_checked_and_a_started_call_as_pending(
+def test_helper_reports_a_spent_budget_as_not_checked_and_a_started_call_as_pending(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     real_adapter = helper_mod._MacSecurity
@@ -334,7 +342,8 @@ def test_helper_reports_spent_budget_as_not_checked_and_a_started_call_as_pendin
     with pytest.raises(helper_mod._BudgetSpent):
         adapter._security_tool(["find-generic-password"])
 
-    # One that started and ran out of time is still a pending prompt.
+    # One that started and ran out of time is a pending prompt, whatever the
+    # budget it was given: the parent decides whether to read it again.
     def hang(*_args: Any, **kwargs: Any) -> Any:
         raise subprocess.TimeoutExpired("security", kwargs["timeout"])
 
@@ -342,12 +351,91 @@ def test_helper_reports_spent_budget_as_not_checked_and_a_started_call_as_pendin
     monkeypatch.setattr(subprocess, "run", hang)
     with pytest.raises(helper_mod._PromptPending):
         adapter._security_tool(["find-generic-password"])
-    # Unless the parent cut the time short to fit a shared budget.
-    adapter.shared_budget = True
-    with pytest.raises(helper_mod._BudgetSpent):
-        adapter._security_tool(["find-generic-password"])
     assert helper_mod._failure_state(helper_mod._BudgetSpent()) == "not-checked"
     assert helper_mod._failure_state(helper_mod._PromptPending()) == "prompt-pending"
+
+
+def _clipped_pair(world: Any) -> tuple[Path, dict[str, str], FakeKeychain]:
+    """Cloudflare uses 2.5 s of the shared 8 s, so resend's read is clipped."""
+
+    repo, refs, keychain = world(["cloudflare", "resend"], cost=0.1)
+    keychain.costs[refs["cloudflare"]] = 2.5
+    return repo, refs, keychain
+
+
+def test_a_clipped_read_that_hangs_is_a_store_timeout_like_exec(world: Any) -> None:
+    repo, refs, keychain = _clipped_pair(world)
+    keychain.costs[refs["resend"]] = 999.0
+
+    resend = _by_id(connect_mod.status_all(repo))["resend"]
+    slot = next(iter(resend["secrets"].values()))
+    assert resend["state"] == connect_mod.BACKEND_FAILURE_STATE
+    assert slot["backend_state"] == "credential_store_timeout"
+    resend_calls = [timeout for _a, ref, timeout in keychain.calls if ref == refs["resend"]]
+    assert len(resend_calls) == 2 and resend_calls[0] < 8 <= resend_calls[1]
+    status = connect_mod.status_all(repo)
+    assert status["credential_backend"]["state"] == "credential_store_timeout"
+    assert "not_checked" not in status["summary"]
+    exec_read = store_mod.SecretStore("macos-keychain").probe(refs["resend"])
+    assert (exec_read.backend_ok, exec_read.reason) == (False, "credential_store_timeout")
+
+
+def test_a_launched_read_the_helper_gave_up_on_is_a_store_timeout_like_exec(world: Any) -> None:
+    repo, refs, keychain = world(["cloudflare"], cost=0.1)
+    keychain.modes[refs["cloudflare"]] = "not-checked"
+
+    provider = _by_id(connect_mod.status_all(repo))["cloudflare"]
+    assert provider["state"] == connect_mod.BACKEND_FAILURE_STATE
+    exec_read = store_mod.SecretStore("macos-keychain").probe(refs["cloudflare"])
+    assert exec_read.reason == "credential_store_timeout"
+
+
+def test_a_clipped_read_the_helper_gave_up_on_is_read_again_then_a_store_timeout(
+    world: Any,
+) -> None:
+    repo, refs, keychain = _clipped_pair(world)
+    keychain.modes[refs["resend"]] = "not-checked"
+
+    resend = _by_id(connect_mod.status_all(repo))["resend"]
+    assert resend["state"] == connect_mod.BACKEND_FAILURE_STATE
+    assert len([call for call in keychain.calls if call[1] == refs["resend"]]) == 2
+
+
+def test_a_clipped_read_reads_ready_on_the_retry(world: Any) -> None:
+    repo, refs, keychain = _clipped_pair(world)
+    keychain.costs[refs["resend"]] = 6.0
+
+    status = connect_mod.status_all(repo)
+    assert {item["provider"]: item["state"] for item in status["providers"]} == {
+        "cloudflare": "unvalidated",
+        "resend": "unvalidated",
+    }
+    assert status["credential_backend"]["state"] == "ready"
+
+
+def test_a_started_dialog_wait_on_a_clipped_read_is_pending(world: Any) -> None:
+    repo, refs, keychain = _clipped_pair(world)
+    keychain.modes[refs["resend"]] = "prompt-pending"
+
+    resend = _by_id(connect_mod.status_all(repo))["resend"]
+    assert next(iter(resend["secrets"].values()))["backend_state"] == "keychain_prompt_pending"
+    assert resend["state"] == connect_mod.BACKEND_FAILURE_STATE
+
+    # A cut-short call that only looked like a dialog reads ready on the retry.
+    keychain.modes.pop(refs["resend"])
+    keychain.pending_first.add(refs["resend"])
+    assert _by_id(connect_mod.status_all(repo))["resend"]["state"] == "unvalidated"
+
+
+def test_the_retry_spends_the_budget_so_later_providers_are_not_checked(world: Any) -> None:
+    repo, refs, keychain = world(["cloudflare", "resend", "orbit-books"], cost=0.1)
+    keychain.costs[refs["cloudflare"]] = 2.5
+    keychain.costs[refs["resend"]] = 999.0
+
+    states = {item["provider"]: item["state"] for item in connect_mod.status_all(repo)["providers"]}
+    assert states["resend"] == connect_mod.BACKEND_FAILURE_STATE
+    assert states["orbit-books"] == "credential_not_checked"
+    assert not [call for call in keychain.calls if call[1] == refs["orbit-books"]]
 
 
 def test_a_wedged_store_is_still_reported_as_a_store_failure(

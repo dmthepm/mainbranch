@@ -183,9 +183,13 @@ when something was not read, and `credential_backend.state` is `not_checked`
 when no credential on a backend was read. Nothing is counted in `needs_repair`;
 the suggested command is `mb connect status <provider>`, which reads that one
 credential with its own time budget, the same read `mb connect exec` does.
-A read that starts with its full budget and does not finish is still
-`credential_store_timeout`, and a macOS dialog that is really waiting is still
-`keychain_prompt_pending`.
+Only a credential that was never asked for is not checked. A read that had been
+cut short by the shared budget and then does not finish is read once more with a
+full budget, as `mb connect exec` would: a healthy item then reads normally, a
+store that really hangs is `credential_store_timeout`, and a macOS dialog that
+is really waiting is `keychain_prompt_pending`. That retry costs at most one
+extra full budget per run; the providers after it have no budget left and are
+not checked.
 
 ### What the exit code means
 

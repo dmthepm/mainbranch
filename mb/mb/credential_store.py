@@ -465,10 +465,6 @@ def _run_helper(
     # cannot finish, and stops its own `security` calls, before this process
     # gives up on it. A pending dialog is then reported as such.
     payload["deadline_epoch"] = time.time() + timeout - HELPER_EXIT_HEADROOM_SECONDS
-    if clipped:
-        # Tells the helper that running out of time here is the command's
-        # budget ending, not a dialog waiting on a click (#1151).
-        payload["shared_budget"] = True
     try:
         returncode, stdout = _invoke_helper(
             [sys.executable, "-m", "mb._credential_helper", backend, action],
@@ -476,7 +472,9 @@ def _run_helper(
             timeout,
         )
     except subprocess.TimeoutExpired:
-        return {"state": "not-checked" if clipped else "timed-out"}
+        if clipped:
+            return _run_helper(backend, action, ref=ref, value=value, interactive=interactive)
+        return {"state": "timed-out"}
     except (OSError, subprocess.SubprocessError):
         return {"state": "unavailable"}
     if len(stdout) > HELPER_OUTPUT_LIMIT:
@@ -492,6 +490,18 @@ def _run_helper(
         return {"state": "unavailable"}
     if returncode != (0 if state in {"ready", "missing"} else 1):
         return {"state": "unavailable"}
+    if state == "not-checked":
+        # The helper ran out of time after the parent had launched it, so the
+        # read did start. Exec reports that as a store timeout; a read the
+        # shared budget cut short gets one more try with a full budget first.
+        if not clipped:
+            return {"state": "timed-out"}
+        return _run_helper(backend, action, ref=ref, value=value, interactive=interactive)
+    if clipped and state == "prompt-pending":
+        # A `security` call the shared budget cut short looks like a dialog
+        # that is waiting. Ask again with a full budget, as exec would: a
+        # healthy item then reads, a real dialog is still reported as one.
+        return _run_helper(backend, action, ref=ref, value=value, interactive=interactive)
     return result
 
 
