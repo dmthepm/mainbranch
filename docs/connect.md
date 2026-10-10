@@ -617,6 +617,26 @@ MB_CONNECT_SECRET_BACKEND=macos-keychain \
 Rotation updates only the selected business's `repo_id`-scoped reference. A
 same-named provider in another business is not a sibling and is never rewritten.
 
+### Storing a secret again
+
+Storing a new secret for a provider that is already connected, custom or
+built in, in repo or user scope, replaces the secret only. The recorded account
+label and metadata stay unless the command gives new ones:
+
+```bash
+mb connect <provider> --token-stdin                       # keeps label and metadata
+mb connect <provider> --token-stdin --account "New label" # replaces the label
+mb connect <provider> --token-stdin --account ""          # clears the label
+mb connect <provider> --token-stdin --metadata region=eu  # sets one key, keeps the rest
+mb connect <provider> --token-stdin --metadata region=    # removes that key
+```
+
+`--json` adds a `reconnect` key saying whether the label was `kept`,
+`replaced` or `cleared`, and which metadata keys were kept, set or removed
+(names only). A first connect and a metadata edit without a secret record
+exactly what they are given, as before. A kept `mode=live` still refuses a
+Stripe test key; pass `--metadata mode=test` with it.
+
 ### Rotate from a recorded source
 
 Record where the credential lives once, as a non-secret reference:

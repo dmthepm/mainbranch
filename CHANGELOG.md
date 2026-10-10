@@ -25,6 +25,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb connect`: storing a new secret for a provider that is already connected
+  no longer wipes its account label and metadata. The label and every metadata
+  key stay unless you pass new ones: `--account "X"` replaces the label,
+  `--account ""` clears it, `--metadata key=value` updates one key and keeps the
+  rest, and `--metadata key=` removes one. This holds for custom and built-in
+  providers in repo and user scope. `--json` adds `reconnect` saying what was
+  kept, replaced or removed (names only). A first connect and a metadata edit
+  without a secret are unchanged. If a kept `mode` disagrees with a new Stripe
+  key, it is refused with a message to pass `--metadata mode=...`.
 - Run from another folder, more suggested commands now name your business repo
   instead of acting on the folder you are in: the next actions in `mb status`
   (JSON and the plain list), the commands in `mb start` (JSON and human),
