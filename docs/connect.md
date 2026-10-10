@@ -638,8 +638,10 @@ mb connect <provider> --token-stdin --metadata region=    # removes that key
 
 `--json` adds a `reconnect` key saying whether the label was `kept`,
 `replaced` or `cleared`, and which metadata keys were kept, set or removed
-(names only). A first connect and a metadata edit without a secret record
-exactly what they are given, as before. A kept `mode=live` still refuses a
+(names only). An edit without a secret (`mb connect <provider> --metadata
+region=eu`, `--account "New label"` alone, or a scope change) on a provider
+that is already recorded follows the same rule and keeps the secret reference,
+label and other keys. A first connect records exactly what it is given. A kept `mode=live` still refuses a
 Stripe test key; pass `--metadata mode=test` with it.
 
 ### Rotate from a recorded source

@@ -165,20 +165,59 @@ def test_user_scope_restore_keeps_record_from_another_workspace(tmp_path, monkey
     assert _entry(repo, "examplehook")["metadata"] == {"account_id": "acct-1"}
 
 
-def test_first_connect_and_tokenless_edit_unchanged(tmp_path, monkeypatch) -> None:
+def _edit(repo: Path, *args: str, ok: bool = True) -> dict[str, Any]:
+    result = runner.invoke(app, ["connect", "examplehook", "--repo", str(repo), "--json", *args])
+    assert (result.exit_code == 0) == ok, result.output
+    payload: dict[str, Any] = json.loads(result.stdout)
+    return payload
+
+
+def test_first_tokenless_connect_unchanged(tmp_path, monkeypatch) -> None:
     repo = _env(monkeypatch, tmp_path)
     first = _store(repo, "examplehook", "--metadata", "gone=", custom=True)
     assert "reconnect" not in first
     assert _entry(repo, "examplehook")["metadata"] == {"gone": ""}
-    assert _entry(repo, "examplehook")["account_label"] == ""
-    # A tokenless edit still records exactly what it was given.
-    result = runner.invoke(
-        app,
-        ["connect", "examplehook", "--repo", str(repo), "--metadata", "only=1", "--json"],
+    fresh = tmp_path / "fresh"
+    fresh.mkdir()
+    out = _edit(
+        fresh, "--custom", "--account", "Only", "--metadata", "k=v", "--metadata", "z=", ok=False
     )
-    assert result.exit_code == 0, result.output
-    assert "reconnect" not in json.loads(result.stdout)
-    assert _entry(repo, "examplehook")["metadata"] == {"only": "1"}
+    assert "reconnect" not in out
+    assert _entry(fresh, "examplehook")["account_label"] == "Only"
+    assert _entry(fresh, "examplehook")["metadata"] == {"k": "v", "z": ""}
+
+
+def test_tokenless_metadata_edit_keeps_label_and_other_keys(tmp_path, monkeypatch) -> None:
+    repo = _env(monkeypatch, tmp_path)
+    _first(repo, "examplehook", custom=True)
+    out = _edit(repo, "--custom", "--metadata", "region=eu", "--metadata", "api_user=")
+    entry = _entry(repo, "examplehook")
+    assert entry["metadata"] == {"account_id": "acct-1", "region": "eu"}
+    assert entry["account_label"] == "Example Co"
+    assert entry["connected"] is True
+    assert entry["secrets"]
+    assert out["reconnect"]["metadata"]["removed"] == ["api_user"]
+
+
+def test_tokenless_account_alone_keeps_metadata_and_clear_works(tmp_path, monkeypatch) -> None:
+    repo = _env(monkeypatch, tmp_path)
+    _first(repo, "examplehook", custom=True)
+    _edit(repo, "--account", "Other Co")
+    assert _entry(repo, "examplehook")["account_label"] == "Other Co"
+    assert _entry(repo, "examplehook")["metadata"] == {"account_id": "acct-1", "api_user": "svc"}
+    _edit(repo, "--account", "")
+    assert _entry(repo, "examplehook")["account_label"] == ""
+    assert _entry(repo, "examplehook")["metadata"] == {"account_id": "acct-1", "api_user": "svc"}
+
+
+def test_tokenless_scope_change_keeps_label_and_metadata(tmp_path, monkeypatch) -> None:
+    repo = _env(monkeypatch, tmp_path)
+    _first(repo, "examplehook", custom=True)
+    _edit(repo, "--scope", "user")
+    entry = _entry(repo, "examplehook")
+    assert entry["scope"] == "user"
+    assert entry["account_label"] == "Example Co"
+    assert entry["metadata"] == {"account_id": "acct-1", "api_user": "svc"}
 
 
 def test_restore_keeping_test_mode_refuses_live_key(tmp_path, monkeypatch) -> None:

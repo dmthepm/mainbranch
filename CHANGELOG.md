@@ -31,8 +31,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `--account ""` clears it, `--metadata key=value` updates one key and keeps the
   rest, and `--metadata key=` removes one. This holds for custom and built-in
   providers in repo and user scope. `--json` adds `reconnect` saying what was
-  kept, replaced or removed (names only). A first connect and a metadata edit
-  without a secret are unchanged. If a kept `mode` disagrees with a new Stripe
+  kept, replaced or removed (names only). The same holds for an edit without a
+  secret (`mb connect <provider> --metadata k=v`, `--account X` alone, or a scope
+  change) on a provider that is already recorded; a first connect records exactly
+  what it is given. If a kept `mode` disagrees with a new Stripe
   key, it is refused with a message to pass `--metadata mode=...`.
 - A keychain credential that is there but that macOS refuses to hand over is no
   longer reported as "missing from the secret store". When mb has just found

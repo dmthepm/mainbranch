@@ -532,9 +532,9 @@ otherwise:
 
 ### `mb connect <provider> --json` after storing a secret again
 
-Storing a new secret for a provider that already has an entry adds one
-additive key, `reconnect`; it is absent on a first connect and on a tokenless
-metadata edit, so those payloads are unchanged:
+Storing a secret, or editing metadata, label or scope without one, for a
+provider that already has an entry adds one additive key, `reconnect`; it is
+absent on a first connect, so that payload is unchanged:
 
 ```json
 "reconnect": {

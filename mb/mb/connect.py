@@ -1950,16 +1950,20 @@ def connect_provider(
             "here would drop the sign-in and orphan its stored grant. Renew the sign-in with "
             "`mb connect google --oauth --reauth`. Nothing was stored.",
         )
-    # What a re-stored secret keeps: the repo entry, else the user-scope record.
+    # What a later connect keeps: the repo entry, else the user-scope record. A
+    # first connect has none and records exactly what it was given.
     prior_entry: dict[str, Any] | None = None
-    if token:
+    if not token:
+        prior_entry = existing_entry if isinstance(raw_existing_entry, dict) else None
+    else:
         raw_prior = providers.get(provider.id)
         if not isinstance(raw_prior, dict) and normalized_scope == "user":
             # Only a user-scope store reads the user-scope file, so a repo-scope
             # store never depends on it being readable.
             raw_prior = _user_scope_provider_entry(repo_id, provider.id)
         prior_entry = raw_prior if isinstance(raw_prior, dict) else None
-    if prior_entry is not None:
+    if prior_entry is not None and not _records_oauth_grant(provider, prior_entry):
+        # A Google sign-in merges its own metadata below.
         metadata = merge_recorded_metadata(prior_entry.get("metadata"), metadata)
     if source:
         if not metadata_pairs:
