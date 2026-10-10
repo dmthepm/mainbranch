@@ -43,6 +43,9 @@ HELPER_STATES = {
 # aggregate command reports the item as not checked instead of letting it fail
 # on the clock and read as a broken credential (#1151).
 MIN_PROBE_SECONDS = 1.5
+# A read given this much less than its full time by a shared budget counts as
+# cut short by it (see `_run_helper`).
+CLIP_SLACK_SECONDS = 2.0
 HELPER_OUTPUT_LIMIT = 1024 * 1024
 # The helper's own deadline ends this long before the parent stops waiting, so
 # it can finish or undo a step and stop its `security` children first.
@@ -452,8 +455,11 @@ def _run_helper(
         if remaining <= 0:
             return {"state": "timed-out"}
         if remaining < timeout:
-            # The shared budget, not the store's own deadline, ends this read.
-            clipped = action == "get"
+            # Only a read the shared budget cut well short is "clipped". The
+            # slack covers the repo and git work an aggregate command does
+            # before its first read, so a read that had essentially its full
+            # time and still hung is the store's own timeout, not starvation.
+            clipped = action == "get" and remaining < timeout - CLIP_SLACK_SECONDS
             timeout = remaining
     # An absolute wall-clock deadline: the helper refuses to start a move it
     # cannot finish, and stops its own `security` calls, before this process

@@ -42,8 +42,12 @@ IDS = [*PLAIN, *CUSTOM]
 class Clock:
     def __init__(self) -> None:
         self.now = 1000.0
+        self.tick = 0.05
 
     def monotonic(self) -> float:
+        # Reading the clock costs a little, as the repo and git work an
+        # aggregate command does before its first credential read does.
+        self.now += self.tick
         return self.now
 
     def time(self) -> float:
@@ -344,3 +348,25 @@ def test_helper_reports_spent_budget_as_not_checked_and_a_started_call_as_pendin
         adapter._security_tool(["find-generic-password"])
     assert helper_mod._failure_state(helper_mod._BudgetSpent()) == "not-checked"
     assert helper_mod._failure_state(helper_mod._PromptPending()) == "prompt-pending"
+
+
+def test_a_wedged_store_is_still_reported_as_a_store_failure(
+    world: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A read that had essentially its whole time and hung is the store's answer."""
+
+    repo, _refs, keychain = world(IDS, cost=60.0)
+
+    status = connect_mod.status_all(repo)
+    states = {item["state"] for item in status["providers"]}
+    first = _by_id(status)[IDS[0]]
+
+    assert first["state"] == connect_mod.BACKEND_FAILURE_STATE
+    assert next(iter(first["secrets"].values()))["backend_state"] == "credential_store_timeout"
+    assert states <= {connect_mod.BACKEND_FAILURE_STATE, "credential_not_checked"}
+    assert status["credential_backend"]["state"] == "credential_store_timeout"
+    assert status["credential_backend"]["ok"] is False
+    assert connect_mod.doctor_check(repo, status=status)["severity"] == "warn"
+    result = runner.invoke(app, ["connect", "status", "--repo", str(repo), "--json"])
+    assert result.exit_code == 1
+    assert [call for call in keychain.calls if call[0] != "get"] == []
