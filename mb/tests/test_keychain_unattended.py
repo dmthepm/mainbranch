@@ -403,6 +403,63 @@ def test_adapter_get_maps_untrusted_read_to_prompt_pending() -> None:
     assert adapter.get("fixture-ref") == ("prompt-pending", None)
 
 
+def _present_then_not_found_adapter(
+    owner: str, *, owners_after: list[str]
+) -> tuple[Any, list[str]]:
+    """An adapter whose existence check finds the item but whose data read says not found.
+
+    ``owners_after`` are the answers to any further existence checks, in order.
+    """
+
+    answers = [owner, *owners_after]
+    checks: list[str] = []
+
+    def item_owner(ref: str) -> str:
+        checks.append(ref)
+        return answers[min(len(checks) - 1, len(answers) - 1)]
+
+    adapter: Any = object.__new__(helper_mod._MacSecurity)
+    adapter.health = lambda: "ready"
+    adapter._recover = lambda ref: None
+    adapter._item_owner = item_owner
+    adapter._query = lambda ref, **kwargs: (7, [])
+    adapter._release_all = lambda values: None
+    adapter.security = SimpleNamespace(
+        SecItemCopyMatching=lambda query, result: helper_mod.ERR_SEC_ITEM_NOT_FOUND
+    )
+    adapter.core = SimpleNamespace(CFRelease=lambda value: None)
+    adapter._security_get = lambda ref: ("missing", None)
+    adapter.stage_kind = "absent"
+    adapter.owner = ""
+    adapter.migrated = False
+    return adapter, checks
+
+
+@pytest.mark.parametrize("owner", ["legacy", "security"])
+def test_an_item_found_but_refused_on_read_is_never_missing(owner: str) -> None:
+    # The existence check found the item; a "not found" from the data read is a
+    # refusal (#1150), so it reads as a pending prompt, never as missing.
+    adapter, checks = _present_then_not_found_adapter(owner, owners_after=[owner])
+
+    assert adapter.get("fixture-ref") == ("prompt-pending", None)
+    assert len(checks) == 2
+
+
+@pytest.mark.parametrize("owner", ["legacy", "security"])
+def test_an_item_gone_between_the_two_reads_is_missing(owner: str) -> None:
+    adapter, _checks = _present_then_not_found_adapter(owner, owners_after=["absent"])
+
+    assert adapter.get("fixture-ref") == ("missing", None)
+
+
+def test_a_security_item_refused_on_read_is_not_taken_for_absent_by_recovery() -> None:
+    # `_recover` rewrites an absent item from its staged copy; a refused read
+    # must not look absent to it.
+    adapter, _checks = _present_then_not_found_adapter("security", owners_after=["security"])
+
+    assert adapter._main_state("fixture-ref") == ("unreadable", None, "prompt-pending")
+
+
 class _FakeLibrary:
     """Accepts ctypes argtypes/restype assignments and records calls."""
 

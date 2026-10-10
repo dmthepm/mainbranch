@@ -535,6 +535,11 @@ Python reads as `ready` until a Python change, then as
 `keychain_prompt_pending`. `mb connect repair --keychain` is the check that
 reports whether each item has moved.
 
+A read macOS refuses can also come back as "not found" even though the item is
+there. Main Branch has already found the item by then, so it reports
+`keychain_prompt_pending` (not `missing`) and the same repair applies. Only an
+item that a second look also cannot find reads as `missing`.
+
 When an item reports `keychain_prompt_pending`, run this once from a terminal
 in the hub, at the screen, and choose **Always Allow** for each dialog (Allow lets only that one read
 through):
