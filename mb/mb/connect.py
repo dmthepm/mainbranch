@@ -1954,7 +1954,9 @@ def connect_provider(
     prior_entry: dict[str, Any] | None = None
     if token:
         raw_prior = providers.get(provider.id)
-        if not isinstance(raw_prior, dict):
+        if not isinstance(raw_prior, dict) and normalized_scope == "user":
+            # Only a user-scope store reads the user-scope file, so a repo-scope
+            # store never depends on it being readable.
             raw_prior = _user_scope_provider_entry(repo_id, provider.id)
         prior_entry = raw_prior if isinstance(raw_prior, dict) else None
     if prior_entry is not None:
