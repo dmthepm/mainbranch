@@ -846,10 +846,29 @@ class _MacSecurity:
         except Exception as exc:
             return "unreadable", None, _failure_state(exc)
         if state == "missing":
-            return "absent", None, ""
+            # The item was proved present a moment ago: only a second look
+            # finding it gone makes it absent (see _not_found_after_proof).
+            state = self._not_found_after_proof(ref)
+            if state == "missing":
+                return "absent", None, ""
         if state != "ready" or value is None:
             return "unreadable", None, state
         return ("security-empty" if value == "" else "security-readable"), value, ""
+
+    def _not_found_after_proof(self, ref: str) -> str:
+        """Classify a "not found" data read of an item whose existence was just proved.
+
+        The access-list query found the item, so a data read that says "not
+        found" is a refusal, not an absence (invariant d). It is reported as a
+        pending prompt, which names the `mb connect repair --keychain` repair.
+        Only a second look that finds the item gone says ``missing``; an item
+        deleted between the two calls reads as pending once, then missing.
+        """
+
+        try:
+            return "missing" if self._item_owner(ref) == "absent" else "prompt-pending"
+        except Exception:
+            return "prompt-pending"
 
     def _drop_stage(self, stage: str) -> None:
         """Remove a staged copy that is proved redundant, if time allows."""
@@ -950,10 +969,15 @@ class _MacSecurity:
             return "missing", None
         if owner == "security":
             self.owner = "security"
-            return self._security_get(ref)
+            state, value = self._security_get(ref)
+            if state == "missing":
+                state = self._not_found_after_proof(ref)
+            return state, value
         if owner != "legacy":
             return _denied_state_for(owner, health=health), None
         state, value = self._ctypes_get(ref, health=health)
+        if state == "missing":
+            state = self._not_found_after_proof(ref)
         self.owner = "legacy"
         if state == "ready" and value is not None and self.stage_kind != "unreadable":
             # Without enough time left for the whole move, read only and move

@@ -34,6 +34,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   kept, replaced or removed (names only). A first connect and a metadata edit
   without a secret are unchanged. If a kept `mode` disagrees with a new Stripe
   key, it is refused with a message to pass `--metadata mode=...`.
+- A keychain credential that is there but that macOS refuses to hand over is no
+  longer reported as "missing from the secret store". When mb has just found
+  the item and the read that follows answers "not found", `mb connect exec`,
+  `mb connect status` and `mb doctor` now say `keychain_prompt_pending`, with
+  the repair they already name: `mb connect repair --keychain`, choosing
+  **Always Allow**. Before, that answer sent you to store the credential again.
+  A credential that is truly gone still reads as missing. Nothing is deleted or
+  renamed in your keychain. If you were told a stored credential was missing
+  after an upgrade, run `mb connect repair --keychain` before you store it
+  again (#1150).
 - Run from another folder, more suggested commands now name your business repo
   instead of acting on the folder you are in: the next actions in `mb status`
   (JSON and the plain list), the commands in `mb start` (JSON and human),
