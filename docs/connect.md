@@ -170,6 +170,23 @@ probe. Rerunning `mb connect test` records the same answer, so confirm the
 credential in the provider's own dashboard, or let the first real workflow run
 be the check.
 
+### Credential not checked
+
+`mb connect status`, `mb connect list` and `mb doctor` read every connected
+credential under one shared time budget. When that budget runs out before a
+provider is reached, the provider is not reported as a broken backend or a
+pending keychain prompt: its state is `credential_not_checked` (shown as `not
+checked`), `ok` is `false`, `stored` is `false`, and its secret reads
+`present: null`, `presence: "unknown"`, `backend_ok: true`,
+`backend_state: "not_checked"`. The summary gains `not_checked: <count>` only
+when something was not read, and `credential_backend.state` is `not_checked`
+when no credential on a backend was read. Nothing is counted in `needs_repair`;
+the suggested command is `mb connect status <provider>`, which reads that one
+credential with its own time budget, the same read `mb connect exec` does.
+A read that starts with its full budget and does not finish is still
+`credential_store_timeout`, and a macOS dialog that is really waiting is still
+`keychain_prompt_pending`.
+
 ### What the exit code means
 
 An exit code from `mb connect test`, `mb connect status`, and `mb connect
@@ -181,6 +198,7 @@ surfaces answer it the same way, so there is no lenient command to run instead.
 | `unvalidated`, `invalid`, `missing_secret`, credential-backend failure | 1 |
 | `stored, unverified` on a provider **with** a probe | 1 — run `mb connect test` |
 | `stored, unverified` on a provider **with no** probe | 0 — nothing to run |
+| `credential not checked` (see below) | 0 — nothing is known to be wrong |
 | `ready` | 0 |
 
 The table covers provider readiness. `mb connect doctor` also checks GitHub

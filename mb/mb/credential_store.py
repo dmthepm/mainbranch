@@ -29,7 +29,20 @@ CREDENTIAL_HELPER_TIMEOUT_SECONDS = 8
 INTERACTIVE_CREDENTIAL_TIMEOUT_SECONDS = 60
 KEYCHAIN_REPAIR_COMMAND = "mb connect repair --keychain"
 KEYCHAIN_REPAIR_ALL_COMMAND = "mb connect repair --keychain --all"
-HELPER_STATES = {"ready", "missing", "locked", "auth-failed", "prompt-pending", "unavailable"}
+HELPER_STATES = {
+    "ready",
+    "missing",
+    "locked",
+    "auth-failed",
+    "prompt-pending",
+    "unavailable",
+    "not-checked",
+}
+# A read that starts with less budget left than this cannot finish (helper
+# start-up, a keychain call and the helper's own exit headroom), so an
+# aggregate command reports the item as not checked instead of letting it fail
+# on the clock and read as a broken credential (#1151).
+MIN_PROBE_SECONDS = 1.5
 HELPER_OUTPUT_LIMIT = 1024 * 1024
 # The helper's own deadline ends this long before the parent stops waiting, so
 # it can finish or undo a step and stop its `security` children first.
@@ -167,13 +180,18 @@ class SecretProbe(NamedTuple):
     # macOS only: "security" when /usr/bin/security owns the item (Python
     # changes cannot prompt), "legacy" when a Python interpreter does.
     owner: str = ""
+    # True when no read happened because the command's credential budget was
+    # spent. Nothing is known about the item: it is neither present nor absent,
+    # and the backend is not known to be unhealthy (#1151).
+    not_checked: bool = False
 
     def __repr__(self) -> str:
         # The value is a secret: keep it out of repr, str and Rich's show_locals.
+        extra = ", not_checked=True" if self.not_checked else ""
         return (
             f"SecretProbe(value=<{'set' if self.value else 'empty'}>, present={self.present!r}, "
             f"backend_ok={self.backend_ok!r}, reason={self.reason!r}, "
-            f"migrated={self.migrated!r}, owner={self.owner!r})"
+            f"migrated={self.migrated!r}, owner={self.owner!r}{extra})"
         )
 
 
@@ -250,7 +268,16 @@ class SecretStore:
         *,
         deadline: float | None = None,
         interactive: bool = False,
+        allow_not_checked: bool = False,
     ) -> SecretProbe:
+        """Read one reference.
+
+        ``allow_not_checked`` is for the status commands: when a shared
+        ``deadline`` leaves too little time to read, they get a probe marked
+        ``not_checked`` rather than a failure that looks like a broken backend.
+        Every other caller gets the timeout failure it always got.
+        """
+
         if not ref:
             return SecretProbe("", False, True, "")
         if self.backend == "local-file":
@@ -267,6 +294,8 @@ class SecretStore:
         state = str(result.get("state") or "unavailable")
         if state == "missing":
             return SecretProbe("", False, True, "")
+        if state == "not-checked" and allow_not_checked:
+            return SecretProbe("", False, True, "", not_checked=True)
         if state != "ready":
             return SecretProbe("", False, False, _reason_for(self.backend, state))
         value = result.get("value")
@@ -377,7 +406,7 @@ def list_keychain_refs(*, deadline: float | None = None) -> KeychainListing:
 
 
 def _reason_for(backend: str, state: str) -> str:
-    if state == "timed-out":
+    if state in {"timed-out", "not-checked"}:
         return "credential_store_timeout"
     if state == "incompatible":
         return "backend_incompatible"
@@ -407,6 +436,7 @@ def _run_helper(
 ) -> dict[str, Any]:
     # The helper treats anything but an explicit true as non-interactive.
     payload: dict[str, Any] = {"ref": ref, "interactive": interactive is True}
+    clipped = False
     if value is not None:
         payload["value"] = value
     timeout = float(
@@ -416,13 +446,23 @@ def _run_helper(
     )
     if deadline is not None:
         remaining = deadline - time.monotonic()
+        if action == "get" and remaining < MIN_PROBE_SECONDS:
+            # Too little left to read: nothing was asked of the store.
+            return {"state": "not-checked"}
         if remaining <= 0:
             return {"state": "timed-out"}
-        timeout = min(timeout, remaining)
+        if remaining < timeout:
+            # The shared budget, not the store's own deadline, ends this read.
+            clipped = action == "get"
+            timeout = remaining
     # An absolute wall-clock deadline: the helper refuses to start a move it
     # cannot finish, and stops its own `security` calls, before this process
     # gives up on it. A pending dialog is then reported as such.
     payload["deadline_epoch"] = time.time() + timeout - HELPER_EXIT_HEADROOM_SECONDS
+    if clipped:
+        # Tells the helper that running out of time here is the command's
+        # budget ending, not a dialog waiting on a click (#1151).
+        payload["shared_budget"] = True
     try:
         returncode, stdout = _invoke_helper(
             [sys.executable, "-m", "mb._credential_helper", backend, action],
@@ -430,7 +470,7 @@ def _run_helper(
             timeout,
         )
     except subprocess.TimeoutExpired:
-        return {"state": "timed-out"}
+        return {"state": "not-checked" if clipped else "timed-out"}
     except (OSError, subprocess.SubprocessError):
         return {"state": "unavailable"}
     if len(stdout) > HELPER_OUTPUT_LIMIT:

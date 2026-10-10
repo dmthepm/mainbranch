@@ -95,6 +95,15 @@ class _PromptPending(Exception):
     """A keychain operation would have to wait on a macOS dialog."""
 
 
+class _BudgetSpent(Exception):
+    """The call's time budget ended before a `security` call could start.
+
+    Nothing was asked of the keychain, so this is not a pending dialog: it
+    reports `not-checked` (#1151). A `security` call that started and then ran
+    out of time is still `_PromptPending`.
+    """
+
+
 def _monotonic_deadline(epoch: float) -> float:
     """Turn the parent's wall-clock deadline into a monotonic one, once."""
 
@@ -102,6 +111,8 @@ def _monotonic_deadline(epoch: float) -> float:
 
 
 def _failure_state(exc: BaseException) -> str:
+    if isinstance(exc, _BudgetSpent):
+        return "not-checked"
     return "prompt-pending" if isinstance(exc, _PromptPending) else "unavailable"
 
 
@@ -220,7 +231,18 @@ def _test_keychain_path() -> str | None:
 class _MacSecurity:
     """Minimal ctypes bridge for generic-password operations."""
 
-    def __init__(self, *, interactive: bool = False, deadline: float | None = None) -> None:
+    shared_budget = False
+
+    def __init__(
+        self,
+        *,
+        interactive: bool = False,
+        deadline: float | None = None,
+        shared_budget: bool = False,
+    ) -> None:
+        # True when the parent cut this call's time short to fit a budget shared
+        # by several reads: running out of it is then not a pending dialog.
+        self.shared_budget = shared_budget
         # The parent sends a wall-clock deadline; it is turned into a monotonic
         # one once, here, so a clock change cannot stretch or shrink the budget.
         # The helper must finish, and stop every `security` child, before the
@@ -654,7 +676,7 @@ class _MacSecurity:
 
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
-            raise _PromptPending
+            raise _BudgetSpent
         try:
             if stdin is None:
                 return subprocess.run(
@@ -676,6 +698,8 @@ class _MacSecurity:
                 timeout=remaining,
             )
         except subprocess.TimeoutExpired as exc:
+            if self.shared_budget:
+                raise _BudgetSpent from exc
             raise _PromptPending from exc
 
     def _keychain_args(self) -> list[str]:
@@ -1039,6 +1063,7 @@ def _macos(action: str, payload: dict[str, Any]) -> tuple[str, str | None, bool,
     adapter = _MacSecurity(
         interactive=payload.get("interactive") is True,
         deadline=float(deadline) if isinstance(deadline, (int, float)) else None,
+        shared_budget=payload.get("shared_budget") is True,
     )
     ref = str(payload.get("ref") or "")
     if action == "health":
@@ -1060,6 +1085,8 @@ def _macos(action: str, payload: dict[str, Any]) -> tuple[str, str | None, bool,
             return adapter.delete(ref), None, False, ""
     except _PromptPending:
         return "prompt-pending", None, False, ""
+    except _BudgetSpent:
+        return "not-checked", None, False, ""
     return "unavailable", None, False, ""
 
 

@@ -25,6 +25,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb connect status`, `mb connect list` and `mb doctor` no longer report a
+  credential as `backend_unavailable` or `keychain_prompt_pending` when `mb
+  connect exec` can read it. With several connected providers the status
+  commands share one time budget, and the providers reached last ran out of it
+  and read as a broken backend. They now say `credential not checked` (nothing
+  to repair; `mb connect status <provider>` reads that one credential), and
+  `mb doctor` no longer sends anyone to the keychain repair for them. A real
+  pending prompt, a locked keychain and a slow store are reported as before.
+  See `docs/connect.md`.
 - Run from another folder, more suggested commands now name your business repo
   instead of acting on the folder you are in: the next actions in `mb status`
   (JSON and the plain list), the commands in `mb start` (JSON and human),

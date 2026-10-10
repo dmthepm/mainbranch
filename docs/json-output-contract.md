@@ -40,6 +40,12 @@ path.
   reports `ok: false` while exiting 0 for a stored-but-unverified provider that
   has no validation probe, because nothing the operator can run would change it;
   see [connect.md](connect.md#what-the-exit-code-means).
+  A provider with `state: credential_not_checked` is the same kind of case:
+  `mb connect status`, `list` and `mb doctor` ran out of their shared credential
+  read time before reaching it, so `ok` is `false`, nothing is reported broken,
+  and the exit code does not fail. `summary.not_checked` appears in
+  `mb connect status --json` only when at least one provider was not checked;
+  see [connect.md](connect.md#credential-not-checked).
 - `result_status`: concise machine-readable envelope state, currently `ok` or
   `error`. Commands may still expose their own domain `status` field with
   command-specific values such as `ready`, `valid`, `committed`, or structured
