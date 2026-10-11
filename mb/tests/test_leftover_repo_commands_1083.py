@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from mb import checkpoint, connect, onboard
+from mb import connect, onboard
 from mb.cli import app
 from mb.init import run as init_run
 
@@ -44,19 +44,27 @@ def _flag(business: Path) -> str:
     return f"--repo {shlex.quote(str(business))}"
 
 
+def _hook_status_command(business: Path) -> dict:
+    result = runner.invoke(app, ["checkpoint", "--repo", str(business), "--hook-status", "--json"])
+    payload: dict = json.loads(result.stdout)
+    return payload
+
+
+def _hook_repair(business: Path) -> str:
+    return str(_hook_status_command(business)["repair_command"])
+
+
 def test_hook_status_repair_command_names_the_business(business: Path) -> None:
-    status = checkpoint.hook_status(business)
-    assert status["state"] == "missing"
-    assert status["repair_command"] == f"mb checkpoint {_flag(business)} --install-hook"
+    assert _hook_status_command(business)["state"] == "missing"
+    assert _hook_repair(business) == f"mb checkpoint {_flag(business)} --install-hook"
 
 
 def test_blocked_hook_repair_command_names_the_business(business: Path) -> None:
     hook = business / ".git" / "hooks" / "commit-msg"
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    status = checkpoint.hook_status(business)
-    assert status["state"] == "blocked_existing_hook"
-    assert status["repair_command"] == (
+    assert _hook_status_command(business)["state"] == "blocked_existing_hook"
+    assert _hook_repair(business) == (
         f"review .git/hooks/commit-msg, then run mb checkpoint {_flag(business)} --install-hook"
     )
 
@@ -65,10 +73,10 @@ def test_hook_status_inside_the_repo_keeps_its_bare_commands(
     business: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(business)
-    assert checkpoint.hook_status(business)["repair_command"] == "mb checkpoint --install-hook"
+    assert _hook_repair(business) == "mb checkpoint --install-hook"
     hook = business / ".git" / "hooks" / "commit-msg"
     hook.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    assert checkpoint.hook_status(business)["repair_command"] == (
+    assert _hook_repair(business) == (
         "review .git/hooks/commit-msg, then run mb checkpoint --install-hook"
     )
 

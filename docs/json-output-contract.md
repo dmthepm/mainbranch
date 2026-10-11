@@ -237,8 +237,9 @@ to the Codex `operator_actions` entries of `mb doctor repair` and `mb init`
 (`codex-agents-md`, `codex-global-kept`, including their `manual_step`), and
 to the `repair` and `repair_command` strings in the Codex status blocks
 (`codex_cli` in `mb status` and `mb start`, the Codex checks in `mb doctor`)
-(#1072). The command fields below follow the same rule, and JSON keys are
-unchanged; only the command values gain the flag: `next_actions` (`mb update`, `mb update --check`, the plan
+(#1072). Only the command fields listed below follow the same rule; `raw.*`,
+`actions[].result` and `applied_actions[].result` are diagnostic copies and are
+never rewritten. JSON keys are unchanged; only the command values gain the flag: `next_actions` (`mb update`, `mb update --check`, the plan
 command), the plugin-rail switch (`mb skill link --repo <path> --plugin`),
 the retry and package-upgrade prose in `warnings`, and doctor's
 `actions[].command`, `sections[].actions[].command`,
@@ -312,6 +313,21 @@ way, from another folder, once the report is built: the fields above wherever
 `mb start` carries them (`update`, `runtime.skill_wiring`, `books.next_command`,
 `ranked_actions[].command`, `readiness`) and its own top-level `next_actions[]`.
 A launch has already run when this happens, so what ran is never rewritten.
+
+Commands that print their own suggestions name the repo the same way, from
+another folder (#1083): `mb checkpoint --hook-status` (`repair_command`, including
+"review .git/hooks/commit-msg, then run `mb checkpoint --repo <path>
+--install-hook`"), `checkpoint_hook_repair` in the onboarding setup facts, the
+`mb onboard plan` hint in `mb onboard status`, and the `mb connect hydrate`
+`repair` and `repair_command` of a provider that exists in user scope but is not
+hydrated in that workspace. In `mb status` and `mb start`, the repair text
+"Run `mb doctor repair --repo <path> --plan` ... `--apply`" no longer ends with
+"from the business repo", since the command names it. Inside the repo these keep
+their existing spelling, including `mb connect hydrate --repo .`. Still bare, as
+written: the nested-backtick "Next:" sentence in `mb start`'s `next_actions`
+(the same text from inside the repo), `daily_state.source_command` (what ran),
+and the suggestions printed by `mb validate`, `mb migrate`, `mb books` and
+`mb skill link`.
 
 `mb doctor --json` adds a `claude-status-line` entry to `checks[]` only when the
 business repo's `CLAUDE.md` still has the pre-#1121 list item "Status field:"

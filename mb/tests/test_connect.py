@@ -2628,6 +2628,7 @@ def test_connect_user_scope_custom_provider_hydrates_and_reads(tmp_path: Path, m
     assert Path(connected["user_scope_path"]).exists()
     assert secret not in Path(connected["user_scope_path"]).read_text(encoding="utf-8")
 
+    monkeypatch.chdir(disposable)  # inside the workspace the command stays bare
     before = connect_mod.status_all(disposable)
     assert before["summary"]["configured"] == 1
     assert before["providers"][0]["provider"] == "mercury"

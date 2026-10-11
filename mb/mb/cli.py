@@ -3577,6 +3577,11 @@ def checkpoint_cmd(
         result = checkpoint_mod.uninstall_commit_hook(repo=repo)
     elif hook_status:
         result = checkpoint_mod.hook_status(repo=repo)
+        # The report is shared with doctor and onboarding, which name the repo themselves.
+        if isinstance(result.get("repair_command"), str):
+            result["repair_command"] = doctor_mod._qualify_field(
+                result["repair_command"], Path(repo).expanduser()
+            )
     elif validate:
         validation_message = sys.stdin.read() if validate == "-" else validate
         result = checkpoint_mod.validate_message(validation_message)
