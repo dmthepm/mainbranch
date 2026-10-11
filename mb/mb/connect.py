@@ -75,6 +75,12 @@ BACKEND_FAILURE_STATE = "backend_unavailable"
 # it works. Distinct from `unvalidated` ("`mb connect test` has not been run"):
 # running the test again cannot clear this state when the provider has no probe.
 UNVERIFIED_STATE = "stored_unverified"
+# An aggregate command (`mb connect status`/`list`, `mb doctor`) ran out of its
+# shared credential budget before it could read this credential. Nothing is
+# known, so nothing is reported broken and nothing is suggested for repair; a
+# single-provider `mb connect status <id>` gets its own budget (#1151).
+NOT_CHECKED_STATE = "credential_not_checked"
+NOT_CHECKED_BACKEND_STATE = "not_checked"
 
 
 # Providers with a real read-only probe in `_validate_with_provider`. Kept as
@@ -140,6 +146,9 @@ def provider_needs_action(item: dict[str, Any]) -> bool:
     test, replace the credential, or fix the backend.
     """
     if item.get("ok"):
+        return False
+    if item.get("state") == NOT_CHECKED_STATE:
+        # Nothing is known to be wrong, so there is nothing to fix.
         return False
     if item.get("state") == UNVERIFIED_STATE:
         # A status item carries `has_probe`, computed from its entry, which is
@@ -1212,6 +1221,27 @@ def _unverified_repair(provider: Provider) -> dict[str, str]:
     }
 
 
+def _not_checked_repair(provider: Provider) -> dict[str, str]:
+    """Guidance for a credential an aggregate command did not get to read.
+
+    Not a repair: nothing is known to be wrong. The one useful step is a
+    single-provider status, which has its own credential budget.
+    """
+
+    command = f"mb connect status {provider.id}"
+    return {
+        "summary": (
+            f"{provider.name} credential not checked: this command ran out of its "
+            "credential-read time before reaching it. Nothing is known to be wrong."
+        ),
+        "repair": (
+            f"Nothing to repair. Run `{command}` to check this one credential on its own; "
+            f"`mb connect exec {provider.id}` reads it the same way."
+        ),
+        "repair_command": command,
+    }
+
+
 def _google_grant_repair(*, gone: bool, readable: bool) -> dict[str, str]:
     """Status's next step when the recorded Google sign-in grant cannot mint a token."""
 
@@ -1249,6 +1279,8 @@ def _repair(
             "repair": detail["repair"],
             "repair_command": detail["repair_command"],
         }
+    if state == NOT_CHECKED_STATE:
+        return _not_checked_repair(provider)
     validation = validation or {}
     validation_repair = str(validation.get("repair") or "")
     validation_repair_command = str(validation.get("repair_command") or "")
@@ -2224,8 +2256,8 @@ def _secret_statuses(
         backend = str(raw.get("backend") or "local-file")
         probe = probes.get(field) if probes is not None else None
         if probe is None:
-            probe = _probe_secret_ref(backend, ref, deadline=deadline)
-        if not probe.present:
+            probe = _probe_secret_ref(backend, ref, deadline=deadline, allow_not_checked=True)
+        if not probe.present and not probe.not_checked:
             missing.append(field)
         secrets[field] = {
             "present": _present_value(probe),
@@ -2233,7 +2265,7 @@ def _secret_statuses(
             "ref": ref,
             "backend": backend,
             "backend_ok": probe.backend_ok,
-            "backend_state": probe.reason or "ready",
+            "backend_state": _probe_backend_state(probe),
         }
     for field in provider.optional_secrets:
         raw = stored_secrets.get(field) if isinstance(stored_secrets, dict) else None
@@ -2246,16 +2278,20 @@ def _secret_statuses(
         backend = str(raw.get("backend") or "local-file")
         probe = probes.get(field) if probes is not None else None
         if probe is None:
-            probe = _probe_secret_ref(backend, ref, deadline=deadline)
+            probe = _probe_secret_ref(backend, ref, deadline=deadline, allow_not_checked=True)
         secrets[field] = {
             "present": _present_value(probe),
             "presence": _secret_presence(probe),
             "ref": ref,
             "backend": backend,
             "backend_ok": probe.backend_ok,
-            "backend_state": probe.reason or "ready",
+            "backend_state": _probe_backend_state(probe),
             "optional": True,
         }
+        if field == GOOGLE_OAUTH_GRANT_SLOT and probe.not_checked:
+            # Not read, so nothing is known about the grant: no `readable` or
+            # `usable` claim, and it is not counted as gone.
+            continue
         if field == GOOGLE_OAUTH_GRANT_SLOT:
             from mb import google_connect
 
@@ -2328,10 +2364,26 @@ def _credential_mode(provider: Provider, entry: dict[str, Any]) -> dict[str, Any
     }
 
 
+def _probe_backend_state(probe: SecretProbe) -> str:
+    if probe.not_checked:
+        return NOT_CHECKED_BACKEND_STATE
+    return probe.reason or "ready"
+
+
+def _secrets_not_checked(secrets: dict[str, Any]) -> list[str]:
+    """Slots an aggregate command did not get to read (see ``NOT_CHECKED_STATE``)."""
+
+    return [
+        field
+        for field, raw in secrets.items()
+        if isinstance(raw, dict) and raw.get("backend_state") == NOT_CHECKED_BACKEND_STATE
+    ]
+
+
 def _secret_presence(probe: SecretProbe) -> str:
     """``present``, ``absent``, or ``unknown`` when the backend could not answer."""
 
-    if not probe.backend_ok:
+    if not probe.backend_ok or probe.not_checked:
         return "unknown"
     return "present" if probe.present else "absent"
 
@@ -2344,7 +2396,7 @@ def _present_value(probe: SecretProbe) -> bool | None:
     secret (#976). ``presence`` carries the same fact as a string.
     """
 
-    return probe.present if probe.backend_ok else None
+    return probe.present if probe.backend_ok and not probe.not_checked else None
 
 
 def _probe_secret_ref(
@@ -2353,11 +2405,17 @@ def _probe_secret_ref(
     *,
     deadline: float | None = None,
     interactive: bool = False,
+    allow_not_checked: bool = False,
 ) -> SecretProbe:
     """Probe stored metadata without letting a foreign backend crash status."""
 
     try:
-        return SecretStore(backend).probe(ref, deadline=deadline, interactive=interactive)
+        return SecretStore(backend).probe(
+            ref,
+            deadline=deadline,
+            interactive=interactive,
+            allow_not_checked=allow_not_checked,
+        )
     except (CredentialStoreError, ValueError):
         return SecretProbe("", False, False, "backend_incompatible")
 
@@ -2379,6 +2437,7 @@ def _unhydrated_status(
     raw_metadata = entry.get("metadata")
     metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
     backend_reason = _backend_failure_reason(secrets)
+    not_checked = _secrets_not_checked(secrets)
     if backend_reason:
         state = BACKEND_FAILURE_STATE
         repair = _repair(provider, state, missing, None, backend_reason)
@@ -2386,6 +2445,10 @@ def _unhydrated_status(
     elif missing:
         repair = _repair(provider, "missing_secret", missing, entry=entry, secrets=secrets)
         state = "missing_secret"
+        ok = False
+    elif not_checked:
+        state = NOT_CHECKED_STATE
+        repair = _repair(provider, state)
         ok = False
     else:
         repair = {
@@ -2406,7 +2469,10 @@ def _unhydrated_status(
         "configured": True,
         "ok": ok,
         "state": state,
-        "stored": bool(provider.required_secrets) and not missing and not backend_reason,
+        "stored": bool(provider.required_secrets)
+        and not missing
+        and not backend_reason
+        and not not_checked,
         **_credential_mode(provider, entry),
         "has_probe": has_provider_probe(provider.id, entry),
         "provider_verified": _provider_verified(stored_validation),
@@ -2495,7 +2561,9 @@ def status_provider(
         backend = str(raw_secret.get("backend") or "local-file")
         probe = _secret_probes.get("access_token") if _secret_probes is not None else None
         if probe is None:
-            probe = _probe_secret_ref(backend, ref, deadline=_credential_deadline)
+            probe = _probe_secret_ref(
+                backend, ref, deadline=_credential_deadline, allow_not_checked=True
+            )
         secret_present = probe.present
         meta_backend_reason = "" if probe.backend_ok else (probe.reason or "keychain_unavailable")
         meta_stored = bool(secret_present and not meta_backend_reason)
@@ -2508,6 +2576,9 @@ def status_provider(
             ok = False
         elif meta_backend_reason:
             state = BACKEND_FAILURE_STATE
+            ok = False
+        elif probe.not_checked:
+            state = NOT_CHECKED_STATE
             ok = False
         elif not secret_present:
             state = "missing_secret"
@@ -2538,7 +2609,7 @@ def status_provider(
         repair = _repair(
             provider,
             state,
-            ["access_token"] if not secret_present else [],
+            ["access_token"] if not secret_present and not probe.not_checked else [],
             meta_validation,
             meta_backend_reason,
         )
@@ -2566,7 +2637,7 @@ def status_provider(
                     "ref": ref,
                     "backend": backend,
                     "backend_ok": probe.backend_ok,
-                    "backend_state": probe.reason or "ready",
+                    "backend_state": _probe_backend_state(probe),
                 }
             },
             "last_checked_at": str(raw_entry.get("last_checked_at") or ""),
@@ -2633,14 +2704,20 @@ def status_provider(
     raw_validation = entry.get("validation")
     validation: dict[str, Any] = raw_validation if isinstance(raw_validation, dict) else {}
     backend_reason = _backend_failure_reason(secrets)
+    not_checked = _secrets_not_checked(secrets)
     # "stored" is about credential material only: a provider that needs no
     # secret (hledger) has nothing stored, even though it can still be ready.
-    stored = bool(provider.required_secrets) and not missing and not backend_reason
+    stored = (
+        bool(provider.required_secrets) and not missing and not backend_reason and not not_checked
+    )
     if backend_reason:
         state = BACKEND_FAILURE_STATE
         ok = False
     elif missing:
         state = "missing_secret"
+        ok = False
+    elif not_checked:
+        state = NOT_CHECKED_STATE
         ok = False
     elif not provider.required_secrets:
         state = "ready"
@@ -4583,14 +4660,33 @@ def status_all(
     # yet (#991): it is configured and reports `missing_secret` to act on.
     connected = [item for item in providers if item.get("configured", item["connected"])]
     unverified = [item for item in connected if item["state"] == UNVERIFIED_STATE]
+    # Not read for want of credential budget: nothing is known to be wrong, so
+    # it is never counted as broken, but `ok` still refuses to call it healthy.
+    not_checked = [item for item in connected if item["state"] == NOT_CHECKED_STATE]
     # A stored-but-unverified provider is not broken: nothing is known to be
     # wrong with it and no repair command would change that. Counting it
     # separately keeps `needs_repair` meaning "there is something to fix",
     # while `ok` still refuses to call the repo fully healthy.
-    broken = [item for item in connected if not item["ok"] and item["state"] != UNVERIFIED_STATE]
+    broken = [
+        item
+        for item in connected
+        if not item["ok"] and item["state"] not in {UNVERIFIED_STATE, NOT_CHECKED_STATE}
+    ]
     unvalidated = [item for item in connected if item["state"] == "unvalidated"]
+    summary = {
+        "configured": len(connected),
+        "healthy": len([item for item in connected if item["ok"]]),
+        "needs_repair": len(broken),
+        "unvalidated": len(unvalidated),
+        "unverified": len(unverified),
+        "actionable": len([item for item in connected if provider_needs_action(item)]),
+    }
+    if not_checked:
+        # Only present when something was not read, so every other status
+        # output keeps exactly the keys it had.
+        summary["not_checked"] = len(not_checked)
     return {
-        "ok": not broken and not unverified,
+        "ok": not broken and not unverified and not not_checked,
         "repo": str(target),
         "config_path": str(_checked_config_path(target)),
         "repo_id": repo_id,
@@ -4599,14 +4695,7 @@ def status_all(
         "github": github or github_context(target),
         "credential_backend": _status_backend_health(providers, deadline=deadline),
         "safe_to_share": True,
-        "summary": {
-            "configured": len(connected),
-            "healthy": len([item for item in connected if item["ok"]]),
-            "needs_repair": len(broken),
-            "unvalidated": len(unvalidated),
-            "unverified": len(unverified),
-            "actionable": len([item for item in connected if provider_needs_action(item)]),
-        },
+        "summary": summary,
     }
 
 
@@ -4852,7 +4941,11 @@ def doctor_check(repo: str | Path = ".", *, status: dict[str, Any] | None = None
             "safe_to_share": True,
         }
     if summary["needs_repair"]:
-        repairs = [item for item in status["providers"] if not item["ok"]]
+        repairs = [
+            item
+            for item in status["providers"]
+            if not item["ok"] and item["state"] != NOT_CHECKED_STATE
+        ]
         # A broken credential backend explains every other provider failure,
         # so it leads the briefing instead of a per-provider reconnect.
         repairs.sort(key=lambda item: item["state"] != BACKEND_FAILURE_STATE)
@@ -4876,6 +4969,22 @@ def doctor_check(repo: str | Path = ".", *, status: dict[str, Any] | None = None
             "severity": "warn",
             "repair": str(first.get("repair") or "Run `mb connect doctor`."),
             "repair_command": str(first.get("repair_command") or "mb connect doctor"),
+            "safe_to_share": True,
+        }
+    if summary.get("not_checked"):
+        skipped = [item for item in status["providers"] if item["state"] == NOT_CHECKED_STATE]
+        names = ", ".join(item["provider"] for item in skipped[:3])
+        return {
+            "name": "integration-credentials",
+            "ok": False,
+            "detail": (
+                f"{summary['not_checked']} of {summary['configured']} connected provider(s) "
+                f"not checked ({names}): this command ran out of credential-read time. "
+                "Nothing is known to be wrong."
+            ),
+            "severity": "info",
+            "repair": str(skipped[0].get("repair") or ""),
+            "repair_command": str(skipped[0].get("repair_command") or ""),
             "safe_to_share": True,
         }
     if summary.get("unverified"):
@@ -4955,6 +5064,27 @@ def _configured_credential_backends(status: dict[str, Any]) -> list[str]:
     return sorted(backends)
 
 
+def _backends_never_read(providers: list[Any]) -> list[str]:
+    """Backends with recorded credentials where none of them was read."""
+
+    read: set[str] = set()
+    skipped: set[str] = set()
+    for raw_provider in providers:
+        provider = raw_provider if isinstance(raw_provider, dict) else {}
+        raw_secrets = provider.get("secrets")
+        secrets = raw_secrets if isinstance(raw_secrets, dict) else {}
+        for raw_secret in secrets.values():
+            secret = raw_secret if isinstance(raw_secret, dict) else {}
+            backend = str(secret.get("backend") or "")
+            if not backend or not secret.get("ref"):
+                continue
+            if secret.get("backend_state") == NOT_CHECKED_BACKEND_STATE:
+                skipped.add(backend)
+            else:
+                read.add(backend)
+    return sorted(skipped - read)
+
+
 def _configured_backend_health(status: dict[str, Any]) -> dict[str, Any] | None:
     backends = _configured_credential_backends(status)
     if not backends:
@@ -4983,6 +5113,22 @@ def _configured_backend_health(status: dict[str, Any]) -> dict[str, Any] | None:
     # The per-provider probes already proved each configured backend answered.
     # Re-probing here would multiply the command's native-store deadline.
     names = ", ".join(backends)
+    unread = _backends_never_read(providers)
+    if unread:
+        # Only a read proves a backend answered. A backend whose every
+        # recorded credential went unread has not been asked at all.
+        return {
+            "backend": names,
+            "ok": True,
+            "state": NOT_CHECKED_BACKEND_STATE,
+            "summary": (
+                f"Credential backend(s) not checked this time: {', '.join(unread)}. "
+                "Nothing is known to be wrong."
+            ),
+            "repair": "",
+            "repair_command": "",
+            "safe_to_share": True,
+        }
     return {
         "backend": names,
         "ok": True,
@@ -5442,6 +5588,8 @@ def render_plan(result: dict[str, Any]) -> None:
 
 def state_label(state: str) -> str:
     """Human phrasing for a provider state. JSON keeps the machine value."""
+    if state == NOT_CHECKED_STATE:
+        return "not checked"
     return "stored, unverified" if state == UNVERIFIED_STATE else state
 
 
@@ -5454,6 +5602,8 @@ def render_status(result: dict[str, Any]) -> None:
     )
     if summary.get("unverified"):
         line += f"  unverified: {summary['unverified']}"
+    if summary.get("not_checked"):
+        line += f"  not checked: {summary['not_checked']}"
     print(line)
     github = result.get("github") or {}
     if github:

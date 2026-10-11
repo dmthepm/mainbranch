@@ -4275,10 +4275,16 @@ def _drift(report: dict[str, Any]) -> dict[str, Any]:
     unverified_integrations = [
         item for item in connected_integrations if item.get("state") == connect_mod.UNVERIFIED_STATE
     ]
+    not_checked_integrations = [
+        item
+        for item in connected_integrations
+        if item.get("state") == connect_mod.NOT_CHECKED_STATE
+    ]
     broken_integrations = [
         item
         for item in connected_integrations
-        if not item.get("ok") and item.get("state") != connect_mod.UNVERIFIED_STATE
+        if not item.get("ok")
+        and item.get("state") not in {connect_mod.UNVERIFIED_STATE, connect_mod.NOT_CHECKED_STATE}
     ]
     if unverified_integrations:
         items.append(
@@ -4293,6 +4299,22 @@ def _drift(report: dict[str, Any]) -> dict[str, Any]:
                     f"{item['provider']}:{item['state']}" for item in unverified_integrations[:5]
                 ],
                 "repair": str(unverified_integrations[0].get("repair") or ""),
+                "safe_to_share": True,
+            }
+        )
+    if not_checked_integrations:
+        items.append(
+            {
+                "id": "integrations_not_checked",
+                "severity": "info",
+                "summary": (
+                    f"{len(not_checked_integrations)} declared integration(s) were not checked: "
+                    "this command ran out of credential-read time. Nothing is known to be wrong."
+                ),
+                "evidence": [
+                    f"{item['provider']}:{item['state']}" for item in not_checked_integrations[:5]
+                ],
+                "repair": str(not_checked_integrations[0].get("repair_command") or ""),
                 "safe_to_share": True,
             }
         )
@@ -4511,7 +4533,7 @@ def _readiness(report: dict[str, Any]) -> dict[str, Any]:
         for item in (report.get("integrations") or {}).get("providers", [])
         if item.get("configured", item.get("connected"))
         and not item["ok"]
-        and item.get("state") != connect_mod.UNVERIFIED_STATE
+        and item.get("state") not in {connect_mod.UNVERIFIED_STATE, connect_mod.NOT_CHECKED_STATE}
     ]
     for item in integration_repairs[:3]:
         command = str(item.get("repair_command") or "mb connect doctor")

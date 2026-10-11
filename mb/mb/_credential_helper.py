@@ -91,8 +91,23 @@ TEST_CRASH_ENV = "MB_CREDENTIAL_TEST_CRASH_AT"
 _SAFE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9:/._@+_-]{0,511}")
 
 
+# A `security` read is not started with less than this left (#1151).
+MIN_READ_SECONDS = 1.0
+
+
 class _PromptPending(Exception):
     """A keychain operation would have to wait on a macOS dialog."""
+
+
+class _BudgetSpent(Exception):
+    """The call's time budget ended before a `security` call could start.
+
+    Nothing was asked of the keychain, so this is not a pending dialog: it
+    reports `not-checked` (#1151). A `security` call that started and then ran
+    out of time is `_PromptPending`, and is never asked again: a read starts
+    only with at least `MIN_READ_SECONDS` left, which a trusted item answers
+    in milliseconds, so a call that used that time is a real dialog.
+    """
 
 
 def _monotonic_deadline(epoch: float) -> float:
@@ -102,6 +117,8 @@ def _monotonic_deadline(epoch: float) -> float:
 
 
 def _failure_state(exc: BaseException) -> str:
+    if isinstance(exc, _BudgetSpent):
+        return "not-checked"
     return "prompt-pending" if isinstance(exc, _PromptPending) else "unavailable"
 
 
@@ -219,6 +236,9 @@ def _test_keychain_path() -> str | None:
 
 class _MacSecurity:
     """Minimal ctypes bridge for generic-password operations."""
+
+    # Set once a `security` call started and timed out in this helper call.
+    dialog_started = False
 
     def __init__(self, *, interactive: bool = False, deadline: float | None = None) -> None:
         # The parent sends a wall-clock deadline; it is turned into a monotonic
@@ -644,7 +664,9 @@ class _MacSecurity:
 
     # -- Items created by Apple-signed /usr/bin/security ---------------------
 
-    def _security_tool(self, args: list[str], *, stdin: str | None = None) -> Any:
+    def _security_tool(
+        self, args: list[str], *, stdin: str | None = None, min_seconds: float = 0.0
+    ) -> Any:
         """Run ``/usr/bin/security`` within the remaining budget.
 
         ``security`` cannot be told to fail instead of showing a dialog, so the
@@ -653,8 +675,12 @@ class _MacSecurity:
         """
 
         remaining = self.deadline - time.monotonic()
-        if remaining <= 0:
-            raise _PromptPending
+        if remaining <= 0 or remaining < min_seconds:
+            # Invariant: a helper call that started a `security` call which
+            # timed out never answers `not-checked`. The dialog was already
+            # shown, so a later read (the item after its staged copy) that
+            # finds no time is pending too, never "not started" (#1151).
+            raise _PromptPending if self.dialog_started else _BudgetSpent
         try:
             if stdin is None:
                 return subprocess.run(
@@ -676,6 +702,7 @@ class _MacSecurity:
                 timeout=remaining,
             )
         except subprocess.TimeoutExpired as exc:
+            self.dialog_started = True
             raise _PromptPending from exc
 
     def _keychain_args(self) -> list[str]:
@@ -683,7 +710,8 @@ class _MacSecurity:
 
     def _security_get(self, ref: str) -> tuple[str, str | None]:
         completed = self._security_tool(
-            ["find-generic-password", "-s", SERVICE_NAME, "-a", ref, "-g", *self._keychain_args()]
+            ["find-generic-password", "-s", SERVICE_NAME, "-a", ref, "-g", *self._keychain_args()],
+            min_seconds=MIN_READ_SECONDS,
         )
         if completed.returncode != 0:
             return ("missing" if completed.returncode == 44 else "unavailable"), None
@@ -1084,6 +1112,8 @@ def _macos(action: str, payload: dict[str, Any]) -> tuple[str, str | None, bool,
             return adapter.delete(ref), None, False, ""
     except _PromptPending:
         return "prompt-pending", None, False, ""
+    except _BudgetSpent:
+        return "not-checked", None, False, ""
     return "unavailable", None, False, ""
 
 

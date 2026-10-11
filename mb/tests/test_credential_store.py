@@ -657,7 +657,9 @@ def test_status_all_shares_one_aggregate_credential_deadline(
         provider["secrets"][next(iter(provider["secrets"]))]["backend_state"]
         for provider in status["providers"]
     }
-    assert states == {"keychain_unavailable", "credential_store_timeout"}
+    # The provider the spent budget never reached is not checked, not a broken
+    # store (#1151); the one that was read still reports what the store said.
+    assert states == {"keychain_unavailable", "not_checked"}
 
 
 def test_token_stdin_and_stdout_preserve_whitespace(

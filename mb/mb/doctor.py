@@ -465,6 +465,7 @@ def _spine_section(repo: Path) -> dict[str, Any]:
             "unvalidated",
             "ready",
             connect_mod.UNVERIFIED_STATE,
+            connect_mod.NOT_CHECKED_STATE,
         }:
             checks.append(
                 {

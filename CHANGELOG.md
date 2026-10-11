@@ -25,6 +25,20 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb connect status`, `mb connect list` and `mb doctor` no longer report a
+  credential as `backend_unavailable` or `keychain_prompt_pending` when `mb
+  connect exec` can read it. With several connected providers the status
+  commands share one time budget, and the providers reached last ran out of it
+  and read as a broken backend. They now say `credential not checked` (nothing
+  to repair; `mb connect status <provider>` reads that one credential), and
+  `mb doctor` no longer sends anyone to the keychain repair for them. A real
+  pending prompt, a locked keychain and a slow store are reported as before:
+  a read the shared budget cut short, and that did not finish, is
+  read once more with a full budget before it is believed. A keychain dialog is
+  shown at most once per run, a leftover staged copy included, and is never
+  asked again. Worst-case `mb status`
+  time is about one extra full budget (about 16 s instead of about 8 s).
+  See `docs/connect.md`.
 - `mb connect`: storing a new secret for a provider that is already connected
   no longer wipes its account label and metadata. The label and every metadata
   key stay unless you pass new ones: `--account "X"` replaces the label,
