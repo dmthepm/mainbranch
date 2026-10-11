@@ -2209,7 +2209,8 @@ def _reconnect_changes(
 ) -> dict[str, Any]:
     """Which recorded fields a re-stored secret kept, replaced or cleared.
 
-    Names only, never values; a key that looks like a secret is left out.
+    Names only, never values. A key whose name suggests a secret, or that is
+    itself secret-shaped (a hand-edited config), is left out, as in status.
     """
 
     previous_label = str(prior_entry.get("account_label") or "")
@@ -2233,7 +2234,11 @@ def _reconnect_changes(
     return {
         "account_label": label_change,
         "metadata": {
-            name: [key for key in keys if not _metadata_key_looks_sensitive(key)]
+            name: [
+                key
+                for key in keys
+                if not (_metadata_key_looks_sensitive(key) or metadata_value_rule(key))
+            ]
             for name, keys in shown.items()
         },
     }
