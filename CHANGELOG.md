@@ -36,7 +36,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   program is still not protected. If Main Branch cannot create its lock file
   under `~/.mainbranch/locks`, the command stops the same way with state
   `credential_lock_unavailable`, so repo-scope connects now need that folder
-  to be writable.
+  to be writable. On native Windows (experimental), which has no such file
+  locking, storing a token with these commands now stops the same way; use
+  WSL2 to connect providers there.
 - `mb connect --scope user` no longer replaces a stored credential it could not
   read, and its rollback after a failed save of the user-scope file no longer
   deletes a credential it cannot prove it just stored. An unreadable existing
