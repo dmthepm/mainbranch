@@ -8,6 +8,7 @@ import pytest
 
 from mb import __version__
 from mb import codex as codex_mod
+from mb import engine as engine_mod
 
 
 @pytest.fixture()
@@ -84,5 +85,27 @@ def stable_runtime_mb_probe(monkeypatch: pytest.MonkeyPatch) -> None:
             "summary": "Login-shell runtime resolves the current mb command.",
             "repair": "",
             "safe_to_share": True,
+        },
+    )
+
+
+@pytest.fixture(autouse=True)
+def no_installed_mb_version_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never run a real ``mb --version`` from a test.
+
+    `mb doctor` and the migration lint list every ``mb`` on PATH and ask each
+    for its version. Unstubbed, every such test starts the contributor's own
+    installed ``mb`` (a full interpreter start), which under parallel workers
+    loads the host heavily. Tests that check the version probe set their own.
+    """
+
+    monkeypatch.setattr(
+        engine_mod,
+        "_mb_binary_version",
+        lambda path, **_: {
+            "ok": True,
+            "version": __version__,
+            "output": f"mb {__version__}",
+            "error": "",
         },
     )
