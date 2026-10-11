@@ -23,6 +23,7 @@ from mb import connect as connect_mod
 from mb.cli import app
 from mb.credential_store import _read_local_secrets
 from tests.test_google_connect import (  # noqa: F401 (fixtures are used by name)
+    client_file,
     google_env,
     loopback_only_network,
     repo,
@@ -113,9 +114,12 @@ c.connect_provider("stripe", repo=sys.argv[3], token=sys.argv[4], scope="user")
 def test_a_second_process_is_refused_while_the_first_holds_the_credential(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from mb import credential_lock
+    try:  # absent on the base commit, where this test must fail on the race itself
+        from mb import credential_lock
 
-    monkeypatch.setattr(credential_lock, "LOCK_WAIT_SECONDS", 0.3)
+        monkeypatch.setattr(credential_lock, "LOCK_WAIT_SECONDS", 0.3)
+    except ImportError:
+        pass
     ready, release = tmp_path / "ready", tmp_path / "release"
     holder = subprocess.Popen(
         [sys.executable, "-c", _HOLDER, str(ready), str(release), str(repo), FIRST],
@@ -182,3 +186,42 @@ def test_an_unwritable_lock_folder_refuses_and_stores_nothing(repo: Path, tmp_pa
     finally:
         home.chmod(0o700)
     assert LATER not in _items()
+
+
+def test_a_google_sign_in_is_refused_while_another_process_holds_its_credential(
+    repo: Path, client_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import fcntl
+    import hashlib
+
+    from mb import credential_lock
+    from mb import google_connect as gc
+    from mb import google_oauth as go
+
+    monkeypatch.setattr(credential_lock, "LOCK_WAIT_SECONDS", 0.3)
+    monkeypatch.setattr(
+        gc,
+        "_sign_in",
+        lambda *a, **k: {
+            "refresh_token": "r",
+            "access_token": "a",
+            "scope": " ".join(go.SCOPES),
+        },
+    )
+    config = connect_mod._read_config(repo)
+    ref = connect_mod._secret_ref(
+        connect_mod._ensure_repo_id(config, repo), "google", gc.GRANT_SLOT
+    )
+    lock_dir = connect_mod._home() / credential_lock.LOCK_DIR_NAME
+    lock_dir.mkdir(parents=True)
+    name = hashlib.sha256(ref.encode()).hexdigest()[:32] + ".lock"
+    fd = os.open(lock_dir / name, os.O_CREAT | os.O_RDWR, 0o600)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    try:
+        with pytest.raises(gc.GoogleConnectError) as caught:
+            gc.bootstrap(repo, client_json=client_file.read_text(), scope="repo")
+    finally:
+        os.close(fd)
+    assert caught.value.state == "credential_busy"
+    assert "Nothing was stored" in str(caught.value)
+    assert _items() == []

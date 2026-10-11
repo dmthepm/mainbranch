@@ -1209,12 +1209,14 @@ access will remain available.
 `mb connect <provider> --token-stdin`, `mb connect rotate` and `mb connect
 google --oauth` hold a lock on the credential from the moment they read its
 previous value until the record is written or the rollback is done, so only one
-`mb` process at a time saves a given credential, in repo and user scope. A
+`mb` process at a time saves a given credential through those three commands,
+in repo and user scope. A
 second command waits about five seconds, then stops before it writes anything,
 says "Another mb connect is saving the <Provider> credential right now. Nothing
 was stored. Try again in a moment.", and exits 1 (`--json` state
-`credential_busy`). The lock is a file under `~/.mainbranch/locks` named from a
-hash of the credential's reference. If that folder cannot be written, the
-command stops the same way (state `credential_lock_unavailable`) rather than
-saving without the lock. The lock stops `mb` from racing itself; it does not
-stop another program, or you, from editing the same credential in the store.
+`credential_busy`). The lock is a file under `$MAINBRANCH_HOME/locks` (default
+`~/.mainbranch/locks`) named from a hash of the credential's reference. If that folder cannot be written, or the
+platform has no file locking (Windows), the command stops the same way (state `credential_lock_unavailable`) rather than
+saving without the lock. The lock stops those commands from racing each other; it does not
+stop any other `mb` command, another program, or you from editing the same
+credential in the store.

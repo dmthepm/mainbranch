@@ -12,13 +12,17 @@ Lock files are never deleted: two processes must always lock the same inode.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # no flock on this platform: refuse rather than save unlocked
+    fcntl = None  # type: ignore[assignment]
 
 LOCK_DIR_NAME = "locks"
 # How long a second connect waits for the first before refusing. Tests shrink it.
@@ -100,6 +104,8 @@ def credential_lock(home: Path, refs: list[str], provider_name: str) -> Iterator
     """
 
     directory = home / LOCK_DIR_NAME
+    if fcntl is None:
+        raise _unavailable(directory, provider_name)
     taken: list[str] = []
     try:
         for ref in sorted(set(refs)):
