@@ -46,7 +46,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   rest, and `--metadata key=` removes one. This holds for custom and built-in
   providers in repo and user scope. `--json` adds `reconnect` saying what was
   kept, replaced or removed (names only; a key name that looks like a secret,
-  such as one left in a hand-edited config, is left out, as in status). The
+  such as one left in a hand-edited config, is left out, as in status, and
+  from the rerun command a failed user-scope store suggests). The
   same holds for an edit without a
   secret (`mb connect <provider> --metadata k=v`, `--account X` alone, or a scope
   change) on a provider that is already recorded; a first connect records exactly

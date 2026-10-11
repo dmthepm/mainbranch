@@ -2140,6 +2140,14 @@ def connect_provider(
                 if recorded_label:
                     command.extend(["--account", recorded_label])
                 for key, value in metadata.items():
+                    # Recorded keys come back through the merge on a rerun, so a
+                    # hand-edited secret-shaped key or value is left out here.
+                    if (
+                        _metadata_key_looks_sensitive(key)
+                        or metadata_value_rule(key)
+                        or metadata_value_rule(value)
+                    ):
+                        continue
                     command.extend(["--metadata", f"{key}={value}"])
                 action = "replaced" if previous_secret.present else "stored"
                 record_state = (
