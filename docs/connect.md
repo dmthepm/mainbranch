@@ -1104,7 +1104,11 @@ rule `user_scope_read_only` (exit 2, `--json` included). The message names the
 file and says to make it writable or move it and rerun; nothing is stored or
 changed. If writing is denied after a token was stored by connect or rotate,
 Main Branch restores the previous credential (or removes the newly created
-one) before returning that refusal. If restoration also fails, it exits 1 with
+one) before returning that refusal. The newly stored credential is removed
+only if it still holds the value this command wrote; if the store changed
+meanwhile, it is left and reported as stayed changed. A stored credential that
+cannot be read stops the command before anything is stored. If restoration
+also fails, it exits 1 with
 `metadata_write_failed`: the message says the credential was stored or replaced
 but not recorded, names the file, and gives a retry command that keeps user
 scope and the selected repo. Make the file writable first, then supply the
