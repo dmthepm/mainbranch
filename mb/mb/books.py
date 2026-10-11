@@ -33,6 +33,8 @@ from typing import Any
 
 import yaml
 
+from mb.engine import repo_flag
+
 STATE_ORDER = {"ok": 0, "info": 1, "warn": 2, "error": 3}
 AUDIENCE_VALUES = frozenset({"mechanical", "operator_decision", "informational"})
 
@@ -2498,7 +2500,10 @@ def render_status(report: dict[str, Any]) -> None:
         for item in (finding.get("evidence") or [])[:5]:
             typer.echo(f"           - {item}")
     typer.echo("")
-    typer.echo("Run `mb books doctor --plan` for safe setup repair guidance.")
+    # `mb books` takes the repo as its argument; named only from another folder (#1083).
+    repo_argument = repo_flag(report.get("repo")).removeprefix(" --repo ")
+    doctor_command = f"mb books doctor --plan {repo_argument}".rstrip()
+    typer.echo(f"Run `{doctor_command}` for safe setup repair guidance.")
 
 
 def render_exposure(report: dict[str, Any]) -> None:

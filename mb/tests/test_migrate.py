@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -129,7 +130,11 @@ def test_migrate_check_prints_privacy_safe_summary_when_pending(tmp_path: Path) 
         "move_file: reference/domain/content-strategy.md -> core/content-strategy.md"
         in result.stdout
     )
-    assert "Run `mb migrate --check --diff`" in result.stdout
+    # Run from another folder, so the suggested command names the repo.
+    assert (
+        f"Run `mb migrate --repo {shlex.quote(str(repo.resolve()))} --check --diff`"
+        in result.stdout
+    )
     assert "--- a/reference/core/offer.md" not in result.stdout
     assert "# Offer" not in result.stdout
 
@@ -174,7 +179,8 @@ def test_migrate_check_json_exposes_same_plan(tmp_path: Path) -> None:
     assert payload["backup"]["will_create"] is True
     assert payload["backup"]["directory"] == ".mb/backups/"
     assert payload["next"] == (
-        "Review this dry-run. If it matches the move you want, run `mb migrate --apply`."
+        "Review this dry-run. If it matches the move you want, run "
+        f"`mb migrate --repo {shlex.quote(str(repo.resolve()))} --apply`."
     )
 
 
@@ -310,7 +316,9 @@ def test_migrate_apply_aborts_before_writes_on_conflict(tmp_path: Path) -> None:
         for error in payload["errors"]
     )
     assert any("from reference/core/offer.md" in error for error in payload["errors"])
-    assert "rerun `mb migrate --check`" in payload["next"]
+    assert (
+        f"rerun `mb migrate --repo {shlex.quote(str(repo.resolve()))} --check`" in payload["next"]
+    )
     assert not (repo / ".mb" / "backups").exists()
     assert (repo / "reference" / "core" / "offer.md").exists()
 

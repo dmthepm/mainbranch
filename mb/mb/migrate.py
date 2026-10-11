@@ -15,6 +15,7 @@ import yaml
 
 from mb import migrations
 from mb.durable import atomic_write_text
+from mb.engine import repo_flag
 from mb.migrations.base import MigrationInfo, MigrationPlan, PlannedChange
 
 ENVELOPE_SCHEMA = "mb.migrate"
@@ -241,6 +242,26 @@ def _next_after_check(result: dict[str, Any]) -> str:
     return "No layout migration is pending."
 
 
+_APPLIED_NEXT = "Run `mb doctor`, `mb validate`, and `mb start --json` from the migrated repo."
+
+
+def name_repo(text: str, repo: str | Path) -> str:
+    """The suggested commands in `next`, naming the business repo from another folder (#1083).
+
+    Unchanged from inside the repo. The apply sentence is built by hand because
+    `mb doctor` takes the repo as an argument and `mb start` as `--repo`.
+    """
+    flag = repo_flag(repo)
+    if not flag:
+        return text
+    if text == _APPLIED_NEXT:
+        quoted = flag.removeprefix(" --repo ")
+        return f"Run `mb doctor {quoted}`, `mb validate{flag}`, and `mb start --json{flag}`."
+    from mb import doctor  # doctor imports modules that import migrate
+
+    return doctor._qualify_prose(text, Path(repo))
+
+
 def _next_after_apply(result: dict[str, Any]) -> str:
     if result.get("errors"):
         return (
@@ -248,7 +269,7 @@ def _next_after_apply(result: dict[str, Any]) -> str:
             "one was created, reconcile the error, then rerun `mb migrate --check`."
         )
     if result.get("applied"):
-        return "Run `mb doctor`, `mb validate`, and `mb start --json` from the migrated repo."
+        return _APPLIED_NEXT
     return "No layout migration was applied."
 
 
@@ -523,7 +544,8 @@ def render_check(result: dict[str, Any]) -> None:
         _render_plan_summary(plan)
         print()
         print(plan.get("privacy_note", "Full diffs are hidden by default."))
-        print("Run `mb migrate --check --diff` to print the full unified diff locally.")
+        diff_command = f"mb migrate{repo_flag(result['repo'])} --check --diff"
+        print(f"Run `{diff_command}` to print the full unified diff locally.")
         backup = result.get("backup") or {}
         if backup.get("will_create"):
             print(f"Backup on apply: {backup['directory']}")

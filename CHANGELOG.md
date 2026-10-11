@@ -10,6 +10,10 @@ The release tag scheme is `oe-vMAJOR.MINOR.PATCH` ("oe" = open engine) — the
 PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
+- `mb validate`, `mb migrate`, `mb books status`, `mb skill repair` and `mb checkpoint --hook-status`:
+  the commands they suggest now name the business repo when you run them from another folder
+  (including `mb skill repair --repo <repo> --apply` and `git init <folder>`); from inside the
+  repo the text is unchanged.
 - `mb connect`: a lock error that is not another save now says so at once. Only a
   lock another process holds counts as `credential_busy`; any other lock error
   (for example no file locking on a network home folder) stops immediately with

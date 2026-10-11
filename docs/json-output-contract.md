@@ -318,7 +318,11 @@ Commands that print their own suggestions name the repo the same way, from
 another folder (#1083): `mb checkpoint --hook-status` (`repair_command`, including
 "review .git/hooks/commit-msg, then run `mb checkpoint --repo <path>
 --install-hook`"), `checkpoint_hook_repair` in the onboarding setup facts, the
-`mb onboard plan` hint in `mb onboard status`, and the `mb connect hydrate`
+`mb onboard plan` hint in `mb onboard status`, `mb validate`
+(`validation_categories.*` repair text and `legacy_repair.next_steps[]`), `mb migrate`
+(`next`), `mb skill repair` (`repair_command`) and `mb books status` (its human `mb books
+doctor --plan <repo>` hint), `mb checkpoint --hook-status` outside a git repo
+(`repair_command` reads `git init <folder>`), and the `mb connect hydrate`
 `repair` and `repair_command` of a provider that exists in user scope but is not
 hydrated in that workspace. In `mb status` and `mb start`, the repair text
 "Run `mb doctor repair --repo <path> --plan` ... `--apply`" no longer ends with

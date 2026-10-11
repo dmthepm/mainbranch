@@ -26,6 +26,7 @@ from mb import (
     topology,
 )
 from mb import pushes as pushes_mod
+from mb.engine import repo_flag
 
 DECISION_STATUS = {"proposed", "accepted", "rejected", "superseded", "running"}
 OFFER_STATUS = {
@@ -2053,9 +2054,10 @@ def run(
     }
 
 
-def render_human(report: dict[str, Any], verbose: bool = False) -> None:
-    """Print results to stdout."""
+def render_human(report: dict[str, Any], verbose: bool = False, repo: Path | None = None) -> None:
+    """Print results to stdout; `repo` names the business repo in the commands it suggests."""
     from rich.console import Console
+    from rich.markup import escape
 
     console = Console()
     if not report["files"]:
@@ -2111,34 +2113,35 @@ def render_human(report: dict[str, Any], verbose: bool = False) -> None:
             for name, item in blockers[:5]:
                 console.print(
                     f"    - {name}: {item.get('errors', 0)} error(s)"
-                    f" — {item.get('operator_summary', '')}"
+                    f" — {escape(str(item.get('operator_summary', '')))}"
                 )
         if mechanical:
             console.print("  [yellow]Bulk-repairable (mechanical)[/yellow]:")
             for name, item in mechanical[:3]:
                 console.print(
                     f"    - {name}: {item.get('warnings', 0)} warning(s)"
-                    f" — {item.get('operator_summary', '')}"
+                    f" — {escape(str(item.get('operator_summary', '')))}"
                 )
         if other:
             console.print("  Other warnings:")
             for name, item in other[:5]:
                 console.print(
                     f"    - {name}: {item.get('warnings', 0)} warning(s)"
-                    f" — {item.get('operator_summary', '')}"
+                    f" — {escape(str(item.get('operator_summary', '')))}"
                 )
         top_repair = categories.get("top_repair")
         if top_repair:
-            console.print(f"  next: {top_repair}")
+            console.print(f"  next: {escape(top_repair)}")
         if not verbose and (mechanical or other):
+            validate_command = f"mb validate{repo_flag(repo)} --cross-refs -v"
             console.print(
-                "  Run `mb validate --cross-refs -v` or `--json` for the full per-file list."
+                f"  Run `{escape(validate_command)}` or `--json` for the full per-file list."
             )
     if legacy_repair:
         console.print("\n[bold yellow]Legacy frontmatter repair[/bold yellow]")
         console.print(f"  {legacy_repair['message']}")
         for step in legacy_repair.get("next_steps", []):
-            console.print(f"  - {step}")
+            console.print(f"  - {escape(step)}")
     console.print()
     if report["ok"]:
         if report["summary"]["warnings"]:
