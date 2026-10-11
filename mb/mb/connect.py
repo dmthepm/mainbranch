@@ -1877,14 +1877,16 @@ def _validate_key_shape(provider: Provider, token: str, metadata: dict[str, str]
         if mode == "live" and token.startswith(("sk_test_", "rk_test_")):
             _refuse(
                 "stripe_mode_mismatch",
-                "metadata says mode=live but the key is a Stripe TEST key. "
-                "Nothing was stored; fix the mode or the key and reconnect.",
+                "The mode is live (metadata says mode=live) and this is a Stripe TEST key. "
+                "Nothing was stored. To switch this connection to test mode, rerun with "
+                "`--metadata mode=test`; otherwise use a live key.",
             )
         if mode == "test" and token.startswith(("sk_live_", "rk_live_")):
             _refuse(
                 "stripe_mode_mismatch",
-                "metadata says mode=test but the key is a Stripe LIVE key. "
-                "Nothing was stored; fix the mode or the key and reconnect.",
+                "The mode is test (metadata says mode=test) and this is a Stripe LIVE key. "
+                "Nothing was stored. To switch this connection to live mode, rerun with "
+                "`--metadata mode=live`; otherwise use a test key.",
             )
 
 
@@ -1906,8 +1908,9 @@ def connect_provider(
     secret only: the recorded ``metadata`` and ``account_label`` stay unless the
     call gives new values. ``account_label=None`` keeps the label, a string
     replaces it, and ``""`` clears it. A metadata pair ``key=value`` updates that
-    key and ``key=`` removes it. A first connect and a tokenless edit record
-    exactly what they were given.
+    key and ``key=`` removes it. A tokenless edit on an already-recorded
+    provider follows the same rule and keeps the secret reference. A first
+    connect records exactly what it was given.
 
     ``source`` is a non-secret reference to where the credential lives, such
     as ``op://vault/item/field``; it is stored as ``metadata.source`` so

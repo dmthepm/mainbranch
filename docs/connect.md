@@ -642,7 +642,9 @@ mb connect <provider> --token-stdin --metadata region=    # removes that key
 region=eu`, `--account "New label"` alone, or a scope change) on a provider
 that is already recorded follows the same rule and keeps the secret reference,
 label and other keys. A first connect records exactly what it is given. A kept `mode=live` still refuses a
-Stripe test key; pass `--metadata mode=test` with it.
+Stripe test key; pass `--metadata mode=test` with it. Kept metadata can disagree with a new
+key (for example a kept Cloudflare `token_type` after you store a different kind of token);
+`--metadata key=` clears a kept key.
 
 ### Rotate from a recorded source
 

@@ -220,15 +220,32 @@ def test_tokenless_scope_change_keeps_label_and_metadata(tmp_path, monkeypatch) 
     assert entry["metadata"] == {"account_id": "acct-1", "api_user": "svc"}
 
 
-def test_restore_keeping_test_mode_refuses_live_key(tmp_path, monkeypatch) -> None:
-    repo = _env(monkeypatch, tmp_path)
-    _store(repo, "stripe", "--metadata", "mode=live", token="sk_live_" + "a" * 24)
+def _restore_refusal(repo: Path, kept_mode: str, key_prefix: str) -> dict[str, Any]:
+    other = "test" if kept_mode == "live" else "live"
+    _store(repo, "stripe", "--metadata", f"mode={kept_mode}", token=f"sk_{kept_mode}_" + "a" * 24)
     result = runner.invoke(
         app,
-        ["connect", "stripe", "--repo", str(repo), "--token", "sk_test_" + "a" * 24, "--json"],
+        ["connect", "stripe", "--repo", str(repo), "--token", key_prefix + "a" * 24, "--json"],
     )
     assert result.exit_code != 0
-    assert _entry(repo, "stripe")["metadata"] == {"mode": "live"}
+    assert _entry(repo, "stripe")["metadata"] == {"mode": kept_mode}
+    assert f"sk_{other}_" + "a" * 24 not in result.output
+    payload: dict[str, Any] = json.loads(result.stdout)
+    return payload
+
+
+def test_restore_kept_live_refuses_test_key_names_fix(tmp_path, monkeypatch) -> None:
+    repo = _env(monkeypatch, tmp_path)
+    payload = _restore_refusal(repo, "live", "sk_test_")
+    assert payload["rule"] == "stripe_mode_mismatch"
+    assert "`--metadata mode=test`" in payload["summary"]
+
+
+def test_restore_kept_test_refuses_live_key_names_fix(tmp_path, monkeypatch) -> None:
+    repo = _env(monkeypatch, tmp_path)
+    payload = _restore_refusal(repo, "test", "sk_live_")
+    assert payload["rule"] == "stripe_mode_mismatch"
+    assert "`--metadata mode=live`" in payload["summary"]
 
 
 def test_secret_like_key_names_stay_out_of_reconnect(tmp_path, monkeypatch) -> None:

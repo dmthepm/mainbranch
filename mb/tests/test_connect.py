@@ -2403,7 +2403,7 @@ def test_connect_stripe_refuses_mode_key_mismatch(tmp_path: Path, monkeypatch) -
         ],
     )
     assert live_mode_test_key.exit_code == 2
-    assert "mode=live but the key is a Stripe TEST key" in live_mode_test_key.stderr
+    assert "metadata says mode=live) and this is a Stripe TEST key" in live_mode_test_key.stderr
     assert "sk_test_fixture_not_real" not in live_mode_test_key.stderr
 
     test_mode_live_key = runner.invoke(
@@ -2420,7 +2420,7 @@ def test_connect_stripe_refuses_mode_key_mismatch(tmp_path: Path, monkeypatch) -
         ],
     )
     assert test_mode_live_key.exit_code == 2
-    assert "mode=test but the key is a Stripe LIVE key" in test_mode_live_key.stderr
+    assert "metadata says mode=test) and this is a Stripe LIVE key" in test_mode_live_key.stderr
 
 
 def test_connect_resend_refuses_malformed_key_shape(tmp_path: Path, monkeypatch) -> None:
