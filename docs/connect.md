@@ -1206,17 +1206,29 @@ access will remain available.
 
 ## One save at a time
 
-`mb connect <provider> --token-stdin`, `mb connect rotate` and `mb connect
-google --oauth` hold a lock on the credential from the moment they read its
-previous value until the record is written or the rollback is done, so only one
-`mb` process at a time saves a given credential through those three commands,
-in repo and user scope. A
-second command waits about five seconds, then stops before it writes anything,
-says "Another mb connect is saving the <Provider> credential right now. Nothing
-was stored. Try again in a moment.", and exits 1 (`--json` state
-`credential_busy`). The lock is a file under `$MAINBRANCH_HOME/locks` (default
-`~/.mainbranch/locks`) named from a hash of the credential's reference. If that folder cannot be written, or the
-platform has no file locking (Windows), the command stops the same way (state `credential_lock_unavailable`) rather than
-saving without the lock. The lock stops those commands from racing each other; it does not
+Commands that store a token hold a lock on the credential from the moment they
+read its previous value until the record is written or the rollback is done:
+`mb connect <provider>` when it is given a token (`--token`, `--token-stdin`,
+`--from-env` or the hidden prompt), `mb connect rotate` and `mb connect google
+--oauth`. They take it in repo and user scope alike, so only one `mb` process at
+a time saves a given credential through them, and they need
+`$MAINBRANCH_HOME/locks` (default `~/.mainbranch/locks`) to be writable. A
+connect that stores no token (metadata only, or a provider with no secrets) and
+disconnecting never touch the lock, so they do not need that folder.
+
+A second command waits about five seconds, then stops before it writes
+anything, says "Another mb connect is saving the <Provider> credential right
+now. Nothing was stored. Try again in a moment.", and exits 1 (`--json` state
+`credential_busy`). Only a lock another process really holds counts as busy.
+The lock is a file under `$MAINBRANCH_HOME/locks` (default `~/.mainbranch/locks`)
+named from a hash of the credential's reference. If that folder cannot be
+created or written, the command stops at once with state
+`credential_lock_unavailable` and asks you to make the folder writable. If the
+file system cannot lock the file (a network home folder without lock support,
+for example) or the platform has no file locking (Windows), it also stops at
+once with that state and says so, without waiting and without claiming another
+save is running; Main Branch needs file locking on the disk under
+`$MAINBRANCH_HOME` (use WSL2 on Windows). Either way nothing is saved without
+the lock. The lock stops those commands from racing each other; it does not
 stop any other `mb` command, another program, or you from editing the same
 credential in the store.
