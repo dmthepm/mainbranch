@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -109,3 +110,25 @@ def no_installed_mb_version_probe(monkeypatch: pytest.MonkeyPatch) -> None:
             "error": "",
         },
     )
+
+
+@pytest.fixture(autouse=True)
+def no_installed_mb_on_path(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Put a no-op ``mb`` first on PATH so no test starts the contributor's own.
+
+    The commit-msg hook writes ``shutil.which("mb")`` into itself, so a test
+    that installs the hook and then commits would run the installed
+    ``mb checkpoint --validate -``. Hooks installed from a test, and the hook's
+    own ``command -v mb`` fallback, now resolve to this stub. Tests that need
+    real validation put their own shim (``sys.executable -m mb``) first on
+    PATH, which wins because their ``monkeypatch`` calls run after this one.
+    """
+
+    # Outside the test's own ``tmp_path``, which some tests list in full.
+    stub_dir = tmp_path_factory.mktemp("no-installed-mb")
+    stub = stub_dir / "mb"
+    stub.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    stub.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{stub_dir}{os.pathsep}{os.environ.get('PATH', '')}")
