@@ -10,10 +10,39 @@ The release tag scheme is `oe-vMAJOR.MINOR.PATCH` ("oe" = open engine) — the
 PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
-- `mb validate`, `mb migrate`, `mb books status`, `mb skill repair` and `mb checkpoint --hook-status`:
-  the commands they suggest now name the business repo when you run them from another folder
-  (including `mb skill repair --repo <repo> --apply` and `git init <folder>`); from inside the
-  repo the text is unchanged.
+
+## [0.6.7] - 2026-10-11
+
+`mb` starts faster and lighter: it no longer loads macOS network settings
+(`_scproxy` / SystemConfiguration) unless a command makes a web request, so
+short commands such as `mb --version` start faster and put less load on the
+system. When you run `mb doctor`, `mb update`, `mb start`, `mb validate`,
+`mb migrate`, `mb books`, `mb skill repair` or `mb checkpoint --hook-status`
+with the repo given from another folder, the commands they suggest now name
+that repo. Before, pasting a suggested `--apply` command while inside a
+different business repo acted on that repo; from inside the business repo the
+output is unchanged. `mb connect` counts only a save already in progress as
+"busy": any other lock error (for example on a network home folder) stops at
+once with `credential_lock_unavailable` and says so, and only connects that
+store a token need `~/.mainbranch/locks` to be writable (0.6.6's notes said
+all repo-scope connects). To upgrade a uv install, run
+`uv tool install --refresh-package mainbranch mainbranch@latest`.
+
+### Fixed
+
+- `mb` starts without loading macOS network settings unless a command makes a
+  web request, so short commands like `mb --version` start faster and put less
+  load on the system.
+- `mb validate`, `mb migrate`, `mb books status`, `mb skill repair` and
+  `mb checkpoint --hook-status`: the commands they suggest now name the
+  business repo when you run them from another folder (including
+  `mb skill repair --repo <repo> --apply` and `git init <folder>`); from inside
+  the repo the text is unchanged.
+- Suggested commands name the business repo from another folder:
+  `mb checkpoint --hook-status`, the `mb onboard plan` hint in
+  `mb onboard status`, the `mb connect hydrate` repair for a workspace that is
+  not hydrated, and the `mb start` wiring repair, which no longer ends with
+  "from the business repo". From inside the repo they read as before (#1083).
 - `mb connect`: a lock error that is not another save now says so at once. Only a
   lock another process holds counts as `credential_busy`; any other lock error
   (for example no file locking on a network home folder) stops immediately with
@@ -22,10 +51,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - Only connects that store a token (`mb connect <provider>` given a token,
   `rotate`, `google --oauth`) need `~/.mainbranch/locks` to be writable; 0.6.6's
   notes said all repo-scope connects.
-
-- Suggested commands name the business repo from another folder: `mb checkpoint --hook-status`, the `mb onboard plan` hint in `mb onboard status`, the `mb connect hydrate` repair for a workspace that is not hydrated, and the `mb start` wiring repair, which no longer ends with "from the business repo". From inside the repo they read as before (#1083).
-
-`mb` starts without loading macOS network settings unless a command makes a web request, so short commands like `mb --version` start faster and put less load on the system.
 
 ## [0.6.6] - 2026-10-11
 
