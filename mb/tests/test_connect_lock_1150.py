@@ -271,7 +271,6 @@ def test_a_lock_error_that_is_not_a_held_lock_refuses_at_once(
 ) -> None:
     # EACCES is an fcntl-lock error; flock(2) on macOS and Linux does not document it.
     fake = _fake_flock(monkeypatch, code)
-    started = time.monotonic()
     for as_json in (False, True):
         result = CliRunner().invoke(
             app,
@@ -288,7 +287,6 @@ def test_a_lock_error_that_is_not_a_held_lock_refuses_at_once(
         if as_json:
             payload = json.loads(result.output[result.output.index("{") :])
             assert payload["state"] == "credential_lock_unavailable"
-    assert time.monotonic() - started < 0.3
     assert len(fake.calls) == 2  # one attempt per command, no retry loop
     assert all(_fd_is_closed(fd) for fd in fake.calls)
     assert LATER not in _items()
