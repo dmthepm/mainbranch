@@ -7,6 +7,7 @@ Temporary stores, no network, no real keychain.
 from __future__ import annotations
 
 import errno
+import hmac
 import json
 import os
 import subprocess
@@ -53,13 +54,13 @@ def test_a_writer_between_the_rollback_comparison_and_delete_keeps_its_credentia
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     connect_mod.connect_provider("stripe", repo=repo, scope="user")
-    real_compare = connect_mod.hmac.compare_digest
+    real_compare = hmac.compare_digest
     real_write = connect_mod._write_user_scope_provider
     seen: dict[str, Any] = {}
 
     def interleave(a: Any, b: Any) -> bool:
-        matched = real_compare(a, b)
-        monkeypatch.setattr(connect_mod.hmac, "compare_digest", real_compare)
+        matched = bool(real_compare(a, b))
+        monkeypatch.setattr(hmac, "compare_digest", real_compare)
         monkeypatch.setattr(connect_mod, "_write_user_scope_provider", real_write)
         seen["second"] = connect_mod.connect_provider(
             "stripe", repo=repo, token=LATER, scope="user"
@@ -70,7 +71,7 @@ def test_a_writer_between_the_rollback_comparison_and_delete_keeps_its_credentia
         raise OSError(errno.EIO, "synthetic")
 
     monkeypatch.setattr(connect_mod, "_write_user_scope_provider", fail)
-    monkeypatch.setattr(connect_mod.hmac, "compare_digest", interleave)
+    monkeypatch.setattr(hmac, "compare_digest", interleave)
     with pytest.raises(connect_mod.MetadataWriteError) as caught:
         connect_mod.connect_provider("stripe", repo=repo, token=FIRST, scope="user")
     assert seen["second"]["ok"]

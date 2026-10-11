@@ -29,7 +29,9 @@ import yaml
 from mb import http_safe
 from mb._credential_helper import STAGE_SUFFIX
 from mb.credential_lock import (
-    CredentialBusyError,  # noqa: F401  (re-exported for the CLI)
+    CredentialBusyError as CredentialBusyError,
+)
+from mb.credential_lock import (
     credential_lock,
     forget_stored,
     note_stored,
