@@ -2064,7 +2064,15 @@ def connect_cmd(
     ),
     command: list[str] = CONNECT_EXEC_COMMAND_ARGUMENT,
     repo: str = typer.Option(".", "--repo", help="Business repo whose metadata is updated."),
-    account_label: str = typer.Option("", "--account", "--label", help="Human account label."),
+    account_label: str | None = typer.Option(
+        None,
+        "--account",
+        "--label",
+        help=(
+            "Human account label. Storing a secret again keeps the recorded label; "
+            '`--account ""` clears it.'
+        ),
+    ),
     scope: str = typer.Option(
         "",
         "--scope",
@@ -2230,7 +2238,7 @@ def connect_cmd(
             target=target,
             provider=provider,
             repo=repo,
-            account_label=account_label,
+            account_label=account_label or "",
             scope=scope,
             metadata=metadata,
             client_file=client_file,
