@@ -225,3 +225,115 @@ def test_a_google_sign_in_is_refused_while_another_process_holds_its_credential(
     assert caught.value.state == "credential_busy"
     assert "Nothing was stored" in str(caught.value)
     assert _items() == []
+
+
+class _FakeFcntl:
+    """A stand-in for the ``fcntl`` the lock module sees; the store keeps the real one."""
+
+    LOCK_EX = 2
+    LOCK_NB = 4
+    LOCK_UN = 8
+
+    def __init__(self, code: int) -> None:
+        self.code = code
+        self.calls: list[int] = []
+
+    def flock(self, fd: int, op: int) -> None:
+        if op & self.LOCK_UN:
+            return
+        self.calls.append(fd)
+        raise OSError(self.code, os.strerror(self.code))
+
+
+def _fake_flock(monkeypatch: pytest.MonkeyPatch, code: int) -> _FakeFcntl:
+    from mb import credential_lock
+
+    fake = _FakeFcntl(code)
+    monkeypatch.setattr(credential_lock, "fcntl", fake)
+    monkeypatch.setattr(credential_lock, "LOCK_WAIT_SECONDS", 0.3)
+    return fake
+
+
+def _fd_is_closed(fd: int) -> bool:
+    try:
+        os.fstat(fd)
+    except OSError:
+        return True
+    return False
+
+
+@pytest.mark.parametrize(
+    "code",
+    [errno.ENOLCK, errno.EINVAL, errno.EBADF, errno.EOPNOTSUPP, errno.EACCES],
+)
+def test_a_lock_error_that_is_not_a_held_lock_refuses_at_once(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    # EACCES is an fcntl-lock error; flock(2) on macOS and Linux does not document it.
+    fake = _fake_flock(monkeypatch, code)
+    started = time.monotonic()
+    for as_json in (False, True):
+        result = CliRunner().invoke(
+            app,
+            ["connect", "stripe", "--token-stdin", "--scope", "user", "--repo", str(repo)]
+            + (["--json"] if as_json else []),
+            input=LATER + "\n",
+        )
+        assert result.exit_code == 1
+        assert "Nothing was stored" in result.output
+        assert "Another mb connect" not in result.output
+        assert "file locking" in result.output
+        assert "Traceback" not in result.output
+        assert LATER not in result.output
+        if as_json:
+            payload = json.loads(result.output[result.output.index("{") :])
+            assert payload["state"] == "credential_lock_unavailable"
+    assert time.monotonic() - started < 0.3
+    assert len(fake.calls) == 2  # one attempt per command, no retry loop
+    assert all(_fd_is_closed(fd) for fd in fake.calls)
+    assert LATER not in _items()
+
+
+@pytest.mark.parametrize("code", [errno.EWOULDBLOCK, errno.EAGAIN])
+def test_a_held_lock_still_waits_then_reports_busy(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    fake = _fake_flock(monkeypatch, code)
+    result = CliRunner().invoke(
+        app,
+        ["connect", "stripe", "--token-stdin", "--scope", "user", "--repo", str(repo), "--json"],
+        input=LATER + "\n",
+    )
+    assert result.exit_code == 1
+    payload = json.loads(result.output[result.output.index("{") :])
+    assert payload["state"] == "credential_busy"
+    assert "Another mb connect is saving the Stripe credential" in result.output
+    assert len(fake.calls) > 1
+    assert _fd_is_closed(fake.calls[-1])
+    assert LATER not in _items()
+
+
+def test_a_google_sign_in_reports_a_lock_error_that_is_not_busy(
+    repo: Path, client_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mb import google_connect as gc
+    from mb import google_oauth as go
+
+    fake = _fake_flock(monkeypatch, errno.ENOLCK)
+    monkeypatch.setattr(
+        gc,
+        "_sign_in",
+        lambda *a, **k: {
+            "refresh_token": "r",
+            "access_token": "a",
+            "scope": " ".join(go.SCOPES),
+        },
+    )
+    with pytest.raises(gc.GoogleConnectError) as caught:
+        gc.bootstrap(repo, client_json=client_file.read_text(), scope="repo")
+    assert caught.value.state == "credential_lock_unavailable"
+    assert "Another mb connect" not in str(caught.value)
+    assert "Nothing was stored" in str(caught.value)
+    assert len(fake.calls) == 1
+    assert _fd_is_closed(fake.calls[0])
+    assert _items() == []

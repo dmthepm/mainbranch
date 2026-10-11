@@ -12,6 +12,7 @@ Lock files are never deleted: two processes must always lock the same inode.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 import time
@@ -87,6 +88,25 @@ def _unavailable(directory: Path, provider_name: str) -> CredentialBusyError:
     )
 
 
+def _no_file_locking(provider_name: str) -> CredentialBusyError:
+    return CredentialBusyError(
+        f"This platform has no file locking, so the {provider_name} credential was not saved. "
+        "Nothing was stored. Use WSL2 on Windows, then rerun the command.",
+        UNAVAILABLE_STATE,
+    )
+
+
+def _cannot_lock(directory: Path, provider_name: str, code: int) -> CredentialBusyError:
+    name = errno.errorcode.get(code, f"error {code}")
+    return CredentialBusyError(
+        f"Main Branch could not lock a file in {_shown(directory)} ({name}), so the "
+        f"{provider_name} credential was not saved. Nothing was stored. That folder may be on a "
+        "file system without file locking, such as a network home folder; set MAINBRANCH_HOME "
+        "to a local folder, then rerun the command.",
+        UNAVAILABLE_STATE,
+    )
+
+
 def _busy(provider_name: str) -> CredentialBusyError:
     return CredentialBusyError(
         f"Another mb connect is saving the {provider_name} credential right now. "
@@ -100,12 +120,15 @@ def credential_lock(home: Path, refs: list[str], provider_name: str) -> Iterator
 
     Refs are locked in sorted order so two multi-slot connects cannot deadlock.
     Raises ``CredentialBusyError`` before the block runs if another process keeps
-    the lock past ``LOCK_WAIT_SECONDS`` or the lock file cannot be opened.
+    the lock past ``LOCK_WAIT_SECONDS`` (``credential_busy``), or at once if the
+    lock file cannot be opened or the file system cannot lock it
+    (``credential_lock_unavailable``). Only EWOULDBLOCK/EAGAIN mean "held": macOS
+    and Linux ``flock(2)`` document no EACCES (that comes from ``fcntl`` locks).
     """
 
     directory = home / LOCK_DIR_NAME
     if fcntl is None:
-        raise _unavailable(directory, provider_name)
+        raise _no_file_locking(provider_name)
     taken: list[str] = []
     try:
         for ref in sorted(set(refs)):
@@ -125,7 +148,12 @@ def credential_lock(home: Path, refs: list[str], provider_name: str) -> Iterator
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
-                except OSError:
+                except OSError as exc:
+                    if exc.errno not in (errno.EWOULDBLOCK, errno.EAGAIN):
+                        # Not a held lock (no lock support, bad descriptor): waiting
+                        # cannot help, and "another connect" would be untrue.
+                        os.close(fd)
+                        raise _cannot_lock(directory, provider_name, exc.errno or 0) from None
                     if time.monotonic() >= deadline:
                         os.close(fd)
                         raise _busy(provider_name) from None

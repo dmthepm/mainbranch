@@ -10,6 +10,14 @@ The release tag scheme is `oe-vMAJOR.MINOR.PATCH` ("oe" = open engine) — the
 PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
+- `mb connect`: a lock error that is not another save now says so at once. Only a
+  lock another process holds counts as `credential_busy`; any other lock error
+  (for example no file locking on a network home folder) stops immediately with
+  `credential_lock_unavailable` and no longer claims another connect is saving
+  (#1162).
+- Only connects that store a token (`--token-stdin`, `rotate`, `google --oauth`)
+  need `~/.mainbranch/locks` to be writable; 0.6.6's notes said all repo-scope
+  connects.
 
 `mb` starts without loading macOS network settings unless a command makes a web request, so short commands like `mb --version` start faster and put less load on the system.
 
