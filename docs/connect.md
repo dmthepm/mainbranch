@@ -189,7 +189,9 @@ full budget, as `mb connect exec` would: a healthy item then reads normally and
 a store that really hangs is `credential_store_timeout`. A keychain read is
 never started with less than a second left, and one that started and waited is
 a real macOS dialog: it is `keychain_prompt_pending` and is not asked again, so
-a dialog is shown at most once per run. The retry costs at most one extra full
+a dialog is shown at most once per run, a leftover staged copy of the item
+included: once a read has waited on a dialog, nothing is answered as not
+checked. The retry costs at most one extra full
 budget per run (about 16 s worst case instead of about 8 s); the providers after
 it have no budget left and are not checked.
 

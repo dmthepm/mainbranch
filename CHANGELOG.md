@@ -35,7 +35,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   pending prompt, a locked keychain and a slow store are reported as before:
   a read the shared budget cut short, and that did not finish, is
   read once more with a full budget before it is believed. A keychain dialog is
-  shown at most once per run and is never asked again. Worst-case `mb status`
+  shown at most once per run, a leftover staged copy included, and is never
+  asked again. Worst-case `mb status`
   time is about one extra full budget (about 16 s instead of about 8 s).
   See `docs/connect.md`.
 - `mb connect`: storing a new secret for a provider that is already connected

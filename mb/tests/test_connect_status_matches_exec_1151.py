@@ -10,6 +10,7 @@ helper and a fake clock; no keychain is touched.
 
 from __future__ import annotations
 
+import ctypes
 import json
 import platform
 import subprocess
@@ -488,3 +489,157 @@ def test_a_wedged_store_is_still_reported_as_a_store_failure(
     result = runner.invoke(app, ["connect", "status", "--repo", str(repo), "--json"])
     assert result.exit_code == 1
     assert [call for call in keychain.calls if call[0] != "get"] == []
+
+
+class HelperSim:
+    """Runs the real helper `get` in-process; only the leaves are fake.
+
+    `health`, `_item_owner` and the `/usr/bin/security` argv are patched, so
+    `_security_tool`, `_recover`, `_stage_state` and the deadline maths are the
+    shipped code. A read of a ref in `dialogs` waits on a dialog until killed.
+    """
+
+    def __init__(self, clock: Clock, monkeypatch: pytest.MonkeyPatch, refs: dict[str, str]) -> None:
+        self.clock = clock
+        self.refs = refs
+        self.dialogs: set[str] = set()
+        self.all_dialog = False
+        self.costs: dict[str, float] = {}
+        self.staged: set[str] = set()
+        self.launches: dict[str, int] = {}
+        self.shown: dict[str, int] = {}
+        monkeypatch.setattr(ctypes, "CDLL", lambda *_a, **_k: _Any())
+        monkeypatch.setattr(helper_mod._MacSecurity, "health", lambda _self: "ready")
+        monkeypatch.setattr(helper_mod._MacSecurity, "_item_owner", self._owner)
+        self.real_run = subprocess.run
+        monkeypatch.setattr(subprocess, "run", self._security)
+        monkeypatch.setattr(platform, "system", lambda: "Darwin")
+
+    def _owner(self, ref: str) -> str:
+        if ref.endswith(helper_mod.STAGE_SUFFIX):
+            return "security" if ref in self.staged else "absent"
+        return "security"
+
+    def _security(self, argv: list[str], **kwargs: Any) -> Any:
+        if argv[0] != helper_mod.SECURITY_TOOL:
+            return self.real_run(argv, **kwargs)  # e.g. git, for the repo identity
+        ref = argv[argv.index("-a") + 1]
+        timeout = float(kwargs["timeout"])
+        if self.all_dialog or ref in self.dialogs:
+            self.shown[ref] = self.shown.get(ref, 0) + 1
+            self.clock.now += timeout
+            raise subprocess.TimeoutExpired(argv, timeout)
+        self.clock.now += self.costs.get(ref, 0.1)
+        return subprocess.CompletedProcess(argv, 0, "", f'password: "{ref}-value"\n')
+
+    def __call__(self, args: list[str], stdin: str, timeout: float) -> tuple[int, str]:
+        payload = json.loads(stdin)
+        ref = payload["ref"]
+        self.launches[ref] = self.launches.get(ref, 0) + 1
+        start = self.clock.now
+        state, value, _migrated, _owner = helper_mod._macos("get", payload)
+        # The helper answers before the parent's own timeout, as it is built to.
+        assert self.clock.now - start <= timeout
+        body: dict[str, Any] = {"state": state}
+        if value is not None:
+            body["value"] = value
+        return (0 if state == "ready" else 1), json.dumps(body)
+
+
+class _Any:
+    def __getattr__(self, _name: str) -> Any:
+        return _Any()
+
+    def __call__(self, *_a: Any, **_k: Any) -> int:
+        return 0
+
+
+def _sim(world: Any, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, dict[str, str], HelperSim]:
+    repo, refs, keychain = world(["cloudflare", "resend"], cost=0.1)
+    sim = HelperSim(keychain.clock, monkeypatch, refs)
+    monkeypatch.setattr(store_mod, "_invoke_helper", sim)
+    return repo, refs, sim
+
+
+def _backend_state(item: dict[str, Any]) -> str:
+    return str(next(iter(item["secrets"].values()))["backend_state"])
+
+
+def test_a_staged_copy_that_dialogs_on_a_clipped_read_is_shown_once_and_pending(
+    world: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, refs, sim = _sim(world, monkeypatch)
+    sim.costs[refs["cloudflare"]] = 2.5
+    stage = refs["resend"] + helper_mod.STAGE_SUFFIX
+    sim.staged.add(stage)
+    sim.dialogs.add(stage)
+
+    resend = _by_id(connect_mod.status_all(repo))["resend"]
+    assert _backend_state(resend) == "keychain_prompt_pending"
+    assert sim.launches[refs["resend"]] == 1
+    assert sim.shown[stage] == 1
+
+
+def test_a_staged_copy_that_dialogs_is_pending_with_the_keychain_repair_unclipped(
+    world: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, refs, sim = _sim(world, monkeypatch)
+    stage = refs["resend"] + helper_mod.STAGE_SUFFIX
+    sim.staged.add(stage)
+    sim.dialogs.add(stage)
+
+    resend = _by_id(connect_mod.status_all(repo))["resend"]
+    assert _backend_state(resend) == "keychain_prompt_pending"
+    assert "repair --keychain" in resend["repair_command"]
+    assert sim.shown[stage] == 1
+
+
+def test_exec_reports_a_dialoging_staged_copy_as_a_pending_prompt(
+    world: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, refs, sim = _sim(world, monkeypatch)
+    stage = refs["resend"] + helper_mod.STAGE_SUFFIX
+    sim.staged.add(stage)
+    sim.dialogs.add(stage)
+
+    result = connect_mod.read_token("resend", repo)
+    assert result["backend_state"] == "keychain_prompt_pending"
+    assert "repair --keychain" in result["repair_command"]
+    assert sim.shown[stage] == 1
+
+
+def test_a_locked_store_where_every_read_dialogs_shows_one_dialog_per_item(
+    world: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, refs, sim = _sim(world, monkeypatch)
+    sim.costs[refs["cloudflare"]] = 2.5
+    stage = refs["resend"] + helper_mod.STAGE_SUFFIX
+    sim.staged.add(stage)
+    sim.dialogs.update({stage, refs["resend"]})
+
+    resend = _by_id(connect_mod.status_all(repo))["resend"]
+    assert sim.shown[stage] == 1
+    assert sim.launches[refs["resend"]] == 1
+    assert sim.shown.get(refs["resend"], 0) == 0
+    assert _backend_state(resend) == "keychain_prompt_pending"
+
+
+def test_a_helper_call_that_started_a_dialog_never_answers_not_checked() -> None:
+    adapter = object.__new__(helper_mod._MacSecurity)
+    adapter.keychain_path = None
+    adapter.dialog_started = False
+
+    def hang(*_args: Any, **kwargs: Any) -> Any:
+        raise subprocess.TimeoutExpired("security", kwargs["timeout"])
+
+    adapter.deadline = time.monotonic() + 5
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(subprocess, "run", hang)
+        with pytest.raises(helper_mod._PromptPending):
+            adapter._security_get("fixture-ref")
+    adapter.deadline = time.monotonic() - 1
+    with pytest.raises(helper_mod._PromptPending):
+        adapter._security_get("fixture-ref")
+    adapter.dialog_started = False
+    with pytest.raises(helper_mod._BudgetSpent):
+        adapter._security_get("fixture-ref")

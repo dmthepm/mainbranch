@@ -237,6 +237,9 @@ def _test_keychain_path() -> str | None:
 class _MacSecurity:
     """Minimal ctypes bridge for generic-password operations."""
 
+    # Set once a `security` call started and timed out in this helper call.
+    dialog_started = False
+
     def __init__(self, *, interactive: bool = False, deadline: float | None = None) -> None:
         # The parent sends a wall-clock deadline; it is turned into a monotonic
         # one once, here, so a clock change cannot stretch or shrink the budget.
@@ -673,7 +676,11 @@ class _MacSecurity:
 
         remaining = self.deadline - time.monotonic()
         if remaining <= 0 or remaining < min_seconds:
-            raise _BudgetSpent
+            # Invariant: a helper call that started a `security` call which
+            # timed out never answers `not-checked`. The dialog was already
+            # shown, so a later read (the item after its staged copy) that
+            # finds no time is pending too, never "not started" (#1151).
+            raise _PromptPending if self.dialog_started else _BudgetSpent
         try:
             if stdin is None:
                 return subprocess.run(
@@ -695,6 +702,7 @@ class _MacSecurity:
                 timeout=remaining,
             )
         except subprocess.TimeoutExpired as exc:
+            self.dialog_started = True
             raise _PromptPending from exc
 
     def _keychain_args(self) -> list[str]:
