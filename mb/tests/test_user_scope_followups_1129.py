@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from mb import connect as connect_mod
 from mb import google_connect as gc
@@ -148,6 +149,58 @@ def test_a_failed_provider_secret_restore_names_it(
     text = json.loads(result.stdout)["summary"] if as_json else result.output
     assert "could not be restored (the Cloudflare credential stayed changed)" in text
     assert DETAIL not in result.output
+
+
+def test_the_replay_command_leaves_out_a_secret_shaped_recorded_key(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Built at run time so no secret-shaped literal sits in the source.
+    sentinel_key = "ghp_" + "E" * 36
+    sentinel_value = "ghp_" + "F" * 36
+    _user_scope_cloudflare(repo)
+    path = connect_mod._user_scope_path()
+
+    def plant(node: Any) -> int:
+        planted = 0
+        if isinstance(node, dict):
+            meta = node.get("metadata")
+            if isinstance(meta, dict) and meta.get("zone_id") == "abc123":
+                meta[sentinel_key] = "legacy"
+                meta["note"] = sentinel_value
+                planted += 1
+            for child in node.values():
+                planted += plant(child)
+        return planted
+
+    planted = 0
+    # Plant in whichever file holds the recorded metadata (repo or user scope).
+    for config in (repo / ".mb" / "connect.yaml", path):
+        if config.exists():
+            data = yaml.safe_load(config.read_text(encoding="utf-8"))
+            planted += plant(data)
+            config.write_text(yaml.safe_dump(data), encoding="utf-8")
+    assert planted >= 1
+    real_set = SecretStore.set
+    writes = 0
+
+    def set_(self: SecretStore, *args: Any, **kwargs: Any) -> None:
+        nonlocal writes
+        writes += 1
+        if writes > 1:  # the connect's own write lands, the restore fails
+            raise OSError(DETAIL)
+        real_set(self, *args, **kwargs)
+
+    monkeypatch.setattr(SecretStore, "set", set_)
+    _fail_user_write(path, "write", errno.ENOSPC, monkeypatch)
+
+    result = _run(repo, "reconnect", True)
+
+    assert result.exit_code == 1, result.output
+    summary = json.loads(result.stdout)["summary"]
+    assert "stayed changed" in summary
+    assert "--metadata zone_id=abc123" in summary
+    assert sentinel_key not in result.output
+    assert sentinel_value not in result.output
 
 
 # --- 1 (late read-only). the sign-in is restored, with a `~/` path -----------------------

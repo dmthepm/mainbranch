@@ -259,6 +259,35 @@ def test_secret_like_key_names_stay_out_of_reconnect(tmp_path, monkeypatch) -> N
     assert result["reconnect"]["metadata"]["kept"] == ["account_id"]
 
 
+def test_secret_shaped_key_names_stay_out_of_reconnect(tmp_path, monkeypatch) -> None:
+    # Built at run time so no secret-shaped literal sits in the source.
+    sentinel = "ghp_" + "A" * 36
+    assert connect_mod.metadata_value_rule(sentinel)
+    repo = _env(monkeypatch, tmp_path)
+    _store(repo, "examplehook", custom=True, token="first-token")
+    path = repo / ".mb" / "connect.yaml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["providers"]["examplehook"]["metadata"] = {sentinel: "legacy", "account_id": "a"}
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    result = runner.invoke(
+        app, ["connect", "examplehook", "--repo", str(repo), "--token", "t2", "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    assert sentinel not in result.output
+    assert json.loads(result.stdout)["reconnect"]["metadata"]["kept"] == ["account_id"]
+
+
+def test_reconnect_lists_drop_secret_shaped_keys_in_every_list() -> None:
+    sentinel = "ghp_" + "B" * 36
+    other = "ghp_" + "C" * 36
+    changes = connect_mod._reconnect_changes(
+        {"metadata": {sentinel: "x", other: "y", "account_id": "a"}},
+        "",
+        {sentinel: "x", "ghp_" + "D" * 36: "z", "account_id": "b"},
+    )
+    assert changes["metadata"] == {"kept": [], "set": ["account_id"], "removed": []}
+
+
 def test_google_merge_unchanged() -> None:
     merged = google_connect_mod.merge_oauth_metadata(
         {"ga4_property_id": "123456789", "search_console_site": "sc-domain:example.com", "x": ""},

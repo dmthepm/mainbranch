@@ -2171,6 +2171,14 @@ def connect_provider(
                 if recorded_label:
                     command.extend(["--account", recorded_label])
                 for key, value in metadata.items():
+                    # Recorded keys come back through the merge on a rerun, so a
+                    # hand-edited secret-shaped key or value is left out here.
+                    if (
+                        _metadata_key_looks_sensitive(key)
+                        or metadata_value_rule(key)
+                        or metadata_value_rule(value)
+                    ):
+                        continue
                     command.extend(["--metadata", f"{key}={value}"])
                 action = "replaced" if previous_secret.present else "stored"
                 record_state = (
@@ -2240,7 +2248,8 @@ def _reconnect_changes(
 ) -> dict[str, Any]:
     """Which recorded fields a re-stored secret kept, replaced or cleared.
 
-    Names only, never values; a key that looks like a secret is left out.
+    Names only, never values. A key whose name suggests a secret, or that is
+    itself secret-shaped (a hand-edited config), is left out, as in status.
     """
 
     previous_label = str(prior_entry.get("account_label") or "")
@@ -2264,7 +2273,11 @@ def _reconnect_changes(
     return {
         "account_label": label_change,
         "metadata": {
-            name: [key for key in keys if not _metadata_key_looks_sensitive(key)]
+            name: [
+                key
+                for key in keys
+                if not (_metadata_key_looks_sensitive(key) or metadata_value_rule(key))
+            ]
             for name, keys in shown.items()
         },
     }
