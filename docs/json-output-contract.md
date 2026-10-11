@@ -536,6 +536,24 @@ otherwise:
   `mb doctor` uses it to say the file is "unreadable or invalid" rather than
   "could not be written".
 
+### `mb connect <provider> --json` after storing a secret again
+
+Storing a secret, or editing metadata, label or scope without one, for a
+provider that already has an entry adds one additive key, `reconnect`; it is
+absent on a first connect, so that payload is unchanged:
+
+```json
+"reconnect": {
+  "account_label": "kept",
+  "metadata": {"kept": ["account_id"], "set": ["region"], "removed": ["api_user"]}
+}
+```
+
+`account_label` is `kept`, `replaced` or `cleared`. The `metadata` lists are
+key names only, never values, and a key whose name looks like a secret is
+left out. The kept values themselves show in `status.account_label` and
+`status.metadata`. Consumers can ignore the key.
+
 ## First Migrated Surfaces
 
 The v1 envelope is present on:

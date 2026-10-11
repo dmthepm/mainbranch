@@ -38,6 +38,18 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   shown at most once per run and is never asked again. Worst-case `mb status`
   time is about one extra full budget (about 16 s instead of about 8 s).
   See `docs/connect.md`.
+- `mb connect`: storing a new secret for a provider that is already connected
+  no longer wipes its account label and metadata. The label and every metadata
+  key stay unless you pass new ones: `--account "X"` replaces the label,
+  `--account ""` clears it, `--metadata key=value` updates one key and keeps the
+  rest, and `--metadata key=` removes one. This holds for custom and built-in
+  providers in repo and user scope. `--json` adds `reconnect` saying what was
+  kept, replaced or removed (names only). The same holds for an edit without a
+  secret (`mb connect <provider> --metadata k=v`, `--account X` alone, or a scope
+  change) on a provider that is already recorded; a first connect records exactly
+  what it is given. If a kept `mode` disagrees with a new Stripe
+  key, it is refused and the message names the switch (`--metadata mode=test` or
+  `--metadata mode=live`) and otherwise says to use a key of that mode.
 - A keychain credential that is there but that macOS refuses to hand over is no
   longer reported as "missing from the secret store". When mb has just found
   the item and the read that follows answers "not found", `mb connect exec`,

@@ -1788,6 +1788,22 @@ def _parse_metadata(pairs: list[str]) -> dict[str, str]:
     return metadata
 
 
+def merge_recorded_metadata(existing: Any, given: dict[str, str]) -> dict[str, str]:
+    """The recorded metadata updated with ``given``.
+
+    Keys given are set, keys given with an empty value are removed, every other
+    recorded key is kept. Recorded keys whose value is empty are dropped.
+    """
+
+    merged = (
+        {str(key): str(value) for key, value in existing.items() if value not in (None, "")}
+        if isinstance(existing, dict)
+        else {}
+    )
+    merged.update(given)
+    return {key: value for key, value in merged.items() if value != ""}
+
+
 def _cloudflare_token_type(metadata: dict[str, Any], secret: str = "") -> str:
     if secret.strip().startswith("cfat_"):
         return "account"
@@ -1893,14 +1909,16 @@ def _validate_key_shape(provider: Provider, token: str, metadata: dict[str, str]
         if mode == "live" and token.startswith(("sk_test_", "rk_test_")):
             _refuse(
                 "stripe_mode_mismatch",
-                "metadata says mode=live but the key is a Stripe TEST key. "
-                "Nothing was stored; fix the mode or the key and reconnect.",
+                "The mode is live (metadata says mode=live) and this is a Stripe TEST key. "
+                "Nothing was stored. To switch this connection to test mode, rerun with "
+                "`--metadata mode=test`; otherwise use a live key.",
             )
         if mode == "test" and token.startswith(("sk_live_", "rk_live_")):
             _refuse(
                 "stripe_mode_mismatch",
-                "metadata says mode=test but the key is a Stripe LIVE key. "
-                "Nothing was stored; fix the mode or the key and reconnect.",
+                "The mode is test (metadata says mode=test) and this is a Stripe LIVE key. "
+                "Nothing was stored. To switch this connection to live mode, rerun with "
+                "`--metadata mode=live`; otherwise use a test key.",
             )
 
 
@@ -1909,7 +1927,7 @@ def connect_provider(
     repo: str | Path = ".",
     *,
     token: str = "",
-    account_label: str = "",
+    account_label: str | None = None,
     metadata_pairs: list[str] | None = None,
     secret_backend: str | None = None,
     scope: str = "repo",
@@ -1917,6 +1935,14 @@ def connect_provider(
     source: str = "",
 ) -> dict[str, Any]:
     """Connect a provider by writing repo metadata and local secrets.
+
+    Storing a secret for a provider that already has an entry replaces the
+    secret only: the recorded ``metadata`` and ``account_label`` stay unless the
+    call gives new values. ``account_label=None`` keeps the label, a string
+    replaces it, and ``""`` clears it. A metadata pair ``key=value`` updates that
+    key and ``key=`` removes it. A tokenless edit on an already-recorded
+    provider follows the same rule and keeps the secret reference. A first
+    connect records exactly what it was given.
 
     ``source`` is a non-secret reference to where the credential lives, such
     as ``op://vault/item/field``; it is stored as ``metadata.source`` so
@@ -1959,6 +1985,21 @@ def connect_provider(
             "here would drop the sign-in and orphan its stored grant. Renew the sign-in with "
             "`mb connect google --oauth --reauth`. Nothing was stored.",
         )
+    # What a later connect keeps: the repo entry, else the user-scope record. A
+    # first connect has none and records exactly what it was given.
+    prior_entry: dict[str, Any] | None = None
+    if not token:
+        prior_entry = existing_entry if isinstance(raw_existing_entry, dict) else None
+    else:
+        raw_prior = providers.get(provider.id)
+        if not isinstance(raw_prior, dict) and normalized_scope == "user":
+            # Only a user-scope store reads the user-scope file, so a repo-scope
+            # store never depends on it being readable.
+            raw_prior = _user_scope_provider_entry(repo_id, provider.id)
+        prior_entry = raw_prior if isinstance(raw_prior, dict) else None
+    if prior_entry is not None and not _records_oauth_grant(provider, prior_entry):
+        # A Google sign-in merges its own metadata below.
+        metadata = merge_recorded_metadata(prior_entry.get("metadata"), metadata)
     if source:
         if not metadata_pairs:
             raw_existing_metadata = existing_entry.get("metadata")
@@ -2042,11 +2083,15 @@ def connect_provider(
     else:
         store = SecretStore(secret_backend)
 
+    if prior_entry is not None and account_label is None:
+        recorded_label = str(prior_entry.get("account_label") or "")
+    else:
+        recorded_label = (account_label or "").strip()
     providers[provider.id] = {
         "provider": provider.id,
         "connected": bool(secrets) or not required,
         "scope": normalized_scope,
-        "account_label": account_label.strip(),
+        "account_label": recorded_label,
         "connected_at": _now(),
         "last_checked_at": _now(),
         "auth": provider.auth,
@@ -2092,8 +2137,8 @@ def connect_provider(
                 ]
                 if provider.category == "custom":
                     command.append("--custom")
-                if account_label:
-                    command.extend(["--account", account_label])
+                if recorded_label:
+                    command.extend(["--account", recorded_label])
                 for key, value in metadata.items():
                     command.extend(["--metadata", f"{key}={value}"])
                 action = "replaced" if previous_secret.present else "stored"
@@ -2135,7 +2180,7 @@ def connect_provider(
         target,
         _credential_deadline=credential_deadline,
     )
-    return {
+    result: dict[str, Any] = {
         "ok": status["state"] not in {"missing_secret", BACKEND_FAILURE_STATE},
         "ready": bool(status["ok"]),
         "provider": provider.id,
@@ -2151,6 +2196,46 @@ def connect_provider(
         "stale_sibling_refs": [],
         "setup": _meta_setup() if provider.id == "meta" else {},
         "status": status,
+    }
+    if prior_entry is not None:
+        result["reconnect"] = _reconnect_changes(prior_entry, recorded_label, metadata)
+    return result
+
+
+def _reconnect_changes(
+    prior_entry: dict[str, Any],
+    recorded_label: str,
+    metadata: dict[str, str],
+) -> dict[str, Any]:
+    """Which recorded fields a re-stored secret kept, replaced or cleared.
+
+    Names only, never values; a key that looks like a secret is left out.
+    """
+
+    previous_label = str(prior_entry.get("account_label") or "")
+    if recorded_label == previous_label:
+        label_change = "kept"
+    elif recorded_label:
+        label_change = "replaced"
+    else:
+        label_change = "cleared"
+    previous = prior_entry.get("metadata")
+    before = (
+        {str(key): str(value) for key, value in previous.items() if value not in (None, "")}
+        if isinstance(previous, dict)
+        else {}
+    )
+    shown = {
+        "kept": sorted(key for key in metadata if key in before and metadata[key] == before[key]),
+        "set": sorted(key for key in metadata if before.get(key) != metadata[key]),
+        "removed": sorted(key for key in before if key not in metadata),
+    }
+    return {
+        "account_label": label_change,
+        "metadata": {
+            name: [key for key in keys if not _metadata_key_looks_sensitive(key)]
+            for name, keys in shown.items()
+        },
     }
 
 

@@ -218,13 +218,7 @@ def merge_oauth_metadata(existing: Any, given: dict[str, str]) -> dict[str, str]
     """The recorded metadata updated with ``given``: keys given are set, keys
     given with an empty value are removed, every other recorded key is kept."""
 
-    merged = (
-        {str(key): str(value) for key, value in existing.items() if value not in (None, "")}
-        if isinstance(existing, dict)
-        else {}
-    )
-    merged.update(normalize_oauth_metadata(given))
-    return {key: value for key, value in merged.items() if value != ""}
+    return connect_mod.merge_recorded_metadata(existing, normalize_oauth_metadata(given))
 
 
 def _oauth_metadata(pairs: list[str], existing: dict[str, Any]) -> dict[str, str]:
