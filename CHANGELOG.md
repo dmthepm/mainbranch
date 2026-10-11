@@ -15,9 +15,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   (for example no file locking on a network home folder) stops immediately with
   `credential_lock_unavailable` and no longer claims another connect is saving
   (#1162).
-- Only connects that store a token (`--token-stdin`, `rotate`, `google --oauth`)
-  need `~/.mainbranch/locks` to be writable; 0.6.6's notes said all repo-scope
-  connects.
+- Only connects that store a token (`mb connect <provider>` given a token,
+  `rotate`, `google --oauth`) need `~/.mainbranch/locks` to be writable; 0.6.6's
+  notes said all repo-scope connects.
 
 `mb` starts without loading macOS network settings unless a command makes a web request, so short commands like `mb --version` start faster and put less load on the system.
 

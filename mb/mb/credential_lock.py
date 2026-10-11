@@ -101,8 +101,8 @@ def _cannot_lock(directory: Path, provider_name: str, code: int) -> CredentialBu
     return CredentialBusyError(
         f"Main Branch could not lock a file in {_shown(directory)} ({name}), so the "
         f"{provider_name} credential was not saved. Nothing was stored. That folder may be on a "
-        "file system without file locking, such as a network home folder; set MAINBRANCH_HOME "
-        "to a local folder, then rerun the command.",
+        "file system without file locking, such as a network home folder. Main Branch needs "
+        "file locking there to save a credential safely.",
         UNAVAILABLE_STATE,
     )
 

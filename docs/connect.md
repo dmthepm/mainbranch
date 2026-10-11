@@ -1206,14 +1206,15 @@ access will remain available.
 
 ## One save at a time
 
-Three commands hold a lock on the credential from the moment they read its
-previous value until the record is written or the rollback is done: `mb connect
-<provider> --token-stdin`, `mb connect rotate` and `mb connect google --oauth`.
-Only one `mb` process at a time saves a given credential through them, in repo
-and user scope. Only commands that store a token take the lock, and they take
-it in either scope; a connect that stores no token (metadata only, no
-`--token-stdin`, a provider with no secrets) and disconnecting never
-touch it, so they do not need `$MAINBRANCH_HOME/locks` to be writable.
+Commands that store a token hold a lock on the credential from the moment they
+read its previous value until the record is written or the rollback is done:
+`mb connect <provider>` when it is given a token (`--token`, `--token-stdin`,
+`--from-env` or the hidden prompt), `mb connect rotate` and `mb connect google
+--oauth`. They take it in repo and user scope alike, so only one `mb` process at
+a time saves a given credential through them, and they need
+`$MAINBRANCH_HOME/locks` (default `~/.mainbranch/locks`) to be writable. A
+connect that stores no token (metadata only, or a provider with no secrets) and
+disconnecting never touch the lock, so they do not need that folder.
 
 A second command waits about five seconds, then stops before it writes
 anything, says "Another mb connect is saving the <Provider> credential right
@@ -1226,7 +1227,8 @@ created or written, the command stops at once with state
 file system cannot lock the file (a network home folder without lock support,
 for example) or the platform has no file locking (Windows), it also stops at
 once with that state and says so, without waiting and without claiming another
-save is running; set `MAINBRANCH_HOME` to a local folder or use WSL2. Either
-way nothing is saved without the lock. The lock stops those commands from racing each other; it does not
+save is running; Main Branch needs file locking on the disk under
+`$MAINBRANCH_HOME` (use WSL2 on Windows). Either way nothing is saved without
+the lock. The lock stops those commands from racing each other; it does not
 stop any other `mb` command, another program, or you from editing the same
 credential in the store.

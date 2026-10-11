@@ -556,7 +556,7 @@ left out. The kept values themselves show in `status.account_label` and
 
 ### `mb connect ... --json` when another save holds the credential
 
-`mb connect <provider> --token-stdin`, `rotate` and `mb connect google --oauth`
+`mb connect <provider>` with a token, `rotate` and `mb connect google --oauth`
 (the commands that store a token, in either scope) exit 1 with
 `state: credential_busy` when another `mb` process is saving the same
 credential and does not finish within about five seconds. They exit 1 at once
@@ -564,7 +564,7 @@ with `state: credential_lock_unavailable` when the lock file cannot be created o
 written, or cannot be locked (no file locking on that file system or platform).
 Both mean nothing was stored; the message says so, in plain text with `~/`
 paths and no credential. Retry on `credential_busy`; fix the folder or
-`MAINBRANCH_HOME` on `credential_lock_unavailable`.
+file system on `credential_lock_unavailable`.
 
 ## First Migrated Surfaces
 
