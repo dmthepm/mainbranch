@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+`mb` starts without loading macOS network settings unless a command makes a web request, so short commands like `mb --version` start faster and put less load on the system.
+
 ## [0.6.6] - 2026-10-11
 
 `mb connect`: storing a credential again keeps the provider's account label

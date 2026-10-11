@@ -10,8 +10,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -443,6 +441,9 @@ def _release_summary(body: str) -> str:
 
 
 def _release_context(version: str, *, timeout: float = 3.0) -> dict[str, Any]:
+    import urllib.error
+    import urllib.request
+
     version = version.strip()
     context: dict[str, Any] = {
         "version": version,

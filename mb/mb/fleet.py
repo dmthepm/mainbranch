@@ -21,8 +21,6 @@ import os
 import re
 import sqlite3
 import subprocess
-import urllib.error
-import urllib.request
 from collections.abc import Callable
 from contextlib import closing, suppress
 from dataclasses import dataclass
@@ -217,6 +215,9 @@ class GitHub:
 
 
 def _http_get(url: str, headers: dict[str, str]) -> tuple[int, Any]:
+    import urllib.error
+    import urllib.request
+
     request = urllib.request.Request(url, headers=headers)
     try:
         with http_safe.open_no_redirect(request, timeout=CLOUDFLARE_TIMEOUT_SECONDS) as response:

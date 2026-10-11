@@ -42,9 +42,7 @@ import socket
 import socketserver
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -510,6 +508,9 @@ def _urllib_sender(
 ) -> tuple[int, bytes]:
     """The one HTTPS path for Google calls. ``mb google`` reads pass ``method="GET"``
     (with no body) and a larger ``max_bytes`` for report answers."""
+    import urllib.error
+    import urllib.request
+
     data = body if method == "POST" else None
     request = urllib.request.Request(url, data=data, headers=dict(headers), method=method)
     try:
