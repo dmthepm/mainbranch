@@ -33,8 +33,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   to repair; `mb connect status <provider>` reads that one credential), and
   `mb doctor` no longer sends anyone to the keychain repair for them. A real
   pending prompt, a locked keychain and a slow store are reported as before:
-  a read the shared budget cut short is read once more with a full budget
-  before it is believed (at most one extra budget per run).
+  a read the shared budget cut short, and that did not finish, is
+  read once more with a full budget before it is believed. A keychain dialog is
+  shown at most once per run and is never asked again. Worst-case `mb status`
+  time is about one extra full budget (about 16 s instead of about 8 s).
   See `docs/connect.md`.
 - A keychain credential that is there but that macOS refuses to hand over is no
   longer reported as "missing from the secret store". When mb has just found

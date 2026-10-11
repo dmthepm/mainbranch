@@ -185,11 +185,13 @@ the suggested command is `mb connect status <provider>`, which reads that one
 credential with its own time budget, the same read `mb connect exec` does.
 Only a credential that was never asked for is not checked. A read that had been
 cut short by the shared budget and then does not finish is read once more with a
-full budget, as `mb connect exec` would: a healthy item then reads normally, a
-store that really hangs is `credential_store_timeout`, and a macOS dialog that
-is really waiting is `keychain_prompt_pending`. That retry costs at most one
-extra full budget per run; the providers after it have no budget left and are
-not checked.
+full budget, as `mb connect exec` would: a healthy item then reads normally and
+a store that really hangs is `credential_store_timeout`. A keychain read is
+never started with less than a second left, and one that started and waited is
+a real macOS dialog: it is `keychain_prompt_pending` and is not asked again, so
+a dialog is shown at most once per run. The retry costs at most one extra full
+budget per run (about 16 s worst case instead of about 8 s); the providers after
+it have no budget left and are not checked.
 
 ### What the exit code means
 

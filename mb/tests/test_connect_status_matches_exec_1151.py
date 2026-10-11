@@ -413,18 +413,48 @@ def test_a_clipped_read_reads_ready_on_the_retry(world: Any) -> None:
     assert status["credential_backend"]["state"] == "ready"
 
 
-def test_a_started_dialog_wait_on_a_clipped_read_is_pending(world: Any) -> None:
+def test_a_started_dialog_wait_on_a_clipped_read_is_pending_and_shown_once(world: Any) -> None:
     repo, refs, keychain = _clipped_pair(world)
     keychain.modes[refs["resend"]] = "prompt-pending"
 
     resend = _by_id(connect_mod.status_all(repo))["resend"]
     assert next(iter(resend["secrets"].values()))["backend_state"] == "keychain_prompt_pending"
     assert resend["state"] == connect_mod.BACKEND_FAILURE_STATE
+    # One launch is one dialog: a started call that waited is never asked again.
+    assert len([call for call in keychain.calls if call[1] == refs["resend"]]) == 1
 
-    # A cut-short call that only looked like a dialog reads ready on the retry.
-    keychain.modes.pop(refs["resend"])
+
+def test_a_clipped_dialog_that_runs_to_the_helper_deadline_is_launched_once(world: Any) -> None:
+    repo, refs, keychain = _clipped_pair(world)
     keychain.pending_first.add(refs["resend"])
-    assert _by_id(connect_mod.status_all(repo))["resend"]["state"] == "unvalidated"
+
+    resend = _by_id(connect_mod.status_all(repo))["resend"]
+    assert next(iter(resend["secrets"].values()))["backend_state"] == "keychain_prompt_pending"
+    assert len([call for call in keychain.calls if call[1] == refs["resend"]]) == 1
+
+
+def test_a_read_is_not_started_with_less_than_the_floor_left(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = object.__new__(helper_mod._MacSecurity)
+    adapter.keychain_path = None
+    started: list[Any] = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: started.append(a))
+
+    adapter.deadline = time.monotonic() + helper_mod.MIN_READ_SECONDS / 2
+    with pytest.raises(helper_mod._BudgetSpent):
+        adapter._security_get("fixture-ref")
+    assert started == []
+    assert helper_mod._failure_state(helper_mod._BudgetSpent()) == "not-checked"
+
+    def hang(*_args: Any, **kwargs: Any) -> Any:
+        raise subprocess.TimeoutExpired("security", kwargs["timeout"])
+
+    # With the floor left the call starts, and a timeout is a real dialog.
+    adapter.deadline = time.monotonic() + helper_mod.MIN_READ_SECONDS + 1
+    monkeypatch.setattr(subprocess, "run", hang)
+    with pytest.raises(helper_mod._PromptPending):
+        adapter._security_get("fixture-ref")
 
 
 def test_the_retry_spends_the_budget_so_later_providers_are_not_checked(world: Any) -> None:

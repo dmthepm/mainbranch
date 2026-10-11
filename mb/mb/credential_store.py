@@ -497,11 +497,6 @@ def _run_helper(
         if not clipped:
             return {"state": "timed-out"}
         return _run_helper(backend, action, ref=ref, value=value, interactive=interactive)
-    if clipped and state == "prompt-pending":
-        # A `security` call the shared budget cut short looks like a dialog
-        # that is waiting. Ask again with a full budget, as exec would: a
-        # healthy item then reads, a real dialog is still reported as one.
-        return _run_helper(backend, action, ref=ref, value=value, interactive=interactive)
     return result
 
 

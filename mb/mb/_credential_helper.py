@@ -91,6 +91,10 @@ TEST_CRASH_ENV = "MB_CREDENTIAL_TEST_CRASH_AT"
 _SAFE_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9:/._@+_-]{0,511}")
 
 
+# A `security` read is not started with less than this left (#1151).
+MIN_READ_SECONDS = 1.0
+
+
 class _PromptPending(Exception):
     """A keychain operation would have to wait on a macOS dialog."""
 
@@ -100,8 +104,9 @@ class _BudgetSpent(Exception):
 
     Nothing was asked of the keychain, so this is not a pending dialog: it
     reports `not-checked` (#1151). A `security` call that started and then ran
-    out of time is `_PromptPending`; a caller whose budget was cut short reads
-    that item again with a full one before believing it.
+    out of time is `_PromptPending`, and is never asked again: a read starts
+    only with at least `MIN_READ_SECONDS` left, which a trusted item answers
+    in milliseconds, so a call that used that time is a real dialog.
     """
 
 
@@ -656,7 +661,9 @@ class _MacSecurity:
 
     # -- Items created by Apple-signed /usr/bin/security ---------------------
 
-    def _security_tool(self, args: list[str], *, stdin: str | None = None) -> Any:
+    def _security_tool(
+        self, args: list[str], *, stdin: str | None = None, min_seconds: float = 0.0
+    ) -> Any:
         """Run ``/usr/bin/security`` within the remaining budget.
 
         ``security`` cannot be told to fail instead of showing a dialog, so the
@@ -665,7 +672,7 @@ class _MacSecurity:
         """
 
         remaining = self.deadline - time.monotonic()
-        if remaining <= 0:
+        if remaining <= 0 or remaining < min_seconds:
             raise _BudgetSpent
         try:
             if stdin is None:
@@ -695,7 +702,8 @@ class _MacSecurity:
 
     def _security_get(self, ref: str) -> tuple[str, str | None]:
         completed = self._security_tool(
-            ["find-generic-password", "-s", SERVICE_NAME, "-a", ref, "-g", *self._keychain_args()]
+            ["find-generic-password", "-s", SERVICE_NAME, "-a", ref, "-g", *self._keychain_args()],
+            min_seconds=MIN_READ_SECONDS,
         )
         if completed.returncode != 0:
             return ("missing" if completed.returncode == 44 else "unavailable"), None
