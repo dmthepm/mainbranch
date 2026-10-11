@@ -25,6 +25,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb connect --scope user` no longer replaces a stored credential it could not
+  read, and its rollback after a failed save of the user-scope file no longer
+  deletes a credential it cannot prove it just stored. An unreadable existing
+  credential now stops the command before anything is written (check `mb
+  connect status <provider>`, then retry); if another process stored a
+  different value meanwhile, the rollback leaves it and says it stayed changed.
 - `mb connect status`, `mb connect list` and `mb doctor` no longer report a
   credential as `backend_unavailable` or `keychain_prompt_pending` when `mb
   connect exec` can read it. With several connected providers the status
