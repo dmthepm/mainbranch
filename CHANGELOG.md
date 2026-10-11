@@ -11,6 +11,31 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-10-11
+
+`mb connect`: storing a credential again keeps the provider's account label
+and metadata. `--account ""` clears the label and `--metadata key=` clears one
+key, and an edit without a secret keeps them too. A kept Stripe `mode` that
+disagrees with a new key is refused, and the message names
+`--metadata mode=test` or `--metadata mode=live`. A keychain credential that
+macOS refuses to hand over is no longer reported missing; the repair is
+`mb connect repair --keychain`. `mb connect status`, `mb status` and
+`mb doctor` now agree with what `mb connect exec` can read: a credential the
+shared read time never reached shows as "not checked" (`mb connect status
+<provider>` reads it in full), while a real pending prompt, a locked keychain
+or a hung store is reported as before (a status run can take about 16 s
+instead of 8 s in the worst case). A user-scope connect never leaves a
+sign-in or repo metadata half-changed when the user-scope file is read-only
+or corrupt, and `mb doctor` names a corrupt user-scope file instead of
+printing a traceback. More suggested commands name your business repo
+(status repairs, update, spine, readiness, start, legacy repair, books).
+`mb google --out` shows a path that leaves your home as you typed it and
+never shows another user's home in full, `mb site`
+counts a Google Ads customer ID as declared only when it has 10 digits, new
+repos get truer `mb init` conventions lines, and the session guidance asks for
+save notes `mb checkpoint --validate` accepts. To upgrade a uv install, run
+`uv tool install --refresh-package mainbranch mainbranch@latest`.
+
 ### Changed
 
 - For a user-scope connect file that is not valid UTF-8, `mb connect status
@@ -161,9 +186,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   the previous one) and names that file, instead of blaming the repo metadata.
   `mb connect token` now prints its not-recorded note after the error line, as
   `mb connect exec` does.
-- Saving progress should no longer suggest a save note that
-  `mb checkpoint --validate` would turn down. The start and end-of-session
-  guidance now says to pick the opening word from the ones `--validate` accepts
+- Saving progress is less likely to suggest a save note that
+  `mb checkpoint --validate` would turn down; validate a note before saving
+  it, because release simulations of a start-wiring repair and a legacy
+  migration still proposed `[repaired]` and `[migrated]` (#1134). The start
+  and end-of-session guidance now says to pick the opening word from the ones `--validate` accepts
   (a repair is `[fixed]`, a migration or update run is `[ran]`, a move or rename
   is `[updated]`) and to validate the note before showing it, instead of
   suggesting `[repaired]`, `[migrated]` or `[moved]`, which fail. Release simulations
