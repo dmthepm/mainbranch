@@ -89,6 +89,41 @@ def test_checkpoint_resolves_current_absolute_mb_entrypoint(
     assert checkpoint_mod._resolved_mb_path() == str(current_mb.resolve())
 
 
+def test_committing_through_the_hook_never_starts_an_installed_mb(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """A host ``mb`` far down PATH must not be the one the test hook runs."""
+
+    installed_dir = tmp_path / "installed"
+    installed_dir.mkdir()
+    marker = tmp_path / "installed-mb-started"
+    installed = installed_dir / "mb"
+    installed.write_text(f'#!/bin/sh\necho started > "{marker}"\nexit 0\n', encoding="utf-8")
+    installed.chmod(0o755)
+    # Drop every other `mb` from PATH (conftest's no-op stub stays), so without
+    # the stub the sentinel below is the first `mb` found, as the contributor's
+    # own would be.
+    kept = [
+        entry
+        for entry in os.environ["PATH"].split(os.pathsep)
+        if Path(entry).name.startswith("no-installed-mb") or not (Path(entry) / "mb").exists()
+    ]
+    monkeypatch.setenv("PATH", os.pathsep.join([*kept, str(installed_dir)]))
+    repo = tmp_path / "acme"
+    init_run(path=str(repo), name="Acme")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+    hook = (repo / ".git" / "hooks" / "commit-msg").read_text(encoding="utf-8")
+    assert str(installed) not in hook
+    (repo / "core" / "offer.md").write_text("# Offer\nUpdated\n", encoding="utf-8")
+    _git(repo, "add", ".")
+
+    result = _git(repo, "commit", "-m", "[updated] offer.md -- clarified guarantee")
+
+    assert result.returncode == 0, result.stderr
+    assert not marker.exists()
+
+
 def test_checkpoint_plan_clean_repo_returns_clean(tmp_path: Path, monkeypatch: Any) -> None:
     repo = _business_repo(tmp_path, monkeypatch)
 
