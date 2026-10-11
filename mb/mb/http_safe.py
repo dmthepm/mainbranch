@@ -13,23 +13,35 @@ download) may keep following redirects through plain ``urlopen``.
 
 from __future__ import annotations
 
-import urllib.request
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import urllib.request
+
+# ``urllib.request`` is imported on first use, not at module level: on macOS it
+# loads ``_scproxy`` (SystemConfiguration), which every ``mb`` process would
+# otherwise pay for, even ``mb --version``.
+_opener: Any = None
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Refuse every redirect; the 3xx comes back as an ``HTTPError``."""
+def _get_opener() -> Any:
+    global _opener
+    if _opener is None:
+        import urllib.request
 
-    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
-        return None
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            """Refuse every redirect; the 3xx comes back as an ``HTTPError``."""
 
+            def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+                return None
 
-OPENER = urllib.request.build_opener(NoRedirect)
+        _opener = urllib.request.build_opener(NoRedirect)
+    return _opener
 
 
 def open_no_redirect(request: urllib.request.Request, timeout: float) -> Any:
     """Open ``request`` without following any redirect."""
-    return OPENER.open(request, timeout=timeout)
+    return _get_opener().open(request, timeout=timeout)
 
 
 def is_redirect(status: int) -> bool:

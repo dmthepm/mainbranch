@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 import re
 import shlex
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -117,6 +115,9 @@ def compare_versions(left: str, right: str) -> int:
 
 
 def latest_pypi_version(timeout: float = 3.0) -> str | None:
+    import urllib.error
+    import urllib.request
+
     try:
         with urllib.request.urlopen(PYPI_PACKAGE_URL, timeout=timeout) as response:
             data = json.loads(response.read().decode("utf-8"))

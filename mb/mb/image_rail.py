@@ -8,8 +8,6 @@ import importlib.util
 import json
 import os
 import struct
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -317,6 +315,9 @@ def _fal_provider_blocker(generate: bool) -> tuple[str, str]:
 
 
 def _generate_fal_image(prompt: str, *, model: str, size: str, quality: str) -> bytes:
+    import urllib.error
+    import urllib.request
+
     del quality  # fal FLUX endpoints tune steps/guidance, not an OpenAI-style quality knob.
     fal_key = os.environ.get("FAL_KEY", "")
     if not fal_key:

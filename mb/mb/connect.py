@@ -14,9 +14,7 @@ import shutil
 import stat
 import subprocess
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from collections.abc import Callable
 from contextlib import ExitStack, suppress
 from dataclasses import dataclass
@@ -3852,6 +3850,9 @@ def _http_get_json(
     ``headers`` (for example GitHub's ``X-OAuth-Scopes``). The body is never
     returned.
     """
+    import urllib.error
+    import urllib.request
+
     request = urllib.request.Request(url, headers=headers or {})
     secret_values = tuple(_header_secret_candidates(headers))
 
