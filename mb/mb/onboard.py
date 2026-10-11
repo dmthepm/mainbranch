@@ -337,7 +337,7 @@ def _setup_complete(repo: Path, *, github_requested: bool = False) -> dict[str, 
         "checkpoint_hook_ready": bool(checkpoint_hook.get("ok")),
         "checkpoint_hook_repair": ""
         if checkpoint_hook.get("ok")
-        else "mb checkpoint --install-hook",
+        else f"mb checkpoint{repo_flag(repo)} --install-hook",
         "committed_with_durable_files": bool(committed and not dirty),
         "github_remote_connected": bool(remote),
         "github_remote": remote,

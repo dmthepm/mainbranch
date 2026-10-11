@@ -19,6 +19,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `rotate`, `google --oauth`) need `~/.mainbranch/locks` to be writable; 0.6.6's
   notes said all repo-scope connects.
 
+- Suggested commands name the business repo from another folder: `mb checkpoint --hook-status`, the `mb onboard plan` hint in `mb onboard status`, the `mb connect hydrate` repair for a workspace that is not hydrated, and the `mb start` wiring repair, which no longer ends with "from the business repo". From inside the repo they read as before (#1083).
+
 `mb` starts without loading macOS network settings unless a command makes a web request, so short commands like `mb --version` start faster and put less load on the system.
 
 ## [0.6.6] - 2026-10-11

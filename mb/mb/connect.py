@@ -47,6 +47,7 @@ from mb.credential_store import (
     select_secret_backend,
 )
 from mb.durable import atomic_write_text
+from mb.engine import repo_flag
 
 CONFIG_RELATIVE_PATH = Path(".mb") / "connect.yaml"
 USER_SCOPE_RELATIVE_PATH = Path("connect") / "user-scope.yaml"
@@ -2528,7 +2529,11 @@ def _backend_failure_reason(secrets: dict[str, Any]) -> str:
 
 
 def _unhydrated_status(
-    provider: Provider, entry: dict[str, Any], *, deadline: float | None = None
+    provider: Provider,
+    entry: dict[str, Any],
+    *,
+    repo: str | Path = ".",
+    deadline: float | None = None,
 ) -> dict[str, Any]:
     secrets, missing = _secret_statuses(provider, entry, deadline=deadline)
     raw_metadata = entry.get("metadata")
@@ -2548,12 +2553,13 @@ def _unhydrated_status(
         repair = _repair(provider, state)
         ok = False
     else:
+        hydrate_flag = repo_flag(repo) or " --repo ."
         repair = {
             "summary": (
                 f"{provider.name} exists in user scope, but this workspace is not hydrated."
             ),
-            "repair": "Run `mb connect hydrate --repo .` from this workspace.",
-            "repair_command": "mb connect hydrate --repo .",
+            "repair": f"Run `mb connect hydrate{hydrate_flag}` from this workspace.",
+            "repair_command": f"mb connect hydrate{hydrate_flag}",
         }
         state = "needs_hydration"
         ok = False
@@ -2634,7 +2640,9 @@ def status_provider(
     if not isinstance(entry, dict):
         user_entry = _user_scope_provider_entry(repo_id, provider.id)
         if user_entry is not None:
-            return _unhydrated_status(provider, user_entry, deadline=_credential_deadline)
+            return _unhydrated_status(
+                provider, user_entry, repo=target, deadline=_credential_deadline
+            )
     if provider.id == "meta":
         prereq_state = _meta_prerequisite_state(
             which_func=which_func,
