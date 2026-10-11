@@ -11,6 +11,7 @@ import functools
 import json
 import math
 import os
+import shlex
 import sys
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -3374,10 +3375,13 @@ def validate_cmd(
                 err=True,
             )
         raise typer.Exit(2) from exc
+    if repo_flag(target):
+        # Only from another folder; the copy leaves the report `run` built alone.
+        report = doctor_mod._qualify_validation_report(report, Path(target).expanduser())
     if json_out:
         typer.echo(json.dumps(report, indent=2))
     else:
-        validate_mod.render_human(report, verbose=verbose)
+        validate_mod.render_human(report, verbose=verbose, repo=Path(target))
     raise typer.Exit(0 if report["ok"] else 1)
 
 
@@ -3582,6 +3586,9 @@ def checkpoint_cmd(
             result["repair_command"] = doctor_mod._qualify_field(
                 result["repair_command"], Path(repo).expanduser()
             )
+            if result["repair_command"] == "git init" and repo_flag(repo):
+                # Not a git repo yet: `git -C` needs the folder to exist, `git init <dir>` makes it.
+                result["repair_command"] = f"git init {shlex.quote(str(result['repo']))}"
     elif validate:
         validation_message = sys.stdin.read() if validate == "-" else validate
         result = checkpoint_mod.validate_message(validation_message)
@@ -3639,6 +3646,7 @@ def migrate_cmd(
         raise typer.Exit(2)
     if apply_changes:
         result = migrate_mod.apply(repo)
+        result["next"] = migrate_mod.name_repo(result["next"], repo)
         if json_out:
             typer.echo(json.dumps(result, indent=2))
         else:
@@ -3646,6 +3654,7 @@ def migrate_cmd(
         raise typer.Exit(0 if result["ok"] else 1)
     if check:
         result = migrate_mod.check(repo, include_diff=diff)
+        result["next"] = migrate_mod.name_repo(result["next"], repo)
         if json_out:
             typer.echo(json.dumps(result, indent=2))
         else:
@@ -3654,6 +3663,7 @@ def migrate_cmd(
         raise typer.Exit(1 if pending or not result["ok"] else 0)
 
     result = migrate_mod.status(repo)
+    result["next"] = migrate_mod.name_repo(result["next"], repo)
     if json_out:
         typer.echo(json.dumps(result, indent=2))
     else:
@@ -3706,6 +3716,7 @@ def migrate_status_cmd(
     """Show current schema version and pending migrations."""
     root_repo = (ctx.obj or {}).get("repo", ".") if isinstance(ctx.obj, dict) else "."
     result = migrate_mod.status(repo or root_repo)
+    result["next"] = migrate_mod.name_repo(result["next"], repo or root_repo)
     if json_out:
         typer.echo(json.dumps(result, indent=2))
     else:
@@ -3889,6 +3900,10 @@ def skill_repair_cmd(
     from mb.engine import inspect_personal_skill_conflicts
 
     result = inspect_personal_skill_conflicts(repo, apply=apply_changes)
+    # `--repo .` acts on the current folder, so name the business repo from another one (#1083).
+    repair_command = f"mb skill repair{repo_flag(repo) or ' --repo .'} --apply"
+    if "repair_command" in result:
+        result["repair_command"] = repair_command
     if json_out:
         typer.echo(json.dumps(result, indent=2))
     else:
@@ -3912,7 +3927,7 @@ def skill_repair_cmd(
                     if finding["repaired"]:
                         typer.echo(f"  moved to: {finding['backup_path']}")
                     else:
-                        typer.echo("  safe repair: run `mb skill repair --repo . --apply`")
+                        typer.echo(f"  safe repair: run `{repair_command}`")
                 else:
                     typer.echo(
                         "  not changed: this is not a stale or broken Main Branch skill link"
@@ -3920,7 +3935,7 @@ def skill_repair_cmd(
         if not apply_changes and summary["repairable"]:
             typer.echo("")
             typer.echo("To move stale or broken Main Branch symlinks to backup:")
-            typer.echo("  mb skill repair --repo . --apply")
+            typer.echo(f"  {repair_command}")
     raise typer.Exit(0 if result["ok"] else 1)
 
 

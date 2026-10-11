@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -1172,7 +1173,7 @@ def test_books_status_cli_human_output_mentions_plan(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "mb books status" in result.output
     assert "Ignore rules:      missing" in result.output
-    assert "Run `mb books doctor --plan`" in result.output
+    assert f"Run `mb books doctor --plan {shlex.quote(str(repo.resolve()))}`" in result.output
 
 
 def test_books_doctor_plan_cli_human_output_formats_ignore_entries(tmp_path: Path) -> None:
