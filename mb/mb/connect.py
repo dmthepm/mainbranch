@@ -18,7 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
-from contextlib import suppress
+from contextlib import ExitStack, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +28,13 @@ import yaml
 
 from mb import http_safe
 from mb._credential_helper import STAGE_SUFFIX
+from mb.credential_lock import (
+    CredentialBusyError,  # noqa: F401  (re-exported for the CLI)
+    credential_lock,
+    forget_stored,
+    note_stored,
+    still_ours,
+)
 from mb.credential_store import (
     KEYCHAIN_REPAIR_ALL_COMMAND,
     KEYCHAIN_REPAIR_COMMAND,
@@ -1121,8 +1128,12 @@ def _restore_secret(store: SecretStore, ref: str, previous: SecretProbe, written
     """
 
     try:
+        if not still_ours(store.backend, ref, written):
+            # A later connect in this process stored here after this one did.
+            return False
         if previous.present:
             store.set(ref, previous.value, deadline=new_credential_deadline())
+            forget_stored(store.backend, ref)
             return True
         if not _snapshot_conclusive(previous):
             return False
@@ -1131,9 +1142,12 @@ def _restore_secret(store: SecretStore, ref: str, previous: SecretProbe, written
             return False
         if not current.present:
             return True
-        if not hmac.compare_digest(current.value.encode(), written.encode()):
+        matched = hmac.compare_digest(current.value.encode(), written.encode())
+        # Re-check after the comparison: a writer that finished in between wins.
+        if not matched or not still_ours(store.backend, ref, written):
             return False
         store.delete(ref)
+        forget_stored(store.backend, ref)
     except Exception:
         return False
     return True
@@ -1960,6 +1974,41 @@ def connect_provider(
     custom: bool = False,
     source: str = "",
 ) -> dict[str, Any]:
+    """Connect a provider (see ``_connect_provider``).
+
+    Storing a credential holds an exclusive per-credential lock from the
+    snapshot of the previous value to the end of any rollback, so only one mb
+    process at a time saves it. The lock is released when this returns.
+    """
+
+    with ExitStack() as locks:
+        return _connect_provider(
+            provider_id,
+            repo,
+            token=token,
+            account_label=account_label,
+            metadata_pairs=metadata_pairs,
+            secret_backend=secret_backend,
+            scope=scope,
+            custom=custom,
+            source=source,
+            locks=locks,
+        )
+
+
+def _connect_provider(
+    provider_id: str,
+    repo: str | Path = ".",
+    *,
+    token: str = "",
+    account_label: str | None = None,
+    metadata_pairs: list[str] | None = None,
+    secret_backend: str | None = None,
+    scope: str = "repo",
+    custom: bool = False,
+    source: str = "",
+    locks: ExitStack,
+) -> dict[str, Any]:
     """Connect a provider by writing repo metadata and local secrets.
 
     Storing a secret for a provider that already has an entry replaces the
@@ -2045,6 +2094,9 @@ def connect_provider(
         if token:
             store = SecretStore(secret_backend)
             ref = _secret_ref(repo_id, provider.id, primary)
+            # Before the snapshot, so nothing else writes this credential until
+            # the record is written or the rollback is done.
+            locks.enter_context(credential_lock(_home(), [ref], provider.name))
             try:
                 if normalized_scope == "user":
                     # The rollback snapshot is a separate bounded read. The write
@@ -2056,6 +2108,7 @@ def connect_provider(
                         # Nothing is known about the item: writing could lose its value.
                         raise KeychainError("credential_store_timeout")
                     credential_deadline = new_credential_deadline()
+                note_stored(store.backend, ref, token)
                 store.set(ref, token, deadline=credential_deadline)
             except KeychainError as exc:
                 # Fail before any metadata is written, so a backend outage
