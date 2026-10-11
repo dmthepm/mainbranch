@@ -142,7 +142,9 @@ def test_connect_hydrate_hint_names_the_workspace(
     doctor = connect.doctor(workspace)
     check = next(item for item in doctor["checks"] if item["name"] == "provider:cloudflare")
     assert check["repair_command"] == command
-    cli = runner.invoke(app, ["connect", "status", "cloudflare", "--repo", str(workspace), "--json"])
+    cli = runner.invoke(
+        app, ["connect", "status", "cloudflare", "--repo", str(workspace), "--json"]
+    )
     assert command in json.dumps(json.loads(cli.stdout))
 
 
