@@ -11,6 +11,7 @@ import json
 import shlex
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -44,9 +45,9 @@ def _flag(business: Path) -> str:
     return f"--repo {shlex.quote(str(business))}"
 
 
-def _hook_status_command(business: Path) -> dict:
+def _hook_status_command(business: Path) -> dict[str, Any]:
     result = runner.invoke(app, ["checkpoint", "--repo", str(business), "--hook-status", "--json"])
-    payload: dict = json.loads(result.stdout)
+    payload: dict[str, Any] = json.loads(result.stdout)
     return payload
 
 
@@ -158,10 +159,10 @@ def test_connect_hydrate_hint_inside_the_workspace_keeps_the_bare_command(
     assert before["repair"] == "Run `mb connect hydrate --repo .` from this workspace."
 
 
-def _start(business: Path) -> dict:
+def _start(business: Path) -> dict[str, Any]:
     result = runner.invoke(app, ["start", "--repo", str(business), "--json"])
     assert result.exit_code in {0, 1}, result.output
-    payload: dict = json.loads(result.stdout)
+    payload: dict[str, Any] = json.loads(result.stdout)
     return payload
 
 
