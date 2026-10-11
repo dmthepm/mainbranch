@@ -1105,8 +1105,10 @@ file and says to make it writable or move it and rerun; nothing is stored or
 changed. If writing is denied after a token was stored by connect or rotate,
 Main Branch restores the previous credential (or removes the newly created
 one) before returning that refusal. The newly stored credential is removed
-only if it still holds the value this command wrote; if the store changed
-meanwhile, it is left and reported as stayed changed. A stored credential that
+only if it still holds the value this command wrote; if it no longer
+matches, it is left and reported as stayed changed. Other `mb connect`
+commands cannot change that credential during the save (see
+[One save at a time](#one-save-at-a-time)). A stored credential that
 cannot be read stops the command before anything is stored. If restoration
 also fails, it exits 1 with
 `metadata_write_failed`: the message says the credential was stored or replaced
@@ -1201,3 +1203,20 @@ value in memory and off argv. Recording the reference with `--source` lets
 storage, desktop integration approval, and reapproval remain operator-owned
 bootstrap. An unlocked desktop integration is not evidence that unattended
 access will remain available.
+
+## One save at a time
+
+`mb connect <provider> --token-stdin`, `mb connect rotate` and `mb connect
+google --oauth` hold a lock on the credential from the moment they read its
+previous value until the record is written or the rollback is done, so only one
+`mb` process at a time saves a given credential through those three commands,
+in repo and user scope. A
+second command waits about five seconds, then stops before it writes anything,
+says "Another mb connect is saving the <Provider> credential right now. Nothing
+was stored. Try again in a moment.", and exits 1 (`--json` state
+`credential_busy`). The lock is a file under `$MAINBRANCH_HOME/locks` (default
+`~/.mainbranch/locks`) named from a hash of the credential's reference. If that folder cannot be written, or the
+platform has no file locking (Windows), the command stops the same way (state `credential_lock_unavailable`) rather than
+saving without the lock. The lock stops those commands from racing each other; it does not
+stop any other `mb` command, another program, or you from editing the same
+credential in the store.

@@ -25,12 +25,26 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb connect`, `mb connect rotate` and `mb connect google --oauth` now save
+  one credential at a time. A second one that starts while another `mb`
+  command is saving the same provider's credential waits a few seconds, then
+  stops before storing anything: "Another mb connect is saving the <Provider>
+  credential right now. Nothing was stored. Try again in a moment." (exit 1,
+  `--json` state `credential_busy`). This closes a gap where one command's
+  rollback could delete the credential a second command had just saved. The
+  guard covers these commands only; a credential edited by hand or by another
+  program is still not protected. If Main Branch cannot create its lock file
+  under `~/.mainbranch/locks`, the command stops the same way with state
+  `credential_lock_unavailable`, so repo-scope connects now need that folder
+  to be writable. On native Windows (experimental), which has no such file
+  locking, storing a token with these commands now stops the same way; use
+  WSL2 to connect providers there.
 - `mb connect --scope user` no longer replaces a stored credential it could not
   read, and its rollback after a failed save of the user-scope file no longer
   deletes a credential it cannot prove it just stored. An unreadable existing
   credential now stops the command before anything is written (check `mb
-  connect status <provider>`, then retry); if another process stored a
-  different value meanwhile, the rollback leaves it and says it stayed changed.
+  connect status <provider>`, then retry); if the stored value no longer
+  matches what the rollback wrote, it leaves it and says it stayed changed.
 - `mb connect status`, `mb connect list` and `mb doctor` no longer report a
   credential as `backend_unavailable` or `keychain_prompt_pending` when `mb
   connect exec` can read it. With several connected providers the status

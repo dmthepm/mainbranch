@@ -554,6 +554,16 @@ key names only, never values, and a key whose name looks like a secret is
 left out. The kept values themselves show in `status.account_label` and
 `status.metadata`. Consumers can ignore the key.
 
+### `mb connect ... --json` when another save holds the credential
+
+`mb connect <provider>`, `rotate` and `mb connect google --oauth` exit 1 with
+`state: credential_busy` when another `mb` process is saving the same
+credential and does not finish within about five seconds, and with
+`state: credential_lock_unavailable` when the lock file cannot be created. Both
+mean nothing was stored; the message says so, in plain text with `~/` paths and
+no credential. Retry on `credential_busy`; fix the folder on
+`credential_lock_unavailable`.
+
 ## First Migrated Surfaces
 
 The v1 envelope is present on:

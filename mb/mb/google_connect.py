@@ -35,7 +35,7 @@ import time
 import urllib.parse
 import webbrowser
 from collections.abc import Callable
-from contextlib import suppress
+from contextlib import ExitStack, suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -43,6 +43,7 @@ from typing import Any, TextIO
 
 from mb import connect as connect_mod
 from mb import google_oauth as go
+from mb.credential_lock import CredentialBusyError, credential_lock, note_stored
 from mb.credential_store import (
     SUPPORTED_BACKENDS,
     CredentialStoreError,
@@ -682,7 +683,18 @@ def _user_scope_record_failed(
     )
 
 
-def bootstrap(
+def bootstrap(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Run the Google sign-in and store it (see ``_bootstrap`` for the arguments).
+
+    The credential lock taken after the sign-in is held until this returns, so
+    the grant, the access token and any rollback are one transaction.
+    """
+
+    with ExitStack() as locks:
+        return _bootstrap(*args, locks=locks, **kwargs)
+
+
+def _bootstrap(
     repo: str | Path = ".",
     *,
     client_json: str | None,
@@ -702,6 +714,7 @@ def bootstrap(
     stdin: TextIO | None = None,
     paste_reader: Callable[[str], str] | None = None,
     progress: Progress | None = None,
+    locks: ExitStack,
 ) -> dict[str, Any]:
     """Run the sign-in and store the grant. Refusals raise ``ConnectRefusal``.
 
@@ -814,6 +827,15 @@ def bootstrap(
         progress.writes = writes
     previous_grant: SecretProbe | None = None
     previous_token: SecretProbe | None = None
+    # After the sign-in (no lock is held while a person types) and before the
+    # snapshot: no other mb process writes either slot until the record is
+    # written or the rollback is done.
+    try:
+        locks.enter_context(
+            credential_lock(connect_mod._home(), [grant_ref, token_ref], provider.name)
+        )
+    except CredentialBusyError as exc:
+        raise GoogleConnectError(str(exc), state=exc.state) from None
     if normalized_scope == "user":
         # Snapshot for the restore if the user-scope record cannot be written. A
         # separate bounded read, taken before anything is stored.
@@ -826,11 +848,13 @@ def bootstrap(
     _minted.pop((store.backend, grant_ref), None)
     writes.grant_started = True
     try:
+        note_stored(store.backend, grant_ref, _grant_json(client, tokens))
         store.set(grant_ref, _grant_json(client, tokens), deadline=deadline)
     except connect_mod.KeychainError as exc:
         raise _store_failure(exc, writes, "grant") from None
     writes.grant = True
     try:
+        note_stored(store.backend, token_ref, str(tokens["access_token"]))
         store.set(token_ref, str(tokens["access_token"]), deadline=deadline)
     except connect_mod.KeychainError as exc:
         raise _store_failure(exc, writes, "token") from None

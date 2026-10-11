@@ -207,14 +207,18 @@ def test_rotate_over_a_google_entry_with_a_foreign_source_names_the_sign_in(repo
 
 
 def _store_snapshot() -> dict[str, bytes]:
-    """Every file under the config home except the user-scope file."""
+    """Every file under the config home except the user-scope file and the lock files.
+
+    Lock files are empty and stay after a connect by design (#1150).
+    """
 
     home = connect_mod._home()
     skip = connect_mod._user_scope_path()
+    locks = home / "locks"
     return {
         str(path): path.read_bytes()
         for path in sorted(home.rglob("*"))
-        if path.is_file() and path != skip
+        if path.is_file() and path != skip and locks not in path.parents
     }
 
 
