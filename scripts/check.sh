@@ -18,8 +18,9 @@ fi
 "$PYTHON" -m mypy mb tests
 # Same pytest as CI, which runs it in parallel with pytest-xdist (a dev extra).
 # A dev venv installed before that extra existed runs the suite serially.
+# MB_PYTEST_WORKERS caps the worker count on a shared machine (default: auto).
 if "$PYTHON" -c "import xdist" >/dev/null 2>&1; then
-  parallel=(-n auto)
+  parallel=(-n "${MB_PYTEST_WORKERS:-auto}")
 else
   echo "pytest-xdist not installed; running tests serially (pip install -e \".[dev]\" to run them in parallel)." >&2
   parallel=()
