@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -1099,34 +1100,59 @@ def _write_user_scope_provider(
     return _write_user_scope(data)
 
 
-def _restore_secret(store: SecretStore, ref: str, previous: SecretProbe) -> bool:
+def _snapshot_conclusive(previous: SecretProbe) -> bool:
+    """True when the snapshot says the item is present or definitely absent.
+
+    A read that was refused, timed out or never happened (``not_checked``) says
+    nothing about what the item holds, so nothing may be written over it.
+    """
+
+    return previous.backend_ok and not previous.not_checked
+
+
+def _restore_secret(store: SecretStore, ref: str, previous: SecretProbe, written: str) -> bool:
     """Put a credential back as it was (or remove the one just created).
 
     Recovery gets its own bounded attempt even if the original command has
     exhausted its credential deadline. Never exposes backend exception text or
-    credential values: it only says whether the restore worked.
+    credential values: it only says whether the restore worked. A credential
+    that was absent before is deleted only if it still holds exactly the value
+    this command wrote; anything else is another writer's and stays.
     """
 
     try:
         if previous.present:
             store.set(ref, previous.value, deadline=new_credential_deadline())
-        else:
-            store.delete(ref)
+            return True
+        if not _snapshot_conclusive(previous):
+            return False
+        current = store.probe(ref, deadline=new_credential_deadline())
+        if not current.backend_ok or current.not_checked:
+            return False
+        if not current.present:
+            return True
+        if not hmac.compare_digest(current.value.encode(), written.encode()):
+            return False
+        store.delete(ref)
     except Exception:
         return False
     return True
 
 
 def _restore_secrets(
-    store: SecretStore, snapshots: list[tuple[str, str, SecretProbe]]
+    store: SecretStore, snapshots: list[tuple[str, str, SecretProbe, str]]
 ) -> list[str]:
-    """Put each ``(label, ref, previous)`` credential back; return the labels that stayed changed.
+    """Put each ``(label, ref, previous, written)`` credential back.
 
-    Every slot gets its own attempt: one failed restore must not skip the next.
+    Returns the labels that stayed changed. Every slot gets its own attempt: one
+    failed restore must not skip the next.
+    ``written`` is the value this command stored, used to prove a new item is its own.
     """
 
     return [
-        label for label, ref, previous in snapshots if not _restore_secret(store, ref, previous)
+        label
+        for label, ref, previous, written in snapshots
+        if not _restore_secret(store, ref, previous, written)
     ]
 
 
@@ -2026,6 +2052,9 @@ def connect_provider(
                     previous_secret = store.probe(ref, deadline=new_credential_deadline())
                     if not previous_secret.backend_ok:
                         raise KeychainError(previous_secret.reason)
+                    if previous_secret.not_checked:
+                        # Nothing is known about the item: writing could lose its value.
+                        raise KeychainError("credential_store_timeout")
                     credential_deadline = new_credential_deadline()
                 store.set(ref, token, deadline=credential_deadline)
             except KeychainError as exc:
@@ -2119,7 +2148,9 @@ def connect_provider(
             # that no longer parses) gets the same restore of the credential.
             shown, cause, fix = _user_scope_record_failure(exc)
             unrestored = (
-                _restore_secrets(store, [(f"the {provider.name} credential", ref, previous_secret)])
+                _restore_secrets(
+                    store, [(f"the {provider.name} credential", ref, previous_secret, token)]
+                )
                 if previous_secret is not None
                 else []
             )

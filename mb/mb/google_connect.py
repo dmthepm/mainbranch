@@ -628,7 +628,7 @@ def _store_failure(
 def _user_scope_record_failed(
     exc: OSError | connect_mod.UserScopeReadOnlyError | connect_mod.ConfigCorruptError,
     store: SecretStore,
-    snapshots: list[tuple[str, str, SecretProbe]],
+    snapshots: list[tuple[str, str, SecretProbe, str]],
     writes: _Writes,
     *,
     reauth: bool,
@@ -638,7 +638,7 @@ def _user_scope_record_failed(
 
     Same restore as ``mb connect --scope user``. Shows the true cause and fix with
     ``~/`` paths, never backend text or a credential. ``snapshots`` holds
-    ``(label, ref, previous)`` for the grant and the access token.
+    ``(label, ref, previous, written)`` for the grant and the access token.
     """
 
     shown, cause, fix = connect_mod._user_scope_record_failure(exc)
@@ -877,8 +877,18 @@ def bootstrap(
                     exc,
                     store,
                     [
-                        ("the Google grant", grant_ref, previous_grant),
-                        ("the access token", token_ref, previous_token),
+                        (
+                            "the Google grant",
+                            grant_ref,
+                            previous_grant,
+                            _grant_json(client, tokens),
+                        ),
+                        (
+                            "the access token",
+                            token_ref,
+                            previous_token,
+                            str(tokens["access_token"]),
+                        ),
                     ],
                     writes,
                     reauth=reauth,
