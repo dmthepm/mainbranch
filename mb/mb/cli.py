@@ -56,6 +56,7 @@ from mb import think as think_mod
 from mb import unreadable as unreadable_mod
 from mb import update as update_mod
 from mb import validate as validate_mod
+from mb.engine import repo_flag
 from mb.freshness import format_update_alert, looks_like_business_repo, package_update_status
 from mb.json_result import envelope, json_default
 
@@ -1422,6 +1423,7 @@ def onboard_cmd(
 
 def _render_onboard_status_human(result: dict[str, Any]) -> None:
     from rich.console import Console
+    from rich.markup import escape
 
     console = Console()
     summary = result["summary"]
@@ -1431,7 +1433,10 @@ def _render_onboard_status_human(result: dict[str, Any]) -> None:
         f"{summary['completed_required']}/{summary['total_required']} required steps complete"
     )
     if not result["state_exists"]:
-        console.print("[yellow]No saved onboarding plan yet.[/yellow] Run `mb onboard plan`.")
+        console.print(
+            "[yellow]No saved onboarding plan yet.[/yellow] "
+            f"Run `mb onboard plan{escape(repo_flag(result['repo']))}`."
+        )
     profile = result["profile"]
     console.print(
         "\n[bold]Profile[/bold] "

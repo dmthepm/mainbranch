@@ -4699,12 +4699,20 @@ _QUALIFY_SKIP_KEYS = {
 }
 
 
+_BUSINESS_REPO_TAIL = " from the business repo."
+
+
 def _qualify_text(value: str, repo: Path) -> str:
     """A command line or a sentence with backticked `mb` commands, naming the repo."""
     from mb import doctor  # doctor imports onboard and codex, which status also imports
 
     qualified = doctor._qualify_field(value, repo)
-    return qualified if qualified != value else doctor._qualify_prose(value, repo)
+    if qualified == value:
+        qualified = doctor._qualify_prose(value, repo)
+    if qualified != value and qualified.endswith(_BUSINESS_REPO_TAIL):
+        # The commands now name the repo, so "from the business repo" is redundant.
+        qualified = qualified[: -len(_BUSINESS_REPO_TAIL)] + "."
+    return qualified
 
 
 def qualify_commands(report: dict[str, Any], repo: Path) -> dict[str, Any]:

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from mb import checkpoint_verbs, topology
+from mb.engine import repo_flag
 
 SURFACE_ORDER = [
     "core",
@@ -194,6 +195,7 @@ def _hook_state_from_text(text: str, expected: str) -> str:
 def hook_status(repo: str | Path = ".") -> dict[str, Any]:
     """Inspect the repo-local checkpoint commit-message hook."""
     target = Path(repo).expanduser().resolve()
+    flag = repo_flag(target)
     root, root_error, hook = _hook_path(target)
     if root is None or hook is None:
         return {
@@ -234,7 +236,7 @@ def hook_status(repo: str | Path = ".") -> dict[str, Any]:
             "safe_to_install": True,
             "safe_to_uninstall": False,
             "summary": "Main Branch checkpoint commit-message hook is not installed",
-            "repair_command": "mb checkpoint --install-hook",
+            "repair_command": f"mb checkpoint{flag} --install-hook",
             "errors": [],
         }
     try:
@@ -250,7 +252,7 @@ def hook_status(repo: str | Path = ".") -> dict[str, Any]:
             "safe_to_install": False,
             "safe_to_uninstall": False,
             "summary": f"could not read checkpoint hook: {exc}",
-            "repair_command": "mb doctor repair --plan",
+            "repair_command": f"mb doctor repair{flag} --plan",
             "errors": [str(exc)],
         }
     state = _hook_state_from_text(text, _hook_body(_resolved_mb_path()))
@@ -274,9 +276,9 @@ def hook_status(repo: str | Path = ".") -> dict[str, Any]:
         "safe_to_install": safe,
         "safe_to_uninstall": safe,
         "summary": summary,
-        "repair_command": "mb checkpoint --install-hook"
+        "repair_command": f"mb checkpoint{flag} --install-hook"
         if safe
-        else "review .git/hooks/commit-msg, then run mb checkpoint --install-hook",
+        else f"review .git/hooks/commit-msg, then run mb checkpoint{flag} --install-hook",
         "errors": [],
     }
 
