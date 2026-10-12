@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+Bets can now carry an optional `stage` (tuning, working, ongoing, done, cut) and an optional `commitment` (the one thing the bet does on a schedule, and the proof it happened); `mb validate` checks both and `mb status --json` reports them.
+
 `mb status`, `mb doctor` and `mb start` no longer run the `mb` your login shell
 finds to check its version. They only ask the login shell where `mb` is and
 compare that with the install you are running; if it is a different install,

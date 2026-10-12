@@ -417,6 +417,121 @@ def test_validate_warns_on_malformed_bet_money_path_without_failing(tmp_path: Pa
     )
 
 
+_BET_BASE = (
+    "status: {status}\n"
+    "opened: 2026-05-16\n"
+    "deadline: 2026-05-30\n"
+    "appetite: 2 weeks\n"
+    "hypothesis: If we do X, Y happens.\n"
+    "metric: calls\n"
+    "target: 3 calls\n"
+    "result: ''\n"
+    "{extra}"
+    "linked_decisions: []\n"
+    "linked_research: []\n"
+    "linked_pushes: []\n"
+    "linked_outcomes: []\n"
+    "public: false\n"
+    "channels: []\n"
+    "tags: []\n"
+)
+
+
+def _validate_bet(tmp_path: Path, extra: str = "", status: str = "open") -> dict[str, Any]:
+    _write(
+        tmp_path / "bets" / "2026-05-16-daily.md",
+        "---\n" + _BET_BASE.format(status=status, extra=extra) + "---\n# Daily bet\n",
+    )
+    report = run(path=str(tmp_path))
+    return next(file for file in report["files"] if file["schema"] == "bets")
+
+
+_COMMITMENT = (
+    "commitment:\n"
+    "  action: Send one outreach message\n"
+    "  cadence: weekdays\n"
+    "  owner: outreach-agent\n"
+    "  evidence: send_id\n"
+)
+
+
+def test_validate_bet_without_stage_or_commitment_is_unchanged(tmp_path: Path) -> None:
+    bet = _validate_bet(tmp_path)
+
+    assert bet["errors"] == []
+    assert bet["warnings"] == []
+
+
+def test_validate_accepts_bet_stage_and_commitment(tmp_path: Path) -> None:
+    bet = _validate_bet(tmp_path, "stage: working\n" + _COMMITMENT)
+
+    assert bet["errors"] == []
+    assert bet["warnings"] == []
+
+
+def test_validate_commitment_owner_is_optional_and_unknown_keys_are_tolerated(
+    tmp_path: Path,
+) -> None:
+    bet = _validate_bet(
+        tmp_path,
+        "commitment:\n  action: Post\n  cadence: daily\n  evidence: url\n  note: x\n",
+    )
+
+    assert bet["errors"] == []
+
+
+def test_validate_rejects_unknown_bet_stage(tmp_path: Path) -> None:
+    bet = _validate_bet(tmp_path, "stage: thriving\n")
+
+    assert any(error.startswith("stage='thriving' not in") for error in bet["errors"])
+
+
+def test_validate_rejects_non_string_bet_stage_without_crashing(tmp_path: Path) -> None:
+    bet = _validate_bet(tmp_path, "stage: [working]\n")
+
+    assert any(error.startswith("stage=['working'] not in") for error in bet["errors"])
+
+
+def test_validate_rejects_bad_commitment_values(tmp_path: Path) -> None:
+    bet = _validate_bet(
+        tmp_path,
+        "commitment:\n  action: '  '\n  cadence: hourly\n  evidence: [url]\n  owner: ''\n",
+    )
+
+    errors = bet["errors"]
+    assert "commitment.action must be a non-empty string" in errors
+    assert any(error.startswith("commitment.cadence='hourly' not in") for error in errors)
+    assert any(error.startswith("commitment.evidence=['url'] not in") for error in errors)
+    assert "commitment.owner must be a non-empty string when present" in errors
+
+
+def test_validate_requires_commitment_cadence_and_evidence(tmp_path: Path) -> None:
+    bet = _validate_bet(tmp_path, "commitment:\n  action: Post\n")
+
+    assert any(error.startswith("missing key: commitment.cadence") for error in bet["errors"])
+    assert any(error.startswith("missing key: commitment.evidence") for error in bet["errors"])
+
+
+def test_validate_rejects_non_mapping_commitment(tmp_path: Path) -> None:
+    bet = _validate_bet(tmp_path, "commitment: daily\n")
+
+    assert any(error.startswith("commitment must be a mapping") for error in bet["errors"])
+
+
+def test_validate_warns_when_bet_stage_disagrees_with_status(tmp_path: Path) -> None:
+    ended_open = _validate_bet(tmp_path, "stage: done\n", status="open")
+    assert ended_open["errors"] == []
+    assert any("stage='done' but status='open'" in w for w in ended_open["warnings"])
+
+    live_closed = _validate_bet(tmp_path, "stage: ongoing\n", status="closed")
+    assert live_closed["errors"] == []
+    assert any("stage='ongoing' but status='closed'" in w for w in live_closed["warnings"])
+
+    agreeing = _validate_bet(tmp_path, "stage: cut\n", status="canceled")
+    assert agreeing["errors"] == []
+    assert agreeing["warnings"] == []
+
+
 def test_validate_keeps_legacy_bet_campaign_links_readable(tmp_path: Path) -> None:
     _write(
         tmp_path / "bets" / "2026-05-08-legacy.md",

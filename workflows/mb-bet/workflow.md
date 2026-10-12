@@ -156,7 +156,13 @@ Mode routing:
    deadline, metric, kill rule, and initial execution plan. If the idea sounds
    like a new offer, ask whether the operator wants a wager or an offer
    candidate. Do not create, move, or delete offer files without an accepted
-   decision or explicit instruction.
+   decision or explicit instruction. Also ask, as optional questions: "What is
+   the one thing this bet does every day (or weekdays, or weekly), who does it,
+   and what proof shows it happened?" If answered, write `commitment` (`action`,
+   `cadence`, `owner`, `evidence` kind: url, commit, send_id, file, other). And
+   ask whether the bet is still being tuned, is working, is an ongoing habit,
+   is done, or was cut; write that as `stage`. Skip both if the operator has no
+   answer. Never write a default, and never record or check daily evidence here.
 2. For `update`, read the bet and linked files, append a dated evidence note,
    update link fields, and keep `result` blank unless there is a real measured
    result.
@@ -219,6 +225,8 @@ outcome without accepted evidence or an accepted decision.
 Bet frontmatter should keep the strict contract:
 
 - `status`
+- `stage` (optional)
+- `commitment` (optional)
 - `opened`
 - `deadline`
 - `appetite`

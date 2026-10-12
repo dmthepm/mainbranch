@@ -1259,6 +1259,8 @@ def _bet_summary(repo: Path, path: Path) -> dict[str, Any]:
         "path": rel,
         "title": _title_from_markdown(path),
         "status": str(meta.get("status", "") or ""),
+        "stage": str(meta.get("stage", "") or ""),
+        "commitment": _bet_commitment_summary(meta),
         "opened": opened.isoformat() if opened else "",
         "deadline": deadline.isoformat() if deadline else "",
         "appetite": str(meta.get("appetite", "") or ""),
@@ -1272,6 +1274,15 @@ def _bet_summary(repo: Path, path: Path) -> dict[str, Any]:
         "public": bool(meta.get("public", False)),
         "channels": [str(channel) for channel in channels if isinstance(channel, str)],
         "updated_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds"),
+    }
+
+
+def _bet_commitment_summary(meta: dict[str, Any]) -> dict[str, str] | None:
+    raw = meta.get("commitment")
+    if not isinstance(raw, dict):
+        return None
+    return {
+        key: str(raw.get(key) or "").strip() for key in ("action", "cadence", "owner", "evidence")
     }
 
 
@@ -5060,7 +5071,8 @@ def render_human(
         console.print("\n[bold]Active bets[/bold]")
         for item in active_bets[:3]:
             deadline = item.get("deadline") or "no deadline"
-            console.print(f"  - {deadline}  {item['title']} [{item['status']}]")
+            stage = f", {item['stage']}" if item.get("stage") else ""
+            console.print(f"  - {deadline}  {item['title']} [{item['status']}{stage}]")
     overdue_bets = bets.get("overdue") or []
     if overdue_bets:
         console.print("[yellow]Overdue active bets[/yellow]")

@@ -149,6 +149,13 @@ kill_rubric:
       comparator: <=
       threshold: 150
       action: double_down
+# Optional (leave out unless the operator wants them):
+# stage: tuning        # tuning | working | ongoing | done | cut
+# commitment:
+#   action: "Send one outreach message"
+#   cadence: daily     # daily | weekdays | weekly
+#   owner: ""          # agent or person who does it
+#   evidence: send_id  # url | commit | send_id | file | other
 linked_decisions: []
 linked_research: []
 linked_pushes: []
@@ -159,6 +166,9 @@ channels: []
 tags: []
 ---
 ```
+
+Optional `stage` and `commitment` (see `workflows/mb-bet/workflow.md`): ask for
+them when a new bet acts on a schedule; never write defaults.
 
 Allowed statuses: `open`, `paused`, `closed`, `canceled`.
 Allowed `appetite_tier` values: `trivial`, `small`, `material`, `strategic`.

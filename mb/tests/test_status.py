@@ -2748,6 +2748,49 @@ def test_status_brain_includes_active_bets(tmp_path: Path) -> None:
     assert brain["bets"]["active"][0]["deadline"] == deadline.isoformat()
 
 
+def test_status_brain_reports_bet_stage_and_commitment(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "bets").mkdir(parents=True)
+    base = (
+        "status: open\n"
+        "opened: 2026-05-16\n"
+        "deadline: 2026-05-30\n"
+        "appetite: 2 weeks\n"
+        "hypothesis: h\n"
+        "metric: m\n"
+        "target: t\n"
+        "result: ''\n"
+    )
+    (repo / "bets" / "2026-05-16-daily.md").write_text(
+        "---\n"
+        + base
+        + "stage: working\n"
+        + "commitment:\n"
+        + "  action: Send one outreach message\n"
+        + "  cadence: weekdays\n"
+        + "  evidence: send_id\n"
+        + "---\n\n# Daily bet\n",
+        encoding="utf-8",
+    )
+    (repo / "bets" / "2026-05-17-plain.md").write_text(
+        "---\n" + base + "---\n\n# Plain bet\n", encoding="utf-8"
+    )
+
+    bets = {b["path"]: b for b in status_mod._brain(repo)["bets"]["recent"]}
+
+    daily = bets["bets/2026-05-16-daily.md"]
+    assert daily["stage"] == "working"
+    assert daily["commitment"] == {
+        "action": "Send one outreach message",
+        "cadence": "weekdays",
+        "owner": "",
+        "evidence": "send_id",
+    }
+    plain = bets["bets/2026-05-17-plain.md"]
+    assert plain["stage"] == ""
+    assert plain["commitment"] is None
+
+
 def test_status_brain_evaluates_declared_bet_exit_signals(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     (repo / "bets").mkdir(parents=True)
