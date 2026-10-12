@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
+from mb import __version__
 from mb import engine as engine_mod
 
 
@@ -337,56 +339,99 @@ def test_mb_install_diagnostics_reports_multiple_versions(tmp_path: Path, monkey
     assert result["repair_command"] == "mb skill link --repo ."
 
 
-def test_login_shell_mb_diagnostics_reports_stale_runtime_mb(tmp_path: Path, monkeypatch) -> None:
-    active_bin = tmp_path / "active"
-    stale_bin = tmp_path / "stale"
-    active_bin.mkdir()
-    stale_bin.mkdir()
-    active_mb = active_bin / "mb"
-    stale_mb = stale_bin / "mb"
-    active_mb.write_text("#!/bin/sh\necho 'mb 0.3.29'\n", encoding="utf-8")
-    stale_mb.write_text("#!/bin/sh\necho 'mb 0.3.18'\n", encoding="utf-8")
-    active_mb.chmod(0o755)
-    stale_mb.chmod(0o755)
+def _stub_mb(bin_dir: Path, marker: Path, version: str) -> Path:
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    mb = bin_dir / "mb"
+    mb.write_text(f"#!/bin/sh\necho ran > {marker}\necho 'mb {version}'\n", encoding="utf-8")
+    mb.chmod(0o755)
+    return mb
+
+
+def _login_shell(tmp_path: Path, login_path: Path, banner: str = "") -> Path:
+    """A login shell whose PATH holds only `login_path` (no /etc/profile)."""
+
     shell = tmp_path / "login-shell"
     shell.write_text(
-        f'#!/bin/sh\nPATH={stale_bin}:$PATH exec /bin/sh -c "$2"\n',
+        f'#!/bin/sh\n{banner}PATH={login_path} exec /bin/sh -c "$2"\n',
         encoding="utf-8",
     )
     shell.chmod(0o755)
-    monkeypatch.setenv("PATH", str(active_bin))
+    return shell
+
+
+def test_login_shell_mb_diagnostics_reports_other_mb_without_running_it(
+    tmp_path: Path, monkeypatch
+) -> None:
+    marker = tmp_path / "ran-marker"
+    running_mb = _stub_mb(tmp_path / "running", tmp_path / "running-marker", "0.3.29")
+    stale_mb = _stub_mb(tmp_path / "stale", marker, "0.3.18")
+    shell = _login_shell(tmp_path, stale_mb.parent)
+    monkeypatch.setattr(sys, "executable", str(running_mb.parent / "python"))
 
     result = engine_mod.login_shell_mb_diagnostics(str(shell))
 
+    assert not marker.exists()
+    assert "--version" not in result["command"]
     assert result["ok"] is False
     assert result["mismatch"] is True
+    assert result["path_mismatch"] is True
+    assert result["version_mismatch"] is False
     assert result["path"] == str(stale_mb)
-    assert result["version"] == "0.3.18"
-    assert result["active_path"] == str(active_mb)
+    assert result["version"] == ""
+    assert result["active_path"] == str(running_mb)
+    assert result["active_version"] == __version__
     assert "different mb" in result["summary"]
+    assert "0.3.18" not in result["summary"]
 
 
 def test_login_shell_mb_diagnostics_ignores_login_shell_banner(tmp_path: Path, monkeypatch) -> None:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    mb = bin_dir / "mb"
-    mb.write_text("#!/bin/sh\necho 'mb 0.3.29'\n", encoding="utf-8")
-    mb.chmod(0o755)
-    shell = tmp_path / "login-shell"
-    shell.write_text(
-        f'#!/bin/sh\necho welcome-banner\nPATH={bin_dir}:$PATH exec /bin/sh -c "$2"\n',
-        encoding="utf-8",
-    )
-    shell.chmod(0o755)
-    monkeypatch.setenv("PATH", str(bin_dir))
-    monkeypatch.setattr(engine_mod, "__version__", "0.3.29")
+    marker = tmp_path / "ran-marker"
+    mb = _stub_mb(tmp_path / "bin", marker, "0.3.29")
+    shell = _login_shell(tmp_path, mb.parent, banner="echo welcome-banner\n")
+    monkeypatch.setattr(sys, "executable", str(mb.parent / "python"))
 
     result = engine_mod.login_shell_mb_diagnostics(str(shell))
 
+    assert not marker.exists()
     assert result["ok"] is True
     assert result["mismatch"] is False
     assert result["path"] == str(mb)
-    assert result["version"] == "0.3.29"
+    assert result["version"] == __version__
+
+
+def test_login_shell_mb_diagnostics_resolves_symlinked_same_install(
+    tmp_path: Path, monkeypatch
+) -> None:
+    marker = tmp_path / "ran-marker"
+    running_mb = _stub_mb(tmp_path / "running", marker, "0.3.29")
+    link_dir = tmp_path / "link"
+    link_dir.mkdir()
+    (link_dir / "mb").symlink_to(running_mb)
+    shell = _login_shell(tmp_path, link_dir)
+    monkeypatch.setattr(sys, "executable", str(running_mb.parent / "python"))
+
+    result = engine_mod.login_shell_mb_diagnostics(str(shell))
+
+    assert not marker.exists()
+    assert result["ok"] is True
+    assert result["path_mismatch"] is False
+
+
+def test_login_shell_mb_diagnostics_unknown_active_path_claims_no_mismatch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    marker = tmp_path / "ran-marker"
+    other = _stub_mb(tmp_path / "other", marker, "0.3.18")
+    shell = _login_shell(tmp_path, other.parent)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "nowhere" / "python"))
+    monkeypatch.setattr(sys, "argv", ["python", "-m", "mb"])
+
+    result = engine_mod.login_shell_mb_diagnostics(str(shell))
+
+    assert not marker.exists()
+    assert result["active_path"] == ""
+    assert result["path_mismatch"] is False
+    assert result["version_mismatch"] is False
 
 
 def test_link_status_explains_stale_engine_path_from_other_install(

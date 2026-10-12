@@ -11,6 +11,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+`mb status`, `mb doctor` and `mb start` no longer run the `mb` your login shell
+finds to check its version. They only ask the login shell where `mb` is and
+compare that with the install you are running; if it is a different install,
+the warning names its path and does not state its version.
+
 ## [0.6.7] - 2026-10-11
 
 `mb` starts faster and lighter: it no longer loads macOS network settings
