@@ -446,7 +446,8 @@ def test_real_status_child_is_peek_only_and_writes_nothing(
     tools.mkdir()
     (tools / "git").symlink_to(shutil.which("git") or "/usr/bin/git")
     monkeypatch.setenv("PATH", f"{tools}:/usr/bin:/bin")
-    assert shutil.which("gh", path=os.environ["PATH"]) is None
+    gh_path = shutil.which("gh", path=os.environ["PATH"])
+    assert gh_path is None
     monkeypatch.setenv("PYTHONPATH", str(MB_PACKAGE_ROOT))
     for proxy in ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy"):
         monkeypatch.setenv(proxy, "http://127.0.0.1:9")
