@@ -154,7 +154,7 @@ kill_rubric:
 # commitment:
 #   action: "Send one outreach message"
 #   cadence: daily     # daily | weekdays | weekly
-#   owner: ""          # agent or person who does it
+#   owner: content-agent  # agent or person who does it
 #   evidence: send_id  # url | commit | send_id | file | other
 linked_decisions: []
 linked_research: []

@@ -466,8 +466,9 @@ def _check_bet_commitment(fm: dict[str, Any], errors: list[str]) -> None:
     action = commitment.get("action")
     if not isinstance(action, str) or not action.strip():
         errors.append("commitment.action must be a non-empty string")
-    owner = commitment.get("owner")
-    if owner is not None and (not isinstance(owner, str) or not owner.strip()):
+    if "owner" in commitment and (
+        not isinstance(commitment["owner"], str) or not commitment["owner"].strip()
+    ):
         errors.append("commitment.owner must be a non-empty string when present")
     for key, allowed in (
         ("cadence", BET_COMMITMENT_CADENCE),

@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 from typer.testing import CliRunner
 
 from mb import relationships
@@ -503,6 +504,16 @@ def test_validate_rejects_bad_commitment_values(tmp_path: Path) -> None:
     assert any(error.startswith("commitment.cadence='hourly' not in") for error in errors)
     assert any(error.startswith("commitment.evidence=['url'] not in") for error in errors)
     assert "commitment.owner must be a non-empty string when present" in errors
+
+
+@pytest.mark.parametrize("owner_line", ["  owner: null\n", "  owner:\n"])
+def test_validate_rejects_null_commitment_owner(tmp_path: Path, owner_line: str) -> None:
+    bet = _validate_bet(
+        tmp_path,
+        "commitment:\n  action: Post\n  cadence: daily\n  evidence: url\n" + owner_line,
+    )
+
+    assert bet["errors"] == ["commitment.owner must be a non-empty string when present"]
 
 
 def test_validate_requires_commitment_cadence_and_evidence(tmp_path: Path) -> None:
