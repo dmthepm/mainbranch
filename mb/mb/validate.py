@@ -414,6 +414,12 @@ BET_ANCHOR_REQUIRED_BEFORE = {"planning", "execution", "spend", "launch", "none"
 BET_SIGNAL_COMPARATORS = {"<", "<=", "==", ">=", ">", "!="}
 BET_SIGNAL_ACTIONS = {"kill", "double_down", "review"}
 BET_OWNER_REF_RE = re.compile(r"^core/team/[a-z0-9][a-z0-9-]*\.md$")
+BET_STAGE = {"tuning", "working", "ongoing", "done", "cut"}
+BET_STAGE_ENDED = {"done", "cut"}
+BET_ACTIVE_STATUS = {"open", "paused"}
+BET_ENDED_STATUS = {"closed", "canceled"}
+BET_COMMITMENT_CADENCE = {"daily", "weekdays", "weekly"}
+BET_COMMITMENT_EVIDENCE = {"url", "commit", "send_id", "file", "other"}
 
 
 def _check_bet_frontmatter(
@@ -430,8 +436,49 @@ def _check_bet_frontmatter(
             f"appetite_tier={appetite_tier!r} is not one of {sorted(BET_APPETITE_TIERS)}"
         )
     _check_bet_owner(fm, warnings)
+    _check_bet_stage(fm, errors, warnings)
+    _check_bet_commitment(fm, errors)
     _check_bet_money_path(path, fm, warnings)
     _check_bet_kill_rubric(fm, warnings)
+
+
+def _check_bet_stage(fm: dict[str, Any], errors: list[str], warnings: list[str]) -> None:
+    if "stage" not in fm:
+        return
+    stage = fm["stage"]
+    if not isinstance(stage, str) or stage not in BET_STAGE:
+        errors.append(f"stage={stage!r} not in {sorted(BET_STAGE)}")
+        return
+    status = fm.get("status")
+    if stage in BET_STAGE_ENDED and status in BET_ACTIVE_STATUS:
+        warnings.append(f"stage={stage!r} but status={status!r}; close or cancel the bet to match")
+    elif stage not in BET_STAGE_ENDED and status in BET_ENDED_STATUS:
+        warnings.append(f"stage={stage!r} but status={status!r}; set stage to done or cut")
+
+
+def _check_bet_commitment(fm: dict[str, Any], errors: list[str]) -> None:
+    if "commitment" not in fm:
+        return
+    commitment = fm["commitment"]
+    if not isinstance(commitment, dict):
+        errors.append("commitment must be a mapping with action, cadence and evidence")
+        return
+    action = commitment.get("action")
+    if not isinstance(action, str) or not action.strip():
+        errors.append("commitment.action must be a non-empty string")
+    if "owner" in commitment and (
+        not isinstance(commitment["owner"], str) or not commitment["owner"].strip()
+    ):
+        errors.append("commitment.owner must be a non-empty string when present")
+    for key, allowed in (
+        ("cadence", BET_COMMITMENT_CADENCE),
+        ("evidence", BET_COMMITMENT_EVIDENCE),
+    ):
+        value = commitment.get(key)
+        if value is None:
+            errors.append(f"missing key: commitment.{key} (one of {sorted(allowed)})")
+        elif not isinstance(value, str) or value not in allowed:
+            errors.append(f"commitment.{key}={value!r} not in {sorted(allowed)}")
 
 
 def _check_bet_owner(fm: dict[str, Any], warnings: list[str]) -> None:
