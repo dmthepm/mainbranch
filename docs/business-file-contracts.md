@@ -320,6 +320,34 @@ and tags.
 **Required body sections:** why now, success/failure signals, kill or
 double-down rule, execution plan, review notes.
 
+**Optional frontmatter:** `stage` and `commitment`. Neither is written by
+default; a bet without them validates exactly as before.
+
+- `stage` is one of `tuning`, `working`, `ongoing`, `done`, `cut`. It sits
+  beside the lifecycle `status` (`open`, `paused`, `closed`, `canceled`) and
+  does not replace it. An unknown value is an error. `done` or `cut` on an
+  `open` or `paused` bet, or `tuning`, `working` or `ongoing` on a `closed` or
+  `canceled` bet, is a warning.
+- `commitment` is the one thing this bet does on a schedule, and the proof it
+  happened. `action` (plain words) is required, `cadence` is required (`daily`,
+  `weekdays` or `weekly`), `evidence` is required (the kind of proof: `url`,
+  `commit`, `send_id`, `file` or `other`), and `owner` is optional (an agent or
+  a person; unlike the bet-level `owner` it is not a team file reference).
+  Anything missing or outside those values is an error. One commitment per bet.
+  Recording or checking each day's evidence is not part of this contract yet.
+
+```yaml
+stage: working
+commitment:
+  action: "Send one outreach message to a past customer"
+  cadence: weekdays
+  owner: outreach-agent
+  evidence: send_id
+```
+
+`mb status --json` reports `stage` (empty string when absent) and `commitment`
+(`null` when absent) on each bet item.
+
 **Privacy boundary:** use public-safe summaries for customer, finance, or
 provider evidence.
 
