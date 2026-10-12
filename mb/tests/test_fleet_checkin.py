@@ -489,3 +489,47 @@ def test_needs_you_follows_the_loop_level(home: Path) -> None:
     doc, _ = fleet_checkin.checkin(status_runner=_runner_for({"healthy": (payload, "")}))
     assert doc["cards"][0]["verdict"] == "needs_you"
     assert doc["overview"]["needs_you"] == 1
+
+
+@needs_tomllib
+def test_unreadable_snapshot_keeps_cards_but_exits_one(home: Path) -> None:
+    hubs = _fixture_hubs(home)
+    hubs["healthy"].mkdir(parents=True)
+    cache = _write_cache(home)
+    cache.write_bytes(b"not a sqlite database")
+    doc, code = fleet_checkin.checkin(
+        hub="healthy", status_runner=_runner_for({"healthy": (_status_payload(), "")})
+    )
+    assert code == 1
+    assert doc["ok"] is False
+    assert doc["cards"][0]["state"] == "ok"
+    assert doc["fleet_snapshot"]["state"] == "unreadable"
+    assert doc["errors"] == ["the fleet snapshot could not be read"]
+    assert cache.read_bytes() == b"not a sqlite database"
+
+
+@needs_tomllib
+def test_snapshot_refresh_failures_warn_in_text(home: Path, capsys: Any) -> None:
+    _fixture_hubs(home)
+    cache = _write_cache(home)
+    snapshot, _ = fleet_checkin.read_snapshot(cache)
+    assert snapshot is not None
+    snapshot["refresh_errors"] = ["a provider read failed"]
+    fleet._store(cache, snapshot)
+    doc, code = fleet_checkin.checkin(hub="elsewhere")
+    assert code == 0
+    assert doc["fleet_snapshot"]["refresh_errors"] == 1
+    fleet_checkin.render_text(doc)
+    assert "snapshot has read failures" in capsys.readouterr().out
+
+
+@needs_tomllib
+def test_cache_path_with_uri_punctuation_is_read_only(home: Path) -> None:
+    cache = _write_cache(home)
+    special = cache.with_name("fleet?#.db")
+    cache.rename(special)
+    before = _tree(special.parent)
+    snapshot, state = fleet_checkin.read_snapshot(special)
+    assert state == "ok"
+    assert snapshot is not None
+    assert _tree(special.parent) == before

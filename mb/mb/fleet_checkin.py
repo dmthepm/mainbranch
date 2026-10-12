@@ -93,7 +93,7 @@ def read_snapshot(path: Path) -> tuple[dict[str, Any] | None, str]:
     if not path.is_file():
         return None, "missing"
     try:
-        uri = f"file:{path}?mode=ro"
+        uri = f"{path.absolute().as_uri()}?mode=ro"
         with closing(sqlite3.connect(uri, uri=True)) as db:
             row = db.execute("SELECT payload FROM snapshots ORDER BY id DESC LIMIT 1").fetchone()
     except sqlite3.Error:
@@ -616,12 +616,17 @@ def checkin(
         f"{_plural(len(cards), 'business', 'businesses')}: {counts['needs_you']} need you, "
         f"{counts['on_track']} on track, {counts['cannot_see']} can't be seen."
     )
-    exit_code = 1 if unreadable else 0
+    exit_code = 1 if unreadable or snap_state == "unreadable" else 0
     warnings = []
     if snapshot_block["state"] in {"missing", "unreadable"}:
         warnings.append("no usable fleet snapshot; site facts are not checked")
     elif snapshot_block["stale"]:
         warnings.append("the fleet snapshot is over a day old")
+    if snapshot_block["refresh_errors"]:
+        warnings.append("the fleet snapshot has read failures; some site facts may be missing")
+    errors = [f"{card['display_name']}: {card['reason']}" for card in unreadable]
+    if snap_state == "unreadable":
+        errors.append("the fleet snapshot could not be read")
     document: dict[str, Any] = {
         "ok": exit_code == 0,
         "schema": CHECKIN_SCHEMA,
@@ -635,7 +640,7 @@ def checkin(
         "fleet_snapshot": snapshot_block,
         "overview": {**counts, "text": overview_text},
         "cards": cards,
-        "errors": [f"{card['display_name']}: {card['reason']}" for card in unreadable],
+        "errors": errors,
         "warnings": warnings,
         "actions": [],
     }

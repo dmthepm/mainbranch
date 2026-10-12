@@ -176,7 +176,8 @@ elsewhere. `checkin` never fetches. Bet counts are capped at five by `status`.
 
 **Exit codes.** `0`: every business produced a card it could read. `1`: cards
 were produced but a business could not be read (missing checkout, not a
-business repo, or status failed or timed out); stdout is still complete and
+business repo, or status failed or timed out), or the fleet snapshot is
+unreadable; stdout is still complete and
 should still be delivered. `2`: the hub list is missing or invalid, `--hub`
 names no hub, or `--timeout` is below 1; no cards. A business that needs you is
 not a failure.
