@@ -11,6 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+`mb fleet checkin` prints one read-only card per business in your hub list:
+loop state, bets, exposure caps, last checkpoint, GitHub, connections and
+sites, as text or `--json`. It writes nothing.
+
 `mb status`, `mb doctor` and `mb start` no longer run the `mb` your login shell
 finds to check its version. They only ask the login shell where `mb` is and
 compare that with the install you are running; if it is a different install,

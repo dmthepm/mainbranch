@@ -20,6 +20,7 @@ mb fleet hubs list        # the hubs mb fleet reads
 mb fleet refresh          # read GitHub and Cloudflare, cache one snapshot
 mb fleet status           # print the cached snapshot (never reads the network)
 mb fleet status --json    # the same, for scripts and dashboards
+mb fleet checkin          # one read-only card per business
 ```
 
 `refresh` exits `0` when every hub, repo and provider read worked and `1` when
@@ -131,6 +132,59 @@ The last ten snapshots are kept. `status` reads the newest and reports its age
 day old or had read failures. Only the facts above are stored. Deployment
 objects also carry build environment variables, and those are dropped before
 anything is written.
+
+## Check-in: one card per business
+
+```bash
+mb fleet checkin [--json] [--hub NAME] [--timeout SECONDS]
+```
+
+`checkin` answers "which business needs me today?" for every hub in the hub
+list. It writes nothing and stores nothing: no history, no trends, no cache of
+its own.
+
+**What it reads.** For each hub with a `checkout` it runs
+`mb status <checkout> --json --peek` in a child process of the same Python
+(never the `mb` on `PATH`), so the last-status-seen marker is not touched and
+your own "since last check" stays yours. Each child is bounded by `--timeout`
+(default 60 seconds) and killed with its process group when it runs out, so one
+slow or broken hub never blocks the others. It also reads the cached fleet
+snapshot, opened read-only. Because `status` makes its own unattended reads, a
+card may reflect GitHub state that `status` fetched.
+
+**The card.** `--json` follows the v1 envelope with `schema: "mb.fleet.checkin"`,
+`schema_version: 1`, `generated_at`, `hub_list`, `fleet_snapshot`, `overview`
+(`needs_you`, `on_track`, `cannot_see`, `text`) and `cards[]`. Each card has
+`hub`, `display_name`, `remote`, `checkout` (as `~/...`), `checkout_state`
+(`ok`, `missing`, `not_on_this_machine`, `not_a_business_repo`), `state`
+(`ok`, `unavailable`, `remote_only`), `verdict`, `freshness`, `text` and seven
+sections: `loop`, `bets`, `exposure`, `checkpoint`, `github`, `connections`,
+`sites`. Every section has `state` (`ok`, `attention`, `not_checked`,
+`unavailable`, `not_applicable`), `as_of`, `source` and a short `text`. Bets
+pass through `stage` and `commitment` when status provides them. Exposure shows
+counts and cap state only, never amounts. `safe_to_share` is `false`. Without
+`--json` you get the overview line and one short card per business, ready to
+paste into a message.
+
+`verdict` is `needs_you` when the loop is `needs_attention` or `not_ready`,
+`on_track` when it is `ready`, and `cannot_see` when the business could not be
+read. A remote-only card is judged from its site flags in the snapshot.
+
+A local checkout whose head differs from the cached `main_sha` (on the default
+branch) is marked `local_matches_remote: false`: it may miss work saved
+elsewhere. `checkin` never fetches. Bet counts are capped at five by `status`.
+
+**Exit codes.** `0`: every business produced a card it could read. `1`: cards
+were produced but a business could not be read (missing checkout, not a
+business repo, or status failed or timed out); stdout is still complete and
+should still be delivered. `2`: the hub list is missing or invalid, `--hub`
+names no hub, or `--timeout` is below 1; no cards. A business that needs you is
+not a failure.
+
+**What it never does.** Fetch, write any file, prompt, repair a keychain, call
+a paid API or a model, send a message, or schedule itself. Delivery and timing
+belong to the caller (a scheduler or a hook), which should deliver on `0` or
+`1` and report on `2`.
 
 ## Not in this slice
 
