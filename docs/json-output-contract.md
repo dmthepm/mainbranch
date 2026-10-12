@@ -330,8 +330,7 @@ hydrated in that workspace. In `mb status` and `mb start`, the repair text
 their existing spelling, including `mb connect hydrate --repo .`. Still bare, as
 written: the nested-backtick "Next:" sentence in `mb start`'s `next_actions`
 (the same text from inside the repo), `daily_state.source_command` (what ran),
-and the suggestions printed by `mb validate`, `mb migrate`, `mb books` and
-`mb skill link`.
+and the closing hint of `mb skill link` ("run `claude` and then /mb-start").
 
 `mb doctor --json` adds a `claude-status-line` entry to `checks[]` only when the
 business repo's `CLAUDE.md` still has the pre-#1121 list item "Status field:"
