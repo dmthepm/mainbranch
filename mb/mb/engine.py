@@ -218,25 +218,44 @@ def _same_path(left: str, right: str) -> bool:
         return Path(left) == Path(right)
 
 
+def _running_mb_path() -> str:
+    """Console script of the running install, never found through PATH.
+
+    pip, pipx and uv put the `mb` script next to the interpreter that runs it, so
+    `sys.argv[0]` is the script that started this process when it is an `mb`
+    file (it also covers installers that copy the script out of the venv). Else
+    the bin dir of `sys.executable`, where pip, pipx and uv put the script;
+    `sys.executable` is not resolved because a venv's `python` links to the base
+    interpreter, which has no `mb`. Returns "" (for example under `python -m mb`
+    from a bare checkout).
+    """
+
+    candidates: list[Path] = []
+    if sys.argv and sys.argv[0] and Path(sys.argv[0]).name == "mb":
+        candidates.append(Path(sys.argv[0]).expanduser().absolute())
+    if sys.executable:
+        candidates.append(Path(sys.executable).parent / "mb")
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return ""
+
+
 def login_shell_mb_diagnostics(shell: str | None = None, *, timeout: float = 5.0) -> dict[str, Any]:
     """Check which `mb` a login shell is likely to execute.
 
     Claude Code and Codex command execution can enter through a login shell even
-    when the operator's current process has the right pipx or venv PATH. This
-    probe keeps the deterministic CLI facts honest without invoking an agent.
+    when the operator's current process has the right pipx or venv PATH. The login
+    shell is asked only where `mb` is (`command -v`); that `mb` is never run. The
+    running install is this package, so its version is `__version__`. The other
+    install's version is not known without running it, so it is reported empty.
     """
 
     shell_path = shell or os.environ.get("SHELL") or "/bin/sh"
     command = (
-        "mb_path=$(command -v mb 2>/dev/null || true); "
-        "printf '__MB_PATH__=%s\\n' \"$mb_path\"; "
-        'if [ -n "$mb_path" ]; then '
-        "mb_version=$(mb --version 2>&1); mb_rc=$?; "
-        "else mb_version=''; mb_rc=127; fi; "
-        "printf '__MB_VERSION__=%s\\n' \"$mb_version\"; "
-        'exit "$mb_rc"'
+        "mb_path=$(command -v mb 2>/dev/null || true); printf '__MB_PATH__=%s\\n' \"$mb_path\""
     )
-    active_path = shutil.which("mb") or ""
+    active_path = _running_mb_path()
     result: subprocess.CompletedProcess[str] | None = None
     try:
         result = subprocess.run(
@@ -262,29 +281,23 @@ def login_shell_mb_diagnostics(shell: str | None = None, *, timeout: float = 5.0
             "mismatch": False,
             "error": str(exc),
             "summary": "Could not check the login-shell mb runtime path.",
-            "repair": "Run `command -v mb && mb --version` in the runtime shell.",
+            "repair": "Run `command -v mb` in the runtime shell.",
             "safe_to_share": True,
         }
 
     output_lines = (result.stdout or "").splitlines() + (result.stderr or "").splitlines()
-    tagged: dict[str, str] = {}
+    runtime_path = ""
     for raw_line in output_lines:
         line = raw_line.strip()
         if line.startswith("__MB_PATH__="):
-            tagged["path"] = line.removeprefix("__MB_PATH__=").strip()
-        elif line.startswith("__MB_VERSION__="):
-            tagged["version"] = line.removeprefix("__MB_VERSION__=").strip()
-    runtime_path = tagged.get("path", "")
-    version_output = tagged.get("version", "")
-    runtime_version = (
-        version_output.removeprefix("mb ").strip()
-        if version_output.startswith("mb ")
-        else version_output
-    )
-    command_ok = result.returncode == 0 and bool(runtime_path and runtime_version)
-    path_mismatch = bool(command_ok and active_path and not _same_path(runtime_path, active_path))
-    version_mismatch = bool(command_ok and runtime_version != __version__)
-    mismatch = path_mismatch or version_mismatch
+            runtime_path = line.removeprefix("__MB_PATH__=").strip()
+    command_ok = result.returncode == 0 and bool(runtime_path)
+    same_install = bool(command_ok and _same_path(runtime_path, active_path))
+    path_mismatch = bool(command_ok and active_path and not same_install)
+    # The other mb is never run, so its version is unknown and never claimed.
+    runtime_version = __version__ if same_install else ""
+    version_mismatch = False
+    mismatch = path_mismatch
     if not command_ok:
         state = "error"
         summary = "Login-shell runtime could not resolve a usable mb command."
@@ -292,8 +305,14 @@ def login_shell_mb_diagnostics(shell: str | None = None, *, timeout: float = 5.0
         state = "warn"
         summary = (
             "Login-shell runtime resolves a different mb than this process. "
-            f"Active mb: {active_path or 'unknown'} {__version__}; "
-            f"login shell mb: {runtime_path} {runtime_version}."
+            f"Active mb: {active_path} {__version__}; "
+            f"login shell mb: {runtime_path} (version not checked)."
+        )
+    elif not active_path:
+        state = "ok"
+        summary = (
+            f"Login shell resolves mb at {runtime_path}; this process's own mb "
+            "script was not found, so they were not compared."
         )
     else:
         state = "ok"

@@ -74,7 +74,7 @@ def stable_runtime_mb_probe(monkeypatch: pytest.MonkeyPatch) -> None:
             "ok": True,
             "state": "ok",
             "shell": "/bin/sh",
-            "command": "command -v mb && mb --version",
+            "command": "command -v mb",
             "path": "/usr/local/bin/mb",
             "version": __version__,
             "active_path": "/usr/local/bin/mb",
