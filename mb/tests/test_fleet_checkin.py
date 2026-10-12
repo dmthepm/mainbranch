@@ -457,7 +457,7 @@ def test_real_status_child_is_peek_only_and_writes_nothing(
     tools = home / "tools"
     tools.mkdir()
     (tools / "git").symlink_to(shutil.which("git") or "/usr/bin/git")
-    monkeypatch.setenv("PATH", f"{tools}:/usr/bin:/bin")
+    monkeypatch.setenv("PATH", str(tools))
     gh_path = shutil.which("gh", path=os.environ["PATH"])
     assert gh_path is None
     monkeypatch.setenv("PYTHONPATH", str(MB_PACKAGE_ROOT))
