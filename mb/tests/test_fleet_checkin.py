@@ -21,6 +21,7 @@ import pytest
 from typer.testing import CliRunner
 
 from mb import fleet, fleet_checkin
+from mb import status as status_mod
 from mb.cli import app
 from mb.init import run as init_run
 
@@ -111,8 +112,13 @@ def _status_payload(**overrides: Any) -> dict[str, Any]:
                         "title": "Webinar test",
                         "status": "active",
                         "deadline": "2026-11-01",
-                        "stage": "test",
-                        "commitment": "small",
+                        "stage": "working",
+                        "commitment": {
+                            "action": "Send one outreach message",
+                            "cadence": "weekdays",
+                            "owner": "",
+                            "evidence": "send_id",
+                        },
                     }
                 ],
                 "due_soon": [],
@@ -214,8 +220,13 @@ def test_cards_json_shape_and_exit_one_when_a_checkout_is_missing(home: Path) ->
     for section in healthy["sections"].values():
         assert {"state", "as_of", "source", "text"} <= set(section)
     bet = healthy["sections"]["bets"]["items"][0]
-    assert bet["stage"] == "test"
-    assert bet["commitment"] == "small"
+    assert bet["stage"] == "working"
+    assert bet["commitment"] == {
+        "action": "Send one outreach message",
+        "cadence": "weekdays",
+        "owner": "",
+        "evidence": "send_id",
+    }
     assert healthy["freshness"]["local_matches_remote"] is True
     overview = doc["overview"]
     assert overview["needs_you"] + overview["on_track"] + overview["cannot_see"] == len(
@@ -534,3 +545,39 @@ def test_cache_path_with_uri_punctuation_is_read_only(home: Path) -> None:
     assert state == "ok"
     assert snapshot is not None
     assert _tree(special.parent) == before
+
+
+@needs_tomllib
+@pytest.mark.parametrize("declared", [True, False])
+def test_card_preserves_real_status_bet_fields(home: Path, declared: bool) -> None:
+    hubs = _fixture_hubs(home)
+    repo = hubs["healthy"]
+    (repo / "bets").mkdir(parents=True)
+    optional = (
+        "stage: working\ncommitment:\n"
+        "  action: Send one outreach message\n"
+        "  cadence: weekdays\n  evidence: send_id\n"
+        if declared
+        else ""
+    )
+    (repo / "bets" / "daily.md").write_text(
+        "---\nstatus: open\n" + optional + "---\n\n# Daily bet\n", encoding="utf-8"
+    )
+    brain = status_mod._brain(repo)
+    payload = _status_payload(brain=brain)
+    doc, code = fleet_checkin.checkin(
+        hub="healthy", status_runner=_runner_for({"healthy": (payload, "")})
+    )
+    assert code == 0
+    bet = doc["cards"][0]["sections"]["bets"]["items"][0]
+    assert bet["stage"] == ("working" if declared else "")
+    assert bet["commitment"] == (
+        {
+            "action": "Send one outreach message",
+            "cadence": "weekdays",
+            "owner": "",
+            "evidence": "send_id",
+        }
+        if declared
+        else None
+    )

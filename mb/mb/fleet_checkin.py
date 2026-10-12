@@ -229,7 +229,7 @@ def _bets_section(status: dict[str, Any], as_of: str) -> dict[str, Any]:
             "deadline": str(bet.get("deadline") or ""),
         }
         for key in ("stage", "commitment"):
-            if bet.get(key):
+            if key in bet:
                 item[key] = bet[key]
         items.append(item)
     count = len(active)
