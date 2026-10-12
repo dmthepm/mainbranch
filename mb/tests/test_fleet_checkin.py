@@ -14,6 +14,7 @@ import subprocess
 import sys
 import textwrap
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -154,11 +155,11 @@ def _status_payload(**overrides: Any) -> dict[str, Any]:
     return payload
 
 
-def _write_cache(home: Path, *, refreshed: str = "2026-10-12T08:00:00Z") -> Path:
+def _write_cache(home: Path, *, refreshed: str | None = None) -> Path:
     cache = home / "state" / "mainbranch" / "fleet.db"
     snapshot = {
         "schema": fleet.FLEET_SCHEMA,
-        "refreshed_at": refreshed,
+        "refreshed_at": refreshed or datetime.now(timezone.utc).isoformat(),
         "hubs": [],
         "repos": [
             {
