@@ -222,17 +222,19 @@ def _running_mb_path() -> str:
     """Console script of the running install, never found through PATH.
 
     pip, pipx and uv put the `mb` script next to the interpreter that runs it, so
-    `sys.executable`'s bin dir is the install's own layout. `sys.argv[0]` is the
-    fallback when it is an absolute-able `mb` file. `sys.executable` is not
-    resolved: a venv's `python` links to the base interpreter, which has no `mb`.
-    Returns "" (for example under `python -m mb` from a bare checkout).
+    `sys.argv[0]` is the script that started this process when it is an `mb`
+    file (it also covers installers that copy the script out of the venv). Else
+    the bin dir of `sys.executable`, where pip, pipx and uv put the script;
+    `sys.executable` is not resolved because a venv's `python` links to the base
+    interpreter, which has no `mb`. Returns "" (for example under `python -m mb`
+    from a bare checkout).
     """
 
     candidates: list[Path] = []
-    if sys.executable:
-        candidates.append(Path(sys.executable).parent / "mb")
     if sys.argv and sys.argv[0] and Path(sys.argv[0]).name == "mb":
         candidates.append(Path(sys.argv[0]).expanduser().absolute())
+    if sys.executable:
+        candidates.append(Path(sys.executable).parent / "mb")
     for candidate in candidates:
         if candidate.is_file():
             return str(candidate)
@@ -305,6 +307,12 @@ def login_shell_mb_diagnostics(shell: str | None = None, *, timeout: float = 5.0
             "Login-shell runtime resolves a different mb than this process. "
             f"Active mb: {active_path} {__version__}; "
             f"login shell mb: {runtime_path} (version not checked)."
+        )
+    elif not active_path:
+        state = "ok"
+        summary = (
+            f"Login shell resolves mb at {runtime_path}; this process's own mb "
+            "script was not found, so they were not compared."
         )
     else:
         state = "ok"
