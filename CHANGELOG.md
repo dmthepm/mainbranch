@@ -24,8 +24,9 @@ daily, weekdays or weekly cadence, optional owner, and evidence kind).
 `mb validate` checks these fields and warns when stage and status disagree;
 `mb status --json` reports `stage` as `""` and `commitment` as `null` when absent.
 `/mb-bet` asks about them as optional questions. `mb status`, `mb doctor` and
-`mb start` now ask the login shell only where its `mb` is. They name a different
-install by path without starting it or claiming its version.
+`mb start` now ask the login shell only where its `mb` is, without starting it.
+When it is a different install, `mb status` and `mb start` name its path without
+claiming its version.
 
 ### Added
 
@@ -40,8 +41,8 @@ install by path without starting it or claiming its version.
 ### Fixed
 
 - `mb status`, `mb doctor` and `mb start` no longer run the `mb` found by the
-  login shell to check its version. A different install is named by path,
-  without claiming its version.
+  login shell to check its version. When it is a different install, `mb status`
+  and `mb start` name its path without claiming its version.
 
 ## [0.6.7] - 2026-10-11
 
