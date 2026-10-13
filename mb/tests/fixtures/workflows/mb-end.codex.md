@@ -27,6 +27,7 @@ workflows are available in Codex.
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `drift.items`

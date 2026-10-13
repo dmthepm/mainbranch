@@ -217,6 +217,7 @@ def test_cards_json_shape_and_exit_one_when_a_checkout_is_missing(home: Path) ->
     assert cards["elsewhere"]["checkout_state"] == "not_on_this_machine"
     assert cards["elsewhere"]["state"] == "remote_only"
     healthy = cards["healthy"]
+    assert healthy["sections"]["loop"]["top_gap"] is None
     assert set(healthy["sections"]) == set(fleet_checkin.SECTION_NAMES)
     for section in healthy["sections"].values():
         assert {"state", "as_of", "source", "text"} <= set(section)
@@ -236,9 +237,135 @@ def test_cards_json_shape_and_exit_one_when_a_checkout_is_missing(home: Path) ->
     assert healthy["sections"]["sites"]["flags"] == {"ci_failing": 1}
     assert healthy["verdict"] == "on_track"  # loop is ready; a failing site is a note
     assert cards["gone"]["sections"]["loop"]["state"] == "unavailable"
+    assert cards["gone"]["sections"]["loop"]["top_gap"] is None
     assert cards["elsewhere"]["sections"]["loop"]["state"] == "not_applicable"
     assert cards["gone"]["verdict"] == "cannot_see"
     assert cards["elsewhere"]["verdict"] == "on_track"
+
+
+@needs_tomllib
+def test_real_status_gap_reaches_card_text_and_json(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = home / "src" / "healthy"
+    init_run(path=str(repo), name="Test Business")
+    (repo / "bets" / "2026-10-13-test.md").write_text(
+        "---\nstatus: open\nopened: 2026-10-13\n"
+        "hypothesis: Outreach will lead to calls.\nmetric: calls\n"
+        "target: 5 calls\nlinked_pushes: []\n---\n# Test bet\n",
+        encoding="utf-8",
+    )
+    _hub_list(
+        home,
+        f'[[hubs]]\nname = "healthy"\nremote = "github:example-co/healthy"\ncheckout = "{repo}"\n',
+    )
+    monkeypatch.setattr(
+        status_mod,
+        "_which",
+        lambda name: "" if name in {"gh", "claude"} else shutil.which(name) or "",
+    )
+    report = status_mod.run(path=str(repo), update_marker=False)
+    gap = next(
+        item
+        for item in report["relationship_health"]["gaps"]
+        if item["id"] == "active_bets_without_push"
+    )
+    report["ranked_actions"] = [{"title": "Review today's work", "severity": "info"}]
+    monkeypatch.setattr(fleet_checkin, "run_status_child", lambda checkout, timeout: (report, ""))
+
+    result = runner.invoke(app, ["fleet", "checkin", "--json"])
+    assert result.exit_code == 0
+    card = json.loads(result.stdout)["cards"][0]
+    assert card["sections"]["loop"]["top_gap"] == {
+        key: gap[key] for key in ("id", "severity", "count", "summary")
+    }
+    assert card["sections"]["loop"]["top_action"]["title"] == "Review today's work"
+    assert "Links: 1 active bet needs a linked push." in card["text"]
+
+    human = runner.invoke(app, ["fleet", "checkin"])
+    assert human.exit_code == 0
+    assert "Links: 1 active bet needs a linked push." in human.stdout
+
+
+@needs_tomllib
+def test_gap_already_named_by_top_action_is_not_repeated(home: Path) -> None:
+    hubs = _fixture_hubs(home)
+    hubs["healthy"].mkdir(parents=True)
+    summary = "1 active bet(s) need a linked push."
+    payload = _status_payload(
+        readiness={"level": "needs_attention"},
+        ranked_actions=[{"title": summary.rstrip("."), "reason": summary}],
+        relationship_health={
+            "gaps": [
+                {
+                    "id": "active_bets_without_push",
+                    "severity": "warn",
+                    "count": 1,
+                    "summary": summary,
+                }
+            ]
+        },
+    )
+    doc, _ = fleet_checkin.checkin(status_runner=_runner_for({"healthy": (payload, "")}))
+    loop = doc["cards"][0]["sections"]["loop"]
+    assert loop["top_gap"]["id"] == "active_bets_without_push"
+    assert "Next: 1 active bet(s) need a linked push." in loop["text"]
+    assert "Links:" not in loop["text"]
+
+
+def test_generic_relationship_action_still_names_the_specific_gap() -> None:
+    summary = "1 active bet(s) need a linked push."
+    payload = _status_payload(
+        ranked_actions=[{"title": "Review business relationship gaps", "reason": summary}],
+        relationship_health={
+            "gaps": [
+                {
+                    "id": "active_bets_without_push",
+                    "severity": "warn",
+                    "count": 1,
+                    "summary": summary,
+                }
+            ]
+        },
+    )
+    loop = fleet_checkin._loop_section(payload, "2026-10-13")
+    assert "Links: 1 active bet needs a linked push." in loop["text"]
+
+
+@needs_tomllib
+def test_no_relationship_gap_has_no_line_and_null_key(home: Path) -> None:
+    hubs = _fixture_hubs(home)
+    hubs["healthy"].mkdir(parents=True)
+    payload = _status_payload(relationship_health={"gaps": []})
+    doc, _ = fleet_checkin.checkin(status_runner=_runner_for({"healthy": (payload, "")}))
+    loop = doc["cards"][0]["sections"]["loop"]
+    assert loop["top_gap"] is None
+    assert "Links:" not in loop["text"]
+
+
+def test_top_gap_prefers_warning_and_preserves_status_order_for_ties() -> None:
+    payload = _status_payload(
+        relationship_health={
+            "gaps": [
+                {"id": "offer", "severity": "info", "count": 1, "summary": "One offer gap."},
+                {
+                    "id": "first_warning",
+                    "severity": "warn",
+                    "count": 2,
+                    "summary": "Two missing links.",
+                },
+                {
+                    "id": "second_warning",
+                    "severity": "warn",
+                    "count": 1,
+                    "summary": "One missing link.",
+                },
+            ]
+        }
+    )
+    loop = fleet_checkin._loop_section(payload, "2026-10-13")
+    assert loop["top_gap"]["id"] == "first_warning"
+    assert "Links: Two missing links." in loop["text"]
 
 
 @needs_tomllib

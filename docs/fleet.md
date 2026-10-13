@@ -160,8 +160,11 @@ card may reflect GitHub state that `status` fetched.
 (`ok`, `unavailable`, `remote_only`), `verdict`, `freshness`, `text` and seven
 sections: `loop`, `bets`, `exposure`, `checkpoint`, `github`, `connections`,
 `sites`. Every section has `state` (`ok`, `attention`, `not_checked`,
-`unavailable`, `not_applicable`), `as_of`, `source` and a short `text`. Bets
-pass through `stage` and `commitment` when status provides them. Exposure shows
+`unavailable`, `not_applicable`), `as_of`, `source` and a short `text`. The `loop`
+section keeps `top_action` and adds `top_gap` with `id`, `severity`, `count`, and
+the status summary, or `null` when there is no gap. The card names the most
+urgent gap on the loop line unless the top action already says it. Bets pass
+through `stage` and `commitment` when status provides them. Exposure shows
 counts and cap state only, never amounts. `safe_to_share` is `false`. Without
 `--json` you get the overview line and one short card per business, ready to
 paste into a message.

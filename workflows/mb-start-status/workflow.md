@@ -25,6 +25,7 @@ json_facts:
   - validation.file_contracts
   - content_strategy
   - ranked_actions
+  - relationship_health.gaps
   - update
   - readiness
   - readiness.dimensions.repo_runtime
@@ -116,6 +117,7 @@ The runtime shell must preserve these paths from the workflow source:
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `readiness.dimensions.repo_runtime`
@@ -157,7 +159,9 @@ runtime handoff. `readiness.dimensions.business_memory` describes onboarding,
 validation, file-contract, and drift signals that may still need owner input.
 
 After hard gates, lead with the top `ranked_actions` entry when the operator
-asks what to do next. Use `since_last_check` and `journal` when the operator
+asks what to do next. After that action, name the first warn-level
+`relationship_health.gaps` item once, with its repair, when one exists.
+Use `since_last_check` and `journal` when the operator
 asks what changed. Use `validation.file_contracts` when a file has the right
 place in the repo but is missing the business shape needed for the next
 workflow; route offer-shape gaps to `mb-think` and ask before durable writes.

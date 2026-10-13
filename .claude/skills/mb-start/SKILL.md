@@ -51,6 +51,7 @@ Required fact paths:
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `readiness.dimensions.repo_runtime`
@@ -194,6 +195,8 @@ mb status --json --peek
 - `ranked_actions` is the deterministic list of one to three business moves.
   Surface the first action as the recommendation, including its reason and
   cited signal summaries.
+- After that action, name the first warn-level `relationship_health.gaps` item
+  once with its repair. Skip it when there is no warning.
 - `brain.bets.active`, `brain.bets.due_soon`, `brain.bets.overdue`, and
   `brain.bets.exit_criteria` are the deterministic bet trigger facts. Use them
   for active, due-soon, overdue, missing-exit, triggered kill, triggered

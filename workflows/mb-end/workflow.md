@@ -22,6 +22,7 @@ json_facts:
   - validation.file_contracts
   - content_strategy
   - ranked_actions
+  - relationship_health.gaps
   - update
   - readiness
   - drift.items
@@ -114,6 +115,7 @@ The runtime shell must preserve these paths from the workflow source:
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `drift.items`
@@ -142,7 +144,9 @@ requests, provider mutation, publishing, spend, and customer contact.
 
 Mid-session save branch: after hard gates, if the intent is a save while the
 operator keeps working (not an end or pause), run only the status scan plus `mb
-checkpoint --plan`, save on approval through `mb checkpoint`, and stop. Do not run
+checkpoint --plan`, check changed bet, push, decision, or research files against
+`relationship_health.gaps` and offer one named link fix when they match, then
+save on approval through `mb checkpoint` and stop. Do not run
 crystallize, the final-thought prompt, or the warm close, and never save with raw
 git.
 
@@ -163,9 +167,13 @@ this order:
    Claude's Task tool.
 6. Save state: answer "is that it?" with the owner-facing state before
    technical details.
-7. Approval-gated save: validate the checkpoint subject, ask before saving,
+7. Link check: if a changed bet, push, decision, or research file appears in
+   `relationship_health.gaps` evidence or records, offer one link fix before
+   writing the checkpoint. Name the field and file; ask at most one question.
+   Skip this check when no changed file is named by a gap.
+8. Approval-gated save: validate the checkpoint subject, ask before saving,
    and save only through `mb checkpoint`.
-8. Warm close: end with one sentence naming the most important saved or drafted
+9. Warm close: end with one sentence naming the most important saved or drafted
    business outcome. Do not plan tomorrow.
 
 Owner-facing save states:

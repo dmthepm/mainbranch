@@ -299,6 +299,7 @@ CODEX_END_REQUIRED_JSON_FACTS = (
     "validation.file_contracts",
     "content_strategy",
     "ranked_actions",
+    "relationship_health.gaps",
     "update",
     "readiness",
     "drift.items",
@@ -1435,7 +1436,8 @@ This is the Codex-native status workflow.
    Tell the operator to fix the runtime/login-shell PATH and rerun the
    read-only checks first.
 4. Lead with the top `ranked_actions` entry when the operator asks what to do
-   next. Include the reason and cited signal summaries.
+   next. Include the reason and cited signal summaries. After it, name the
+   first warn-level `relationship_health.gaps` item once with its repair.
 5. For "what changed?" answer from `since_last_check.journal` first, then
    top-level `journal` for recent context.
 6. For provider questions, read `integrations` first. Run `mb connect plan` or
@@ -1569,6 +1571,7 @@ Shared source required JSON fact paths:
 - `money_path.objects.proof.quality`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `drift.items`
@@ -1603,6 +1606,10 @@ Owner-facing save states are `drafted`, `saved locally`, `ready to send up`,
 `sent for review`, `landed in main`, and `blocked by unrelated cleanup`.
 Technical branch, proposal, merge, and working-tree details come second unless
 the operator asks for plumbing.
+
+Before the checkpoint, compare changed bets, pushes, decisions, and research
+files with `relationship_health.gaps` evidence or records. If a gap names one,
+offer one link fix with the field and file; ask at most one question. Otherwise skip.
 
 ## Routing Rules
 
