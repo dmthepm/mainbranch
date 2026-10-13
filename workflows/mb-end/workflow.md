@@ -144,8 +144,9 @@ requests, provider mutation, publishing, spend, and customer contact.
 
 Mid-session save branch: after hard gates, if the intent is a save while the
 operator keeps working (not an end or pause), run only the status scan plus `mb
-checkpoint --plan`, check changed bet, push, decision, or research files against
-`relationship_health.gaps` and offer one named link fix when they match, then
+checkpoint --plan`, check bet, push, decision, or research files this session
+created or edited against `relationship_health.gaps` and offer one named link
+fix when they match, then
 save on approval through `mb checkpoint` and stop. Do not run
 crystallize, the final-thought prompt, or the warm close, and never save with raw
 git.
@@ -167,10 +168,13 @@ this order:
    Claude's Task tool.
 6. Save state: answer "is that it?" with the owner-facing state before
    technical details.
-7. Link check: if a changed bet, push, decision, or research file appears in
-   `relationship_health.gaps` evidence or records, offer one link fix before
-   writing the checkpoint. Name the field and file; ask at most one question.
-   Skip this check when no changed file is named by a gap.
+7. Link check: if a bet, push, decision, or research file this session created
+   or edited appears in `relationship_health.gaps` evidence or records, offer
+   one link fix before writing the checkpoint. Name the field and file; ask at
+   most one question. The checkpoint plan lists every uncommitted file,
+   including work left from earlier sessions, so use it only to confirm a file
+   this session touched. Skip this check when no such file is named by a gap,
+   or when you cannot tell which files this session touched.
 8. Approval-gated save: validate the checkpoint subject, ask before saving,
    and save only through `mb checkpoint`.
 9. Warm close: end with one sentence naming the most important saved or drafted

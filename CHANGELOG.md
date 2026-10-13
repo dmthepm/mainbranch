@@ -14,12 +14,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 `mb status` now warns when a live push names no bet, unless it is marked as a
 one-off with `linked_bets: []` and a short `no_bet_reason`.
 
+`mb status` now uses a push's dated name to find stale work when the push has no
+review, start, or date field.
+
 `mb fleet checkin` now shows the most urgent missing business link with its count beside the next action; JSON adds `loop.top_gap`.
 
 `/mb-start` names a link warning after the top action. `/mb-end` offers a link fix for a changed file before saving a checkpoint.
-
-`mb status` now uses a push's dated name to find stale work when the push has no
-review, start, or date field.
 
 ## [0.6.8] - 2026-10-13
 
