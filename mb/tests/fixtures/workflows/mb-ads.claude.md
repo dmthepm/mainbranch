@@ -103,6 +103,19 @@ This snapshot does not replace shipped `.claude/skills/mb-ads/SKILL.md`.
    spend, publish GTM, upload conversions, change billing, or contact customers.
    Execution needs explicit approval and runtime evidence for that exact surface.
 
+## Push Links
+
+When creating or first writing a push, ask once:
+"Which bet does this push serve, and which existing decision or research supports it?"
+Offer active bets and recent decisions and research by name from status facts or files already read.
+Accept "none yet" and continue. For a deliberate one-off with no bet, write
+`linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
+chosen repo-relative paths in `linked_bets`, `linked_decisions`, and
+`linked_research` on the push; add its path to `linked_pushes` on each named
+bet, decision, and research file. Leave unanswered links empty; do not invent
+a reason. Mirror typed links in `## Related links` as relative Markdown links.
+Use docs/business-connections.md; never infer links from body-only references.
+
 ## Handoff Shape
 
 ```text

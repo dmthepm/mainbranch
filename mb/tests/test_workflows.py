@@ -301,6 +301,39 @@ def test_generated_site_claude_and_codex_snapshots_match_fixtures() -> None:
     )
 
 
+def test_push_creating_workflows_ask_for_links_and_keep_one_off_route() -> None:
+    question = (
+        "Which bet does this push serve, and which existing decision or research supports it?"
+    )
+    for source, shipped in (
+        (ADS_WORKFLOW, SHIPPED_ADS_SKILL),
+        (ORGANIC_WORKFLOW, SHIPPED_ORGANIC_SKILL),
+        (SITE_WORKFLOW, SHIPPED_SITE_SKILL),
+    ):
+        workflow = load_workflow(source)
+        source_text = source.read_text(encoding="utf-8")
+        step_start = source_text.index("When creating or first writing a push, ask once:")
+        step_end = source_text.index(
+            "Use docs/business-connections.md; never infer links from body-only references.",
+            step_start,
+        ) + len("Use docs/business-connections.md; never infer links from body-only references.")
+        step = source_text[step_start:step_end]
+        for text in (
+            source_text,
+            shipped.read_text(encoding="utf-8"),
+            render_claude_shell(workflow),
+            render_codex_shell(workflow),
+        ):
+            assert step in text
+            assert question in text
+            assert 'Accept "none yet" and continue' in text
+            assert "`linked_bets: []`" in text
+            assert "`no_bet_reason`" in text
+            assert "`linked_decisions`" in text
+            assert "`linked_research`" in text
+            assert "`linked_pushes` on each named" in text
+
+
 def test_shipped_claude_end_skill_preserves_shared_workflow_contract() -> None:
     workflow = load_workflow(END_WORKFLOW)
     skill_text = SHIPPED_END_SKILL.read_text(encoding="utf-8")

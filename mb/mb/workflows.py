@@ -519,6 +519,18 @@ def _display_path(path: Path) -> str:
     return path.as_posix()
 
 
+_PUSH_LINK_STEP = """When creating or first writing a push, ask once:
+"Which bet does this push serve, and which existing decision or research supports it?"
+Offer active bets and recent decisions and research by name from status facts or files already read.
+Accept "none yet" and continue. For a deliberate one-off with no bet, write
+`linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
+chosen repo-relative paths in `linked_bets`, `linked_decisions`, and
+`linked_research` on the push; add its path to `linked_pushes` on each named
+bet, decision, and research file. Leave unanswered links empty; do not invent
+a reason. Mirror typed links in `## Related links` as relative Markdown links.
+Use docs/business-connections.md; never infer links from body-only references."""
+
+
 def render_claude_shell(workflow: WorkflowSource) -> str:
     """Render a Claude Code shell snapshot for a workflow source."""
 
@@ -1261,6 +1273,10 @@ This snapshot does not replace shipped `.claude/skills/mb-organic/SKILL.md`.
 8. Do not publish, schedule, upload to accounts, mutate provider accounts,
    spend, auto-DM, auto-reply, contact customers, or execute provider setup.
 
+## Push Links
+
+{_PUSH_LINK_STEP}
+
 ## Handoff Shape
 
 ```text
@@ -1337,6 +1353,12 @@ account mutation, customer contact, or Claude Code entrypoints in Codex.
    secrets.
 9. Do not publish, schedule, upload to accounts, mutate provider accounts,
    spend, auto-DM, auto-reply, contact customers, or execute provider setup.
+
+## Push Links
+
+{_PUSH_LINK_STEP}
+
+For Codex, include these as proposed file edits and stop before applying.
 
 ## Handoff Shape
 
@@ -1418,6 +1440,10 @@ This snapshot does not replace shipped `.claude/skills/mb-ads/SKILL.md`.
    perform provider mutation, mutate provider accounts, change budgets, start
    spend, publish GTM, upload conversions, change billing, or contact customers.
    Execution needs explicit approval and runtime evidence for that exact surface.
+
+## Push Links
+
+{_PUSH_LINK_STEP}
 
 ## Handoff Shape
 
@@ -1511,6 +1537,12 @@ customer contact, or Claude Code entrypoints in Codex.
    mutate provider accounts, change budgets, start spend, publish GTM, upload
    conversions, change billing, or contact customers.
 
+## Push Links
+
+{_PUSH_LINK_STEP}
+
+For Codex, include these as proposed file edits and stop before applying.
+
 ## Handoff Shape
 
 ```text
@@ -1599,6 +1631,10 @@ This snapshot does not replace shipped `.claude/skills/mb-site/SKILL.md`.
    customers. Do not contact customers or execute account changes without
    explicit approval and runtime evidence for that surface.
 
+## Push Links
+
+{_PUSH_LINK_STEP}
+
 ## Handoff Shape
 
 ```text
@@ -1684,6 +1720,12 @@ Modes: plan, brief, build, preview, check, publish, iterate, graduate, or recove
    Cloudflare Pages projects, attach custom domains, deploy, git push, publish,
    spend, mutate provider accounts, contact customers, or execute account
    changes.
+
+## Push Links
+
+{_PUSH_LINK_STEP}
+
+For Codex, include these as proposed file edits and stop before applying.
 
 ## Handoff Shape
 

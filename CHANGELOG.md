@@ -21,6 +21,10 @@ review, start, or date field.
 
 `/mb-start` names a link warning after the top action. `/mb-end` offers a link fix for a changed file before saving a checkpoint.
 
+When planning a new ads, organic, or site push, Main Branch asks which bet
+it serves and which decisions or research support it, then records the links
+on both sides. A deliberate one-off can record why it has no bet.
+
 ## [0.6.8] - 2026-10-13
 
 `mb fleet checkin` gives you one short morning card per business in your hub
