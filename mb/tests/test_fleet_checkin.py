@@ -352,14 +352,28 @@ def test_stale_snapshot_warns(home: Path) -> None:
     assert any("over a day old" in w for w in doc["warnings"])
 
 
-def test_missing_or_invalid_hub_list_exits_two(home: Path) -> None:
-    result = runner.invoke(app, ["fleet", "checkin", "--json"])
+@needs_tomllib
+@pytest.mark.parametrize(
+    "hub_list",
+    [None, "this is = not [valid", 'name = "no hubs"\n'],
+    ids=["missing", "invalid-toml", "no-hubs"],
+)
+@pytest.mark.parametrize("json_out", [False, True], ids=["text", "json"])
+def test_invalid_hub_list_exits_two_without_home_path(
+    home: Path, hub_list: str | None, json_out: bool
+) -> None:
+    if hub_list is not None:
+        _hub_list(home, hub_list)
+    result = runner.invoke(app, ["fleet", "checkin", *(["--json"] if json_out else [])])
     assert result.exit_code == 2
-    payload = json.loads(result.stdout)
-    assert payload["ok"] is False
-    assert "cards" not in payload
-    _hub_list(home, "this is = not [valid")
-    assert runner.invoke(app, ["fleet", "checkin"]).exit_code == 2
+    assert str(home) not in result.output
+    assert "~/config/mainbranch/fleet.toml" in result.output
+    if json_out:
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is False
+        assert "cards" not in payload
+    else:
+        assert "card" not in result.output
 
 
 @needs_tomllib

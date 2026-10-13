@@ -3033,12 +3033,15 @@ def site_check_cmd(
     raise typer.Exit(0 if result["ok"] else 1)
 
 
-def _fleet_config_exit(command: str, exc: fleet_mod.FleetConfigError, json_out: bool) -> NoReturn:
+def _fleet_config_exit(
+    command: str, exc: fleet_mod.FleetConfigError, json_out: bool, error: str | None = None
+) -> NoReturn:
+    message = str(exc) if error is None else error
     if json_out:
         typer.echo(
             json.dumps(
                 envelope(
-                    {"ok": False, "errors": [str(exc)], "actions": ["edit the hub list"]},
+                    {"ok": False, "errors": [message], "actions": ["edit the hub list"]},
                     command=command,
                     schema_name=f"mainbranch.{command.replace('mb ', '').replace(' ', '_')}",
                 ),
@@ -3046,7 +3049,7 @@ def _fleet_config_exit(command: str, exc: fleet_mod.FleetConfigError, json_out: 
             )
         )
     else:
-        typer.echo(f"{command}: {exc}", err=True)
+        typer.echo(f"{command}: {message}", err=True)
     raise typer.Exit(2) from exc
 
 
@@ -3106,7 +3109,9 @@ def fleet_checkin_cmd(
     try:
         result, code = fleet_checkin_mod.checkin(hub=hub, timeout=timeout)
     except fleet_mod.FleetConfigError as exc:
-        _fleet_config_exit("mb fleet checkin", exc, json_out)
+        _fleet_config_exit(
+            "mb fleet checkin", exc, json_out, fleet_checkin_mod.scrub_home(str(exc))
+        )
     if json_out:
         typer.echo(
             _json_payload(

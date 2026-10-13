@@ -167,6 +167,15 @@ def _scrub(value: Any, home: str) -> Any:
     return value
 
 
+def scrub_home(value: Any) -> Any:
+    """Replace the home directory and its realpath in check-in output."""
+    home = str(Path.home())
+    real_home = os.path.realpath(home)
+    if real_home != home:
+        value = _scrub(value, real_home)
+    return _scrub(value, home)
+
+
 def _section(state: str, as_of: str, source: str, text: str, **facts: Any) -> dict[str, Any]:
     return {"state": state, "as_of": as_of, "source": source, "text": text, **facts}
 
@@ -644,10 +653,7 @@ def checkin(
         "warnings": warnings,
         "actions": [],
     }
-    real_home = os.path.realpath(home)
-    if real_home != home:
-        document = _scrub(document, real_home)
-    return _scrub(document, home), exit_code
+    return scrub_home(document), exit_code
 
 
 def render_text(document: dict[str, Any]) -> None:
