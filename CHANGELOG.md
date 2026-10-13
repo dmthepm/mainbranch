@@ -11,16 +11,37 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
-`mb fleet checkin` prints one read-only card per business in your hub list:
-loop state, bets, exposure caps, last checkpoint, GitHub, connections and
-sites, as text or `--json`. It writes nothing.
+## [0.6.8] - 2026-10-13
 
-Bets can now carry an optional `stage` (tuning, working, ongoing, done, cut) and an optional `commitment` (the one thing the bet does on a schedule, and the proof it happened); `mb validate` checks both and `mb status --json` reports them.
+`mb fleet checkin` gives you one short morning card per business in your hub
+list, with its loop, bets, exposure counts, last checkpoint, GitHub,
+connections and sites. Read it as text ready to paste or use `--json`
+(`mb.fleet.checkin` v1). It only reads: no fetch, writes or prompts. Each
+business has a `--timeout`, and paths display as `~/...`. The caller owns
+delivery and scheduling. Bets can now say what they do on a schedule with an
+optional stage (tuning, working, ongoing, done or cut) and commitment (action,
+daily, weekdays or weekly cadence, optional owner, and evidence kind).
+`mb validate` checks these fields and warns when stage and status disagree;
+`mb status --json` reports `stage` as `""` and `commitment` as `null` when absent.
+`/mb-bet` asks about them as optional questions. `mb status`, `mb doctor` and
+`mb start` now ask the login shell only where its `mb` is. They name a different
+install by path without starting it or claiming its version.
 
-`mb status`, `mb doctor` and `mb start` no longer run the `mb` your login shell
-finds to check its version. They only ask the login shell where `mb` is and
-compare that with the install you are running; if it is a different install,
-the warning names its path and does not state its version.
+### Added
+
+- `mb fleet checkin` prints one read-only card per business in your hub list:
+  loop state, bets, exposure counts, last checkpoint, GitHub, connections and
+  sites, as text or `--json`. It does not fetch or write. Each business has a
+  `--timeout`, and paths display as `~/...`.
+- Bets may include `stage` and `commitment` beside their existing status.
+  `mb validate` checks both; `mb status --json` reports both per bet; `/mb-bet`
+  asks for them only when useful.
+
+### Fixed
+
+- `mb status`, `mb doctor` and `mb start` no longer run the `mb` found by the
+  login shell to check its version. A different install is named by path,
+  without claiming its version.
 
 ## [0.6.7] - 2026-10-11
 
