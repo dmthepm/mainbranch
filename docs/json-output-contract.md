@@ -602,6 +602,7 @@ The v1 envelope is present on:
 - `mb fleet refresh --json`
 - `mb fleet status --json`
 - `mb fleet hubs list --json`
+- `mb fleet checkin --json` (`schema: "mb.fleet.checkin"`, `safe_to_share: false`)
 
 Future commands should use the same shared metadata when they add or revise
 `--json` output. Avoid moving existing payloads under a new `data` key unless a

@@ -34,6 +34,7 @@ from mb import doctor as doctor_mod
 from mb import educational as educational_mod
 from mb import feedback as feedback_mod
 from mb import fleet as fleet_mod
+from mb import fleet_checkin as fleet_checkin_mod
 from mb import graph as graph_mod
 from mb import image_rail as image_rail_mod
 from mb import init as init_mod
@@ -3032,12 +3033,15 @@ def site_check_cmd(
     raise typer.Exit(0 if result["ok"] else 1)
 
 
-def _fleet_config_exit(command: str, exc: fleet_mod.FleetConfigError, json_out: bool) -> NoReturn:
+def _fleet_config_exit(
+    command: str, exc: fleet_mod.FleetConfigError, json_out: bool, error: str | None = None
+) -> NoReturn:
+    message = str(exc) if error is None else error
     if json_out:
         typer.echo(
             json.dumps(
                 envelope(
-                    {"ok": False, "errors": [str(exc)], "actions": ["edit the hub list"]},
+                    {"ok": False, "errors": [message], "actions": ["edit the hub list"]},
                     command=command,
                     schema_name=f"mainbranch.{command.replace('mb ', '').replace(' ', '_')}",
                 ),
@@ -3045,7 +3049,7 @@ def _fleet_config_exit(command: str, exc: fleet_mod.FleetConfigError, json_out: 
             )
         )
     else:
-        typer.echo(f"{command}: {exc}", err=True)
+        typer.echo(f"{command}: {message}", err=True)
     raise typer.Exit(2) from exc
 
 
@@ -3088,6 +3092,35 @@ def fleet_status_cmd(
     else:
         fleet_mod.render_status(result)
     raise typer.Exit(0 if result["ok"] else 1)
+
+
+@fleet_app.command("checkin")
+def fleet_checkin_cmd(
+    json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
+    hub: str = typer.Option("", "--hub", help="Check in on one hub from the hub list."),
+    timeout: int = typer.Option(
+        fleet_checkin_mod.DEFAULT_TIMEOUT_SECONDS,
+        "--timeout",
+        min=1,
+        help="Seconds to wait for each business before marking it unavailable.",
+    ),
+) -> None:
+    """One read-only card per business: loop, bets, exposure, checkpoint, GitHub, sites."""
+    try:
+        result, code = fleet_checkin_mod.checkin(hub=hub, timeout=timeout)
+    except fleet_mod.FleetConfigError as exc:
+        _fleet_config_exit(
+            "mb fleet checkin", exc, json_out, fleet_checkin_mod.scrub_home(str(exc))
+        )
+    if json_out:
+        typer.echo(
+            _json_payload(
+                result, command="mb fleet checkin", schema_name="mainbranch.fleet_checkin"
+            )
+        )
+    else:
+        fleet_checkin_mod.render_text(result)
+    raise typer.Exit(code)
 
 
 @fleet_hubs_app.command("list")

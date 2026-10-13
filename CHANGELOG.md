@@ -11,6 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+`mb fleet checkin` prints one read-only card per business in your hub list:
+loop state, bets, exposure caps, last checkpoint, GitHub, connections and
+sites, as text or `--json`. It writes nothing.
+
 Bets can now carry an optional `stage` (tuning, working, ongoing, done, cut) and an optional `commitment` (the one thing the bet does on a schedule, and the proof it happened); `mb validate` checks both and `mb status --json` reports them.
 
 `mb status`, `mb doctor` and `mb start` no longer run the `mb` your login shell
