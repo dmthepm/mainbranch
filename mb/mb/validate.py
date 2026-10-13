@@ -604,6 +604,10 @@ def _check_push_frontmatter(path: Path, fm: dict[str, Any], errors: list[str]) -
         errors.append("type must be 'push'")
     for key in ("slug", "kind", "status", "health", "owner", "audience", "offer", "promise"):
         _require_non_empty_string(fm, key, errors)
+    if "no_bet_reason" in fm and not (
+        isinstance(fm["no_bet_reason"], str) and fm["no_bet_reason"].strip()
+    ):
+        errors.append("no_bet_reason must be a non-empty string when present")
     promise = fm.get("promise")
     if isinstance(promise, str) and len(promise.strip()) > 140:
         errors.append("promise must be 140 characters or fewer")

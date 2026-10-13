@@ -11,6 +11,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+`mb status` now warns when a live push names no bet, unless it is marked as a
+one-off with `linked_bets: []` and a short `no_bet_reason`.
+
+`mb status` now uses a push's dated name to find stale work when the push has no
+review, start, or date field.
+
 ## [0.6.8] - 2026-10-13
 
 `mb fleet checkin` gives you one short morning card per business in your hub

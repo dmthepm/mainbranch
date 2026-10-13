@@ -1381,6 +1381,30 @@ def test_validate_accepts_push_lifecycle_statuses(tmp_path: Path) -> None:
     assert all(f["ok"] for f in push_files)
 
 
+def test_validate_push_no_bet_reason_requires_non_empty_string(tmp_path: Path) -> None:
+    for slug, reason in (
+        ("one-off", "One-time notice"),
+        ("empty", "'  '"),
+        ("non-string", "123"),
+    ):
+        path = tmp_path / "pushes" / f"2026-05-06-{slug}" / "push.md"
+        _write(
+            path,
+            _push("planned", slug=slug).replace(
+                "---\n#", f"linked_bets: []\nno_bet_reason: {reason}\n---\n#"
+            ),
+        )
+
+    report = run(path=str(tmp_path))
+    files = {Path(item["path"]).parent.name: item for item in report["files"]}
+    assert files["2026-05-06-one-off"]["ok"] is True
+    for slug in ("empty", "non-string"):
+        assert (
+            "no_bet_reason must be a non-empty string when present"
+            in files[f"2026-05-06-{slug}"]["errors"]
+        )
+
+
 def test_validate_requires_canonical_push_schema(tmp_path: Path) -> None:
     _write(
         tmp_path / "pushes" / "2026-05-06-incomplete" / "push.md",

@@ -2075,6 +2075,90 @@ def test_status_relationship_health_accepts_push_side_bet_links(
     assert report["relationship_health"]["summary"]["active_bets_without_push"] == 0
 
 
+def test_status_flags_only_live_pushes_without_a_bet(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    repo = tmp_path / "business"
+    init_run(path=str(repo), name="Test Business")
+    bet_path = "bets/2026-05-01-launch.md"
+    bet_linked_push = "pushes/2026-05-06-bet-linked/push.md"
+    (repo / bet_path).write_text(
+        f"---\nstatus: open\nlinked_pushes:\n  - {bet_linked_push}\n---\n# Launch bet\n",
+        encoding="utf-8",
+    )
+    for slug, status, extra in (
+        ("unlinked", "planned", ""),
+        ("push-linked", "active", f"linked_bets:\n  - {bet_path}\n"),
+        ("bet-linked", "paused", ""),
+        ("completed", "completed", ""),
+        ("one-off", "active", "linked_bets: []\nno_bet_reason: One-time notice\n"),
+        ("empty-reason", "active", "linked_bets: []\nno_bet_reason: '  '\n"),
+    ):
+        push = _write_push(repo, f"2026-05-06-{slug}", status=status) / "push.md"
+        push.write_text(
+            push.read_text(encoding="utf-8").replace(
+                "---\n\n# Launch push", extra + "---\n\n# Launch push"
+            ),
+            encoding="utf-8",
+        )
+
+    result = runner.invoke(app, ["status", str(repo), "--json", "--peek"])
+    assert result.exit_code == 0
+    health = json.loads(result.stdout)["relationship_health"]
+    assert health["summary"]["active_pushes_without_bet"] == 2
+    assert health["summary"]["active_bets_without_push"] == 0
+    assert {item["path"] for item in health["sections"]["pushes"]["active_without_bet"]} == {
+        "pushes/2026-05-06-unlinked/push.md",
+        "pushes/2026-05-06-empty-reason/push.md",
+    }
+    assert any(
+        gap["id"] == "active_pushes_without_bet" and gap["count"] == 2 for gap in health["gaps"]
+    )
+    assert "active_pushes_without_offer" in health["summary"]
+
+    human = runner.invoke(app, ["status", str(repo), "--no-color", "--peek"])
+    assert human.exit_code == 0
+    assert "2 live push(es) do not say which bet they serve" in human.stdout
+
+
+def test_status_dates_undated_push_from_slug(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    repo = tmp_path / "business"
+    init_run(path=str(repo), name="Test Business")
+    for slug, frontmatter_slug, started in (
+        ("old", "2026-04-01-old", ""),
+        ("recent", "2026-05-01-recent", ""),
+        ("explicit", "2026-04-01-explicit", "started: 2026-05-01\n"),
+        ("undated", "undated", ""),
+    ):
+        push = _write_push(repo, f"2026-05-06-{slug}") / "push.md"
+        content = push.read_text(encoding="utf-8")
+        content = content.replace(f"slug: {slug}\n", f"slug: {frontmatter_slug}\n")
+        content = content.replace("started: 2026-05-06\n", started)
+        content = content.replace("review_on: 2026-05-20\n", "")
+        push.write_text(content, encoding="utf-8")
+
+    report = status_mod.run(
+        path=str(repo),
+        now=datetime(2026, 5, 8, 12, 0, tzinfo=timezone.utc),
+        update_marker=False,
+    )
+    stale = report["relationship_health"]["sections"]["pushes"]["stale_without_outcome"]
+    assert [(item["path"], item["age_days"]) for item in stale] == [
+        ("pushes/2026-05-06-old/push.md", 37)
+    ]
+
+
+def test_push_stale_date_fallback_rejects_invalid_or_missing_slug() -> None:
+    today = date(2026, 5, 8)
+    assert status_mod._is_push_stale({"slug": "2026-04-01-old"}, today) == (True, 37)
+    assert status_mod._is_push_stale({"slug": "2026-05-01-recent"}, today) == (False, 7)
+    assert status_mod._is_push_stale(
+        {"slug": "2026-04-01-old", "started": "2026-05-01"}, today
+    ) == (False, 7)
+    assert status_mod._is_push_stale({"slug": "2026-04-99-invalid"}, today) == (False, 0)
+    assert status_mod._is_push_stale({"slug": "undated"}, today) == (False, 0)
+
+
 def test_status_surfaces_validation_category_counts(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
     repo = tmp_path / "acme"
