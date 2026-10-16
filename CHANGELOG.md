@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+`mb status` now notes accepted decisions and older research that have no business links, without adding them to the daily warning list.
+
 Decisions marked `codified` now pass validation and leave the uncodified work list.
 
 Status shows the full number of recent and stale records beside its short lists, so hidden work stays visible.

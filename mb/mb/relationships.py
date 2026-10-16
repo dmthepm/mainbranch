@@ -10,6 +10,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 REGISTRY_VERSION = "0.1"
+INFO_GAPS_WITHOUT_DAILY_ACTIONS = frozenset(
+    {"accepted_decisions_without_links", "research_without_links"}
+)
 
 LOCAL_REF_ROOTS = {
     "bets",

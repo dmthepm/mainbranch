@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mb.relationships import INFO_GAPS_WITHOUT_DAILY_ACTIONS
+
 RANKER_SCHEMA_VERSION = "1.0"
 MAX_ACTIONS = 3
 
@@ -503,6 +505,7 @@ def _add_bet_actions(actions: list[dict[str, Any]], report: dict[str, Any]) -> N
 def _add_relationship_actions(actions: list[dict[str, Any]], report: dict[str, Any]) -> None:
     relationship_health = _dict(report.get("relationship_health"))
     gaps = [_dict(item) for item in _list(relationship_health.get("gaps"))]
+    gaps = [item for item in gaps if item.get("id") not in INFO_GAPS_WITHOUT_DAILY_ACTIONS]
     if not gaps:
         return
     warnings = [item for item in gaps if item.get("severity") == "warn"]

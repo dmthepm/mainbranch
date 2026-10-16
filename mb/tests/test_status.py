@@ -2030,6 +2030,46 @@ def test_status_relationship_health_flags_active_bet_and_offer_gaps(
     assert "active bet(s) need a linked push" in human.stdout
 
 
+def test_relationship_health_notes_unlinked_decisions_and_older_research(tmp_path: Path) -> None:
+    repo = tmp_path / "business"
+    for folder in ("bets", "decisions", "research"):
+        (repo / folder).mkdir(parents=True)
+
+    def write(path: str, frontmatter: str) -> None:
+        (repo / path).write_text(f"---\n{frontmatter}---\n# Record\n", encoding="utf-8")
+
+    write("decisions/accepted.md", "status: accepted\n")
+    write("decisions/codified.md", "status: codified\n")
+    write("decisions/reverse-linked.md", "status: accepted\n")
+    write(
+        "decisions/research-linked.md",
+        "status: accepted\nlinked_research:\n  - research/linked.md\n",
+    )
+    write("decisions/proposed.md", "status: proposed\n")
+    write("decisions/superseded.md", "status: superseded\n")
+    write("bets/bet.md", "linked_decisions:\n  - decisions/reverse-linked.md\n")
+    for number in range(6):
+        write(f"research/old-{number}.md", "date: 2026-09-05\n")
+    write("research/recent.md", "date: 2026-10-05\n")
+    write("research/undated.md", "status: complete\n")
+    write("research/linked.md", "date: 2026-09-05\n")
+
+    health = status_mod._relationship_health(
+        repo, brain={"pushes": {"records": []}}, today=date(2026, 10, 15)
+    )
+    gaps = {item["id"]: item for item in health["gaps"]}
+    decisions = gaps["accepted_decisions_without_links"]
+    research = gaps["research_without_links"]
+    assert decisions["severity"] == research["severity"] == "info"
+    assert decisions["count"] == health["summary"]["accepted_decisions_without_links"] == 2
+    assert set(decisions["evidence"]) == {"decisions/accepted.md", "decisions/codified.md"}
+    assert research["count"] == health["summary"]["research_without_links"] == 6
+    assert len(research["records"]) == len(research["evidence"]) == 5
+    assert health["sections"]["research"]["without_links_total"] == 6
+    assert health["summary"]["warnings"] == 0
+    assert health["summary"]["info"] == 2
+
+
 def test_status_relationship_health_accepts_push_side_bet_links(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -3159,6 +3199,52 @@ def test_status_readiness_install_repair_names_the_install_mode(
 
     assert repair in readiness["next_actions"]
     assert not any("pipx install mainbranch" in action for action in readiness["next_actions"])
+
+
+def test_readiness_keeps_existing_offer_repair_and_ignores_only_new_gaps(tmp_path: Path) -> None:
+    offer = {
+        "id": "offers_without_current_push_or_playbook",
+        "severity": "info",
+        "repair": "Link the offer to an active push.",
+    }
+    missing = {
+        "id": "missing_relationship_targets",
+        "severity": "warn",
+        "repair": "Fix the missing linked file.",
+    }
+    new_gaps = [
+        {
+            "id": "accepted_decisions_without_links",
+            "severity": "info",
+            "repair": "Link each decision to the bet or push it informs.",
+        },
+        {
+            "id": "research_without_links",
+            "severity": "info",
+            "repair": "Link each research note to the bet or push it informs.",
+        },
+    ]
+    report = {
+        "repo": {"looks_like_mainbranch_repo": True},
+        "git": {"inside_work_tree": True, "dirty": False},
+        "install": {"ok": True},
+        "update": {"severity": "current", "command": ""},
+        "runtime": {
+            "skill_wiring": {"ok": True, "repair": ""},
+            "claude_code": {"found": True, "repair": ""},
+        },
+        "brain": status_mod._brain(tmp_path),
+        "onboarding": {"summary": {"status": "ready"}},
+        "integrations": {"providers": []},
+        "github": {"authenticated": True, "context": {"ok": True}},
+    }
+    for gaps, expected in (
+        ([offer], ["Link the offer to an active push."]),
+        ([offer, missing], ["Link the offer to an active push."]),
+        (new_gaps, ["Run `claude` in this repo, then `/mb-start`."]),
+    ):
+        report["relationship_health"] = {"gaps": gaps}
+        assert status_mod._readiness(report)["next_actions"] == expected
 
 
 def test_status_ranker_mentions_due_bets(tmp_path: Path, monkeypatch) -> None:

@@ -59,6 +59,7 @@ GOOGLE_ADS_STATUS_WORDS = {
     "no_evidence_recorded": "no conversion evidence recorded",
 }
 STALE_RESEARCH_DAYS = 45
+UNLINKED_RESEARCH_DAYS = 30
 ACTIVE_BET_STATUSES = {"open", "paused"}
 BET_APPETITE_TIERS = {"trivial", "small", "material", "strategic"}
 BET_SIGNAL_COMPARATORS = {"<", "<=", "==", ">=", ">", "!="}
@@ -3293,6 +3294,8 @@ def _relationship_health(
         for item in pushes
     }
     offers = _offer_summaries(repo)
+    decisions = [_file_summary(repo, path) for path in _relative_markdown_files(repo, "decisions")]
+    research = [_file_summary(repo, path) for path in _relative_markdown_files(repo, "research")]
     bet_paths = {str(item.get("path") or "") for item in all_bets}
     push_paths = {str(item.get("path") or "") for item in pushes}
     current_push_paths = {
@@ -3300,6 +3303,19 @@ def _relationship_health(
         for item in pushes
         if str(item.get("status", "")).lower() in ACTIVE_PUSH_STATUSES
     }
+    accepted_decisions_without_links = [
+        item
+        for item in decisions
+        if str(item.get("status") or "").lower() in {"accepted", "codified"}
+        and not adjacency.get(str(item["path"]))
+    ]
+    research_without_links = [
+        {**item, "age_days": (today - research_date).days}
+        for item in research
+        if (research_date := _parse_explicit_date(item.get("date"))) is not None
+        and (today - research_date).days > UNLINKED_RESEARCH_DAYS
+        and not adjacency.get(str(item["path"]))
+    ]
 
     active_bets_without_push = [
         item
@@ -3478,6 +3494,27 @@ def _relationship_health(
         if offers_without_current_push_or_playbook
         else None,
         _gap(
+            gap_id="accepted_decisions_without_links",
+            severity="info",
+            summary=(
+                f"{len(accepted_decisions_without_links)} accepted decision(s) "
+                "have no business links."
+            ),
+            records=accepted_decisions_without_links,
+            repair="Link each decision to the bet or push it informs.",
+        )
+        if accepted_decisions_without_links
+        else None,
+        _gap(
+            gap_id="research_without_links",
+            severity="info",
+            summary=f"{len(research_without_links)} older research note(s) have no business links.",
+            records=research_without_links,
+            repair="Link each research note to the bet or push it informs.",
+        )
+        if research_without_links
+        else None,
+        _gap(
             gap_id="missing_relationship_targets",
             severity="warn",
             summary=(
@@ -3505,6 +3542,8 @@ def _relationship_health(
             "completed_pushes_without_outcome": len(completed_pushes_without_outcome),
             "stale_pushes_without_outcome": len(stale_pushes_without_outcome),
             "offers_without_current_push_or_playbook": len(offers_without_current_push_or_playbook),
+            "accepted_decisions_without_links": len(accepted_decisions_without_links),
+            "research_without_links": len(research_without_links),
             "missing_relationship_targets": len(missing_relationship_targets),
         },
         "gaps": active_gaps,
@@ -3527,6 +3566,14 @@ def _relationship_health(
             "offers": {
                 "records": len(offers),
                 "without_current_push_or_playbook": offers_without_current_push_or_playbook[:5],
+            },
+            "decisions": {
+                "without_links": accepted_decisions_without_links[:5],
+                "without_links_total": len(accepted_decisions_without_links),
+            },
+            "research": {
+                "without_links": research_without_links[:5],
+                "without_links_total": len(research_without_links),
             },
             "outcomes": {
                 "linked_count": len(outcome_edges),
@@ -4215,7 +4262,11 @@ def _drift(report: dict[str, Any]) -> dict[str, Any]:
     relationship_health = report.get("relationship_health") or {}
     relationship_summary = relationship_health.get("summary") or {}
     if relationship_summary.get("gaps", 0):
-        top_gap = (relationship_health.get("gaps") or [{}])[0]
+        relationship_gaps = relationship_health.get("gaps") or []
+        top_gap = next(
+            (gap for gap in relationship_gaps if gap.get("severity") == "warn"),
+            relationship_gaps[0] if relationship_gaps else {},
+        )
         items.append(
             {
                 "id": "relationship_health_gaps",
@@ -4594,7 +4645,11 @@ def _readiness(report: dict[str, Any]) -> dict[str, Any]:
     elif bets.get("due_soon"):
         next_actions.append("Review active bets with deadlines in the next 7 days.")
     relationship_health = report.get("relationship_health") or {}
-    relationship_gaps = relationship_health.get("gaps") or []
+    relationship_gaps = [
+        gap
+        for gap in relationship_health.get("gaps") or []
+        if gap.get("id") not in relationships.INFO_GAPS_WITHOUT_DAILY_ACTIONS
+    ]
     if relationship_gaps:
         first_gap = relationship_gaps[0]
         next_actions.append(
