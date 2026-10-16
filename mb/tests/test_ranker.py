@@ -469,6 +469,56 @@ def test_info_only_relationship_gaps_do_not_become_daily_action() -> None:
     }
 
 
+def test_existing_offer_gap_keeps_ranked_action_with_or_without_warning() -> None:
+    offer = {
+        "id": "offers_without_current_push_or_playbook",
+        "severity": "info",
+        "summary": "1 offer(s) have no current push or playbook.",
+        "safe_to_share": False,
+    }
+    missing = {
+        "id": "missing_relationship_targets",
+        "severity": "warn",
+        "summary": "1 relationship link(s) point to missing files.",
+        "safe_to_share": True,
+    }
+    report = _base_report()
+    for gaps, score, severity, evidence in (
+        ([offer], 85, "info", ["offers_without_current_push_or_playbook"]),
+        (
+            [offer, missing],
+            88,
+            "warn",
+            ["offers_without_current_push_or_playbook", "missing_relationship_targets"],
+        ),
+    ):
+        report["relationship_health"] = {"gaps": gaps}
+        action = next(
+            item
+            for item in ranker.rank_status_report(report)
+            if item["id"] == "review_relationship_health"
+        )
+        assert action["reason"] == offer["summary"]
+        assert action["score"] == score
+        assert action["severity"] == severity
+        assert action["safe_to_share"] is False
+        assert action["signals"][0]["evidence"] == evidence
+        assert action["signals"][0]["safe_to_share"] is False
+
+
+def test_only_new_relationship_gaps_have_no_ranked_action() -> None:
+    report = _base_report()
+    report["relationship_health"] = {
+        "gaps": [
+            {"id": "accepted_decisions_without_links", "severity": "info"},
+            {"id": "research_without_links", "severity": "info"},
+        ]
+    }
+    assert "review_relationship_health" not in {
+        action["id"] for action in ranker.rank_status_report(report)
+    }
+
+
 def test_ranker_never_displaces_business_pressure_for_money_path() -> None:
     report = _base_report()
     report["drift"] = {

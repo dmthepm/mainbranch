@@ -363,6 +363,48 @@ def test_info_only_relationship_gap_does_not_change_fleet_loop() -> None:
     assert "Links:" not in loop["text"]
 
 
+def test_existing_offer_gap_keeps_fleet_headline() -> None:
+    payload = _status_payload(
+        readiness={"level": "ready"},
+        relationship_health={
+            "gaps": [
+                {
+                    "id": "offers_without_current_push_or_playbook",
+                    "severity": "info",
+                    "count": 1,
+                    "summary": "1 offer(s) have no current push or playbook.",
+                }
+            ]
+        },
+    )
+    loop = fleet_checkin._loop_section(payload, "2026-10-15")
+    assert loop["top_gap"] == {
+        "id": "offers_without_current_push_or_playbook",
+        "severity": "info",
+        "count": 1,
+        "summary": "1 offer(s) have no current push or playbook.",
+    }
+    assert loop["text"] == "Ready to work. Links: 1 offer has no current push or playbook."
+
+
+def test_both_new_relationship_gaps_have_no_fleet_headline() -> None:
+    payload = _status_payload(
+        relationship_health={
+            "gaps": [
+                {
+                    "id": "accepted_decisions_without_links",
+                    "severity": "info",
+                    "summary": "Decision.",
+                },
+                {"id": "research_without_links", "severity": "info", "summary": "Research."},
+            ]
+        }
+    )
+    loop = fleet_checkin._loop_section(payload, "2026-10-15")
+    assert loop["top_gap"] is None
+    assert "Links:" not in loop["text"]
+
+
 def test_top_gap_prefers_warning_and_preserves_status_order_for_ties() -> None:
     payload = _status_payload(
         relationship_health={

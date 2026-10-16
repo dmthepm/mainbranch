@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mb.relationships import INFO_GAPS_WITHOUT_DAILY_ACTIONS
+
 RANKER_SCHEMA_VERSION = "1.0"
 MAX_ACTIONS = 3
 
@@ -503,30 +505,30 @@ def _add_bet_actions(actions: list[dict[str, Any]], report: dict[str, Any]) -> N
 def _add_relationship_actions(actions: list[dict[str, Any]], report: dict[str, Any]) -> None:
     relationship_health = _dict(report.get("relationship_health"))
     gaps = [_dict(item) for item in _list(relationship_health.get("gaps"))]
-    warnings = [item for item in gaps if item.get("severity") == "warn"]
-    if not warnings:
+    gaps = [item for item in gaps if item.get("id") not in INFO_GAPS_WITHOUT_DAILY_ACTIONS]
+    if not gaps:
         return
-    first_gap = warnings[0]
-    score = WEIGHTS["relationship_health_gaps"] + min(len(warnings) * 3, 18)
+    warnings = [item for item in gaps if item.get("severity") == "warn"]
+    first_gap = gaps[0]
+    score = WEIGHTS["relationship_health_gaps"] + min(len(gaps) * 3, 18)
     actions.append(
         _action(
             action_id="review_relationship_health",
             title="Review business relationship gaps",
             command="mb status --verbose --peek",
-            severity="warn",
+            severity="warn" if warnings else "info",
             score=score,
             reason=str(
-                first_gap.get("summary")
-                or f"{len(warnings)} business relationship gap(s) need review."
+                first_gap.get("summary") or f"{len(gaps)} business relationship gap(s) need review."
             ),
             signals=[
                 _signal(
                     "relationship_health.gaps",
-                    severity="warn",
+                    severity="warn" if warnings else "info",
                     summary="business graph has actionable relationship gaps",
-                    evidence=[str(item.get("id") or "") for item in warnings[:5]],
+                    evidence=[str(item.get("id") or "") for item in gaps[:5]],
                     weight=WEIGHTS["relationship_health_gaps"],
-                    safe_to_share=all(bool(item.get("safe_to_share", True)) for item in warnings),
+                    safe_to_share=all(bool(item.get("safe_to_share", True)) for item in gaps),
                 )
             ],
         )

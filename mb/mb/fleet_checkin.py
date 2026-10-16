@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from mb import fleet
+from mb import fleet, relationships
 
 CHECKIN_SCHEMA = "mb.fleet.checkin"
 CHECKIN_SCHEMA_VERSION = 1
@@ -215,7 +215,10 @@ def _loop_section(status: dict[str, Any], as_of: str) -> dict[str, Any]:
     if title and level != "ready":
         text += f" Next: {title}."
     gaps = [_dict(item) for item in _list(_dict(status.get("relationship_health")).get("gaps"))]
-    gap = next((item for item in gaps if item.get("severity") == "warn"), {})
+    gaps = [
+        item for item in gaps if item.get("id") not in relationships.INFO_GAPS_WITHOUT_DAILY_ACTIONS
+    ]
+    gap = min(gaps, key=lambda item: 0 if item.get("severity") == "warn" else 1, default={})
     summary = str(gap.get("summary") or "")
     count = _int(gap.get("count"))
     top_gap = (

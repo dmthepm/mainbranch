@@ -3201,6 +3201,52 @@ def test_status_readiness_install_repair_names_the_install_mode(
     assert not any("pipx install mainbranch" in action for action in readiness["next_actions"])
 
 
+def test_readiness_keeps_existing_offer_repair_and_ignores_only_new_gaps(tmp_path: Path) -> None:
+    offer = {
+        "id": "offers_without_current_push_or_playbook",
+        "severity": "info",
+        "repair": "Link the offer to an active push.",
+    }
+    missing = {
+        "id": "missing_relationship_targets",
+        "severity": "warn",
+        "repair": "Fix the missing linked file.",
+    }
+    new_gaps = [
+        {
+            "id": "accepted_decisions_without_links",
+            "severity": "info",
+            "repair": "Link each decision to the bet or push it informs.",
+        },
+        {
+            "id": "research_without_links",
+            "severity": "info",
+            "repair": "Link each research note to the bet or push it informs.",
+        },
+    ]
+    report = {
+        "repo": {"looks_like_mainbranch_repo": True},
+        "git": {"inside_work_tree": True, "dirty": False},
+        "install": {"ok": True},
+        "update": {"severity": "current", "command": ""},
+        "runtime": {
+            "skill_wiring": {"ok": True, "repair": ""},
+            "claude_code": {"found": True, "repair": ""},
+        },
+        "brain": status_mod._brain(tmp_path),
+        "onboarding": {"summary": {"status": "ready"}},
+        "integrations": {"providers": []},
+        "github": {"authenticated": True, "context": {"ok": True}},
+    }
+    for gaps, expected in (
+        ([offer], ["Link the offer to an active push."]),
+        ([offer, missing], ["Link the offer to an active push."]),
+        (new_gaps, ["Run `claude` in this repo, then `/mb-start`."]),
+    ):
+        report["relationship_health"] = {"gaps": gaps}
+        assert status_mod._readiness(report)["next_actions"] == expected
+
+
 def test_status_ranker_mentions_due_bets(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(status_mod, "_which", lambda name: f"/usr/bin/{name}")
     monkeypatch.setattr(

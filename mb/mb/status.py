@@ -4646,7 +4646,9 @@ def _readiness(report: dict[str, Any]) -> dict[str, Any]:
         next_actions.append("Review active bets with deadlines in the next 7 days.")
     relationship_health = report.get("relationship_health") or {}
     relationship_gaps = [
-        gap for gap in relationship_health.get("gaps") or [] if gap.get("severity") == "warn"
+        gap
+        for gap in relationship_health.get("gaps") or []
+        if gap.get("id") not in relationships.INFO_GAPS_WITHOUT_DAILY_ACTIONS
     ]
     if relationship_gaps:
         first_gap = relationship_gaps[0]
