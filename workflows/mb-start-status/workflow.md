@@ -155,6 +155,9 @@ broken repo wiring, repair blockers, validation blockers, private-data
 boundaries, unsafe provider operations, destructive-operation requests, and
 approval-gated status marker writes.
 
+Route short clips or social cuts from a sales video or VSL to `mb-organic`.
+Route a request to make an ad from the video to `mb-ads`.
+
 Keep repo/runtime readiness separate from business-memory completeness.
 `readiness.level` and `readiness.score` describe repo shape, install, git, and
 runtime handoff. `readiness.dimensions.business_memory` describes onboarding,

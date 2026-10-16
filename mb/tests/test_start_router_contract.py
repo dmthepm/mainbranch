@@ -22,6 +22,18 @@ def _normalize(text: str) -> str:
     return " ".join(" ".join(lines).split())
 
 
+def test_sales_video_clips_and_paid_ads_have_distinct_routes() -> None:
+    router = _read(ROUTER_REF).lower()
+    ads = _read(ADS_SKILL).lower()
+
+    assert "short clips or social cuts from a sales video or vsl: `/mb-organic`" in router
+    assert "make an ad from this video, compliance: `/mb-ads`" in router
+    assert '"make short clips from this sales video"' in ads
+    assert "organic clips | route to `/mb-organic`" in ads
+    assert '"make an ad from this video"' in ads
+    assert "| video repurpose |" in ads
+
+
 def test_mb_start_delegates_router_detail_without_bloating_skill_body() -> None:
     start = _read(START_SKILL)
 

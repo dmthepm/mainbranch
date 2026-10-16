@@ -110,6 +110,10 @@ this shared contract separates planning, drafting, review, and read-only checks
 from provider mutation, publishing, uploads, spend, account changes, GTM
 publishes, conversion uploads, and customer contact.
 
+Repurpose a video here when the operator wants paid ad creative from it. Route
+short clips, social cuts, and organic posts from a sales video or VSL to
+`mb-organic`.
+
 Supported modes:
 
 - `static`: draft image-ad hooks, primaries, headlines, and image prompts.

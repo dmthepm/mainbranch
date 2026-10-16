@@ -139,7 +139,7 @@ Detect if user is in the right place:
 |-----------|-----------|----------|
 | "mine", "scrape", "research competitors", "what are they saying" | Research/Mining | `/mb-think` (research mode) |
 | "transcribe", "extract from video" | Mining | `/mb-think` (research mode) |
-| "short clips from sales video", "repurpose this VSL", "turn this sales video into clips" | Repurpose | Continue with [references/sales-video-repurpose.md](references/sales-video-repurpose.md) |
+| "short clips from sales video", "repurpose this VSL", "social cuts from this sales video" | Repurpose | Continue with [references/sales-video-repurpose.md](references/sales-video-repurpose.md) |
 | "create", "generate", "write scripts", "make content" | Create | Continue in `/mb-organic` |
 
 **If mining intent detected:**

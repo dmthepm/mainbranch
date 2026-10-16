@@ -60,6 +60,8 @@ account mutation, customer contact, or Claude Code entrypoints in Codex.
    from the shared contract. Use content_strategy.overall_state,
    content_strategy.simple_entry_point, content_strategy.layers, and
    content_strategy.findings before parsing raw strategy files.
+   Short clips and social cuts from a sales video or VSL route to `mb-organic`;
+   paid ads from it route to `mb-ads`.
 5. Codex may draft patch-shaped recommendations, sample copy, review notes,
    and exact file targets, then stop before changing files.
 6. Name artifact routes as plans only: `pushes/<YYYY-MM-DD-slug>/push.md`,

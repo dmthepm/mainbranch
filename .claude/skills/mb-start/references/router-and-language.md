@@ -319,8 +319,8 @@ Signals and routes:
   founder voice, weekly content plan: `/mb-think` to codify the strategy layer,
   then `/mb-organic`, `/mb-site`, or `/mb-ads` for output
 - site, landing page, lander, minisite, publish: `/mb-site`
-- ads, Google Ads, Meta Ads, video ad, compliance: `/mb-ads`
-- organic, reels, TikTok, LinkedIn, carousel, repurpose: `/mb-organic`
+- ads, Google Ads, Meta Ads, make an ad from this video, compliance: `/mb-ads`
+- organic, reels, TikTok, LinkedIn, carousel, short clips or social cuts from a sales video or VSL: `/mb-organic`
 - wiki, notes, public knowledge base, atomic notes: `/mb-wiki`
 - confused, help, explain the system: `/mb-help`
 

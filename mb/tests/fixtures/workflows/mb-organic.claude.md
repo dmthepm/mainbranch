@@ -6,7 +6,8 @@ Approval gates: `updates_repairs_migrations`, `file_writes`, `checkpoint`, `prov
 Public/private boundaries: `no_secrets`, `no_raw_provider_exports`, `no_raw_transcripts`, `no_customer_member_data`, `no_private_runtime_settings`, `no_private_dms_or_gated_communities`, `no_raw_finance_legal_records`
 
 Use from `/mb-organic` when the operator wants organic content planning,
-scripts, carousels, static posts, sales-video repurposing, or content review.
+scripts, carousels, static posts, short clips or social cuts from a sales video
+or VSL, or content review. Paid ads from that video route to `/mb-ads`.
 Preserve the existing Claude skill's mode language, mining handoff, voice
 adaptation, content strategy integration, artifact routing, and source/privacy
 boundaries.
@@ -60,6 +61,7 @@ This snapshot does not replace shipped `.claude/skills/mb-organic/SKILL.md`.
    modes. Use content_strategy.overall_state, content_strategy.simple_entry_point,
    content_strategy.layers, and content_strategy.findings before parsing raw
    strategy files.
+   Short clips and social cuts from a sales video or VSL use sales-video-repurpose.
 4. Draft from active offer, audience, voice, content strategy, relevant
    channel/account/person layers, research, sales-video notes, active pushes,
    and money_path.objects.proof.quality. Do not call proof good, bad,

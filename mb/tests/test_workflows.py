@@ -1259,6 +1259,7 @@ def test_organic_runtime_shells_surface_content_contract_and_boundaries() -> Non
     workflow = load_workflow(ORGANIC_WORKFLOW)
 
     for shell in (render_claude_shell(workflow), render_codex_shell(workflow)):
+        assert "Short clips and social cuts from a sales video or VSL" in shell
         assert "plan, video, carousel, static, sales-video-repurpose, or review" in shell
         assert "route to `mb-think`" in shell
         assert "content_strategy.overall_state" in shell
@@ -1268,6 +1269,19 @@ def test_organic_runtime_shells_surface_content_contract_and_boundaries() -> Non
         assert "Do not publish" in shell
         assert "mutate provider accounts" in shell
         assert "contact customers" in shell
+
+
+def test_sales_video_clip_route_agrees_across_workflow_sources_and_shells() -> None:
+    for path in (START_STATUS_WORKFLOW, ADS_WORKFLOW, ORGANIC_WORKFLOW):
+        source = " ".join(path.read_text(encoding="utf-8").split())
+        assert "short clips" in source
+        assert "mb-organic" in source
+
+    for path in (START_STATUS_WORKFLOW, ADS_WORKFLOW, ORGANIC_WORKFLOW):
+        workflow = load_workflow(path)
+        for shell in (render_claude_shell(workflow), render_codex_shell(workflow)):
+            assert "short clips" in shell.lower()
+            assert "mb-organic" in shell
 
 
 def test_organic_codex_shell_keeps_read_only_planning_boundary() -> None:

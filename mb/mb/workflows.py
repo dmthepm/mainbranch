@@ -608,6 +608,8 @@ def _daily_codex_route_text(workflow: WorkflowSource) -> str:
             "7. Present one clear business route and the signal behind it. Mutate the "
             "status marker only when the operator explicitly approves recording the "
             "daily check-in.\n"
+            "Route short clips or social cuts from a sales video or VSL to `mb-organic`; "
+            "make an ad from this video routes to `mb-ads`.\n"
             "8. Ask before business-file writes, checkpoints, repairs, updates, migrations, "
             "provider mutation, publishing, spend, customer contact, destructive operations, "
             "or public issue/proposal submission."
@@ -672,6 +674,8 @@ def _daily_claude_route_text(workflow: WorkflowSource) -> str:
             "7. Present one clear business route and the signal behind it. Mutate the "
             "status marker only when the operator explicitly approves recording the "
             "daily check-in.\n"
+            "Route short clips or social cuts from a sales video or VSL to `/mb-organic`; "
+            "make an ad from this video routes to `/mb-ads`.\n"
             "8. Ask before business-file writes, checkpoints, repairs, updates, migrations, "
             "provider mutation, publishing, spend, customer contact, destructive operations, "
             "or public issue/proposal submission."
@@ -1279,7 +1283,8 @@ Approval gates: {_inline_code_list(workflow.approval_gates)}
 Public/private boundaries: {_inline_code_list(workflow.public_private_boundaries)}
 
 Use from `/mb-organic` when the operator wants organic content planning,
-scripts, carousels, static posts, sales-video repurposing, or content review.
+scripts, carousels, static posts, short clips or social cuts from a sales video
+or VSL, or content review. Paid ads from that video route to `/mb-ads`.
 Preserve the existing Claude skill's mode language, mining handoff, voice
 adaptation, content strategy integration, artifact routing, and source/privacy
 boundaries.
@@ -1307,6 +1312,7 @@ This snapshot does not replace shipped `.claude/skills/mb-organic/SKILL.md`.
    modes. Use content_strategy.overall_state, content_strategy.simple_entry_point,
    content_strategy.layers, and content_strategy.findings before parsing raw
    strategy files.
+   Short clips and social cuts from a sales video or VSL use sales-video-repurpose.
 4. Draft from active offer, audience, voice, content strategy, relevant
    channel/account/person layers, research, sales-video notes, active pushes,
    and money_path.objects.proof.quality. Do not call proof good, bad,
@@ -1389,6 +1395,8 @@ account mutation, customer contact, or Claude Code entrypoints in Codex.
    from the shared contract. Use content_strategy.overall_state,
    content_strategy.simple_entry_point, content_strategy.layers, and
    content_strategy.findings before parsing raw strategy files.
+   Short clips and social cuts from a sales video or VSL route to `mb-organic`;
+   paid ads from it route to `mb-ads`.
 5. Codex may draft patch-shaped recommendations, sample copy, review notes,
    and exact file targets, then stop before changing files.
 6. Name artifact routes as plans only: `pushes/<YYYY-MM-DD-slug>/push.md`,
@@ -1444,8 +1452,8 @@ Approval gates: {_inline_code_list(workflow.approval_gates)}
 Public/private boundaries: {_inline_code_list(workflow.public_private_boundaries)}
 
 Use from `/mb-ads` when the operator wants paid creative planning, ad copy,
-image prompts, video scripts, long-form paid creative, compliance review,
-launch plans, launch instrumentation checks, launch checks, optional read-only
+image prompts, video scripts, long-form paid creative, video repurposing for ads,
+compliance review, launch plans, launch instrumentation checks, launch checks, optional read-only
 account context, or Google Ads Search planning. Preserve the existing Claude
 skill's mode language, proof discipline, review workflow, paid-search
 launch-plan path, and provider gates.
@@ -1476,6 +1484,7 @@ This snapshot does not replace shipped `.claude/skills/mb-ads/SKILL.md`.
    long-form-video, review, launch-plan, check, or account-context modes.
    Treat instrumentation as the launch-readiness sub-mode for GA4/GTM/pixels,
    booking links, HubSpot/forms, and submit/booking smoke.
+   Short clips or social cuts from a sales video or VSL route to `/mb-organic`.
 5. Draft from active offer, audience, voice, content strategy, proof facts,
    relevant research, decisions, active pushes, playbooks, and
    money_path.objects.proof.quality. Do not turn unapproved proof into public
@@ -1570,6 +1579,7 @@ customer contact, or Claude Code entrypoints in Codex.
    Codex may draft patch-shaped recommendations, sample copy, review notes, and
    launch-plan specs. Name exact file targets, then stop before changing files
    or running provider tools.
+   Short clips or social cuts from a sales video or VSL route to `mb-organic`.
 6. Name artifact routes as plans only: `pushes/<YYYY-MM-DD-slug>/push.md`,
    `pushes/<YYYY-MM-DD-slug>/ads-batch-001.md`,
    `pushes/<YYYY-MM-DD-slug>/playbooks/<playbook>.md`, `research/`, and

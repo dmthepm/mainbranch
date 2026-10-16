@@ -90,6 +90,7 @@ customer contact, or Claude Code entrypoints in Codex.
    Codex may draft patch-shaped recommendations, sample copy, review notes, and
    launch-plan specs. Name exact file targets, then stop before changing files
    or running provider tools.
+   Short clips or social cuts from a sales video or VSL route to `mb-organic`.
 6. Name artifact routes as plans only: `pushes/<YYYY-MM-DD-slug>/push.md`,
    `pushes/<YYYY-MM-DD-slug>/ads-batch-001.md`,
    `pushes/<YYYY-MM-DD-slug>/playbooks/<playbook>.md`, `research/`, and
