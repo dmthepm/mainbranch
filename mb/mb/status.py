@@ -3254,6 +3254,15 @@ def _is_push_stale(record: dict[str, Any], today: date) -> tuple[bool, int]:
             if age_days > STALE_PUSH_DAYS:
                 return True, age_days
             return False, age_days
+    if any(record.get(key) not in (None, "") for key in ("review_on", "started", "date")):
+        return False, 0
+    slug = str(record.get("slug") or "")
+    match = re.match(r"^(\d{4}-\d{2}-\d{2})(?:-|$)", slug)
+    if match:
+        slug_date = _parse_explicit_date(match.group(1))
+        if slug_date is not None:
+            age_days = (today - slug_date).days
+            return age_days > STALE_PUSH_DAYS, age_days
     return False, 0
 
 
@@ -3272,7 +3281,12 @@ def _relationship_health(
     closed_bets = [item for item in all_bets if str(item.get("status", "")).lower() == "closed"]
     push_report = brain.get("pushes") or {}
     pushes = [item for item in push_report.get("records", []) if isinstance(item, dict)]
+    push_frontmatter = {
+        str(item.get("path") or ""): pushes_mod.read_frontmatter(repo / str(item.get("path") or ""))
+        for item in pushes
+    }
     offers = _offer_summaries(repo)
+    bet_paths = {str(item.get("path") or "") for item in all_bets}
     push_paths = {str(item.get("path") or "") for item in pushes}
     current_push_paths = {
         str(item.get("path") or "")
@@ -3294,6 +3308,23 @@ def _relationship_health(
         if str(item.get("status", "")).lower() in ACTIVE_PUSH_STATUSES
         and not _linked_paths(adjacency, str(item.get("path") or ""), "offer")
     ]
+    active_pushes_without_bet = [
+        item
+        for item in pushes
+        if str(item.get("status", "")).lower() in ACTIVE_PUSH_STATUSES
+        and not (
+            (
+                _linked_paths(adjacency, str(item.get("path") or ""), "bet")
+                | _linked_paths(adjacency, str(item.get("path") or ""), "push")
+            )
+            & bet_paths
+        )
+        and not (
+            push_frontmatter[str(item.get("path") or "")].get("linked_bets") == []
+            and isinstance(push_frontmatter[str(item.get("path") or "")].get("no_bet_reason"), str)
+            and push_frontmatter[str(item.get("path") or "")]["no_bet_reason"].strip()
+        )
+    ]
     completed_pushes_without_outcome = [
         item
         for item in pushes
@@ -3306,7 +3337,15 @@ def _relationship_health(
             continue
         if _linked_paths(adjacency, str(item.get("path") or ""), "outcome"):
             continue
-        stale, age_days = _is_push_stale(item, today)
+        source = push_frontmatter[str(item.get("path") or "")]
+        stale, age_days = _is_push_stale(
+            {
+                **item,
+                "date": source.get("date"),
+                "slug": source.get("slug") or Path(str(item["path"])).parent.name,
+            },
+            today,
+        )
         if stale:
             stale_item = dict(item)
             stale_item["age_days"] = age_days
@@ -3382,6 +3421,20 @@ def _relationship_health(
         if active_pushes_without_offer
         else None,
         _gap(
+            gap_id="active_pushes_without_bet",
+            severity="warn",
+            summary=(
+                f"{len(active_pushes_without_bet)} live push(es) do not say which bet they serve."
+            ),
+            records=active_pushes_without_bet,
+            repair=(
+                "Link each push to its bet with `linked_bets`, write the bet with `/mb-bet`, "
+                "or set `linked_bets: []` and a short `no_bet_reason` for a one-off."
+            ),
+        )
+        if active_pushes_without_bet
+        else None,
+        _gap(
             gap_id="completed_pushes_without_outcome",
             severity="warn",
             summary=(
@@ -3441,6 +3494,7 @@ def _relationship_health(
             "active_bets_without_push": len(active_bets_without_push),
             "closed_bets_without_outcome": len(closed_bets_without_outcome),
             "active_pushes_without_offer": len(active_pushes_without_offer),
+            "active_pushes_without_bet": len(active_pushes_without_bet),
             "completed_pushes_without_outcome": len(completed_pushes_without_outcome),
             "stale_pushes_without_outcome": len(stale_pushes_without_outcome),
             "offers_without_current_push_or_playbook": len(offers_without_current_push_or_playbook),
@@ -3459,6 +3513,7 @@ def _relationship_health(
             "pushes": {
                 "records": len(pushes),
                 "active_without_offer": active_pushes_without_offer[:5],
+                "active_without_bet": active_pushes_without_bet[:5],
                 "completed_without_outcome": completed_pushes_without_outcome[:5],
                 "stale_without_outcome": stale_pushes_without_outcome[:5],
             },

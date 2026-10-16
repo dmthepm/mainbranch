@@ -363,6 +363,12 @@ nurture, outreach, event, announcement, round, or wave.
 **Required frontmatter:** existing push schema: type, slug, kind, status,
 health, goal, owner, audience, offer, promise.
 
+Link a live push to the bet it serves with `linked_bets`. For a deliberate
+one-off, set `linked_bets: []` and a short, non-empty `no_bet_reason` instead.
+`mb status` warns when neither link nor reason is present. With no `review_on`,
+`started`, or `date`, status uses a leading date in the push slug or folder name
+to check whether the push is stale.
+
 **Required body sections:** goal, audience, channel, assets, approval gates,
 timeline, outcome/review plan.
 

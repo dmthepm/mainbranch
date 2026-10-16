@@ -408,6 +408,11 @@ metrics_sources:
 ---
 ```
 
+For a one-off push without a bet, use `linked_bets: []` and a non-empty
+`no_bet_reason` in its frontmatter. `mb status` warns about live pushes with no
+bet link or one-off reason. If the push has no review, start, or date field,
+status uses the leading date in its slug or folder name to check staleness.
+
 `mb validate` enforces this shape: `type: push`, bounded `kind:`, lifecycle
 `status:`, separate `health:`, structured `goal: { metric, target, by }`, one
 `owner`, a named `audience`, a named `offer`, and a short `promise`.
