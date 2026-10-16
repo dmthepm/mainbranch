@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+`mb status` warns when older bets, pushes, decisions, research, or playbooks are still saved on another branch, so you can check for duplicates before bringing them into main.
+
 `mb status` now notes accepted decisions and older research that have no business links, without adding them to the daily warning list.
 
 Decisions marked `codified` now pass validation and leave the uncodified work list.

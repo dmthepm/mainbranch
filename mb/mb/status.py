@@ -7,7 +7,7 @@ import re
 import shlex
 import shutil
 import subprocess
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +67,10 @@ ACTIVE_PUSH_STATUSES = {"planned", "active", "paused"}
 COMPLETED_PUSH_STATUSES = {"completed"}
 LIVE_OFFER_STATUSES = {"accepted", "graduated", "running", "scaling"}
 STALE_PUSH_DAYS = 14
+STRANDED_RECORD_DAYS = 3
+STRANDED_BRANCH_LIMIT = 50
+STRANDED_COMMIT_LIMIT = 200
+STRANDED_RECORD_ROOTS = ("bets", "pushes", "decisions", "research", "playbooks")
 PUSH_STATUSES_EXPECTING_PLAYBOOK = {"planned", "active"}
 PLAYBOOK_STATUSES_NEEDING_ATTENTION = {"draft", "planned"}
 PLAYBOOK_APPROVAL_STATUSES_NEEDING_ATTENTION = {"needed", "rejected", ""}
@@ -274,7 +278,9 @@ def _which(name: str) -> str:
     return shutil.which(name) or ""
 
 
-def _run_command(args: list[str], cwd: Path | None = None, timeout: float = 3.0) -> dict[str, Any]:
+def _run_command(
+    args: list[str], cwd: Path | None = None, timeout: float = 3.0, input: str | None = None
+) -> dict[str, Any]:
     try:
         result = subprocess.run(
             args,
@@ -282,6 +288,7 @@ def _run_command(args: list[str], cwd: Path | None = None, timeout: float = 3.0)
             capture_output=True,
             text=True,
             timeout=timeout,
+            input=input,
         )
     except FileNotFoundError:
         return {"ok": False, "returncode": 127, "stdout": "", "stderr": f"{args[0]} not found"}
@@ -487,6 +494,183 @@ def _git_info(repo: Path) -> dict[str, Any]:
         "worktree_root": worktree_root,
         "summary": summary,
         "error": "" if status["ok"] else status["stderr"].strip(),
+    }
+
+
+def _stranded_record_gap(
+    repo: Path, git: dict[str, Any], *, now: datetime
+) -> dict[str, Any] | None:
+    """Find old record commits held on branches outside the default branch."""
+    default = str(git.get("default_branch") or "")
+    current = str(git.get("branch") or "")
+    if not git.get("inside_work_tree") or not default or not current:
+        return None
+    shallow = _run_command(["git", "rev-parse", "--is-shallow-repository"], cwd=repo)
+    if not shallow["ok"] or shallow["stdout"].strip() != "false":
+        return None
+    refs = _run_command(
+        [
+            "git",
+            "for-each-ref",
+            "--format=%(refname)%09%(upstream)%09%(objectname)%09%(symref)",
+            "refs/heads",
+            "refs/remotes",
+        ],
+        cwd=repo,
+    )
+    if not refs["ok"]:
+        return None
+    local: dict[str, str] = {}
+    remotes: dict[str, str] = {}
+    upstreams: dict[str, str] = {}
+    tips: dict[str, str] = {}
+    remote_default_refs: set[str] = set()
+    for line in refs["stdout"].splitlines():
+        ref, upstream, tip, symref = (line.split("\t") + ["", "", "", ""])[:4]
+        tips[ref] = tip
+        if ref.startswith("refs/heads/"):
+            name = ref.removeprefix("refs/heads/")
+            local[name] = ref
+            upstreams[name] = upstream
+        elif ref.startswith("refs/remotes/"):
+            remote, _, branch = ref.removeprefix("refs/remotes/").partition("/")
+            if branch == "HEAD":
+                if symref:
+                    remote_default_refs.add(symref)
+            else:
+                remotes[ref] = f"{remote}/{branch}"
+                if branch == default:
+                    remote_default_refs.add(ref)
+    default_ref = local.get(default)
+    if not default_ref:
+        return None
+    bases = [default_ref, *sorted(remote_default_refs & remotes.keys())]
+
+    branches: list[tuple[str, list[str]]] = []
+    consumed_remotes: set[str] = set()
+    for name, ref in sorted(local.items()):
+        if name == default:
+            continue
+        branch_refs = [ref]
+        for remote_ref in remotes:
+            remote_name = remotes[remote_ref].partition("/")[2]
+            if remote_ref not in remote_default_refs and (
+                remote_ref == upstreams.get(name) or remote_name == name
+            ):
+                consumed_remotes.add(remote_ref)
+                branch_refs.append(remote_ref)
+        branches.append((name, branch_refs))
+    for ref, name in sorted(remotes.items()):
+        if ref in consumed_remotes or ref in remote_default_refs:
+            continue
+        branches.append((name, [ref]))
+    branches_capped = len(branches) > STRANDED_BRANCH_LIMIT
+    records: list[dict[str, Any]] = []
+    commits_capped = False
+    for name, branch_refs in branches[:STRANDED_BRANCH_LIMIT]:
+        log = _run_command(
+            [
+                "git",
+                "log",
+                f"--max-count={STRANDED_COMMIT_LIMIT + 1}",
+                "--format=%ct%x09%H",
+                "--name-only",
+                *branch_refs,
+                "--not",
+                *bases,
+                "--",
+                *STRANDED_RECORD_ROOTS,
+            ],
+            cwd=repo,
+            timeout=5.0,
+        )
+        if not log["ok"]:
+            return None
+        file_dates: dict[str, int] = {}
+        commit_date: int | None = None
+        commits = 0
+        for line in log["stdout"].splitlines():
+            if "\t" in line:
+                timestamp, _, commit = line.partition("\t")
+                if timestamp.isdigit() and re.fullmatch(r"[0-9a-f]{40,64}", commit):
+                    commits += 1
+                    commit_date = int(timestamp)
+                    continue
+            if commit_date is not None and line.startswith(
+                tuple(f"{root}/" for root in STRANDED_RECORD_ROOTS)
+            ):
+                file_dates[line] = min(file_dates.get(line, commit_date), commit_date)
+        if commits > STRANDED_COMMIT_LIMIT:
+            commits_capped = True
+        if not file_dates:
+            continue
+        branch_tips = list(dict.fromkeys(tips[ref] for ref in branch_refs))
+        changed_by_tip = {tip: set(file_dates) for tip in branch_tips}
+        for base in bases:
+            diff = _run_command(
+                [
+                    "git",
+                    "diff-tree",
+                    "--stdin",
+                    "-r",
+                    "--name-only",
+                    "--diff-filter=ACMRTUXB",
+                    "--",
+                    *STRANDED_RECORD_ROOTS,
+                ],
+                cwd=repo,
+                timeout=5.0,
+                input="".join(f"{tip} {tips[base]}\n" for tip in branch_tips),
+            )
+            if not diff["ok"]:
+                return None
+            different: dict[str, set[str]] = {tip: set() for tip in branch_tips}
+            current_tip = ""
+            for line in diff["stdout"].splitlines():
+                if line in different:
+                    current_tip = line
+                elif current_tip:
+                    different[current_tip].add(line)
+            for tip in branch_tips:
+                changed_by_tip[tip] &= different[tip]
+        files = set().union(*changed_by_tip.values())
+        if not files:
+            continue
+        oldest = min(file_dates[path] for path in files)
+        age = now - datetime.fromtimestamp(oldest, timezone.utc)
+        age_days = max(0, age.days)
+        if age > timedelta(days=STRANDED_RECORD_DAYS):
+            records.append(
+                {
+                    "branch": name,
+                    "current": name == current,
+                    "files": sorted(files)[:5],
+                    "files_total": len(files),
+                    "age_days": age_days,
+                    "commits_capped": commits > STRANDED_COMMIT_LIMIT,
+                }
+            )
+    if not records:
+        return None
+    current_text = " Your current branch is included." if any(r["current"] for r in records) else ""
+    return {
+        "id": "records_stranded_on_branches",
+        "severity": "warn",
+        "summary": (
+            f"{len(records)} branch(es) hold older business records outside {default}."
+            f"{current_text}"
+        ),
+        "count": len(records),
+        "evidence": [str(item["branch"]) for item in records[:5]],
+        "records": records[:5],
+        "branches_total": len(records),
+        "branches_capped": branches_capped,
+        "commits_capped": commits_capped,
+        "repair": (
+            f"Check {default} for a duplicate record, then merge each branch into {default} "
+            "or close it."
+        ),
+        "safe_to_share": True,
     }
 
 
@@ -4789,6 +4973,14 @@ def run(
         brain=brain,
         today=current_time.date(),
     )
+    stranded_gap = _stranded_record_gap(repo_path, git, now=current_time)
+    if stranded_gap is not None:
+        health = report["relationship_health"]
+        health["gaps"].insert(0, stranded_gap)
+        health["summary"]["gaps"] += 1
+        health["summary"]["warnings"] += 1
+        health["summary"]["records_stranded_on_branches"] = stranded_gap["count"]
+        health["ok"] = False
     report["playbook_health"] = _playbook_health(repo_path, brain=brain)
     report["money_path"] = _money_path(repo_path, report)
     report["since_last_check"] = _since_last_check(
