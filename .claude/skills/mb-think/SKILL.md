@@ -75,6 +75,10 @@ codify, stale source cleanup, public/private handling, checkpoint plan,
 checkpoint approval, and explicit write approval.
 Do not tell Codex users to run Claude Code entrypoints.
 
+For observations, use research-only for a short, sourced readout; changed steering adds a decision in the same approved session.
+Link `linked_research` and `linked_decisions` both ways, plus a known bet or push; update an existing trial bet through `/mb-bet` after approval.
+Summarize numbers; exclude raw rows, account IDs, customer data, and tables. A status-only question creates neither research nor a decision.
+
 When research identifies a reusable growth mechanic such as a comment-keyword,
 DM-keyword, public reply/link, resource delivery, provider setup recipe, or
 approval gate, route the durable plan into

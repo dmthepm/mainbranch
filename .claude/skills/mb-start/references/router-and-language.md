@@ -285,6 +285,17 @@ strategy, positioning, offer, audience, voice, soul check, vendor choice.
 Route to `/mb-think`, with `codify` when the task is to turn known context into
 durable repo truth.
 
+Observations and readouts ("I noticed", "the numbers show", "this week's
+read") route to `/mb-think` research-only for a concise evidence-backed
+readout; a changed course ("we should stop or switch", "change of plan") adds
+a linked decision in the same approved session. Ask before writing either
+file. Summarize numbers and cite the source; never save raw provider rows,
+account IDs, customer data, or exported tables. A status-only request such as
+"where are we" or "what changed" gets a status answer without proposed
+research or decision. If an observation changes a measurable trial's target
+or cut point, use `/mb-think` for the readout and linked decision, then update
+or link the existing bet through `/mb-bet` after approval before continuing.
+
 ### Stale source, claim, or angle cleanup
 
 Signals: stale source, old source, outdated file, obsolete claim, retire this

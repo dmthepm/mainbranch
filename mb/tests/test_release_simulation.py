@@ -76,6 +76,36 @@ def test_channel_trial_simulations_cover_new_existing_and_routine_work() -> None
     assert "mb-bet" in " ".join(routine.must_not)
 
 
+def test_observation_simulations_cover_readout_steering_and_status_only() -> None:
+    by_id = {sim.id: sim for sim in release_simulation.simulations()}
+    readout = by_id["observation_readout_only"]
+    steering = by_id["observation_changed_course"]
+    status = by_id["status_only_no_record"]
+
+    assert (
+        set(readout.tiers)
+        == set(steering.tiers)
+        == {
+            "prerelease_candidate",
+            "release_acceptance",
+        }
+    )
+    assert set(status.tiers) == {"prerelease_candidate"}
+    assert {sim.fixture_profile for sim in (readout, steering, status)} == {
+        "fresh_sanitized_business_repo"
+    }
+    assert all(sim.must_observe and sim.must_not for sim in (readout, steering, status))
+    assert "research/ readout" in " ".join(readout.must_observe)
+    assert "decisions/ file" in " ".join(readout.must_not)
+    assert "linked_research" in " ".join(steering.must_observe)
+    assert "linked_decisions" in " ".join(steering.must_observe)
+    assert "existing bet" in " ".join(steering.must_observe)
+    assert "TEST-ACCOUNT-1191" in " ".join(steering.must_not)
+    assert "without proposing" in " ".join(status.must_observe)
+    assert "research/ readout" in " ".join(status.must_not)
+    assert "ask_before_write" not in status.expected_behaviors
+
+
 def test_release_simulation_covers_ambiguous_mb_start_offer_choice() -> None:
     simulations = {
         sim.id: sim for sim in release_simulation.simulations_for_tier("prerelease_candidate")

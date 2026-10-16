@@ -64,8 +64,9 @@ workflows are available in Codex.
 4. Route offer-shape gaps from `validation.file_contracts` to `mb-think` after hard gates, and ask before durable writes.
 5. Use due-soon and overdue bet deadlines, missing-exit criteria, triggered failure signals, and triggered double-down signals for update, kill, close, double-down, or narrate routing.
 For a current channel trial with a measurable target and review or cut point, check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise offer `mb-bet` before execution, ask only for a missing target, cut point, or unclear owner, and ask before writing. Routine channel work without a wager stays in its channel workflow.
-6. Present one clear business route and the signal behind it. Mutate the status marker only when the operator explicitly approves recording the daily check-in.
-7. Ask before business-file writes, checkpoints, repairs, updates, migrations, provider mutation, publishing, spend, customer contact, destructive operations, or public issue/proposal submission.
+6. Route an observation or readout to `mb-think` research-only for a short evidence-backed readout. A changed course adds a linked decision in the same approved session. Summarize numbers and cite sources; never save raw provider rows, account IDs, customer data, or exported tables. A status-only question gets a status answer without research or a decision. If the observation changes a measurable trial target or cut point, update or link its existing bet through `mb-bet` after approval before continuing.
+7. Present one clear business route and the signal behind it. Mutate the status marker only when the operator explicitly approves recording the daily check-in.
+8. Ask before business-file writes, checkpoints, repairs, updates, migrations, provider mutation, publishing, spend, customer contact, destructive operations, or public issue/proposal submission.
 
 ## Handoff Shape
 

@@ -5,12 +5,9 @@ Runtime support: `codex_cli: owner_loop_shell`
 Approval gates: `updates_repairs_migrations`, `file_writes`, `checkpoint`, `provider_mutation`, `publishing_or_spend`, `customer_contact`, `private_data`, `destructive_operations`, `structured_collection`, `public_issue_or_proposal`
 Public/private boundaries: `no_secrets`, `no_raw_provider_exports`, `no_raw_transcripts`, `no_customer_member_data`, `no_private_runtime_settings`, `no_private_dms_or_gated_communities`, `no_raw_finance_legal_records`
 
-Codex is first-class for the proven owner loop only. This guidance is generated
-from the engine workflow source for business-repo `AGENTS.md`; the business repo
-does not need to contain `workflows/mb-think/workflow.md`. Treat this rendered
-route as the Codex shell for natural-language thinking tasks. It does not claim
-Claude Code runtime entrypoints work inside Codex or that all Main Branch
-workflows are available in Codex.
+Codex supports the proven owner loop. Use this generated `AGENTS.md` guidance
+as the Codex shell for natural-language thinking tasks. The business repo does
+not need to contain `workflows/mb-think/workflow.md`. Claude Code entrypoints stay separate.
 
 ## Required mb Commands
 
@@ -62,14 +59,17 @@ workflows are available in Codex.
    caveats, promotion limits, and public/private handling.
 6. Write a decision when durable business truth changes. Codify only after the
    operator accepts the direction.
-7. For transcripts, authenticated community content, provider recordings, or
+7. For observations, ask before a concise sourced research-only readout; changed steering adds a linked decision in the same approved session.
+   Set decision `linked_research` and research `linked_decisions`, link a known bet or push, and update an existing trial bet through `mb-bet` after approval.
+   Summarize numbers with source and caveat; exclude raw provider rows, account IDs, customer data, and exported tables. Status-only stays status.
+8. For transcripts, authenticated community content, provider recordings, or
    mixed private/business sources, use manifest-first allow/skip filters before
    reading content. Route synthesized output, not raw payloads.
-8. For stale source, claim, proof, or angle cleanup, identify the stale item,
+9. For stale source, claim, proof, or angle cleanup, identify the stale item,
    find downstream usage, keep history auditable with a stale note, reconcile
    current truth after approval, record and codify the decision, then
    checkpoint only after approval.
-9. Ask for approval before creating or editing business files, promoting
+10. Ask for approval before creating or editing business files, promoting
    research into core truth, using structured collection, opening public
    issues, publishing, provider mutation, spend, customer contact, or checkpoint.
 

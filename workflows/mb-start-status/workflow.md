@@ -179,6 +179,15 @@ triggered kill, triggered double-down, close, update, and narrate moments
 before inventing bet state from prose. Use `onboarding` to resume setup without
 inventing a new interview.
 
+An observation or readout ("I noticed", "the numbers show", "this week's
+read") routes to `mb-think` research-only for a short, evidence-backed readout;
+if the operator also changes course ("we should stop or switch", "change of
+plan"), route to research and a linked decision in the same approved session.
+Summarize numbers and cite their source; never save raw provider rows, account
+IDs, customer data, or exported tables. Ask before either write. A request only
+for status ("where are we", "what changed") gets a status answer without
+proposing research or a decision.
+
 When the operator asks to run or continue a current channel trial with a
 measurable target and a review or cut point (date, spend cap, or number of posts
 or sends), check `brain.bets` and relevant `bets/` files for a bet that already
@@ -187,6 +196,9 @@ covers it. Use and link that bet if found. Otherwise offer to frame one through
 missing target, review or cut point, or owner when unclear. Ask before writing.
 A routine scheduled post, reply, or fix without a wager stays in its channel
 workflow.
+If an observation changes a measurable trial's target or cut point, make the
+short readout and linked decision through `mb-think`, then update or link its
+existing bet through `mb-bet` after approval before continuing the trial.
 
 Data/ops surface routing: whose-data questions route to `mb spine declare` and
 `mb spine show` — the declaration is a committed repo fact that doctor grades,
