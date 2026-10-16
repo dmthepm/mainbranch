@@ -11,6 +11,13 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- Ads skill descriptions send short sales-video clips and organic social cuts to `/mb-organic` while keeping paid video repurposing in `/mb-ads`.
+- Entry rules suggest a bet first only when the operator gives a measurable target and a review or cut point.
+- `mb update` can append marked entry rules to a hand-edited `CLAUDE.md` after approval, preserving the operator's text and reporting the plan in `--check`.
+- uv tool upgrades use the version verified from PyPI with a full cache refresh, so the upgrade command cannot resolve an older cached release.
+
 ## [0.6.10] - 2026-10-16
 
 - Seven release simulations now flag clear route, record, link, or write regressions and send uncertain answers for hand grading.

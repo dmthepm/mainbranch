@@ -1,12 +1,10 @@
 ---
 name: mb-ads
-description: "Create and review ads, and prepare provider-safe launch plans/checks. Flexible entry points: full pipeline (copy + images), copy only, images only, creative variations (hook library), video scripts, long-form video ads/VSL-style paid creative, paid video repurpose, compliance review, launch-plan, instrumentation, check, or optional Meta ad account check. Use when asked to create ads, ad copy, image prompts, video ad scripts, paid sales videos, creative variations, review ads, plan paid traffic, check analytics/GA4/GTM/pixels/booking/form readiness, or check launch performance. Say /mb-ads or describe what you need."
+description: "Create and review ads, and prepare provider-safe launch plans/checks. Flexible entry points: full pipeline (copy + images), copy only, images only, creative variations (hook library), video scripts, long-form video ads/VSL-style paid creative, paid video repurpose, compliance review, launch-plan, instrumentation, check, or optional Meta ad account check. Use when asked to create ads, ad copy, image prompts, video ad scripts, paid sales videos, creative variations, review ads, plan paid traffic, check analytics/GA4/GTM/pixels/booking/form readiness, or check launch performance. Short clips and organic social cuts from a sales video go to /mb-organic. Say /mb-ads or describe what you need."
 loops: [ship, reflect]
 ---
 
 # Ads Skill
-
-Create ads, generate creative variations, review for compliance, and check ad account performance.
 
 **CLI facts first:** Find the business repo, run `mb status --json --peek`,
 then use status readiness, drift, integrations, measurement, and ranked actions

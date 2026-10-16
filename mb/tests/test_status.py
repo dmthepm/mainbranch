@@ -3171,7 +3171,7 @@ def test_status_readiness_mentions_due_bets(tmp_path: Path) -> None:
     ("mode", "repair"),
     [
         ("pipx", "Run `pipx upgrade mainbranch`."),
-        ("uv", "Run `uv tool install --refresh-package mainbranch mainbranch@latest`."),
+        ("uv", "Run `uv tool install --refresh mainbranch@latest`."),
         ("wheel", "Run `pip install --upgrade mainbranch`."),
         ("unknown", MODE_NEUTRAL_UPDATE_TEXT),
     ],

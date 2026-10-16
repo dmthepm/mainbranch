@@ -419,7 +419,11 @@ def score_simulation_assertions(
             "no_write": "changed files before approval",
             "forbidden_pattern": "forbidden identifier in changed file",
         }[kind]
-        excerpt = _assertion_excerpt(answer, value, assertion.subject) if state != "pass" else ""
+        excerpt = (
+            _assertion_excerpt(answer, value, assertion.subject, route=kind.startswith("route_"))
+            if state != "pass"
+            else ""
+        )
         detail = f"{reason}; {excerpt}" if excerpt else reason
         checks.append(
             {"kind": kind, "value": value, "state": state, "ok": state == "pass", "reason": detail}
@@ -583,8 +587,10 @@ def _record_evidence(answer: str, prefix: str) -> str:
     return "ambiguous" if ambiguous else "absent"
 
 
-def _assertion_excerpt(answer: str, value: str, subject: str) -> str:
+def _assertion_excerpt(answer: str, value: str, subject: str, *, route: bool = False) -> str:
     for clause in _assertion_clauses(answer):
+        if route and subject and not re.search(subject, clause, re.I):
+            continue
         if (value and value.lstrip("/").lower() in clause.lower()) or (
             subject and re.search(subject, clause, re.I)
         ):

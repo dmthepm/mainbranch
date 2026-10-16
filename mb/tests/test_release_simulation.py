@@ -2176,6 +2176,27 @@ def test_clips_routed_to_ads_fail(answer: str) -> None:
     assert score["state"] == "fail"
 
 
+def test_conversion_video_table_quotes_clips_row_and_scores_rows_separately() -> None:
+    sim = next(
+        item
+        for item in release_simulation.simulations()
+        if item.id == "conversion_video_natural_prompt_routing"
+    )
+    vsl = '| "Write a VSL for this offer" | `/mb-ads`, long-form paid video |'
+    clips_ads = '| "Make short clips from this sales video" | `/mb-ads`, paid repurpose |'
+    clips_organic = '| "Make short clips from this sales video" | `/mb-organic`, clips |'
+
+    wrong = release_simulation.score_simulation_assertions(sim, vsl + "\n" + clips_ads)
+    forbidden = next(check for check in wrong["checks"] if check["kind"] == "route_forbidden")
+    assert forbidden["state"] == "fail"
+    assert "Make short clips" in forbidden["reason"]
+    assert "Write a VSL" not in forbidden["reason"]
+
+    right = release_simulation.score_simulation_assertions(sim, vsl + "\n" + clips_organic)
+    forbidden = next(check for check in right["checks"] if check["kind"] == "route_forbidden")
+    assert forbidden["state"] == "pass"
+
+
 def test_readout_rejects_written_log_and_provider_identifier() -> None:
     sim = next(
         item for item in release_simulation.simulations() if item.id == "observation_readout_only"

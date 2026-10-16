@@ -415,9 +415,11 @@ mb update
 <!-- mainbranch:entry-rules:begin -->
 ## Trials and readouts
 
-For a current experiment with a measurable target and a review or cut point,
-check existing bets first and reuse the matching bet. If none covers the work,
-offer to open one with `mb-bet` before doing the work.
+Only when the operator states both a measurable target and a review or cut point
+for a current experiment, check existing bets first and reuse the matching bet.
+If none covers that experiment, offer to open one with `/mb-bet` before the work.
+Otherwise, route to the requested work, or to `/mb-think` if the operator is
+unsure what to do.
 For an observation or readout, such as "the numbers show" or "this week's read",
 offer a short `research/` readout with summarized numbers, source, timeframe,
 caveat, and next question. Do not file the readout in `log/`.
@@ -464,9 +466,10 @@ Desktop app or the `claude` CLI. From this business repo, check `mb --version`,
 run `mb start --json` and `mb status --json --peek`, inspect repair options
 with `mb doctor repair --plan`, then ask before running any write/apply command
 such as `mb skill link --repo .`, `mb skill repair --repo . --apply`,
-`mb doctor repair --apply`, or `mb update`. After repairing skill wiring, tell
-the operator: "I repaired missing Main Branch start wiring in this business
-folder; restart Claude Code from this repo and try `/mb-start` again."
+`mb doctor repair --apply`, or `mb update`. Until a repair command succeeds,
+describe the repair as proposed. After applying it, tell the operator:
+"I repaired missing Main Branch start wiring in this business folder;
+restart Claude Code from this repo and try `/mb-start` again."
 
 If `mb status --json --peek` reports `update.severity` as `recommended` or
 `required`, make that the only recommendation before business routing. Name the

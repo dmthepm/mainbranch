@@ -19,7 +19,6 @@ from mb import codex as codex_mod
 from mb import unreadable as unreadable_mod
 from mb.doctor import _not_business_folder_guard, codex_repair_actions
 from mb.engine import (
-    PACKAGE_NAME,
     PLUGIN_INSTALL_COMMAND,
     bundled_skills,
     claude_mainbranch_plugin_status,
@@ -51,22 +50,20 @@ from mb.freshness import (
 from mb.freshness import (
     latest_pypi_version as _latest_pypi_version,
 )
+from mb.freshness import (
+    uv_update_command_text as uv_update_command_text,
+)
 
 VERSION_RE = re.compile(r'__version__\s*=\s*["\']([^"\']+)["\']')
 CLONE_UPDATE_COMMAND = ["git", "pull", "--ff-only", "origin", "main"]
-# `@latest` rather than `uv tool upgrade`: it also clears an exact-version pin
-# left behind by an earlier `uv tool install mainbranch==X` (#963).
-# `--refresh-package` makes uv re-read the index for this one package; without
-# it, minutes after a release uv can resolve `@latest` from its cached index and
-# reinstall the version already installed (#1008).
-UV_UPDATE_COMMAND = [
-    "uv",
-    "tool",
-    "install",
-    "--refresh-package",
-    PACKAGE_NAME,
-    f"{PACKAGE_NAME}@latest",
-]
+# Fallback when the latest version is unknown; a known PyPI version is pinned.
+UV_UPDATE_COMMAND = UV_UPDATE_COMMAND_TEXT.split()
+
+
+def _uv_update_command(latest: str | None) -> list[str]:
+    return uv_update_command_text(latest).split()
+
+
 UV_MANUAL_MESSAGE = (
     "Main Branch was installed as a uv tool. Upgrading replaces the installed "
     "command, so it only runs after an explicit yes at an interactive prompt. "
@@ -823,6 +820,13 @@ def _predict_surface_consent(result: dict[str, Any], repo: Path, codex: dict[str
         planned["apply_commands"].append(f"mb doctor repair{_repo_flag(repo)} --apply --only codex")
     if consent["claude_writes"]:
         planned["apply_commands"].append(_update_command(repo))
+        result["operator_actions"].append(
+            operator_action(
+                _update_command(repo),
+                consent["claude_writes"],
+                "Run interactively and approve the CLAUDE.md entry guidance refresh.",
+            )
+        )
 
 
 def _codex_blocked_actions(plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1383,6 +1387,8 @@ def run(
     # unknown: nothing installs and no install command is handed out.
     latest = _checked_latest_version() if mode in {"pipx", "uv", "wheel"} else None
 
+    uv_command = uv_update_command_text(latest)
+
     if check:
         if mode in {"pipx", "uv", "wheel"} and latest is None:
             result["actions"] = [
@@ -1395,11 +1401,11 @@ def run(
             ]
         elif mode == "uv":
             result["actions"] = [
-                f"would run `{UV_UPDATE_COMMAND_TEXT}` after an explicit yes",
+                f"would run `{uv_command}` after an explicit yes",
             ]
             _note_manual_update(
                 result,
-                command=UV_UPDATE_COMMAND_TEXT,
+                command=uv_command,
                 message=UV_MANUAL_MESSAGE,
                 latest=latest,
             )
@@ -1543,28 +1549,28 @@ def run(
             result["ok"] = False
             result["new_version"] = result["old_version"]
             result["errors"].append("uv install mode detected, but `uv` is not on PATH")
-            result["next_actions"].append(UV_UPDATE_COMMAND_TEXT)
+            result["next_actions"].append(uv_command)
             return result
         approved = False
         if wants_prompt:
-            approved = (confirm or _confirm_uv_update)(UV_UPDATE_COMMAND_TEXT, root)
+            approved = (confirm or _confirm_uv_update)(uv_command, root)
             if not approved:
-                result["actions"].append(f"declined `{UV_UPDATE_COMMAND_TEXT}`")
+                result["actions"].append(f"declined `{uv_command}`")
         if not approved:
             _note_manual_update(
                 result,
-                command=UV_UPDATE_COMMAND_TEXT,
+                command=uv_command,
                 message=UV_DECLINED_MESSAGE if wants_prompt else UV_MANUAL_MESSAGE,
                 latest=latest,
             )
         else:
-            upgrade = _run_command(UV_UPDATE_COMMAND)
-            result["actions"].append(f"ran `{UV_UPDATE_COMMAND_TEXT}`")
+            upgrade = _run_command(_uv_update_command(latest))
+            result["actions"].append(f"ran `{uv_command}`")
             if upgrade.returncode != 0:
                 result["ok"] = False
                 result["new_version"] = result["old_version"]
-                result["errors"].append(_command_error(UV_UPDATE_COMMAND_TEXT, upgrade))
-                result["next_actions"].append(UV_UPDATE_COMMAND_TEXT)
+                result["errors"].append(_command_error(uv_command, upgrade))
+                result["next_actions"].append(uv_command)
                 return result
             result["new_version"] = _version_from_mb_command() or result["old_version"]
             result["upgrade_performed"] = True

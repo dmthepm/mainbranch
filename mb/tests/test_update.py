@@ -1005,12 +1005,9 @@ def test_update_uv_check_names_command_without_running_installer(
     assert result["ok"] is True
     assert result["mode"] == "uv"
     assert result["new_version"] == "9.9.9"
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in result["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
     assert any(
-        "would run `uv tool install --refresh-package mainbranch mainbranch@latest`" in a
-        for a in result["actions"]
+        "would run `uv tool install --refresh mainbranch==9.9.9`" in a for a in result["actions"]
     )
     assert calls == []
 
@@ -1026,9 +1023,7 @@ def test_update_uv_check_json_exits_zero_with_next_action(monkeypatch: Any, tmp_
     payload = json.loads(invoked.stdout)
     assert payload["mode"] == "uv"
     assert payload["errors"] == []
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in payload["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in payload["next_actions"]
 
 
 def test_update_uv_non_interactive_prints_command_and_exits_zero(
@@ -1050,9 +1045,7 @@ def test_update_uv_non_interactive_prints_command_and_exits_zero(
     assert result["ok"] is True
     assert result["upgrade_performed"] is False
     assert result["new_version"] == "9.9.9"
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in result["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
     assert _installer_calls(calls) == []
     assert result["skills_relinked_count"] == 1
 
@@ -1076,9 +1069,7 @@ def test_update_uv_json_never_prompts(monkeypatch: Any, tmp_path: Path) -> None:
     assert invoked.exit_code == 0
     payload = json.loads(invoked.stdout)
     assert payload["upgrade_performed"] is False
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in payload["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in payload["next_actions"]
     assert _installer_calls(calls) == []
 
 
@@ -1098,12 +1089,10 @@ def test_update_uv_declined_prompt_leaves_install_alone(monkeypatch: Any, tmp_pa
 
     result = update_mod.run(repo=tmp_path / "biz", interactive=True, confirm=decline)
 
-    assert asked == ["uv tool install --refresh-package mainbranch mainbranch@latest"]
+    assert asked == ["uv tool install --refresh mainbranch==9.9.9"]
     assert result["ok"] is True
     assert result["upgrade_performed"] is False
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in result["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
     assert _installer_calls(calls) == []
 
 
@@ -1143,15 +1132,11 @@ def test_update_uv_accepted_prompt_runs_install_then_relinks(
         "uv",
         "tool",
         "install",
-        "--refresh-package",
-        "mainbranch",
-        "mainbranch@latest",
+        "--refresh",
+        "mainbranch==9.9.9",
     ] in calls
     assert result["skills_relinked_count"] == 1
-    assert any(
-        "ran `uv tool install --refresh-package mainbranch mainbranch@latest`" in a
-        for a in result["actions"]
-    )
+    assert any("ran `uv tool install --refresh mainbranch==9.9.9`" in a for a in result["actions"])
 
 
 def test_update_uv_install_failure_surfaces_command(monkeypatch: Any, tmp_path: Path) -> None:
@@ -1173,9 +1158,7 @@ def test_update_uv_install_failure_surfaces_command(monkeypatch: Any, tmp_path: 
     assert result["ok"] is False
     assert result["upgrade_performed"] is False
     assert "network unreachable" in result["errors"][0]
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in result["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
 
 
 def test_update_uv_missing_binary_returns_error(monkeypatch: Any, tmp_path: Path) -> None:
@@ -1192,9 +1175,7 @@ def test_update_uv_missing_binary_returns_error(monkeypatch: Any, tmp_path: Path
 
     assert result["ok"] is False
     assert "`uv` is not on PATH" in result["errors"][0]
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in result["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
 
 
 def test_update_uses_uv_tool_dir_when_path_detection_is_inconclusive(
@@ -1208,9 +1189,7 @@ def test_update_uses_uv_tool_dir_when_path_detection_is_inconclusive(
     result = update_mod.run(repo=tmp_path / "biz", check=True)
 
     assert result["mode"] == "uv"
-    assert (
-        "uv tool install --refresh-package mainbranch mainbranch@latest" in result["next_actions"]
-    )
+    assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
 
 
 def _uv_tool_dir_probe(
@@ -1678,8 +1657,8 @@ def test_update_dev_build_of_published_release_is_behind_pypi(
 
     assert result["installed_ahead_of_latest"] is False
     assert result["new_version"] == "0.6.3"
-    assert result["manual_update_command"] == update_mod.UV_UPDATE_COMMAND_TEXT
-    assert update_mod.UV_UPDATE_COMMAND_TEXT in result["next_actions"]
+    assert result["manual_update_command"] == update_mod.uv_update_command_text("0.6.3")
+    assert update_mod.uv_update_command_text("0.6.3") in result["next_actions"]
 
 
 # Installed and PyPI versions for each relation the #1036 matrix covers.
@@ -1790,7 +1769,7 @@ def test_update_cli_json_already_current_names_no_install_command(
 
 
 _EXPECTED_CHECK_COMMAND = {
-    ("uv", "behind"): update_mod.UV_UPDATE_COMMAND_TEXT,
+    ("uv", "behind"): update_mod.uv_update_command_text(_RELATIONS["behind"][1]),
     ("wheel", "behind"): update_mod.PIP_UPDATE_COMMAND_TEXT,
 }
 
@@ -1838,14 +1817,14 @@ def test_update_run_installer_by_mode_and_relation(
     result = update_mod.run(repo=tmp_path / "biz", interactive=True, confirm=confirm)
 
     expected_installs = {
-        ("uv", "behind"): [update_mod.UV_UPDATE_COMMAND],
+        ("uv", "behind"): [update_mod._uv_update_command(latest)],
         ("pipx", "behind"): [["pipx", "upgrade", "mainbranch"]],
         ("pipx", "current"): [["pipx", "upgrade", "mainbranch"]],
     }.get((mode, relation), [])
     assert result["ok"] is True
     assert _installer_calls(calls) == expected_installs
     assert prompts == (
-        [update_mod.UV_UPDATE_COMMAND_TEXT] if (mode, relation) == ("uv", "behind") else []
+        [update_mod.uv_update_command_text(latest)] if (mode, relation) == ("uv", "behind") else []
     )
     expected_manual = (
         update_mod.PIP_UPDATE_COMMAND_TEXT if (mode, relation) == ("wheel", "behind") else ""
@@ -1888,7 +1867,7 @@ def test_update_check_rc_install_gets_final_release_context(
     assert result["new_version"] == "0.6.3"
     assert result["release"]["source"] == "github_release"
     assert result["release"]["summary"] == "Test release summary."
-    assert result["manual_update_command"] == update_mod.UV_UPDATE_COMMAND_TEXT
+    assert result["manual_update_command"] == update_mod.uv_update_command_text("0.6.3")
 
 
 def test_update_check_final_install_gets_no_release_context_for_same_release(
@@ -2041,7 +2020,7 @@ def test_update_check_with_unknown_latest_lists_no_install_command(
 @pytest.mark.parametrize(
     ("mode", "installer"),
     [
-        ("uv", update_mod.UV_UPDATE_COMMAND),
+        ("uv", update_mod._uv_update_command("0.6.4")),
         ("pipx", ["pipx", "upgrade", "mainbranch"]),
     ],
 )
@@ -2224,7 +2203,7 @@ def test_confirm_uv_update_defaults_to_no(
 
     assert approved is expected
     out = capsys.readouterr().out
-    assert "uv tool install --refresh-package mainbranch mainbranch@latest" in out
+    assert update_mod.UV_UPDATE_COMMAND_TEXT in out
     assert str(tmp_path / "_engine") in out
 
 
@@ -2259,7 +2238,7 @@ def test_update_render_human_manual_path_names_the_command(capsys: Any) -> None:
     assert "version: 0.5.2 -> 0.6.0" in output
     assert "Main Branch did not upgrade this install." in output
     assert "refreshed 15 skill link(s)" in output
-    assert "next: uv tool install --refresh-package mainbranch mainbranch@latest" in output
+    assert f"next: {update_mod.UV_UPDATE_COMMAND_TEXT}" in output
 
 
 def test_update_check_uv_carries_the_manual_command_like_wheel_does(
@@ -2272,7 +2251,7 @@ def test_update_check_uv_carries_the_manual_command_like_wheel_does(
 
     seen = {}
     for mode, command in (
-        ("uv", "uv tool install --refresh-package mainbranch mainbranch@latest"),
+        ("uv", "uv tool install --refresh mainbranch==9.9.9"),
         ("wheel", "pip install --upgrade mainbranch"),
     ):
         monkeypatch.setattr(update_mod, "install_mode", lambda mode=mode: mode)
@@ -2317,7 +2296,7 @@ def _git(repo: Path, *args: str) -> str:
 
 @pytest.fixture
 def business_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A committed business repo with stale AGENTS.md and a bare .gitignore."""
+    """A committed business repo with stale AGENTS.md and current Claude rules."""
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
@@ -2328,7 +2307,9 @@ def business_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(engine_mod, "_personal_skills_dir", lambda: home / ".claude" / "skills")
     repo = tmp_path / "biz"
     repo.mkdir()
-    (repo / "CLAUDE.md").write_text("# Business\n", encoding="utf-8")
+    (repo / "CLAUDE.md").write_text(
+        "# Business\n\n" + claude_guidance._current_block() + "\n", encoding="utf-8"
+    )
     (repo / "AGENTS.md").write_text("# Old guidance\n", encoding="utf-8")
     (repo / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
     _git(repo, "init", "-q", "-b", "main")
@@ -2480,12 +2461,10 @@ def test_update_terminal_no_leaves_tracked_files(
     assert codex_apply in commands
 
 
-def test_update_leaves_an_old_claude_md_conventions_line_alone(
+def test_update_appends_rules_after_old_claude_conventions_line(
     monkeypatch: pytest.MonkeyPatch, business_repo: Path
 ) -> None:
-    # #1119: CLAUDE.md is written once by `mb init` and belongs to the
-    # operator. `mb update` refreshes AGENTS.md, .gitignore and skill links,
-    # even after a yes, and never rewrites the old one-set status line.
+    # The operator's old conventions stay byte-identical when rules append.
     old = (
         "# Business\n\n## Conventions\n\n"
         "- Status field: proposed | running | scaling | killed | graduated | died.\n"
@@ -2503,10 +2482,10 @@ def test_update_leaves_an_old_claude_md_conventions_line_alone(
     result = update_mod.run(repo=business_repo, interactive=True, confirm_surfaces=say_yes)
 
     assert result["ok"] is True, result["errors"]
-    assert asked == [[".gitignore", "AGENTS.md"]]
-    assert (business_repo / "CLAUDE.md").read_text(encoding="utf-8") == old
+    assert asked == [[".gitignore", "AGENTS.md", "CLAUDE.md"]]
+    assert (business_repo / "CLAUDE.md").read_text(encoding="utf-8").startswith(old)
     changed = sorted(line[3:] for line in _git(business_repo, "status", "--porcelain").splitlines())
-    assert "CLAUDE.md" not in changed
+    assert "CLAUDE.md" in changed
 
 
 def test_update_adds_entry_rules_to_069_claude_and_keeps_operator_notes(
@@ -2540,11 +2519,70 @@ def test_update_adds_entry_rules_to_069_claude_and_keeps_operator_notes(
     assert claude_guidance.plan(business_repo) == (None, None)
 
 
+def test_update_appends_entry_rules_to_hand_edited_claude_once_with_approval(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path
+) -> None:
+    old = "# My operating notes\n\nKeep this wording and spacing.\n"
+    path = business_repo / "CLAUDE.md"
+    path.write_text(old, encoding="utf-8")
+    _commit_all(business_repo, "hand-edited guidance")
+    _wheel_update_env(monkeypatch, [])
+
+    check = update_mod.run(repo=business_repo, check=True)
+    assert "CLAUDE.md" in check["surface_refresh"]["planned"]["tracked_files"]
+    assert any("append the marked entry rules" in warning for warning in check["warnings"])
+    assert any("CLAUDE.md" in action.get("changes", []) for action in check["operator_actions"])
+    assert path.read_text(encoding="utf-8") == old
+
+    declined = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: False
+    )
+    assert any("append the marked entry rules" in warning for warning in declined["warnings"])
+    assert path.read_text(encoding="utf-8") == old
+
+    accepted = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+    assert accepted["ok"] is True, accepted["errors"]
+    applied = path.read_text(encoding="utf-8")
+    assert applied.startswith(old)
+    assert applied.count(claude_guidance.BEGIN) == applied.count(claude_guidance.END) == 1
+    second = update_mod.run(repo=business_repo, check=True)
+    assert "CLAUDE.md" not in second["surface_refresh"]["planned"]["tracked_files"]
+    assert path.read_text(encoding="utf-8") == applied
+
+
 def test_claude_entry_rules_with_missing_end_marker_are_left_unchanged(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "CLAUDE.md"
     broken = "# Business\n\n" + claude_guidance.BEGIN + "\nOperator text.\n"
+    path.write_text(broken, encoding="utf-8")
+    content, refusal = claude_guidance.plan(tmp_path)
+    assert content is None
+    assert refusal is not None and "incomplete" in refusal
+    assert path.read_text(encoding="utf-8") == broken
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        "# Business\n"
+        + claude_guidance.BEGIN
+        + "\n"
+        + claude_guidance.END
+        + "\n"
+        + claude_guidance.BEGIN
+        + "\n"
+        + claude_guidance.END
+        + "\n",
+        "# Business\n" + claude_guidance.END + "\n" + claude_guidance.BEGIN + "\n",
+    ],
+)
+def test_claude_entry_rules_with_duplicate_or_reversed_markers_are_left_unchanged(
+    tmp_path: Path, broken: str
+) -> None:
+    path = tmp_path / "CLAUDE.md"
     path.write_text(broken, encoding="utf-8")
     content, refusal = claude_guidance.plan(tmp_path)
     assert content is None
@@ -2623,15 +2661,15 @@ def test_plan_link_skills_writes_nothing_and_names_gitignore(business_repo: Path
 
 
 def test_uv_update_command_refreshes_the_package_index() -> None:
-    assert update_mod.UV_UPDATE_COMMAND == [
+    assert update_mod._uv_update_command("9.9.9") == [
         "uv",
         "tool",
         "install",
-        "--refresh-package",
-        "mainbranch",
-        "mainbranch@latest",
+        "--refresh",
+        "mainbranch==9.9.9",
     ]
-    assert " ".join(update_mod.UV_UPDATE_COMMAND) == update_mod.UV_UPDATE_COMMAND_TEXT
+    assert update_mod.UV_UPDATE_COMMAND_TEXT == "uv tool install --refresh mainbranch@latest"
+    assert update_mod._uv_update_command(None) == update_mod.UV_UPDATE_COMMAND
 
 
 def test_emitted_commands_quote_a_repo_path_with_spaces_and_parens(

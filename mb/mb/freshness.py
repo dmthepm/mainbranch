@@ -19,10 +19,18 @@ PYPI_PACKAGE_URL = "https://pypi.org/pypi/mainbranch/json"
 GITHUB_RELEASE_URL_TEMPLATE = "https://github.com/noontide-co/mainbranch/releases/tag/oe-v{version}"
 _LATEST_AUTO = object()
 # Required-update command per install mode (#965). `mb update` reuses these, so
-# both surfaces name the same command. `@latest` with `--refresh-package` is the
-# uv form `mb update` runs (#963, #1008).
+# both surfaces name the same command. Use a PyPI version when known; this
+# cache-refreshing fallback also clears an existing exact-version tool pin.
 PIPX_UPDATE_COMMAND_TEXT = "pipx upgrade mainbranch"
-UV_UPDATE_COMMAND_TEXT = "uv tool install --refresh-package mainbranch mainbranch@latest"
+UV_UPDATE_COMMAND_TEXT = "uv tool install --refresh mainbranch@latest"
+
+
+def uv_update_command_text(latest: str | None) -> str:
+    """Use PyPI's checked version when available, refreshing uv metadata."""
+    version = checked_release_version(latest)
+    return f"uv tool install --refresh mainbranch=={version}" if version else UV_UPDATE_COMMAND_TEXT
+
+
 PIP_UPDATE_COMMAND_TEXT = "pip install --upgrade mainbranch"
 REQUIRED_UPDATE_COMMANDS = {
     "pipx": PIPX_UPDATE_COMMAND_TEXT,
@@ -189,7 +197,11 @@ def package_update_status(
         reason = f"Package freshness does not apply in {mode} mode."
     elif installed_key < minimum_key:
         severity = "required"
-        command = REQUIRED_UPDATE_COMMANDS.get(mode, "")
+        command = (
+            uv_update_command_text(latest_text)
+            if mode == "uv"
+            else REQUIRED_UPDATE_COMMANDS.get(mode, "")
+        )
         if installed_key < version_key(MB_UPDATE_AVAILABLE_VERSION):
             reason = "Installed version predates mb update and the current skill-link repair flow."
         else:

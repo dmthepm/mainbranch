@@ -11,6 +11,10 @@ BEGIN = "<!-- mainbranch:entry-rules:begin -->"
 END = "<!-- mainbranch:entry-rules:end -->"
 _OLD_ANCHOR = "## First-run setup intent"
 _OLD_SIGNATURE = "Main Branch CLI facts are the source of truth for repo health"
+APPEND_NOTICE = (
+    "CLAUDE.md has no managed entry rule markers or known 0.6.9 anchor; "
+    "mb update can append the marked entry rules after the operator's text with approval."
+)
 
 
 def _current_block() -> str:
@@ -23,8 +27,8 @@ def _current_block() -> str:
 def plan(repo: Path) -> tuple[str | None, str | None]:
     """Return the proposed whole file and a refusal, if its boundaries are broken.
 
-    A 0.6.9 file has no markers. Insert beside its operating contract only when
-    the known contract and following heading are present. Other text is kept.
+    A 0.6.9 file has no markers. Insert beside its known operating contract;
+    append to other hand-edited files. Other text is kept.
     """
     path = repo / "CLAUDE.md"
     if not path.is_file():
@@ -45,7 +49,8 @@ def plan(repo: Path) -> tuple[str | None, str | None]:
         start = existing.index(_OLD_ANCHOR)
         updated = existing[:start] + block + "\n\n" + existing[start:]
     else:
-        return None, None
+        updated = existing + ("\n" if existing.endswith("\n") else "\n\n") + block + "\n"
+        return updated, APPEND_NOTICE
     return (updated if updated != existing else None), None
 
 
