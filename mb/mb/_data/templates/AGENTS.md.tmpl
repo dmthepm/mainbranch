@@ -49,9 +49,11 @@ accounts require explicit operator approval before applying.
 
 ## Trials and readouts
 
-For a current experiment with a measurable target and a review or cut point,
-check existing bets first and reuse the matching bet. If none covers the work,
-offer to open one with `mb-bet` before doing the work.
+Only when the operator states both a measurable target and a review or cut point
+for a current experiment, check existing bets first and reuse the matching bet.
+If none covers that experiment, offer to open one with `mb-bet` before the work.
+Otherwise, route to the requested work, or to `mb-think` if the operator is
+unsure what to do.
 For an observation or readout, such as "the numbers show" or "this week's read",
 offer a short `research/` readout with summarized numbers, source, timeframe,
 caveat, and next question. Do not file the readout in `log/`.

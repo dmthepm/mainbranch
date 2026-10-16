@@ -278,7 +278,7 @@ Which install modes `mb update` upgrades for you:
 |---|---|
 | `pipx` | Runs `pipx upgrade mainbranch` automatically. |
 | Git clone | Runs `git pull --ff-only origin main` automatically. |
-| `uv` tool install | Prints `uv tool install --refresh-package mainbranch mainbranch@latest` and runs it only after you answer yes at an interactive prompt. Use `@latest` rather than `uv tool upgrade`: it also clears an exact-version pin left by an earlier `uv tool install mainbranch==X`. `--refresh-package mainbranch` makes uv re-read the package index, so a run minutes after a release gets the new version instead of the cached one; the tool keeps the Python it already uses. Agent surfaces are refreshed either way. |
+| `uv` tool install | Prints `uv tool install --refresh mainbranch==<latest>` using the version verified from PyPI, and runs it only after you answer yes at an interactive prompt. If PyPI cannot be checked, `mb update` leaves the package alone; the fallback command is `uv tool install --refresh mainbranch@latest`. Reinstalling with an explicit requirement clears an earlier exact-version pin. `--refresh` revalidates cached index data, and the tool keeps the Python it already uses. Agent surfaces are refreshed either way. |
 | Any other wheel install (for example `pip install mainbranch`) | Prints `pip install --upgrade mainbranch` for you to run in the environment that owns the install. Agent surfaces are refreshed either way. |
 
 `mb update` never replaces a uv tool install without an explicit yes. When it

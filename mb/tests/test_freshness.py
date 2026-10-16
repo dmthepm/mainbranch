@@ -106,7 +106,7 @@ def test_current_source_install_does_not_render_alert(tmp_path: Path) -> None:
     ("mode", "command"),
     [
         ("pipx", "pipx upgrade mainbranch"),
-        ("uv", "uv tool install --refresh-package mainbranch mainbranch@latest"),
+        ("uv", "uv tool install --refresh mainbranch==0.6.2"),
         ("wheel", "pip install --upgrade mainbranch"),
     ],
 )

@@ -608,8 +608,8 @@ terminal, refuses to run without one, and never prints a value.
 
 To move an existing install, in this order, from a terminal in the hub:
 
-1. `mb update`. It runs `uv tool install --refresh-package mainbranch
-   mainbranch@latest`, which keeps the Python the tool already uses; `uv tool list --show-python` shows it before
+1. `mb update`. It runs `uv tool install --refresh mainbranch==<latest>` with the
+   version verified from PyPI, which keeps the Python the tool already uses; `uv tool list --show-python` shows it before
    and after. Do not upgrade or reinstall uv's Python until step 3 reports
    nothing pending: a new Python cannot read items that have not moved yet.
 2. `mb connect status`. Every credential this Python can read moves to

@@ -38,7 +38,12 @@ def read_json_object(path: Path, *, default: dict[str, Any] | None = None) -> di
 
 
 def atomic_write_text(
-    path: Path, text: str, *, encoding: str = "utf-8", mode: int | None = None
+    path: Path,
+    text: str,
+    *,
+    encoding: str = "utf-8",
+    mode: int | None = None,
+    newline: str | None = None,
 ) -> None:
     """Replace a file from a same-directory temp file with its final mode already set."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -47,7 +52,7 @@ def atomic_write_text(
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     tmp = Path(tmp_name)
     try:
-        with os.fdopen(fd, "w", encoding=encoding) as handle:
+        with os.fdopen(fd, "w", encoding=encoding, newline=newline) as handle:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())

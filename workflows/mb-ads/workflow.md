@@ -1,7 +1,7 @@
 ---
 name: mb-ads
 title: Ads And Paid Creative
-description: "Plan and review paid creative, launch plans, launch instrumentation checks, account-readiness checks, and provider-safe Google Ads search plans from deterministic Main Branch facts."
+description: "Plan and review paid creative, launch plans, launch instrumentation checks, account-readiness checks, and provider-safe Google Ads search plans from deterministic Main Branch facts. Short clips and organic social cuts from a sales video go to /mb-organic; keep paid video repurposing here."
 loops:
   - sense
   - ship
