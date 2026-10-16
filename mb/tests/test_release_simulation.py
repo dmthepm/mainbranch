@@ -2040,6 +2040,88 @@ def test_skill_invocation_is_strong_route_evidence() -> None:
     assert wrong["state"] == "fail"
 
 
+@pytest.mark.parametrize(
+    ("simulation_id", "answer", "expected"),
+    [
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't avoid /mb-ads, use /mb-ads too.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: not without /mb-ads.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: never skip /mb-ads.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't omit /mb-ads.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't wait, use /mb-ads too.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't use /mb-ads, use /mb-ads too.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: do not use /mb-ads.",
+            "correct",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: avoid /mb-ads.",
+            "correct",
+        ),
+        (
+            "observation_readout_only",
+            "Propose research/readout.md. Don't avoid writing log/note.md.",
+            "wrong",
+        ),
+        (
+            "observation_readout_only",
+            "Propose research/readout.md. Never skip filing log/note.md.",
+            "wrong",
+        ),
+        (
+            "observation_readout_only",
+            "Propose research/readout.md. Do not file log/note.md.",
+            "correct",
+        ),
+        ("status_only_no_record", "Do not create a research/readout.md file.", "correct"),
+    ],
+)
+def test_negation_scope_never_crosses_pass_fail_boundary(
+    simulation_id: str, answer: str, expected: str
+) -> None:
+    sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
+    state = release_simulation.score_simulation_assertions(sim, answer)["state"]
+    assert state in ({"pass", "review"} if expected == "correct" else {"fail", "review"})
+
+
+def test_repeated_record_scoring_finishes_within_two_seconds() -> None:
+    from time import perf_counter
+
+    sim = next(
+        item for item in release_simulation.simulations() if item.id == "observation_changed_course"
+    )
+    answer = ("I propose research/readout.md and decisions/stop-trial.md.\n" * 1800)[:100_000]
+    assert len(answer) == 100_000
+    start = perf_counter()
+    release_simulation.score_simulation_assertions(sim, answer)
+    assert perf_counter() - start < 2
+
+
 def test_simulation_without_assertions_has_no_new_scoring() -> None:
     sim = next(item for item in release_simulation.simulations() if not item.assertions)
     score = release_simulation.score_simulation_assertions(sim, "", {"research/example.md": ""})

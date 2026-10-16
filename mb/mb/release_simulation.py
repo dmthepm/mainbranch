@@ -376,7 +376,11 @@ def score_simulation_assertions(
             if kind == "route_required":
                 state = "pass" if invoked or evidence == "positive" else "review"
             else:
-                state = "fail" if invoked or evidence == "positive" else "pass"
+                state = (
+                    "fail"
+                    if invoked or evidence == "positive"
+                    else ("review" if evidence == "ambiguous" else "pass")
+                )
         elif kind.startswith("record_"):
             written = any(path.startswith(value) for path in effects)
             evidence = _record_evidence(answer, value)
@@ -457,6 +461,16 @@ def _assertion_clauses(answer: str) -> list[str]:
 
 
 _ROUTE_NEGATION = re.compile(r"\b(?:not|never|no|avoid|without|don't|do not)\b", re.I)
+_NEGATED_ACTION = re.compile(
+    r"\b(?:don't|do not|never|not)\s+(?:use|route|take|send|put|file|write|"
+    r"create|save|add|open|start|propose|suggest|recommend|draft)\b",
+    re.I,
+)
+_DOUBLE_NEGATION = re.compile(
+    r"\b(?:don't|do not|never|not)\s+(?:avoid|skip|omit|exclude|without)\b|"
+    r"\bnot\s+without\b",
+    re.I,
+)
 _RECORD_ACTION = re.compile(
     r"\b(?:propos\w*|suggest\w*|recommend\w*|offer\w*|put|capture|"
     r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start|file)\b",
@@ -474,6 +488,21 @@ _PATHLESS_BET = re.compile(
 )
 
 
+def _negation_scope(before: str) -> str:
+    """Classify a nearby negation without treating an affirmative pivot as refusal."""
+    negations = list(_ROUTE_NEGATION.finditer(before))
+    if not negations:
+        return "none"
+    tail = before[negations[-1].start() :]
+    if _DOUBLE_NEGATION.search(before) or re.search(
+        r",\s*\b(?:use|route|take|put|write|save|add)\b", tail, re.I
+    ):
+        return "ambiguous"
+    if _NEGATED_ACTION.search(tail) or re.search(r"\b(?:avoid|without|not\s+an?)\b", tail, re.I):
+        return "negative"
+    return "ambiguous"
+
+
 def _route_evidence(answer: str, value: str, subject: str) -> str:
     route = re.compile(rf"(?<![\w/-])/?{re.escape(value.lstrip('/'))}(?![\w-])", re.I)
     ambiguous = False
@@ -482,16 +511,19 @@ def _route_evidence(answer: str, value: str, subject: str) -> str:
             continue
         if subject and not re.search(subject, clause, re.I):
             continue
-        match = route.search(clause)
-        assert match is not None
-        before = clause[: match.start()]
-        if _ROUTE_NEGATION.search(before):
-            continue
-        if "|" in clause or re.search(
-            r"\b(?:use|route|take|through|for|with|via)\b|:", before, re.I
-        ):
-            return "positive"
-        ambiguous = True
+        for match in route.finditer(clause):
+            before = clause[: match.start()]
+            scope = _negation_scope(before)
+            if scope == "negative":
+                continue
+            if scope == "ambiguous":
+                ambiguous = True
+                continue
+            if "|" in clause or re.search(
+                r"\b(?:use|route|take|through|for|with|via)\b|:", before, re.I
+            ):
+                return "positive"
+            ambiguous = True
     return "ambiguous" if ambiguous else "absent"
 
 
@@ -504,25 +536,43 @@ def _record_evidence(answer: str, prefix: str) -> str:
             and not _RECORD_NEGATION.search(clause)
         ):
             ambiguous = True
-        for path in re.finditer(rf"(?<!\w){re.escape(prefix)}[\w./-]*", clause, re.I):
-            before = clause[: path.start()]
-            after = clause[path.end() :]
-            if _RECORD_NEGATION.search(before) or re.search(
+        paths = list(re.finditer(rf"(?<!\w){re.escape(prefix)}[\w./-]*", clause, re.I))
+        actions = list(_RECORD_ACTION.finditer(clause))
+        negations = list(_RECORD_NEGATION.finditer(clause))
+        action_index = negation_index = 0
+        for path in paths:
+            while action_index < len(actions) and actions[action_index].start() < path.start():
+                action_index += 1
+            while (
+                negation_index < len(negations) and negations[negation_index].start() < path.start()
+            ):
+                negation_index += 1
+            action = actions[action_index - 1] if action_index else None
+            last_negation = negations[negation_index - 1] if negation_index else None
+            before = clause[max(0, path.start() - 120) : path.start()]
+            after = clause[path.end() : path.end() + 50]
+            scope = (
+                _negation_scope(before)
+                if last_negation and last_negation.start() >= path.start() - 120
+                else "none"
+            )
+            if scope == "negative" or re.search(
                 r"\b(?:is|are|was|were)\s+not\s+(?:needed|required)\b", after, re.I
             ):
+                continue
+            if scope == "ambiguous":
+                ambiguous = True
                 continue
             if path.group().endswith("/"):
                 ambiguous = True
                 continue
-            actions = list(_RECORD_ACTION.finditer(before))
-            if not actions:
+            if action is None:
                 ambiguous = True
                 continue
-            action = actions[-1]
-            between = before[action.end() :]
-            if len(between) > 100:
+            if path.start() - action.end() > 100:
                 ambiguous = True
                 continue
+            between = clause[action.end() : path.start()]
             if action.group().lower().startswith("draft") and re.search(
                 r"\b(?:email|post|copy)\b", between, re.I
             ):
@@ -555,17 +605,30 @@ def _has_reciprocal_links(answer: str, effects: dict[str, str]) -> bool:
     decision_paths = set(_DECISION_PATH.findall(combined)) | {
         path for path in effects if path.startswith("decisions/")
     }
-    for research_path in research_paths:
-        for decision_path in decision_paths:
-            decision_source = effects.get(decision_path, answer)
-            research_source = effects.get(research_path, answer)
-            decision_links = re.search(r"linked_research\s*:\s*([^\n]+)", decision_source)
-            research_links = re.search(r"linked_decisions\s*:\s*([^\n]+)", research_source)
-            if (
-                decision_links
-                and research_links
-                and research_path in decision_links.group(1)
-                and decision_path in research_links.group(1)
+
+    def links(source: str, field: str, pattern: re.Pattern[str]) -> set[str]:
+        return {
+            path
+            for match in re.finditer(rf"{field}\s*:\s*([^\n]+)", source)
+            for path in pattern.findall(match.group(1))
+        }
+
+    answer_research_links = links(answer, "linked_research", _RESEARCH_PATH)
+    answer_decision_links = links(answer, "linked_decisions", _DECISION_PATH)
+    decision_links = {
+        path: links(content, "linked_research", _RESEARCH_PATH)
+        for path, content in effects.items()
+        if path in decision_paths
+    }
+    research_links = {
+        path: links(content, "linked_decisions", _DECISION_PATH)
+        for path, content in effects.items()
+        if path in research_paths
+    }
+    for decision_path in decision_paths:
+        for research_path in decision_links.get(decision_path, answer_research_links):
+            if research_path in research_paths and decision_path in research_links.get(
+                research_path, answer_decision_links
             ):
                 return True
     return False
