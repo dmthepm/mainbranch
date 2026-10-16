@@ -11,6 +11,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+Decisions marked `codified` now pass validation and leave the uncodified work list.
+
+Status shows the full number of recent and stale records beside its short lists, so hidden work stays visible.
+
+Recent activity now includes bets and playbooks, and `/mb-start` uses it to explain what changed.
+
 `mb status` now warns when a live push names no bet, unless it is marked as a
 one-off with `linked_bets: []` and a short `no_bet_reason`.
 

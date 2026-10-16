@@ -28,7 +28,7 @@ from mb import (
 from mb import pushes as pushes_mod
 from mb.engine import repo_flag
 
-DECISION_STATUS = {"proposed", "accepted", "rejected", "superseded", "running"}
+DECISION_STATUS = {"proposed", "running", "accepted", "codified", "rejected", "superseded"}
 OFFER_STATUS = {
     "proposed",
     "running",
@@ -216,6 +216,7 @@ DECISION_STATUS_ORDER = {
     "proposed": 0,
     "running": 1,
     "accepted": 2,
+    "codified": 2,
     "rejected": 2,
     "superseded": 2,
 }

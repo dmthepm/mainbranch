@@ -60,6 +60,7 @@ Required fact paths:
 - `runtime.codex_cli`
 - `runtime.claude_code`
 - `since_last_check`
+- `git_activity`
 - `journal`
 - `checkpoint`
 - `onboarding`
@@ -206,16 +207,15 @@ mb status --json --peek
   playbook, page readiness, and outcome feedback. Use it as evidence; cite
   `money_path.objects.proof.quality` facts instead of claiming an offer will
   convert.
-- `validation.file_contracts`, `content_strategy`, `readiness`, and
-  `drift.items` map file gaps, content layers, setup gates, and repair commands.
-- `onboarding.summary` and `onboarding.checklist` replace separate onboarding
-  probes unless the status report is unavailable.
-- `journal`, `since_last_check.journal`, `integrations`, `github`,
+- `validation.file_contracts`, `content_strategy`, `readiness`, and `drift.items` map file gaps, content layers, setup gates, and repair commands.
+- `onboarding.summary` and `onboarding.checklist` replace separate onboarding probes unless status is unavailable.
+- `git_activity`, `journal`, `since_last_check.journal`, `integrations`, `github`,
   `measurement`, and `brain.bets` supply continuity facts for routing.
 
-Only run a narrower fallback command such as `mb onboard status --json`,
-`mb doctor`, `mb validate --cross-refs`, or `mb connect doctor --json` when status
-points at that section as unavailable, degraded, or needing repair.
+Use `git_activity` and `since_last_check` from `mb status` to answer what changed; business repos need no latest or changelog index.
+
+Only run `mb onboard status --json`, `mb doctor`, `mb validate --cross-refs`, or
+`mb connect doctor --json` when status marks that section unavailable, degraded, or needing repair.
 
 ## Step 1: Check Main Branch Updates
 

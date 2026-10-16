@@ -24,10 +24,15 @@
       "counts",
       "pushes",
       "recent_decisions",
+      "recent_decisions_total",
       "recent_research",
+      "recent_research_total",
       "stale_decisions",
+      "stale_decisions_total",
       "stale_research",
-      "uncodified_decisions"
+      "stale_research_total",
+      "uncodified_decisions",
+      "uncodified_decisions_total"
     ],
     "content_strategy": [
       "counts",

@@ -34,6 +34,7 @@ json_facts:
   - runtime.codex_cli
   - runtime.claude_code
   - since_last_check
+  - git_activity
   - journal
   - checkpoint
   - onboarding
@@ -126,6 +127,7 @@ The runtime shell must preserve these paths from the workflow source:
 - `runtime.codex_cli`
 - `runtime.claude_code`
 - `since_last_check`
+- `git_activity`
 - `journal`
 - `checkpoint`
 - `onboarding`
@@ -161,8 +163,9 @@ validation, file-contract, and drift signals that may still need owner input.
 After hard gates, lead with the top `ranked_actions` entry when the operator
 asks what to do next. After that action, name the first warn-level
 `relationship_health.gaps` item once, with its repair, when one exists.
-Use `since_last_check` and `journal` when the operator
-asks what changed. Use `validation.file_contracts` when a file has the right
+Use `git_activity` and `since_last_check` from `mb status` to answer what changed;
+business repos need no separate latest or changelog index. Use `journal` for
+the operator's recorded context. Use `validation.file_contracts` when a file has the right
 place in the repo but is missing the business shape needed for the next
 workflow; route offer-shape gaps to `mb-think` and ask before durable writes.
 Use `money_path` for customer progress, offer, proof, CTA, channel, push, page

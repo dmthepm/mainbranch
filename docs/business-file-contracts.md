@@ -281,6 +281,10 @@ research or a decision.
 **Required frontmatter:** `date`, `status`, plus relationship fields when
 linked work exists.
 
+**Status:** `proposed`, `running`, `accepted`, `codified`, `rejected`, or
+`superseded`. Use `codified` after the accepted decision has been applied to
+reference files.
+
 **Required body sections:** situation, options, accepted direction, rejected
 alternatives, consequences, review/supersession trigger.
 
