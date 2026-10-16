@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-10-16
+
 Daily observations can become short research readouts, and a change of plan can become a linked decision after your approval.
 
 When you ask to run a measurable channel trial, Main Branch checks for an existing bet and offers to record one before the work starts; routine channel tasks stay in their usual workflow.
