@@ -278,7 +278,9 @@ def _which(name: str) -> str:
     return shutil.which(name) or ""
 
 
-def _run_command(args: list[str], cwd: Path | None = None, timeout: float = 3.0) -> dict[str, Any]:
+def _run_command(
+    args: list[str], cwd: Path | None = None, timeout: float = 3.0, input: str | None = None
+) -> dict[str, Any]:
     try:
         result = subprocess.run(
             args,
@@ -286,6 +288,7 @@ def _run_command(args: list[str], cwd: Path | None = None, timeout: float = 3.0)
             capture_output=True,
             text=True,
             timeout=timeout,
+            input=input,
         )
     except FileNotFoundError:
         return {"ok": False, "returncode": 127, "stdout": "", "stderr": f"{args[0]} not found"}
@@ -509,7 +512,7 @@ def _stranded_record_gap(
         [
             "git",
             "for-each-ref",
-            "--format=%(refname)%09%(upstream)",
+            "--format=%(refname)%09%(upstream)%09%(objectname)%09%(symref)",
             "refs/heads",
             "refs/remotes",
         ],
@@ -520,24 +523,28 @@ def _stranded_record_gap(
     local: dict[str, str] = {}
     remotes: dict[str, str] = {}
     upstreams: dict[str, str] = {}
+    tips: dict[str, str] = {}
+    remote_default_refs: set[str] = set()
     for line in refs["stdout"].splitlines():
-        ref, _, upstream = line.partition("\t")
+        ref, upstream, tip, symref = (line.split("\t") + ["", "", "", ""])[:4]
+        tips[ref] = tip
         if ref.startswith("refs/heads/"):
             name = ref.removeprefix("refs/heads/")
             local[name] = ref
             upstreams[name] = upstream
-        elif ref.startswith("refs/remotes/") and not ref.endswith("/HEAD"):
-            remotes[ref] = ref.removeprefix("refs/remotes/")
+        elif ref.startswith("refs/remotes/"):
+            remote, _, branch = ref.removeprefix("refs/remotes/").partition("/")
+            if branch == "HEAD":
+                if symref:
+                    remote_default_refs.add(symref)
+            else:
+                remotes[ref] = f"{remote}/{branch}"
+                if branch == default:
+                    remote_default_refs.add(ref)
     default_ref = local.get(default)
     if not default_ref:
         return None
-    bases = [default_ref]
-    default_remote = f"refs/remotes/origin/{default}"
-    if default_remote in remotes:
-        bases.append(default_remote)
-    default_upstream = upstreams.get(default)
-    if default_upstream in remotes and default_upstream not in bases:
-        bases.append(default_upstream)
+    bases = [default_ref, *sorted(remote_default_refs & remotes.keys())]
 
     branches: list[tuple[str, list[str]]] = []
     consumed_remotes: set[str] = set()
@@ -547,12 +554,14 @@ def _stranded_record_gap(
         branch_refs = [ref]
         for remote_ref in remotes:
             remote_name = remotes[remote_ref].partition("/")[2]
-            if remote_ref == upstreams.get(name) or remote_name == name:
+            if remote_ref not in remote_default_refs and (
+                remote_ref == upstreams.get(name) or remote_name == name
+            ):
                 consumed_remotes.add(remote_ref)
                 branch_refs.append(remote_ref)
         branches.append((name, branch_refs))
     for ref, name in sorted(remotes.items()):
-        if ref in consumed_remotes or name.partition("/")[2] == default:
+        if ref in consumed_remotes or ref in remote_default_refs:
             continue
         branches.append((name, [ref]))
     branches_capped = len(branches) > STRANDED_BRANCH_LIMIT
@@ -577,23 +586,46 @@ def _stranded_record_gap(
         )
         if not log["ok"]:
             return None
-        oldest: int | None = None
-        files: set[str] = set()
+        file_dates: dict[str, int] = {}
+        commit_date: int | None = None
         commits = 0
         for line in log["stdout"].splitlines():
             if "\t" in line:
                 timestamp, _, commit = line.partition("\t")
                 if timestamp.isdigit() and re.fullmatch(r"[0-9a-f]{40,64}", commit):
                     commits += 1
-                    value = int(timestamp)
-                    oldest = value if oldest is None else min(oldest, value)
+                    commit_date = int(timestamp)
                     continue
-            if line and any(line.startswith(f"{root}/") for root in STRANDED_RECORD_ROOTS):
-                files.add(line)
+            if commit_date is not None and line.startswith(
+                tuple(f"{root}/" for root in STRANDED_RECORD_ROOTS)
+            ):
+                file_dates[line] = min(file_dates.get(line, commit_date), commit_date)
         if commits > STRANDED_COMMIT_LIMIT:
             commits_capped = True
-        if oldest is None:
+        if not file_dates:
             continue
+        diff = _run_command(
+            [
+                "git",
+                "diff-tree",
+                "--stdin",
+                "-r",
+                "--name-only",
+                "--diff-filter=ACMRTUXB",
+                "--",
+                *STRANDED_RECORD_ROOTS,
+            ],
+            cwd=repo,
+            timeout=5.0,
+            input="".join(f"{tips[ref]} {tips[default_ref]}\n" for ref in branch_refs),
+        )
+        if not diff["ok"]:
+            return None
+        changed = set(diff["stdout"].splitlines())
+        files = file_dates.keys() & changed
+        if not files:
+            continue
+        oldest = min(file_dates[path] for path in files)
         age = now - datetime.fromtimestamp(oldest, timezone.utc)
         age_days = max(0, age.days)
         if age > timedelta(days=STRANDED_RECORD_DAYS):

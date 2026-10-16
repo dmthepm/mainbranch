@@ -135,6 +135,68 @@ def test_default_remote_already_contains_record(tmp_path: Path) -> None:
     assert gap(repo) is None
 
 
+def test_squash_merged_record_with_identical_content_does_not_warn(tmp_path: Path) -> None:
+    repo = repo_with_branch(tmp_path, path="bets/b.md")
+    (repo / "bets").mkdir()
+    (repo / "bets" / "b.md").write_text("record\n")
+    git(repo, "add", "bets/b.md")
+    git(repo, "commit", "-m", "same record on main", days_ago=1)
+    assert gap(repo) is None
+
+
+def test_squash_merged_record_edited_on_main_still_warns(tmp_path: Path) -> None:
+    repo = repo_with_branch(tmp_path, path="bets/b.md")
+    (repo / "bets").mkdir()
+    (repo / "bets" / "b.md").write_text("edited record\n")
+    git(repo, "add", "bets/b.md")
+    git(repo, "commit", "-m", "edited record on main", days_ago=1)
+    found = gap(repo)
+    assert found is not None
+    assert found["records"][0]["files"] == ["bets/b.md"]
+
+
+def test_deleted_record_on_branch_does_not_warn(tmp_path: Path) -> None:
+    repo = repo_with_branch(tmp_path)
+    git(repo, "checkout", "feature/record")
+    git(repo, "rm", "bets/x.md")
+    git(repo, "commit", "-m", "remove record", days_ago=1)
+    git(repo, "checkout", "main")
+    assert gap(repo) is None
+
+
+def test_other_remote_default_is_base_for_tracking_branch(tmp_path: Path) -> None:
+    repo = repo_with_branch(tmp_path)
+    git(repo, "remote", "add", "origin", str(repo))
+    git(repo, "remote", "add", "upstream", str(repo))
+    git(repo, "update-ref", "refs/remotes/origin/main", "refs/heads/main")
+    git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    git(repo, "update-ref", "refs/remotes/upstream/main", "refs/heads/feature/record")
+    git(repo, "symbolic-ref", "refs/remotes/upstream/HEAD", "refs/remotes/upstream/main")
+    git(repo, "branch", "--set-upstream-to=upstream/main", "feature/record")
+    assert gap(repo) is None
+
+
+def test_remote_head_target_with_another_name_is_a_base(tmp_path: Path) -> None:
+    repo = repo_with_branch(tmp_path)
+    git(repo, "update-ref", "refs/remotes/upstream/trunk", "refs/heads/feature/record")
+    git(repo, "symbolic-ref", "refs/remotes/upstream/HEAD", "refs/remotes/upstream/trunk")
+    assert gap(repo) is None
+
+
+def test_only_remaining_record_files_set_branch_age(tmp_path: Path) -> None:
+    repo = repo_with_branch(tmp_path)
+    (repo / "bets").mkdir()
+    (repo / "bets" / "x.md").write_text("record\n")
+    git(repo, "add", "bets/x.md")
+    git(repo, "commit", "-m", "same old record on main", days_ago=1)
+    git(repo, "checkout", "feature/record")
+    (repo / "bets" / "recent.md").write_text("recent\n")
+    git(repo, "add", "bets/recent.md")
+    git(repo, "commit", "-m", "recent record", days_ago=1)
+    git(repo, "checkout", "main")
+    assert gap(repo) is None
+
+
 def test_current_branch_is_included(tmp_path: Path) -> None:
     repo = repo_with_branch(tmp_path)
     git(repo, "checkout", "feature/record")
