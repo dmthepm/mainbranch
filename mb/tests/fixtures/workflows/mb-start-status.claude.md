@@ -27,6 +27,7 @@ This snapshot does not replace shipped `.claude/skills` prose.
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `readiness.dimensions.repo_runtime`

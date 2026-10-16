@@ -26,6 +26,7 @@ This snapshot does not replace shipped `.claude/skills/mb-end/SKILL.md`.
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `drift.items`

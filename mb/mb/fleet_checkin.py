@@ -214,6 +214,32 @@ def _loop_section(status: dict[str, Any], as_of: str) -> dict[str, Any]:
     text = words.get(level, "Readiness not known.")
     if title and level != "ready":
         text += f" Next: {title}."
+    gaps = [_dict(item) for item in _list(_dict(status.get("relationship_health")).get("gaps"))]
+    gap = min(gaps, key=lambda item: 0 if item.get("severity") == "warn" else 1, default={})
+    summary = str(gap.get("summary") or "")
+    count = _int(gap.get("count"))
+    top_gap = (
+        {
+            "id": str(gap.get("id") or ""),
+            "severity": str(gap.get("severity") or ""),
+            "count": count,
+            "summary": summary,
+        }
+        if summary
+        else None
+    )
+    if top_gap and (level == "ready" or summary.rstrip(".") != title.rstrip(".")):
+        words_for_gap = summary.replace("bet(s)", "bet" if count == 1 else "bets")
+        words_for_gap = words_for_gap.replace("push(es)", "push" if count == 1 else "pushes")
+        words_for_gap = words_for_gap.replace("offer(s)", "offer" if count == 1 else "offers")
+        words_for_gap = words_for_gap.replace("link(s)", "link" if count == 1 else "links")
+        if count == 1:
+            words_for_gap = (
+                words_for_gap.replace(" need ", " needs ")
+                .replace(" have ", " has ")
+                .replace(" point ", " points ")
+            )
+        text += f" Links: {words_for_gap[:120].rstrip()}"
     return _section(
         "ok" if level == "ready" else "attention",
         as_of,
@@ -221,6 +247,7 @@ def _loop_section(status: dict[str, Any], as_of: str) -> dict[str, Any]:
         text,
         level=level,
         top_action={"title": title, "severity": str(top.get("severity") or "")} if title else None,
+        top_gap=top_gap,
     )
 
 
@@ -484,6 +511,7 @@ def _sections_unavailable(
     text: str, hub: str, snapshot: dict[str, Any], snap_state: str, state: str
 ) -> dict[str, Any]:
     sections = {name: _section(state, "", STATUS_SOURCE, text) for name in SECTION_NAMES}
+    sections["loop"]["top_gap"] = None
     sections["sites"] = _sites_section(hub, snapshot, snap_state)
     return sections
 

@@ -22,6 +22,7 @@ json_facts:
   - validation.file_contracts
   - content_strategy
   - ranked_actions
+  - relationship_health.gaps
   - update
   - readiness
   - drift.items
@@ -114,6 +115,7 @@ The runtime shell must preserve these paths from the workflow source:
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `drift.items`
@@ -142,7 +144,10 @@ requests, provider mutation, publishing, spend, and customer contact.
 
 Mid-session save branch: after hard gates, if the intent is a save while the
 operator keeps working (not an end or pause), run only the status scan plus `mb
-checkpoint --plan`, save on approval through `mb checkpoint`, and stop. Do not run
+checkpoint --plan`, check bet, push, decision, or research files this session
+created or edited against `relationship_health.gaps` and offer one named link
+fix when they match, then
+save on approval through `mb checkpoint` and stop. Do not run
 crystallize, the final-thought prompt, or the warm close, and never save with raw
 git.
 
@@ -163,9 +168,16 @@ this order:
    Claude's Task tool.
 6. Save state: answer "is that it?" with the owner-facing state before
    technical details.
-7. Approval-gated save: validate the checkpoint subject, ask before saving,
+7. Link check: if a bet, push, decision, or research file this session created
+   or edited appears in `relationship_health.gaps` evidence or records, offer
+   one link fix before writing the checkpoint. Name the field and file; ask at
+   most one question. The checkpoint plan lists every uncommitted file,
+   including work left from earlier sessions, so use it only to confirm a file
+   this session touched. Skip this check when no such file is named by a gap,
+   or when you cannot tell which files this session touched.
+8. Approval-gated save: validate the checkpoint subject, ask before saving,
    and save only through `mb checkpoint`.
-8. Warm close: end with one sentence naming the most important saved or drafted
+9. Warm close: end with one sentence naming the most important saved or drafted
    business outcome. Do not plan tomorrow.
 
 Owner-facing save states:

@@ -38,6 +38,7 @@ Required fact paths:
 - `validation.file_contracts`
 - `content_strategy`
 - `ranked_actions`
+- `relationship_health.gaps`
 - `update`
 - `readiness`
 - `drift.items`
@@ -140,6 +141,12 @@ Run these in the user's business repo first:
 mb status --json --peek
 mb checkpoint --plan --json
 ```
+
+Before the checkpoint, compare bets, pushes, decisions, and research files this
+session created or edited with `relationship_health.gaps` evidence or records.
+The checkpoint plan also lists older uncommitted work, so do not treat it as
+this session's files. If a gap names one, offer one link fix with the field and
+file; ask at most one question. Otherwise, or when unsure, skip.
 
 **Parse what you find into categories:**
 
