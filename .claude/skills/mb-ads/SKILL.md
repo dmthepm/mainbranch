@@ -1,6 +1,6 @@
 ---
 name: mb-ads
-description: "Create and review ads, and prepare provider-safe launch plans/checks. Flexible entry points: full pipeline (copy + images), copy only, images only, creative variations (hook library), video scripts, long-form video ads/VSL-style paid creative, video repurpose, compliance review, launch-plan, instrumentation, check, or optional Meta ad account check. Use when asked to create ads, ad copy, image prompts, video ad scripts, paid sales videos, creative variations, review ads, plan paid traffic, check analytics/GA4/GTM/pixels/booking/form readiness, or check launch performance. Say /mb-ads or describe what you need."
+description: "Create and review ads, and prepare provider-safe launch plans/checks. Flexible entry points: full pipeline (copy + images), copy only, images only, creative variations (hook library), video scripts, long-form video ads/VSL-style paid creative, paid video repurpose, compliance review, launch-plan, instrumentation, check, or optional Meta ad account check. Use when asked to create ads, ad copy, image prompts, video ad scripts, paid sales videos, creative variations, review ads, plan paid traffic, check analytics/GA4/GTM/pixels/booking/form readiness, or check launch performance. Say /mb-ads or describe what you need."
 loops: [ship, reflect]
 ---
 
@@ -306,7 +306,6 @@ offer `mb connect plan` or continuing from reference files.
 ---
 
 ## Triage (Flexible Intent Detection)
-
 Detect what the user wants from natural language. Route internally to the right component pipeline. See [references/entry-points.md](references/entry-points.md) for the complete entry point detection table and component composition.
 
 ### Intent Detection
@@ -319,7 +318,8 @@ Detect what the user wants from natural language. Route internally to the right 
 | "creative variations", "hook library", "one-liners", "50 hooks" | Hook Library | Bulk creative variations (flexible quantity) |
 | "video scripts", "ad scripts", "spoken word" | Video Scripts | Spoken-word script pipeline |
 | "video ad script", "turn this offer into a video ad", "paid sales video", "long-form video ad", "VSL-style paid creative" | Long-Form Video Ads | Load [references/long-form-video-ads.md](references/long-form-video-ads.md) |
-| "I'm repurposing a video", "I shot a video" | Video Repurpose | Transcribe + extract hooks + copy variants |
+| "Make an ad from this video", "repurpose this video for paid ads" | Video Repurpose | Use approved source material for paid hooks + ad copy variants |
+| "Make short clips from this sales video", "organic cuts from this VSL" | Organic clips | Route to `/mb-organic` |
 | "I want ideas for an ad", "brainstorm" | Ideation | Account check (if available) + concept generation |
 | "research winning ads", "mine reviews", "analyze competitors first" | Research / Mining | Route to `/mb-think` winning-ad research before generation |
 | "launch ads", "paid traffic plan", "Google Ads launch", "$X/day for Y days" | Launch Plan | Provider-safe plan/check mode, no account mutation |

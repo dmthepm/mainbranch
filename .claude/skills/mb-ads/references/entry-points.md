@@ -17,7 +17,8 @@ Real ad workflows don't fit neat categories. Someone might have images but need 
 | User Says | Intent | Components Assembled | Ad account? |
 |-----------|--------|---------------------|------------|
 | "I want ideas for an ad" | Ideation | Account check (if available) + research + concept generation | Read-only |
-| "I'm repurposing a video" | Video Repurpose | Transcribe + extract hooks + copy variants | No |
+| "Make an ad from this video" | Video Repurpose | Use approved source material for paid hooks + ad copy variants | No |
+| "Make short clips from this sales video" | Organic clips | Route to `/mb-organic` | No |
 | "I already have images, just need copy" | Copy Only | Skip image gen, primaries + headlines | No |
 | "Just need images for existing copy" | Image Only | Image prompts and optional provider generation | No |
 | "Full from scratch" | Full Pipeline | Copy + compliance + images (classic static flow) | Optional |
@@ -43,7 +44,8 @@ Real ad workflows don't fit neat categories. Someone might have images but need 
 3. Check for component-specific language:
    - "just copy" / "only copy" / "have images" → Copy Only
    - "just images" / "only images" / "have copy" → Image Only
-   - "repurpose" / "transcribe" / "video I shot" → Video Repurpose
+   - "make an ad from this video" / "repurpose for paid ads" → Video Repurpose
+   - "short clips from a sales video" / "organic cuts from a VSL" → `/mb-organic`
    - "variations" / "hook library" / "one-liners" / "creative variations" → Hook Library
 4. Check for account-related language:
    - "performance" / "what's working" / "check account" / "CPA" / "ROAS" → Account Check

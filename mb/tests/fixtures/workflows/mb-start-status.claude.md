@@ -63,6 +63,7 @@ This snapshot does not replace shipped `.claude/skills` prose.
 For a current channel trial with a measurable target and review or cut point, check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise offer `mb-bet` before execution, ask only for a missing target, cut point, or unclear owner, and ask before writing. Routine channel work without a wager stays in its channel workflow.
 6. Route an observation or readout to `/mb-think` research-only for a short evidence-backed readout. A changed course adds a linked decision in the same approved session. Summarize numbers and cite sources; never save raw provider rows, account IDs, customer data, or exported tables. A status-only question gets a status answer without research or a decision. If the observation changes a measurable trial target or cut point, update or link its existing bet through `/mb-bet` after approval before continuing.
 7. Present one clear business route and the signal behind it. Mutate the status marker only when the operator explicitly approves recording the daily check-in.
+Route short clips or social cuts from a sales video or VSL to `/mb-organic`; make an ad from this video routes to `/mb-ads`.
 8. Ask before business-file writes, checkpoints, repairs, updates, migrations, provider mutation, publishing, spend, customer contact, destructive operations, or public issue/proposal submission.
 
 ## Handoff Shape

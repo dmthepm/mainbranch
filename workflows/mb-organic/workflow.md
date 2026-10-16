@@ -82,8 +82,9 @@ Supported modes:
 - `video`: draft Reels, TikTok, Shorts, or creator-style scripts.
 - `carousel`: draft slide-by-slide carousel copy.
 - `static`: draft a single post or caption.
-- `sales-video-repurpose`: turn approved sales-video material into short-form
-  clips, excerpts, carousel adaptations, or post drafts.
+- `sales-video-repurpose`: turn approved sales-video or VSL material into short
+  clips, social cuts, excerpts, carousel adaptations, or organic post drafts.
+  A request to make a paid ad from the video routes to `mb-ads`.
 - `review`: check drafts against voice, proof, source, privacy, CTA, and
   approval boundaries.
 

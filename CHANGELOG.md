@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+- Short clips and social cuts from a sales video now route to `/mb-organic`; paid video ads stay with `/mb-ads`.
+
 Business folders now guide every session to reuse a current bet for measurable trials and offer a short research readout, plus a linked decision when the numbers change the plan. An approved `mb update` adds the guidance to existing folders.
 
 ## [0.6.9] - 2026-10-16

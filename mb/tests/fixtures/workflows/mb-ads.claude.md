@@ -6,8 +6,8 @@ Approval gates: `updates_repairs_migrations`, `file_writes`, `checkpoint`, `prov
 Public/private boundaries: `no_secrets`, `no_raw_provider_exports`, `no_raw_transcripts`, `no_customer_member_data`, `no_private_runtime_settings`, `no_private_dms_or_gated_communities`, `no_raw_finance_legal_records`, `no_oauth_tokens`, `no_conversion_uploads`, `no_account_identifiers_in_public_examples`
 
 Use from `/mb-ads` when the operator wants paid creative planning, ad copy,
-image prompts, video scripts, long-form paid creative, compliance review,
-launch plans, launch instrumentation checks, launch checks, optional read-only
+image prompts, video scripts, long-form paid creative, video repurposing for ads,
+compliance review, launch plans, launch instrumentation checks, launch checks, optional read-only
 account context, or Google Ads Search planning. Preserve the existing Claude
 skill's mode language, proof discipline, review workflow, paid-search
 launch-plan path, and provider gates.
@@ -87,6 +87,7 @@ This snapshot does not replace shipped `.claude/skills/mb-ads/SKILL.md`.
    long-form-video, review, launch-plan, check, or account-context modes.
    Treat instrumentation as the launch-readiness sub-mode for GA4/GTM/pixels,
    booking links, HubSpot/forms, and submit/booking smoke.
+   Short clips or social cuts from a sales video or VSL route to `/mb-organic`.
 5. Draft from active offer, audience, voice, content strategy, proof facts,
    relevant research, decisions, active pushes, playbooks, and
    money_path.objects.proof.quality. Do not turn unapproved proof into public
