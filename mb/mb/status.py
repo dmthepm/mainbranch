@@ -604,25 +604,36 @@ def _stranded_record_gap(
             commits_capped = True
         if not file_dates:
             continue
-        diff = _run_command(
-            [
-                "git",
-                "diff-tree",
-                "--stdin",
-                "-r",
-                "--name-only",
-                "--diff-filter=ACMRTUXB",
-                "--",
-                *STRANDED_RECORD_ROOTS,
-            ],
-            cwd=repo,
-            timeout=5.0,
-            input="".join(f"{tips[ref]} {tips[default_ref]}\n" for ref in branch_refs),
-        )
-        if not diff["ok"]:
-            return None
-        changed = set(diff["stdout"].splitlines())
-        files = file_dates.keys() & changed
+        branch_tips = list(dict.fromkeys(tips[ref] for ref in branch_refs))
+        changed_by_tip = {tip: set(file_dates) for tip in branch_tips}
+        for base in bases:
+            diff = _run_command(
+                [
+                    "git",
+                    "diff-tree",
+                    "--stdin",
+                    "-r",
+                    "--name-only",
+                    "--diff-filter=ACMRTUXB",
+                    "--",
+                    *STRANDED_RECORD_ROOTS,
+                ],
+                cwd=repo,
+                timeout=5.0,
+                input="".join(f"{tip} {tips[base]}\n" for tip in branch_tips),
+            )
+            if not diff["ok"]:
+                return None
+            different: dict[str, set[str]] = {tip: set() for tip in branch_tips}
+            current_tip = ""
+            for line in diff["stdout"].splitlines():
+                if line in different:
+                    current_tip = line
+                elif current_tip:
+                    different[current_tip].add(line)
+            for tip in branch_tips:
+                changed_by_tip[tip] &= different[tip]
+        files = set().union(*changed_by_tip.values())
         if not files:
             continue
         oldest = min(file_dates[path] for path in files)

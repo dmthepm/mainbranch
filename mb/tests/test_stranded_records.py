@@ -135,6 +135,25 @@ def test_default_remote_already_contains_record(tmp_path: Path) -> None:
     assert gap(repo) is None
 
 
+def test_squash_merged_record_on_remote_default_with_local_main_behind(tmp_path: Path) -> None:
+    repo = repo_with_branch(tmp_path, path="bets/b.md")
+    remote = tmp_path / "origin.git"
+    git(repo, "init", "--bare", str(remote))
+    git(repo, "remote", "add", "origin", str(remote))
+    git(repo, "push", "origin", "main")
+    git(repo, "checkout", "-b", "remote-default", "main")
+    (repo / "bets").mkdir()
+    (repo / "bets" / "b.md").write_text("record\n")
+    git(repo, "add", "bets/b.md")
+    git(repo, "commit", "-m", "squash record onto main", days_ago=1)
+    git(repo, "push", "origin", "remote-default:main")
+    git(repo, "checkout", "main")
+    git(repo, "branch", "-D", "remote-default")
+    git(repo, "fetch", "origin")
+    assert git(repo, "rev-parse", "main") != git(repo, "rev-parse", "origin/main")
+    assert gap(repo) is None
+
+
 def test_squash_merged_record_with_identical_content_does_not_warn(tmp_path: Path) -> None:
     repo = repo_with_branch(tmp_path, path="bets/b.md")
     (repo / "bets").mkdir()
