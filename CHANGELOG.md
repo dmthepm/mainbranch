@@ -11,7 +11,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
-Daily observations can become short research readouts, and a change of plan can become a linked decision after your approval.
+## [0.6.9] - 2026-10-16
+
+`/mb-start` and `/mb-think` now have guidance for turning a daily observation into a short research readout, and a change of plan into a decision linked to it, after your approval. In release testing it did not yet apply when a request skipped those skills; a fix is planned for the next release.
 
 When you ask to run a measurable channel trial, Main Branch checks for an existing bet and offers to record one before the work starts; routine channel tasks stay in their usual workflow.
 
