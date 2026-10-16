@@ -142,12 +142,18 @@ media_backend: ""    # optional hint; requires media_location
 ---
 ```
 
-If the push ties to a bet, decision, research file, playbook, or outcome,
-add the typed frontmatter link (`linked_bets`, `linked_decisions`,
-`linked_research`, `linked_playbooks`, `linked_outcomes`) and mirror it in
-`## Related links` as Markdown relative links, or preview
-`mb doctor repair --plan` and ask first. Use the connection matrix in
-docs/business-connections.md; never infer links from body-only references.
+When creating or first writing a push, ask once:
+"Which bet does this push serve, and which existing decision or research supports it?"
+Offer active bets and recent decisions and research by name from status facts or files already read.
+Accept "none yet" and continue. For a deliberate one-off with no bet, write
+`linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
+chosen repo-relative paths in `linked_bets`, `linked_decisions`, and
+`linked_research` on the push; add its path to `linked_pushes` on each named
+bet, decision, and research file. Leave unanswered links empty; do not invent
+a reason. Mirror typed links in `## Related links` as relative Markdown links.
+Use docs/business-connections.md; never infer links from body-only references.
+Also link named playbooks and outcomes through `linked_playbooks` and
+`linked_outcomes`.
 
 When an ad-adjacent workflow needs a resource-delivery plan, provider setup
 recipe, launch checklist, or external automation approval record, draft it

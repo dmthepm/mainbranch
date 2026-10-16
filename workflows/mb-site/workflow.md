@@ -307,6 +307,17 @@ Use `.mainbranch/repo.json` for new site repo descriptors and keep
 as compatibility. Do not commit absolute local paths, secrets, raw provider
 caches, or permission claims in descriptors.
 
+When creating or first writing a push, ask once:
+"Which bet does this push serve, and which existing decision or research supports it?"
+Offer active bets and recent decisions and research by name from status facts or files already read.
+Accept "none yet" and continue. For a deliberate one-off with no bet, write
+`linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
+chosen repo-relative paths in `linked_bets`, `linked_decisions`, and
+`linked_research` on the push; add its path to `linked_pushes` on each named
+bet, decision, and research file. Leave unanswered links empty; do not invent
+a reason. Mirror typed links in `## Related links` as relative Markdown links.
+Use docs/business-connections.md; never infer links from body-only references.
+
 ## Approval Gates
 
 Always ask before:

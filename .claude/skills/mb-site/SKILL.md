@@ -149,14 +149,18 @@ promise: ""
 ---
 ```
 
-If the push or site record is tied to a bet, decision, research file,
-playbook, or outcome, add the appropriate typed frontmatter link
-(`linked_bets`, `linked_decisions`, `linked_research`,
-`linked_playbooks`, `linked_outcomes`). Mirror frontmatter links in
-`## Related links` with Markdown relative links, or preview
-`mb doctor repair --plan` and ask before applying the repair. Use the
-connection decision matrix in docs/business-connections.md before adding
-typed links. Do not infer frontmatter links from body-only references.
+When creating or first writing a push, ask once:
+"Which bet does this push serve, and which existing decision or research supports it?"
+Offer active bets and recent decisions and research by name from status facts or files already read.
+Accept "none yet" and continue. For a deliberate one-off with no bet, write
+`linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
+chosen repo-relative paths in `linked_bets`, `linked_decisions`, and
+`linked_research` on the push; add its path to `linked_pushes` on each named
+bet, decision, and research file. Leave unanswered links empty; do not invent
+a reason. Mirror typed links in `## Related links` as relative Markdown links.
+Use docs/business-connections.md; never infer links from body-only references.
+Also link named playbooks and outcomes through `linked_playbooks` and
+`linked_outcomes`.
 
 ## Re-Invoke Often
 
