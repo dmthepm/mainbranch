@@ -1786,3 +1786,423 @@ def test_checkpoint_guidance_points_repair_and_migration_at_accepted_verbs() -> 
     assert "mb checkpoint --validate" in router
     assert "`[fixed]`" in router
     assert "`[ran]`" in router
+
+
+@pytest.mark.parametrize(
+    ("simulation_id", "good", "bad", "bad_effects"),
+    [
+        (
+            "conversion_video_natural_prompt_routing",
+            "Short clips from the sales video route to /mb-organic. "
+            "Paid video ads route to /mb-ads.",
+            "Short clips from the sales video route to /mb-ads.",
+            {},
+        ),
+        (
+            "channel_trial_new_bet",
+            "I propose a bets/weekly-email-trial.md file for the measurable trial, after approval.",
+            "Start the weekly email now; no bet needed.",
+            {},
+        ),
+        (
+            "channel_trial_existing_bet",
+            "The covering bet is bets/2026-10-01-weekly-email-trial.md. Ask before the next send.",
+            "The covering bet is bets/2026-10-01-weekly-email-trial.md. "
+            "I propose a new bets/duplicate.md file.",
+            {},
+        ),
+        (
+            "routine_channel_task_no_bet",
+            "Route the weekly post to /mb-organic and ask before saving it.",
+            "Route the weekly post to /mb-bet and propose a bets/post.md file.",
+            {},
+        ),
+        (
+            "observation_readout_only",
+            "I propose a research/readout.md file with both weeks' signup and visit figures, "
+            "source, caveat and next question. May I write it?",
+            "I propose a research/readout.md file and a log/weekly-note.md file. May I write them?",
+            {},
+        ),
+        (
+            "observation_changed_course",
+            "I propose research/readout.md and decisions/stop-trial.md after approval. "
+            "Decision linked_research: [research/readout.md]. "
+            "Research linked_decisions: [decisions/stop-trial.md].",
+            "The rate changed from 8% to 3%; stop the trial. No files needed.",
+            {},
+        ),
+        (
+            "status_only_no_record",
+            "The current status shows the trial is steady. No new record is needed.",
+            "I propose a research/readout.md file from this status.",
+            {},
+        ),
+    ],
+)
+def test_targeted_simulation_assertions_reject_bad_and_accept_good(
+    simulation_id: str, good: str, bad: str, bad_effects: dict[str, str]
+) -> None:
+    sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
+    good_score = release_simulation.score_simulation_assertions(sim, good)
+    bad_score = release_simulation.score_simulation_assertions(sim, bad, bad_effects)
+    assert good_score["state"] in {"pass", "review"}, good_score["failures"]
+    assert bad_score["state"] in {"fail", "review"}
+
+
+@pytest.mark.parametrize(
+    ("simulation_id", "answer"),
+    [
+        ("conversion_video_natural_prompt_routing", "Clips: /mb-organic; paid video ads: /mb-ads"),
+        (
+            "conversion_video_natural_prompt_routing",
+            "| Clips | **mb-organic** |\n| Paid ads | `mb-ads` |",
+        ),
+        ("conversion_video_natural_prompt_routing", "- Short clips: `mb-organic`\n- Ads: /mb-ads"),
+        (
+            "channel_trial_new_bet",
+            "I’d suggest a bet in bets/ for the weekly trial; may I save it?",
+        ),
+        ("channel_trial_new_bet", "I recommend a trial record at bets/weekly.md after approval."),
+        ("channel_trial_new_bet", "- Offer a new bet: bets/weekly.md\n- Ask before saving."),
+        ("channel_trial_new_bet", "I could add bets/weekly.md after approval."),
+        ("channel_trial_new_bet", "I can add a bets/weekly.md record after approval."),
+        ("channel_trial_new_bet", "I should add bets/weekly.md after approval."),
+        ("channel_trial_new_bet", "May I save bets/weekly.md after your review?"),
+        ("channel_trial_new_bet", "I'd write bets/weekly.md after approval."),
+        (
+            "channel_trial_existing_bet",
+            "Draft the next email using bets/2026-10-01-weekly-email-trial.md; ask before sending",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "| Covering bet | bets/2026-10-01-weekly-email-trial.md |\n"
+            "| Next | Ask before sending |",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Use bets/2026-10-01-weekly-email-trial.md for this trial. No new bet is needed.",
+        ),
+        ("routine_channel_task_no_bet", "Use mb-organic for the weekly post; ask before saving"),
+        ("routine_channel_task_no_bet", "| Weekly post | **mb-organic** |"),
+        ("routine_channel_task_no_bet", "- Draft the weekly post with `mb-organic`.\n- Ask first."),
+        ("observation_readout_only", "I’d suggest a short readout in research/ after approval"),
+        ("observation_readout_only", "I recommend a research/readout.md record after approval."),
+        ("observation_readout_only", "- Offer a short research/readout.md readout.\n- Ask first."),
+        ("observation_readout_only", "I suggest research/readout.md. Do not file this in log/."),
+        ("observation_readout_only", "I propose research/readout.md without a decisions/ file."),
+        (
+            "observation_changed_course",
+            "I’d suggest research/readout.md and decisions/stop-trial.md; "
+            "linked_research: research/readout.md; linked_decisions: decisions/stop-trial.md",
+        ),
+        (
+            "observation_changed_course",
+            "I recommend research/readout.md and decisions/stop-trial.md. "
+            "Decision linked_research: research/readout.md. "
+            "Research linked_decisions: decisions/stop-trial.md.",
+        ),
+        (
+            "observation_changed_course",
+            "- Propose research/readout.md and decisions/stop-trial.md\n"
+            "- linked_research: research/readout.md\n"
+            "- linked_decisions: decisions/stop-trial.md",
+        ),
+        (
+            "status_only_no_record",
+            "No new research/ draft or decisions/ file is needed; here is today’s status",
+        ),
+        ("status_only_no_record", "Do not file this in log/. Here is today's status."),
+        ("status_only_no_record", "Here is the status without a new research/ record."),
+        ("status_only_no_record", "Here is the status instead of a decisions/ file."),
+        ("status_only_no_record", "A research/ file is not needed for today's status."),
+        ("status_only_no_record", "Don't add a bets/ record from this status."),
+    ],
+)
+def test_correct_assertion_phrasings_do_not_fail(simulation_id: str, answer: str) -> None:
+    sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
+    score = release_simulation.score_simulation_assertions(sim, answer)
+    assert score["state"] in {"pass", "review"}, score["failures"]
+
+
+@pytest.mark.parametrize(
+    ("simulation_id", "answer", "expected"),
+    [
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: /mb-organic; paid video ads: /mb-ads",
+            "correct",
+        ),
+        (
+            "channel_trial_new_bet",
+            "I’d suggest a bet in bets/ for the weekly trial; may I save it?",
+            "correct",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Draft the next email using bets/2026-10-01-weekly-email-trial.md; ask before sending",
+            "correct",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Use the existing bet; let’s open another bet for this same trial",
+            "wrong",
+        ),
+        (
+            "routine_channel_task_no_bet",
+            "Use mb-organic for the weekly post; ask before saving",
+            "correct",
+        ),
+        (
+            "observation_readout_only",
+            "I’d suggest a short readout in research/ after approval",
+            "correct",
+        ),
+        (
+            "observation_changed_course",
+            "I’d suggest research/readout.md and decisions/stop-trial.md; "
+            "linked_research: research/readout.md; linked_decisions: decisions/stop-trial.md",
+            "correct",
+        ),
+        (
+            "status_only_no_record",
+            "No new research/ draft or decisions/ file is needed; here is today’s status",
+            "correct",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips are not an /mb-ads job; I would take them through /mb-organic",
+            "correct",
+        ),
+        (
+            "channel_trial_new_bet",
+            "Let's put a measurable weekly email trial into bets/ after you approve it",
+            "correct",
+        ),
+        (
+            "observation_readout_only",
+            "I'd put a short interpretation in research/ once you approve",
+            "correct",
+        ),
+        (
+            "observation_changed_course",
+            "After your approval, let's capture research/readout.md and "
+            "decisions/stop-trial.md. The decision's linked_research: "
+            "research/readout.md; the readout's linked_decisions: decisions/stop-trial.md",
+            "correct",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Keep bets/2026-10-01-weekly-email-trial.md as context, "
+            "but set up a fresh bet for the same email trial",
+            "wrong",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Use bets/2026-10-01-weekly-email-trial.md and launch a second "
+            "trial bet covering the same email",
+            "wrong",
+        ),
+        (
+            "status_only_no_record",
+            "The status is steady; open a fresh bet to track the same weekly email trial",
+            "wrong",
+        ),
+        (
+            "observation_readout_only",
+            "I suggest research/readout.md. I'd suggest not filing this in log/; "
+            "let's log it anyway in log/note.md",
+            "wrong",
+        ),
+    ],
+)
+def test_both_review_verdicts_never_cross_the_pass_fail_boundary(
+    simulation_id: str, answer: str, expected: str
+) -> None:
+    sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
+    state = release_simulation.score_simulation_assertions(sim, answer)["state"]
+    assert state in ({"pass", "review"} if expected == "correct" else {"fail", "review"})
+
+
+def test_skill_invocation_is_strong_route_evidence() -> None:
+    sim = next(
+        item
+        for item in release_simulation.simulations()
+        if item.id == "conversion_video_natural_prompt_routing"
+    )
+    score = release_simulation.score_simulation_assertions(
+        sim, "The short clips need a route.", skill_invocations=("/mb-organic",)
+    )
+    assert score["state"] == "pass"
+    wrong = release_simulation.score_simulation_assertions(
+        sim, "The short clips need a route.", skill_invocations=("/mb-ads",)
+    )
+    assert wrong["state"] == "fail"
+
+
+@pytest.mark.parametrize(
+    ("simulation_id", "answer", "expected"),
+    [
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't avoid /mb-ads, use /mb-ads too.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: not without /mb-ads.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: never skip /mb-ads.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't omit /mb-ads.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't wait, use /mb-ads too.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: don't use /mb-ads, use /mb-ads too.",
+            "wrong",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: do not use /mb-ads.",
+            "correct",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: use /mb-organic. Clips: avoid /mb-ads.",
+            "correct",
+        ),
+        (
+            "observation_readout_only",
+            "Propose research/readout.md. Don't avoid writing log/note.md.",
+            "wrong",
+        ),
+        (
+            "observation_readout_only",
+            "Propose research/readout.md. Never skip filing log/note.md.",
+            "wrong",
+        ),
+        (
+            "observation_readout_only",
+            "Propose research/readout.md. Do not file log/note.md.",
+            "correct",
+        ),
+        ("status_only_no_record", "Do not create a research/readout.md file.", "correct"),
+    ],
+)
+def test_negation_scope_never_crosses_pass_fail_boundary(
+    simulation_id: str, answer: str, expected: str
+) -> None:
+    sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
+    state = release_simulation.score_simulation_assertions(sim, answer)["state"]
+    assert state in ({"pass", "review"} if expected == "correct" else {"fail", "review"})
+
+
+def test_repeated_record_scoring_finishes_within_two_seconds() -> None:
+    from time import perf_counter
+
+    sim = next(
+        item for item in release_simulation.simulations() if item.id == "observation_changed_course"
+    )
+    answer = ("I propose research/readout.md and decisions/stop-trial.md.\n" * 1800)[:100_000]
+    assert len(answer) == 100_000
+    start = perf_counter()
+    release_simulation.score_simulation_assertions(sim, answer)
+    assert perf_counter() - start < 2
+
+
+def test_simulation_without_assertions_has_no_new_scoring() -> None:
+    sim = next(item for item in release_simulation.simulations() if not item.assertions)
+    score = release_simulation.score_simulation_assertions(sim, "", {"research/example.md": ""})
+    assert score == {
+        "state": "pass",
+        "ok": True,
+        "passed": 0,
+        "total": 0,
+        "checks": [],
+        "failures": [],
+        "reviews": [],
+    }
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Use the existing bet bets/2026-10-01-weekly-email-trial.md; "
+        "let's open another bet for this same trial.",
+        "The existing bet is bets/2026-10-01-weekly-email-trial.md. Start a new bet.",
+    ],
+)
+def test_pathless_duplicate_bet_proposal_fails(answer: str) -> None:
+    sim = next(
+        item for item in release_simulation.simulations() if item.id == "channel_trial_existing_bet"
+    )
+    score = release_simulation.score_simulation_assertions(sim, answer)
+    assert score["ok"] is False
+    assert score["state"] == "review"
+    assert "record_forbidden" in {check["kind"] for check in score["checks"] if not check["ok"]}
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Clips: /mb-ads; paid video ads: /mb-organic",
+        "| Clips | `mb-ads` |\n| Paid video ads | **mb-organic** |",
+    ],
+)
+def test_clips_routed_to_ads_fail(answer: str) -> None:
+    sim = next(
+        item
+        for item in release_simulation.simulations()
+        if item.id == "conversion_video_natural_prompt_routing"
+    )
+    score = release_simulation.score_simulation_assertions(sim, answer)
+    assert score["ok"] is False
+    assert {check["kind"] for check in score["checks"] if not check["ok"]} == {
+        "route_required",
+        "route_forbidden",
+    }
+    assert score["state"] == "fail"
+
+
+def test_readout_rejects_written_log_and_provider_identifier() -> None:
+    sim = next(
+        item for item in release_simulation.simulations() if item.id == "observation_readout_only"
+    )
+    answer = "I propose a research/readout.md file after approval."
+    score = release_simulation.score_simulation_assertions(
+        sim, answer, {"log/weekly.md": "account_id: TEST-ACCOUNT-1191"}
+    )
+    assert score["ok"] is False
+    assert {item["kind"] for item in score["checks"] if not item["ok"]} == {
+        "record_forbidden",
+        "no_write",
+        "forbidden_pattern",
+    }
+
+
+def test_changed_course_requires_both_reciprocal_links() -> None:
+    sim = next(
+        item for item in release_simulation.simulations() if item.id == "observation_changed_course"
+    )
+    answer = "I propose research/readout.md and decisions/stop-trial.md after approval."
+    score = release_simulation.score_simulation_assertions(sim, answer)
+    assert score["ok"] is False
+    assert any("linked_research" in review for review in score["reviews"])
+
+
+def test_assertion_schema_rejects_malformed_entries() -> None:
+    manifest = json.loads(json.dumps(release_simulation.load_manifest()))
+    manifest["simulations"][0]["assertions"] = [{"kind": "record_required", "value": "unknown/"}]
+    assert "invalid record prefix" in " ".join(release_simulation.validate_manifest(manifest))

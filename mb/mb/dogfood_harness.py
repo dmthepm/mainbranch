@@ -197,6 +197,7 @@ class HarnessState:
     fixture_repo: Path
     mb_path: Path
     failures: list[str] = field(default_factory=list)
+    reviews: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     commands: list[CommandResult] = field(default_factory=list)
     parsed_json: dict[str, Any] = field(default_factory=dict)
@@ -1152,6 +1153,29 @@ def transcript_text_from_payload(payload: dict[str, Any]) -> str:
     return "\n".join(chunk for chunk in chunks if chunk)
 
 
+def skill_invocations_from_payload(payload: dict[str, Any]) -> tuple[str, ...]:
+    """Read Skill tool-use blocks when the print payload includes them."""
+    routes: list[str] = []
+
+    def visit(value: Any) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+        elif isinstance(value, dict):
+            if value.get("type") == "tool_use" and value.get("name") == "Skill":
+                tool_input = value.get("input")
+                if isinstance(tool_input, dict):
+                    skill = tool_input.get("skill")
+                    if isinstance(skill, str):
+                        routes.append(skill if skill.startswith("/") else f"/{skill}")
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    visit(child)
+
+    visit(payload)
+    return tuple(routes)
+
+
 def _text_from_list(values: list[Any]) -> list[str]:
     chunks: list[str] = []
     for item in values:
@@ -1331,6 +1355,7 @@ def run_claude_print(
         )
         post_status = git_text(profile_repo, "status", "--short")
         post_diff = git_text(profile_repo, "diff", "--stat")
+        file_effects = changed_file_effects(profile_repo)
         profile_record["post_run_git_status"] = post_status
         profile_record["post_run_git_diff"] = post_diff
         write_json(
@@ -1372,6 +1397,20 @@ def run_claude_print(
             if text:
                 transcript_parts.append(f"## {simulation.label}\n\n{text.strip()}\n")
         else:
+            text = ""
+        assertion_score = release_simulation.score_simulation_assertions(
+            simulation,
+            text,
+            file_effects,
+            skill_invocations_from_payload(payload) if payload is not None else (),
+        )
+        if simulation.assertions:
+            turn["assertions"] = assertion_score
+            for failure in assertion_score["failures"]:
+                state.fail(f"{simulation.id}: {failure}")
+            for review in assertion_score["reviews"]:
+                state.reviews.append(f"REVIEW {simulation.id}: {review}")
+        if payload is None:
             turn["error"] = error
         turns.append(turn)
         if result.returncode != 0:
@@ -1437,6 +1476,10 @@ def run_claude_print(
                 "expected_behaviors": list(simulation.expected_behaviors),
                 "must_observe": list(simulation.must_observe),
                 "must_not": list(simulation.must_not),
+                "assertions": [
+                    {"kind": item.kind, "value": item.value, "subject": item.subject}
+                    for item in simulation.assertions
+                ],
             }
             for simulation in simulations
         ],
@@ -1444,6 +1487,31 @@ def run_claude_print(
         "transcript_excerpts": str(transcript_path),
         "rubric": rubric,
     }
+
+
+def changed_file_effects(repo: Path) -> dict[str, str]:
+    """Read changed regular files in a disposable simulation repo."""
+    effects: dict[str, str] = {}
+    status = git_text(repo, "status", "--porcelain", "--untracked-files=all")
+    for row in status.splitlines():
+        if len(row) < 4:
+            continue
+        relative = row[3:]
+        if " -> " in relative:
+            relative = relative.split(" -> ", 1)[1]
+        path = (repo / relative).resolve()
+        if not path.is_relative_to(repo.resolve()):
+            continue
+        if not path.exists():
+            effects[relative] = "[deleted file]"
+            continue
+        if not path.is_file():
+            continue
+        try:
+            effects[relative] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            effects[relative] = "[unreadable changed file]"
+    return effects
 
 
 def classify_print_grounding(
@@ -1824,6 +1892,10 @@ Evidence folder: local artifact; see harness output and summary.json
 
 {bullet_list(state.failures) if state.failures else "- None recorded by the harness."}
 
+### Simulation assertions needing hand grade
+
+{bullet_list(state.reviews) if state.reviews else "- None."}
+
 ### Warnings / Manual Follow-Up
 
 {bullet_list(state.warnings) if state.warnings else "- None."}
@@ -1897,8 +1969,10 @@ def summarize_mb_command_facts(state: HarnessState) -> dict[str, Any]:
 
 def write_summary(state: HarnessState, *, install_mode: str, mb_version: str) -> None:
     summary = {
-        "ok": not state.failures,
+        "ok": not state.failures and not state.reviews,
+        "needs_hand_grade": bool(state.reviews),
         "failures": state.failures,
+        "reviews": state.reviews,
         "warnings": state.warnings,
         "root": str(state.root),
         "evidence_dir": str(state.evidence_dir),
@@ -1987,6 +2061,10 @@ def run_harness(args: argparse.Namespace) -> int:
         for failure in state.failures:
             print(f"  - {failure}", file=sys.stderr)
         exit_code = 1
+    if state.reviews:
+        print("Simulations needing hand grade:")
+        for review in state.reviews:
+            print(f"  - {review}")
     if state.warnings:
         print("Warnings:")
         for warning in state.warnings:

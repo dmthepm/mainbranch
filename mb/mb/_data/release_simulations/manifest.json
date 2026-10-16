@@ -768,6 +768,21 @@
             "#412"
           ]
         }
+      ],
+      "assertions": [
+        {
+          "kind": "route_required",
+          "value": "/mb-organic",
+          "subject": "clips?|excerpts?|creator|social cuts?|repurpos"
+        },
+        {
+          "kind": "route_forbidden",
+          "value": "/mb-ads",
+          "subject": "clips?|excerpts?|creator|social cuts?|repurpos"
+        },
+        {
+          "kind": "no_write"
+        }
       ]
     },
     {
@@ -1145,6 +1160,15 @@
             "#1190"
           ]
         }
+      ],
+      "assertions": [
+        {
+          "kind": "record_required",
+          "value": "bets/"
+        },
+        {
+          "kind": "no_write"
+        }
       ]
     },
     {
@@ -1185,6 +1209,19 @@
             "#1190"
           ]
         }
+      ],
+      "assertions": [
+        {
+          "kind": "text_required",
+          "value": "bets/2026-10-01-weekly-email-trial.md"
+        },
+        {
+          "kind": "record_forbidden",
+          "value": "bets/"
+        },
+        {
+          "kind": "no_write"
+        }
       ]
     },
     {
@@ -1223,6 +1260,23 @@
           "issue_refs": [
             "#1190"
           ]
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "route_required",
+          "value": "/mb-organic"
+        },
+        {
+          "kind": "route_forbidden",
+          "value": "/mb-bet"
+        },
+        {
+          "kind": "record_forbidden",
+          "value": "bets/"
+        },
+        {
+          "kind": "no_write"
         }
       ]
     },
@@ -1264,6 +1318,27 @@
           "issue_refs": [
             "#1191"
           ]
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "record_required",
+          "value": "research/"
+        },
+        {
+          "kind": "record_forbidden",
+          "value": "decisions/"
+        },
+        {
+          "kind": "record_forbidden",
+          "value": "log/"
+        },
+        {
+          "kind": "no_write"
+        },
+        {
+          "kind": "forbidden_pattern",
+          "value": "TEST-ACCOUNT-[0-9]+|(?m:^\\s*(?:provider_row|account_id)\\s*:)"
         }
       ]
     },
@@ -1310,6 +1385,26 @@
             "#1190"
           ]
         }
+      ],
+      "assertions": [
+        {
+          "kind": "record_required",
+          "value": "research/"
+        },
+        {
+          "kind": "record_required",
+          "value": "decisions/"
+        },
+        {
+          "kind": "reciprocal_links"
+        },
+        {
+          "kind": "no_write"
+        },
+        {
+          "kind": "forbidden_pattern",
+          "value": "TEST-ACCOUNT-[0-9]+|(?m:^\\s*(?:provider_row|account_id)\\s*:)"
+        }
       ]
     },
     {
@@ -1345,6 +1440,23 @@
           "issue_refs": [
             "#1191"
           ]
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "record_forbidden",
+          "value": "research/"
+        },
+        {
+          "kind": "record_forbidden",
+          "value": "decisions/"
+        },
+        {
+          "kind": "record_forbidden",
+          "value": "bets/"
+        },
+        {
+          "kind": "no_write"
         }
       ]
     }

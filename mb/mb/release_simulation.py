@@ -40,6 +40,15 @@ class BehaviorCheck:
 
 
 @dataclass(frozen=True)
+class SimulationAssertion:
+    """A deterministic check scoped to one simulation."""
+
+    kind: str
+    value: str = ""
+    subject: str = ""
+
+
+@dataclass(frozen=True)
 class Simulation:
     """One operator-moment simulation prompt and expected behavior contract."""
 
@@ -52,6 +61,7 @@ class Simulation:
     expected_behaviors: tuple[str, ...]
     must_observe: tuple[str, ...]
     must_not: tuple[str, ...]
+    assertions: tuple[SimulationAssertion, ...] = ()
     fixture_profile: str = "fresh_sanitized_business_repo"
     recorded_facts: dict[str, Any] = field(default_factory=dict, compare=False, hash=False)
 
@@ -114,6 +124,7 @@ def simulations(manifest: dict[str, Any] | None = None) -> tuple[Simulation, ...
                 expected_behaviors=tuple(_str_list(item, "expected_behaviors")),
                 must_observe=tuple(_str_list(item, "must_observe")),
                 must_not=tuple(_str_list(item, "must_not")),
+                assertions=_parse_assertions(item),
                 fixture_profile=_required_str(item, "fixture_profile"),
                 recorded_facts=_dict(item, "recorded_facts"),
             )
@@ -257,7 +268,11 @@ def validate_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
     tier_ids = {str(item.get("id", "")) for item in _list(data, "tiers")}
     check_ids = {check.id for check in behavior_checks(data)}
     simulation_ids: set[str] = set()
-    for sim in simulations(data):
+    try:
+        parsed_simulations = simulations(data)
+    except ValueError as exc:
+        return [str(exc)]
+    for sim in parsed_simulations:
         if sim.id in simulation_ids:
             errors.append(f"duplicate simulation id: {sim.id}")
         simulation_ids.add(sim.id)
@@ -284,6 +299,339 @@ def validate_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
             if sim_id not in simulation_ids:
                 errors.append(f"{tier_id} references unknown simulation {sim_id}")
     return errors
+
+
+_ASSERTION_KINDS = frozenset(
+    {
+        "route_required",
+        "route_forbidden",
+        "record_required",
+        "record_forbidden",
+        "text_required",
+        "reciprocal_links",
+        "no_write",
+        "forbidden_pattern",
+    }
+)
+_RECORD_PREFIXES = frozenset({"research/", "decisions/", "log/", "bets/"})
+
+
+def _parse_assertions(item: dict[str, Any]) -> tuple[SimulationAssertion, ...]:
+    raw = item.get("assertions", [])
+    sim_id = str(item.get("id", "unknown"))
+    if not isinstance(raw, list):
+        raise ValueError(f"{sim_id} assertions must be a list")
+    parsed: list[SimulationAssertion] = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict) or not isinstance(entry.get("kind"), str):
+            raise ValueError(f"{sim_id} assertion {index} needs a kind")
+        kind = entry["kind"]
+        value = entry.get("value", "")
+        subject = entry.get("subject", "")
+        if (
+            kind not in _ASSERTION_KINDS
+            or not isinstance(value, str)
+            or not isinstance(subject, str)
+        ):
+            raise ValueError(f"{sim_id} assertion {index} has invalid kind or fields")
+        needs_value = kind not in {"reciprocal_links", "no_write"}
+        if needs_value != bool(value.strip()):
+            raise ValueError(f"{sim_id} assertion {index} has invalid value")
+        if kind.startswith("record_") and value not in _RECORD_PREFIXES:
+            raise ValueError(f"{sim_id} assertion {index} has invalid record prefix")
+        if kind.startswith("route_") and not re.fullmatch(r"/mb-[a-z-]+", value):
+            raise ValueError(f"{sim_id} assertion {index} has invalid route")
+        if kind == "forbidden_pattern":
+            try:
+                re.compile(value)
+            except re.error as exc:
+                raise ValueError(f"{sim_id} assertion {index} has invalid pattern") from exc
+        if subject:
+            try:
+                re.compile(subject)
+            except re.error as exc:
+                raise ValueError(f"{sim_id} assertion {index} has invalid subject") from exc
+        if set(entry) - {"kind", "value", "subject"}:
+            raise ValueError(f"{sim_id} assertion {index} has unknown fields")
+        parsed.append(SimulationAssertion(kind, value, subject))
+    return tuple(parsed)
+
+
+def score_simulation_assertions(
+    simulation: Simulation,
+    answer: str,
+    file_effects: dict[str, str] | None = None,
+    skill_invocations: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Score explicit expectations against one answer and its changed files."""
+    effects = file_effects or {}
+    failures: list[str] = []
+    reviews: list[str] = []
+    checks: list[dict[str, Any]] = []
+    for assertion in simulation.assertions:
+        kind, value = assertion.kind, assertion.value
+        if kind.startswith("route_"):
+            evidence = _route_evidence(answer, value, assertion.subject)
+            invoked = value in skill_invocations
+            if kind == "route_required":
+                state = "pass" if invoked or evidence == "positive" else "review"
+            else:
+                state = (
+                    "fail"
+                    if invoked or evidence == "positive"
+                    else ("review" if evidence == "ambiguous" else "pass")
+                )
+        elif kind.startswith("record_"):
+            written = any(path.startswith(value) for path in effects)
+            evidence = _record_evidence(answer, value)
+            if kind == "record_required":
+                state = "pass" if written or evidence == "positive" else "review"
+            else:
+                state = (
+                    "fail"
+                    if written or evidence == "positive"
+                    else ("review" if evidence == "ambiguous" else "pass")
+                )
+        elif kind == "text_required":
+            state = "pass" if value.lower() in answer.lower() else "review"
+        elif kind == "reciprocal_links":
+            if _has_reciprocal_links(answer, effects):
+                state = "pass"
+            elif any(path.startswith(("research/", "decisions/")) for path in effects):
+                state = "fail"
+            else:
+                state = "review"
+        elif kind == "no_write":
+            state = "fail" if effects else "pass"
+        else:
+            state = (
+                "fail"
+                if any(re.search(value, content, re.IGNORECASE) for content in effects.values())
+                else "pass"
+            )
+        reason = {
+            "route_required": f"expected {value} route",
+            "route_forbidden": f"forbidden {value} route",
+            "record_required": f"expected {value} record proposal or write",
+            "record_forbidden": f"forbidden {value} record proposal or write",
+            "text_required": f"expected answer to name {value}",
+            "reciprocal_links": "expected linked_research and linked_decisions paths",
+            "no_write": "changed files before approval",
+            "forbidden_pattern": "forbidden identifier in changed file",
+        }[kind]
+        excerpt = _assertion_excerpt(answer, value, assertion.subject) if state != "pass" else ""
+        detail = f"{reason}; {excerpt}" if excerpt else reason
+        checks.append(
+            {"kind": kind, "value": value, "state": state, "ok": state == "pass", "reason": detail}
+        )
+        if state == "fail":
+            failures.append(detail)
+        elif state == "review":
+            reviews.append(f"{kind}: {detail}")
+    overall = "fail" if failures else "review" if reviews else "pass"
+    return {
+        "state": overall,
+        "ok": overall == "pass",
+        "passed": sum(check["state"] == "pass" for check in checks),
+        "total": len(checks),
+        "checks": checks,
+        "failures": failures,
+        "reviews": reviews,
+    }
+
+
+def _assertion_clauses(answer: str) -> list[str]:
+    """Separate claims at sentences, semicolons, and independent actions."""
+    clauses: list[str] = []
+    for line in answer.splitlines():
+        if line.lstrip().startswith("|"):
+            clauses.append(line.strip(" |"))
+        else:
+            clauses.extend(
+                clause.strip()
+                for clause in re.split(
+                    r"(?<=[.!?])\s+|[;|]+|,\s*(?=but\b)|"
+                    r"\bbut\b|\blet's\b|\blet us\b",
+                    line,
+                    flags=re.IGNORECASE,
+                )
+                if clause.strip()
+            )
+    return clauses
+
+
+_ROUTE_NEGATION = re.compile(r"\b(?:not|never|no|avoid|without|don't|do not)\b", re.I)
+_NEGATED_ACTION = re.compile(
+    r"\b(?:don't|do not|never|not)\s+(?:use|route|take|send|put|file|write|"
+    r"create|save|add|open|start|propose|suggest|recommend|draft)\b",
+    re.I,
+)
+_DOUBLE_NEGATION = re.compile(
+    r"\b(?:don't|do not|never|not)\s+(?:avoid|skip|omit|exclude|without)\b|"
+    r"\bnot\s+without\b",
+    re.I,
+)
+_RECORD_ACTION = re.compile(
+    r"\b(?:propos\w*|suggest\w*|recommend\w*|offer\w*|put|capture|"
+    r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start|file)\b",
+    re.I,
+)
+_RECORD_NEGATION = re.compile(
+    r"\b(?:no\s+(?:new\s+)?|not\s+|do\s+not\s+|don't\s+|"
+    r"without\s+|instead\s+of\s+|no\s+need\s+to\s+)",
+    re.I,
+)
+_PATHLESS_BET = re.compile(
+    r"\b(?:another|new|fresh|second|duplicate)\b.{0,25}\bbet\b|"
+    r"\bbet\b.{0,25}\b(?:another|new|fresh|second|duplicate)\b",
+    re.I,
+)
+
+
+def _negation_scope(before: str) -> str:
+    """Classify a nearby negation without treating an affirmative pivot as refusal."""
+    negations = list(_ROUTE_NEGATION.finditer(before))
+    if not negations:
+        return "none"
+    tail = before[negations[-1].start() :]
+    if _DOUBLE_NEGATION.search(before) or re.search(
+        r",\s*\b(?:use|route|take|put|write|save|add)\b", tail, re.I
+    ):
+        return "ambiguous"
+    if _NEGATED_ACTION.search(tail) or re.search(r"\b(?:avoid|without|not\s+an?)\b", tail, re.I):
+        return "negative"
+    return "ambiguous"
+
+
+def _route_evidence(answer: str, value: str, subject: str) -> str:
+    route = re.compile(rf"(?<![\w/-])/?{re.escape(value.lstrip('/'))}(?![\w-])", re.I)
+    ambiguous = False
+    for clause in _assertion_clauses(answer):
+        if not route.search(clause):
+            continue
+        if subject and not re.search(subject, clause, re.I):
+            continue
+        for match in route.finditer(clause):
+            before = clause[: match.start()]
+            scope = _negation_scope(before)
+            if scope == "negative":
+                continue
+            if scope == "ambiguous":
+                ambiguous = True
+                continue
+            if "|" in clause or re.search(
+                r"\b(?:use|route|take|through|for|with|via)\b|:", before, re.I
+            ):
+                return "positive"
+            ambiguous = True
+    return "ambiguous" if ambiguous else "absent"
+
+
+def _record_evidence(answer: str, prefix: str) -> str:
+    ambiguous = False
+    for clause in _assertion_clauses(answer):
+        if (
+            prefix == "bets/"
+            and _PATHLESS_BET.search(clause)
+            and not _RECORD_NEGATION.search(clause)
+        ):
+            ambiguous = True
+        paths = list(re.finditer(rf"(?<!\w){re.escape(prefix)}[\w./-]*", clause, re.I))
+        actions = list(_RECORD_ACTION.finditer(clause))
+        negations = list(_RECORD_NEGATION.finditer(clause))
+        action_index = negation_index = 0
+        for path in paths:
+            while action_index < len(actions) and actions[action_index].start() < path.start():
+                action_index += 1
+            while (
+                negation_index < len(negations) and negations[negation_index].start() < path.start()
+            ):
+                negation_index += 1
+            action = actions[action_index - 1] if action_index else None
+            last_negation = negations[negation_index - 1] if negation_index else None
+            before = clause[max(0, path.start() - 120) : path.start()]
+            after = clause[path.end() : path.end() + 50]
+            scope = (
+                _negation_scope(before)
+                if last_negation and last_negation.start() >= path.start() - 120
+                else "none"
+            )
+            if scope == "negative" or re.search(
+                r"\b(?:is|are|was|were)\s+not\s+(?:needed|required)\b", after, re.I
+            ):
+                continue
+            if scope == "ambiguous":
+                ambiguous = True
+                continue
+            if path.group().endswith("/"):
+                ambiguous = True
+                continue
+            if action is None:
+                ambiguous = True
+                continue
+            if path.start() - action.end() > 100:
+                ambiguous = True
+                continue
+            between = clause[action.end() : path.start()]
+            if action.group().lower().startswith("draft") and re.search(
+                r"\b(?:email|post|copy)\b", between, re.I
+            ):
+                continue
+            if re.search(r"\b(?:using|based on|from)\s*$", before, re.I):
+                continue
+            return "positive"
+    return "ambiguous" if ambiguous else "absent"
+
+
+def _assertion_excerpt(answer: str, value: str, subject: str) -> str:
+    for clause in _assertion_clauses(answer):
+        if (value and value.lstrip("/").lower() in clause.lower()) or (
+            subject and re.search(subject, clause, re.I)
+        ):
+            return f'"{clause[:120]}"'
+    return '"no matching clause"'
+
+
+_RESEARCH_PATH = re.compile(r"research/[a-zA-Z0-9_./-]+\.md")
+_DECISION_PATH = re.compile(r"decisions/[a-zA-Z0-9_./-]+\.md")
+
+
+def _has_reciprocal_links(answer: str, effects: dict[str, str]) -> bool:
+    """Find one decision/research pair whose link fields name each other."""
+    combined = answer + "\n" + "\n".join(effects.values())
+    research_paths = set(_RESEARCH_PATH.findall(combined)) | {
+        path for path in effects if path.startswith("research/")
+    }
+    decision_paths = set(_DECISION_PATH.findall(combined)) | {
+        path for path in effects if path.startswith("decisions/")
+    }
+
+    def links(source: str, field: str, pattern: re.Pattern[str]) -> set[str]:
+        return {
+            path
+            for match in re.finditer(rf"{field}\s*:\s*([^\n]+)", source)
+            for path in pattern.findall(match.group(1))
+        }
+
+    answer_research_links = links(answer, "linked_research", _RESEARCH_PATH)
+    answer_decision_links = links(answer, "linked_decisions", _DECISION_PATH)
+    decision_links = {
+        path: links(content, "linked_research", _RESEARCH_PATH)
+        for path, content in effects.items()
+        if path in decision_paths
+    }
+    research_links = {
+        path: links(content, "linked_decisions", _DECISION_PATH)
+        for path, content in effects.items()
+        if path in research_paths
+    }
+    for decision_path in decision_paths:
+        for research_path in decision_links.get(decision_path, answer_research_links):
+            if research_path in research_paths and decision_path in research_links.get(
+                research_path, answer_decision_links
+            ):
+                return True
+    return False
 
 
 # A refusal exempts a match only inside the clause that holds the match, and
