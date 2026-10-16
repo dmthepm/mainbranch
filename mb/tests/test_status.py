@@ -3397,6 +3397,28 @@ def test_status_git_activity_parser_and_failure(tmp_path: Path, monkeypatch) -> 
     )
 
 
+def test_status_git_activity_includes_bet_and_playbook_only_commits(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Fixture"], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.email", "fixture@example.test"],
+        check=True,
+    )
+    for folder, name in (("bets", "Bet"), ("playbooks", "Playbook")):
+        path = tmp_path / folder / "item.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"# {name}\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(tmp_path), "add", str(path)], check=True)
+        subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", f"Add {name}"], check=True)
+
+    activity = status_mod._git_recent_activity(tmp_path, {"inside_work_tree": True})
+    assert activity["available"] is True
+    assert [item["files"] for item in activity["items"]] == [
+        ["playbooks/item.md"],
+        ["bets/item.md"],
+    ]
+
+
 def test_status_brain_marks_stale_decisions(tmp_path: Path, monkeypatch) -> None:
     repo = tmp_path / "repo"
     decisions = repo / "decisions"
@@ -4229,6 +4251,7 @@ def test_uncodified_decisions_drift(tmp_path: Path) -> None:
     uncodified = brain["uncodified_decisions"]
 
     assert len(uncodified) == 1
+    assert brain["uncodified_decisions_total"] == 1
     assert uncodified[0]["path"].endswith("2026-05-01-old-accepted.md")
 
     report = {
@@ -4250,6 +4273,33 @@ def test_uncodified_decisions_drift(tmp_path: Path) -> None:
     assert "uncodified_decisions" in by_id
     assert "never" in by_id["uncodified_decisions"]["summary"]
     assert "codify" in by_id["uncodified_decisions"]["repair"]
+
+
+@pytest.mark.parametrize("count", [3, 9])
+def test_uncodified_decision_total_and_shown_count(tmp_path: Path, count: int) -> None:
+    repo = tmp_path / "biz"
+    decisions = repo / "decisions"
+    decisions.mkdir(parents=True)
+    for index in range(count):
+        (decisions / f"2025-01-01-choice-{index}.md").write_text(
+            "---\ndate: 2025-01-01\nstatus: accepted\n---\n# Choice\n",
+            encoding="utf-8",
+        )
+    brain = status_mod._brain(repo)
+    assert brain["uncodified_decisions_total"] == count
+    assert len(brain["uncodified_decisions"]) == min(count, 5)
+    report = {
+        "repo": str(repo),
+        "brain": brain,
+        "runtime": {},
+        "since_last_check": {"marker_gitignore": {"ok": True}},
+    }
+    gap = next(
+        item for item in status_mod._drift(report)["items"] if item["id"] == "uncodified_decisions"
+    )
+    assert len(gap["evidence"]) == min(count, 5)
+    assert gap["summary"].startswith(f"{count} accepted decision")
+    assert ("(5 shown)" in gap["summary"]) is (count > 5)
 
 
 def test_status_runtime_claude_repair_is_plugin_first_when_missing(

@@ -39,6 +39,7 @@ workflows are available in Codex.
 - `runtime.codex_cli`
 - `runtime.claude_code`
 - `since_last_check`
+- `git_activity`
 - `journal`
 - `checkpoint`
 - `onboarding`
@@ -59,7 +60,7 @@ workflows are available in Codex.
 
 1. Use the business repo `AGENTS.md` bootstrap posture: read facts first, keep writes approval-gated, and translate git/provider details into business language.
 2. Run hard gates before routing: required updates, runtime mismatch, repair blockers, readiness blockers, private-data boundaries, unsafe provider operations, and destructive-operation requests.
-3. Use `ranked_actions`, `since_last_check`, `journal`, `money_path`, `content_strategy`, `validation.file_contracts`, `onboarding`, `readiness`, `update`, `drift.items`, and `brain.bets` as cited facts.
+3. Use `ranked_actions`, `since_last_check`, `git_activity`, `journal`, `money_path`, `content_strategy`, `validation.file_contracts`, `onboarding`, `readiness`, `update`, `drift.items`, and `brain.bets` as cited facts. Recent activity and `since_last_check` answer what changed without a separate latest or changelog index.
 4. Route offer-shape gaps from `validation.file_contracts` to `mb-think` after hard gates, and ask before durable writes.
 5. Use due-soon and overdue bet deadlines, missing-exit criteria, triggered failure signals, and triggered double-down signals for update, kill, close, double-down, or narrate routing.
 6. Present one clear business route and the signal behind it. Mutate the status marker only when the operator explicitly approves recording the daily check-in.

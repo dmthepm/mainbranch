@@ -505,6 +505,8 @@ def _git_recent_activity(repo: Path, git: dict[str, Any]) -> dict[str, Any]:
         "reference/core",
         "research",
         "decisions",
+        "bets",
+        "playbooks",
         "pushes",
         "campaigns",
         "log",
@@ -1233,10 +1235,15 @@ def _brain(repo: Path) -> dict[str, Any]:
     return {
         "counts": counts,
         "recent_decisions": decisions[:5],
+        "recent_decisions_total": len(decisions),
         "stale_decisions": stale[:5],
+        "stale_decisions_total": len(stale),
         "uncodified_decisions": uncodified[:5],
+        "uncodified_decisions_total": len(uncodified),
         "recent_research": research[:5],
+        "recent_research_total": len(research),
         "stale_research": stale_research[:5],
+        "stale_research_total": len(stale_research),
         "bets": bets,
         "pushes": push_facts,
     }
@@ -4141,11 +4148,19 @@ def _drift(report: dict[str, Any]) -> dict[str, Any]:
         )
     stale_decisions = report["brain"].get("stale_decisions") or []
     if stale_decisions:
+        stale_decisions_total = report["brain"].get("stale_decisions_total", len(stale_decisions))
+        shown = (
+            f" ({len(stale_decisions)} shown)"
+            if stale_decisions_total > len(stale_decisions)
+            else ""
+        )
         items.append(
             {
                 "id": "stale_decisions",
                 "severity": "warn",
-                "summary": f"{len(stale_decisions)} proposed/running decision(s) are stale.",
+                "summary": (
+                    f"{stale_decisions_total} proposed/running decision(s) are stale{shown}."
+                ),
                 "evidence": [item["path"] for item in stale_decisions[:5]],
                 "repair": "Review stale proposed/running decisions in `decisions/`.",
                 "safe_to_share": True,
@@ -4153,13 +4168,21 @@ def _drift(report: dict[str, Any]) -> dict[str, Any]:
         )
     uncodified_decisions = report["brain"].get("uncodified_decisions") or []
     if uncodified_decisions:
+        uncodified_total = report["brain"].get(
+            "uncodified_decisions_total", len(uncodified_decisions)
+        )
+        shown = (
+            f" ({len(uncodified_decisions)} shown)"
+            if uncodified_total > len(uncodified_decisions)
+            else ""
+        )
         items.append(
             {
                 "id": "uncodified_decisions",
                 "severity": "warn",
                 "summary": (
-                    f"{len(uncodified_decisions)} accepted decision(s) were never "
-                    "codified into reference files — decided, but reality unchanged."
+                    f"{uncodified_total} accepted decision(s) were never "
+                    f"codified into reference files{shown}."
                 ),
                 "evidence": [item["path"] for item in uncodified_decisions[:5]],
                 "repair": "Run `/mb-think codify <decision-file>` to apply each, "
@@ -4169,13 +4192,17 @@ def _drift(report: dict[str, Any]) -> dict[str, Any]:
         )
     stale_research = report["brain"].get("stale_research") or []
     if stale_research:
+        stale_research_total = report["brain"].get("stale_research_total", len(stale_research))
+        shown = (
+            f" ({len(stale_research)} shown)" if stale_research_total > len(stale_research) else ""
+        )
         items.append(
             {
                 "id": "stale_research",
                 "severity": "info",
                 "summary": (
-                    f"{len(stale_research)} research note(s) are older than "
-                    "current freshness rules."
+                    f"{stale_research_total} research note(s) are older than "
+                    f"current freshness rules{shown}."
                 ),
                 "evidence": [item["path"] for item in stale_research[:5]],
                 "repair": "Refresh or supersede stale research before using it for decisions.",

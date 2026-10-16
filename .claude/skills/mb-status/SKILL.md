@@ -49,6 +49,7 @@ Required fact paths:
 - `runtime.codex_cli`
 - `runtime.claude_code`
 - `since_last_check`
+- `git_activity`
 - `journal`
 - `checkpoint`
 - `onboarding`
@@ -76,6 +77,9 @@ Public/private boundaries: `no_secrets`, `no_raw_provider_exports`,
 Core route: status facts first, runtime mismatch gates before business routing,
 one owner-facing recommendation, business language first, and explicit approval
 before mutating the status marker or doing durable writes.
+
+Use recent `git_activity` and `since_last_check` from `mb status` to answer
+what changed. Business repos need no separate latest or changelog index.
 
 ## Workflow
 

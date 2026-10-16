@@ -82,6 +82,22 @@ def test_validate_passes_well_formed(tmp_path: Path) -> None:
     assert all(f["ok"] for f in report["files"])
 
 
+def test_validate_strict_accepts_codified_decision_and_rejects_unknown_status(
+    tmp_path: Path,
+) -> None:
+    decision = tmp_path / "decisions" / "2026-04-29-choice.md"
+    _write(decision, "---\ndate: 2026-04-29\nstatus: codified\n---\n# Choice\n")
+
+    accepted = runner.invoke(app, ["validate", str(tmp_path), "--strict", "--json"])
+    assert accepted.exit_code == 0, accepted.stdout
+    assert json.loads(accepted.stdout)["ok"] is True
+
+    _write(decision, "---\ndate: 2026-04-29\nstatus: unknown\n---\n# Choice\n")
+    rejected = runner.invoke(app, ["validate", str(tmp_path), "--strict", "--json"])
+    assert rejected.exit_code == 1
+    assert json.loads(rejected.stdout)["ok"] is False
+
+
 def test_validate_accepts_simple_content_strategy_entry_point(tmp_path: Path) -> None:
     _write(
         tmp_path / "core" / "content-strategy.md",
@@ -668,13 +684,14 @@ def test_validate_handles_no_frontmatter(tmp_path: Path) -> None:
     assert report["ok"] is False
 
 
-def test_cross_refs_pass_when_targets_exist(tmp_path: Path) -> None:
+@pytest.mark.parametrize("decision_status", ["accepted", "codified"])
+def test_cross_refs_pass_when_targets_exist(tmp_path: Path, decision_status: str) -> None:
     _write(
         tmp_path / "decisions" / "2026-04-29-ok.md",
         (
             "---\n"
             "date: 2026-04-29\n"
-            "status: accepted\n"
+            f"status: {decision_status}\n"
             "linked_research:\n"
             "  - research/2026-04-29-topic-source.md\n"
             "---\n"
@@ -2633,7 +2650,7 @@ def test_validate_names_the_allowed_status_values_in_the_rollup(tmp_path: Path) 
     }
     for text in (entry["repair"], entry["operator_summary"]):
         assert "bets: canceled | closed | open | paused" in text
-        assert "decisions: accepted | proposed | rejected | running | superseded" in text
+        assert "decisions: accepted | codified | proposed | rejected | running | superseded" in text
         assert "shipped" not in text
     assert "allowed_status" not in report["validation_categories"]["by_category"].get(
         "missing_required_key", {}
