@@ -358,34 +358,53 @@ def _parse_assertions(item: dict[str, Any]) -> tuple[SimulationAssertion, ...]:
 
 
 def score_simulation_assertions(
-    simulation: Simulation, answer: str, file_effects: dict[str, str] | None = None
+    simulation: Simulation,
+    answer: str,
+    file_effects: dict[str, str] | None = None,
+    skill_invocations: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Score explicit expectations against one answer and its changed files."""
     effects = file_effects or {}
     failures: list[str] = []
+    reviews: list[str] = []
     checks: list[dict[str, Any]] = []
     for assertion in simulation.assertions:
         kind, value = assertion.kind, assertion.value
         if kind.startswith("route_"):
-            clauses = _relevant_clauses(answer, assertion.subject)
-            route = re.compile(
-                rf"(?<![\w/-])/?{re.escape(value.lstrip('/'))}(?![\w-])", re.IGNORECASE
-            )
-            found = any(route.search(clause) for clause in clauses)
-            ok = found if kind == "route_required" else not found
+            evidence = _route_evidence(answer, value, assertion.subject)
+            invoked = value in skill_invocations
+            if kind == "route_required":
+                state = "pass" if invoked or evidence == "positive" else "review"
+            else:
+                state = "fail" if invoked or evidence == "positive" else "pass"
         elif kind.startswith("record_"):
-            proposed = _proposed_record(answer, value)
             written = any(path.startswith(value) for path in effects)
-            found = proposed or written
-            ok = found if kind == "record_required" else not found
+            evidence = _record_evidence(answer, value)
+            if kind == "record_required":
+                state = "pass" if written or evidence == "positive" else "review"
+            else:
+                state = (
+                    "fail"
+                    if written or evidence == "positive"
+                    else ("review" if evidence == "ambiguous" else "pass")
+                )
         elif kind == "text_required":
-            ok = value.lower() in answer.lower()
+            state = "pass" if value.lower() in answer.lower() else "review"
         elif kind == "reciprocal_links":
-            ok = _has_reciprocal_links(answer, effects)
+            if _has_reciprocal_links(answer, effects):
+                state = "pass"
+            elif any(path.startswith(("research/", "decisions/")) for path in effects):
+                state = "fail"
+            else:
+                state = "review"
         elif kind == "no_write":
-            ok = not effects
+            state = "fail" if effects else "pass"
         else:
-            ok = not any(re.search(value, content, re.IGNORECASE) for content in effects.values())
+            state = (
+                "fail"
+                if any(re.search(value, content, re.IGNORECASE) for content in effects.values())
+                else "pass"
+            )
         reason = {
             "route_required": f"expected {value} route",
             "route_forbidden": f"forbidden {value} route",
@@ -396,105 +415,131 @@ def score_simulation_assertions(
             "no_write": "changed files before approval",
             "forbidden_pattern": "forbidden identifier in changed file",
         }[kind]
-        checks.append({"kind": kind, "value": value, "ok": ok, "reason": reason})
-        if not ok:
-            failures.append(reason)
+        excerpt = _assertion_excerpt(answer, value, assertion.subject) if state != "pass" else ""
+        detail = f"{reason}; {excerpt}" if excerpt else reason
+        checks.append(
+            {"kind": kind, "value": value, "state": state, "ok": state == "pass", "reason": detail}
+        )
+        if state == "fail":
+            failures.append(detail)
+        elif state == "review":
+            reviews.append(f"{kind}: {detail}")
+    overall = "fail" if failures else "review" if reviews else "pass"
     return {
-        "ok": not failures,
-        "passed": len(checks) - len(failures),
+        "state": overall,
+        "ok": overall == "pass",
+        "passed": sum(check["state"] == "pass" for check in checks),
         "total": len(checks),
         "checks": checks,
         "failures": failures,
+        "reviews": reviews,
     }
 
 
 def _assertion_clauses(answer: str) -> list[str]:
-    """Keep routes and record proposals in their own list item or table cell."""
+    """Separate claims at sentences, semicolons, and independent actions."""
     clauses: list[str] = []
     for line in answer.splitlines():
-        # A Markdown table row attaches its route to the subject in that row.
-        # Other delimiters separate independent claims.
         if line.lstrip().startswith("|"):
             clauses.append(line.strip(" |"))
         else:
             clauses.extend(
                 clause.strip()
-                for clause in re.split(r"(?<=[.!?])\s+|[;|]+|,\s*(?=but\b)", line)
+                for clause in re.split(
+                    r"(?<=[.!?])\s+|[;|]+|,\s*(?=but\b)|"
+                    r"\bbut\b|\blet's\b|\blet us\b",
+                    line,
+                    flags=re.IGNORECASE,
+                )
                 if clause.strip()
             )
     return clauses
 
 
-def _relevant_clauses(answer: str, subject: str) -> list[str]:
-    clauses = _assertion_clauses(answer)
-    if not subject:
-        return clauses
-    return [clause for clause in clauses if re.search(subject, clause, re.IGNORECASE)]
-
-
-_RECORD_PROPOSAL = re.compile(
-    r"\b(?:propos\w*|suggest\w*|recommend\w*|offer\w*|"
-    r"(?:could|can|should|may|would|will|i(?:'|’)d|let's|let us)\s+"
-    r"(?:i\s+)?(?:propos\w*|suggest\w*|recommend\w*|offer\w*|"
-    r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start|file)|"
+_ROUTE_NEGATION = re.compile(r"\b(?:not|never|no|avoid|without|don't|do not)\b", re.I)
+_RECORD_ACTION = re.compile(
+    r"\b(?:propos\w*|suggest\w*|recommend\w*|offer\w*|put|capture|"
     r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start|file)\b",
-    re.IGNORECASE,
+    re.I,
 )
-_RECORD_INTENT = re.compile(r"\b(?:record|file|readout|decision|bet|note|draft)\b", re.IGNORECASE)
 _RECORD_NEGATION = re.compile(
     r"\b(?:no\s+(?:new\s+)?|not\s+|do\s+not\s+|don't\s+|"
     r"without\s+|instead\s+of\s+|no\s+need\s+to\s+)",
-    re.IGNORECASE,
+    re.I,
 )
-_PATHLESS_NEW_BET = re.compile(
-    r"\b(?:propos\w*|suggest\w*|recommend\w*|offer\w*|"
-    r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start)\b"
-    r".{0,60}\b(?:a\s+new|another|duplicate)\s+bet\b",
-    re.IGNORECASE,
+_PATHLESS_BET = re.compile(
+    r"\b(?:another|new|fresh|second|duplicate)\b.{0,25}\bbet\b|"
+    r"\bbet\b.{0,25}\b(?:another|new|fresh|second|duplicate)\b",
+    re.I,
 )
 
 
-def _proposed_record(answer: str, prefix: str) -> bool:
+def _route_evidence(answer: str, value: str, subject: str) -> str:
+    route = re.compile(rf"(?<![\w/-])/?{re.escape(value.lstrip('/'))}(?![\w-])", re.I)
+    ambiguous = False
+    for clause in _assertion_clauses(answer):
+        if not route.search(clause):
+            continue
+        if subject and not re.search(subject, clause, re.I):
+            continue
+        match = route.search(clause)
+        assert match is not None
+        before = clause[: match.start()]
+        if _ROUTE_NEGATION.search(before):
+            continue
+        if "|" in clause or re.search(
+            r"\b(?:use|route|take|through|for|with|via)\b|:", before, re.I
+        ):
+            return "positive"
+        ambiguous = True
+    return "ambiguous" if ambiguous else "absent"
+
+
+def _record_evidence(answer: str, prefix: str) -> str:
+    ambiguous = False
     for clause in _assertion_clauses(answer):
         if (
             prefix == "bets/"
+            and _PATHLESS_BET.search(clause)
             and not _RECORD_NEGATION.search(clause)
-            and _PATHLESS_NEW_BET.search(clause)
         ):
-            return True
-        for path in re.finditer(rf"(?<!\w){re.escape(prefix)}[\w./-]*", clause, re.IGNORECASE):
+            ambiguous = True
+        for path in re.finditer(rf"(?<!\w){re.escape(prefix)}[\w./-]*", clause, re.I):
             before = clause[: path.start()]
-            next_path = re.search(r"(?:research|decisions|log|bets)/", clause[path.end() :])
-            after = (
-                clause[path.end() : path.end() + next_path.start()]
-                if next_path
-                else clause[path.end() :]
-            )
+            after = clause[path.end() :]
             if _RECORD_NEGATION.search(before) or re.search(
-                r"\b(?:is|are|was|were)?\s*not\s+(?:needed|required)\b", after, re.I
+                r"\b(?:is|are|was|were)\s+not\s+(?:needed|required)\b", after, re.I
             ):
                 continue
-            verbs = list(_RECORD_PROPOSAL.finditer(before))
-            if not verbs:
+            if path.group().endswith("/"):
+                ambiguous = True
                 continue
-            for verb in reversed(verbs):
-                between = before[verb.end() :]
-                if len(between) > 100:
-                    continue
-                action = verb.group().lower()
-                # An ordinary content draft can cite an existing bet. It proposes
-                # a record only when the action names that record or its path.
-                lead = re.sub(r"^(?:\s*(?:a|an|the|new|short)\b)*\s*", "", between, flags=re.I)
-                if (
-                    action.startswith(
-                        ("draft", "creat", "writ", "sav", "add", "open", "start", "file")
-                    )
-                    and lead
-                    and not _RECORD_INTENT.search(between)
-                ):
-                    continue
-                return True
-    return False
+            actions = list(_RECORD_ACTION.finditer(before))
+            if not actions:
+                ambiguous = True
+                continue
+            action = actions[-1]
+            between = before[action.end() :]
+            if len(between) > 100:
+                ambiguous = True
+                continue
+            if action.group().lower().startswith("draft") and re.search(
+                r"\b(?:email|post|copy)\b", between, re.I
+            ):
+                continue
+            if re.search(r"\b(?:using|based on|from)\s*$", before, re.I):
+                continue
+            return "positive"
+    return "ambiguous" if ambiguous else "absent"
+
+
+def _assertion_excerpt(answer: str, value: str, subject: str) -> str:
+    for clause in _assertion_clauses(answer):
+        if (value and value.lstrip("/").lower() in clause.lower()) or (
+            subject and re.search(subject, clause, re.I)
+        ):
+            return f'"{clause[:120]}"'
+    return '"no matching clause"'
 
 
 _RESEARCH_PATH = re.compile(r"research/[a-zA-Z0-9_./-]+\.md")

@@ -11,7 +11,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
-- Release simulations now fail when seven key operator scenarios miss their own expected route, record, link, or write boundary.
+- Seven release simulations now flag clear route, record, link, or write regressions and send uncertain answers for hand grading.
 
 - Short clips and social cuts from a sales video now route to `/mb-organic`; paid video ads stay with `/mb-ads`.
 

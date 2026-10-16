@@ -1210,8 +1210,15 @@ def test_dogfood_entrypoint_reports_missing_pyyaml_before_harness(tmp_path: Path
     assert "lock" not in result.stderr
 
 
-def test_run_claude_print_fails_simulation_assertion_in_result_and_receipt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("answer", "expected_state"),
+    [
+        ("I propose a research/readout.md file.", "fail"),
+        ("I might keep something in research/.", "review"),
+    ],
+)
+def test_run_claude_print_assertion_state_reaches_result_and_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, answer: str, expected_state: str
 ) -> None:
     state = harness.HarnessState(
         engine_repo=tmp_path / "engine",
@@ -1244,9 +1251,7 @@ def test_run_claude_print_fails_simulation_assertion_in_result_and_receipt(
         timeout: int | None = None,
     ) -> harness.CommandResult:
         del state, command, cwd, env, timeout
-        stdout = json.dumps(
-            {"result": {"content": [{"text": "I propose a research/readout.md file."}]}}
-        )
+        stdout = json.dumps({"result": {"content": [{"text": answer}]}})
         path = tmp_path / "response.json"
         path.write_text(stdout, encoding="utf-8")
         return harness.CommandResult(label, ["claude"], tmp_path, 0, stdout, "", path, path, path)
@@ -1268,7 +1273,18 @@ def test_run_claude_print_fails_simulation_assertion_in_result_and_receipt(
 
     harness.run_claude_print(state, max_budget_usd="0.01", simulation_tier="pr_smoke")
 
-    assert state.claude["turns"][0]["assertions"]["ok"] is False
-    assert state.failures == ["status_only_no_record: forbidden research/ record proposal or write"]
+    assert state.claude["turns"][0]["assertions"]["state"] == expected_state
     receipt = harness.evidence_template(state, install_mode="editable", mb_version="mb 0.0")
-    assert state.failures[0] in receipt
+    if expected_state == "fail":
+        assert len(state.failures) == 1
+        assert state.failures[0] in receipt
+    else:
+        assert state.failures == []
+        assert len(state.reviews) == 1
+        assert state.reviews[0].startswith("REVIEW status_only_no_record: record_forbidden:")
+        assert state.reviews[0] in receipt
+        harness.write_summary(state, install_mode="editable", mb_version="mb 0.0")
+        summary = json.loads((state.evidence_dir / "summary.json").read_text())
+        assert summary["ok"] is False
+        assert summary["needs_hand_grade"] is True
+        assert summary["failures"] == []

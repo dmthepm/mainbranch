@@ -107,18 +107,23 @@ inspect their expected observations and prohibitions manually.
 Selected simulations also have an optional `assertions` list. Each item has a
 `kind` and, where needed, a `value` or `subject`. `route_required` and
 `route_forbidden` check a named `mb-` route, with or without a slash or Markdown
-formatting, in that simulation's visible answer. `subject` narrows the check to
-the clause, list item, or table row about a topic such as clips.
+formatting, in that simulation's visible answer. A recorded Skill tool call is
+stronger route evidence when the payload includes one. `subject` narrows the
+check to the clause, list item, or table row about a topic such as clips.
 `record_required` and `record_forbidden` check proposals in the answer and
 changed files under a named `research/`, `decisions/`, `log/`, or `bets/`
-prefix. A proposal to open another bet also counts without a path. Negated
-proposals do not count. `text_required` checks a literal answer phrase. `reciprocal_links`
+prefix. A pathless proposal for another bet needs hand grading. Negation applies
+to its own clause and resets at the next sentence, semicolon, or action.
+`text_required` checks a literal answer phrase. `reciprocal_links`
 checks for both link fields with repo-relative paths. `no_write` checks the
 simulation repo's changed files, and `forbidden_pattern` checks their contents.
-An assertion failure marks that simulation and the harness receipt failed,
-with a one-line reason. Simulations without assertions keep their current
-generic scoring. These checks can only observe visible text and changed files;
-manual review still verifies actual skill invocation, approval, and intent.
+Each assertion scores `pass`, `fail`, or `review`. Strong positive evidence
+passes, and a clear forbidden action fails. Missing or ambiguous evidence gets
+`REVIEW` with a quoted clause in the receipt. REVIEW blocks an automatic
+simulation pass and calls for a hand grade; it does not count as a release
+failure. Simulations without assertions keep their current generic scoring.
+Manual review still verifies approval, intent, and any skill use absent from
+the print payload.
 
 The harness materializes each simulation's `fixture_profile` before a
 print-mode run by copying the healthy disposable business repo into a

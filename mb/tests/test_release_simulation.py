@@ -1846,9 +1846,8 @@ def test_targeted_simulation_assertions_reject_bad_and_accept_good(
     sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
     good_score = release_simulation.score_simulation_assertions(sim, good)
     bad_score = release_simulation.score_simulation_assertions(sim, bad, bad_effects)
-    assert good_score["ok"] is True, good_score["failures"]
-    assert bad_score["ok"] is False
-    assert bad_score["failures"]
+    assert good_score["state"] in {"pass", "review"}, good_score["failures"]
+    assert bad_score["state"] in {"fail", "review"}
 
 
 @pytest.mark.parametrize(
@@ -1920,10 +1919,139 @@ def test_targeted_simulation_assertions_reject_bad_and_accept_good(
         ("status_only_no_record", "Don't add a bets/ record from this status."),
     ],
 )
-def test_correct_assertion_phrasings_pass(simulation_id: str, answer: str) -> None:
+def test_correct_assertion_phrasings_do_not_fail(simulation_id: str, answer: str) -> None:
     sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
     score = release_simulation.score_simulation_assertions(sim, answer)
-    assert score["ok"], score["failures"]
+    assert score["state"] in {"pass", "review"}, score["failures"]
+
+
+@pytest.mark.parametrize(
+    ("simulation_id", "answer", "expected"),
+    [
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips: /mb-organic; paid video ads: /mb-ads",
+            "correct",
+        ),
+        (
+            "channel_trial_new_bet",
+            "I’d suggest a bet in bets/ for the weekly trial; may I save it?",
+            "correct",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Draft the next email using bets/2026-10-01-weekly-email-trial.md; ask before sending",
+            "correct",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Use the existing bet; let’s open another bet for this same trial",
+            "wrong",
+        ),
+        (
+            "routine_channel_task_no_bet",
+            "Use mb-organic for the weekly post; ask before saving",
+            "correct",
+        ),
+        (
+            "observation_readout_only",
+            "I’d suggest a short readout in research/ after approval",
+            "correct",
+        ),
+        (
+            "observation_changed_course",
+            "I’d suggest research/readout.md and decisions/stop-trial.md; "
+            "linked_research: research/readout.md; linked_decisions: decisions/stop-trial.md",
+            "correct",
+        ),
+        (
+            "status_only_no_record",
+            "No new research/ draft or decisions/ file is needed; here is today’s status",
+            "correct",
+        ),
+        (
+            "conversion_video_natural_prompt_routing",
+            "Clips are not an /mb-ads job; I would take them through /mb-organic",
+            "correct",
+        ),
+        (
+            "channel_trial_new_bet",
+            "Let's put a measurable weekly email trial into bets/ after you approve it",
+            "correct",
+        ),
+        (
+            "observation_readout_only",
+            "I'd put a short interpretation in research/ once you approve",
+            "correct",
+        ),
+        (
+            "observation_changed_course",
+            "After your approval, let's capture research/readout.md and "
+            "decisions/stop-trial.md. The decision's linked_research: "
+            "research/readout.md; the readout's linked_decisions: decisions/stop-trial.md",
+            "correct",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Keep bets/2026-10-01-weekly-email-trial.md as context, "
+            "but set up a fresh bet for the same email trial",
+            "wrong",
+        ),
+        (
+            "channel_trial_existing_bet",
+            "Use bets/2026-10-01-weekly-email-trial.md and launch a second "
+            "trial bet covering the same email",
+            "wrong",
+        ),
+        (
+            "status_only_no_record",
+            "The status is steady; open a fresh bet to track the same weekly email trial",
+            "wrong",
+        ),
+        (
+            "observation_readout_only",
+            "I suggest research/readout.md. I'd suggest not filing this in log/; "
+            "let's log it anyway in log/note.md",
+            "wrong",
+        ),
+    ],
+)
+def test_both_review_verdicts_never_cross_the_pass_fail_boundary(
+    simulation_id: str, answer: str, expected: str
+) -> None:
+    sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
+    state = release_simulation.score_simulation_assertions(sim, answer)["state"]
+    assert state in ({"pass", "review"} if expected == "correct" else {"fail", "review"})
+
+
+def test_skill_invocation_is_strong_route_evidence() -> None:
+    sim = next(
+        item
+        for item in release_simulation.simulations()
+        if item.id == "conversion_video_natural_prompt_routing"
+    )
+    score = release_simulation.score_simulation_assertions(
+        sim, "The short clips need a route.", skill_invocations=("/mb-organic",)
+    )
+    assert score["state"] == "pass"
+    wrong = release_simulation.score_simulation_assertions(
+        sim, "The short clips need a route.", skill_invocations=("/mb-ads",)
+    )
+    assert wrong["state"] == "fail"
+
+
+def test_simulation_without_assertions_has_no_new_scoring() -> None:
+    sim = next(item for item in release_simulation.simulations() if not item.assertions)
+    score = release_simulation.score_simulation_assertions(sim, "", {"research/example.md": ""})
+    assert score == {
+        "state": "pass",
+        "ok": True,
+        "passed": 0,
+        "total": 0,
+        "checks": [],
+        "failures": [],
+        "reviews": [],
+    }
 
 
 @pytest.mark.parametrize(
@@ -1940,6 +2068,7 @@ def test_pathless_duplicate_bet_proposal_fails(answer: str) -> None:
     )
     score = release_simulation.score_simulation_assertions(sim, answer)
     assert score["ok"] is False
+    assert score["state"] == "review"
     assert "record_forbidden" in {check["kind"] for check in score["checks"] if not check["ok"]}
 
 
@@ -1962,6 +2091,7 @@ def test_clips_routed_to_ads_fail(answer: str) -> None:
         "route_required",
         "route_forbidden",
     }
+    assert score["state"] == "fail"
 
 
 def test_readout_rejects_written_log_and_provider_identifier() -> None:
@@ -1987,7 +2117,7 @@ def test_changed_course_requires_both_reciprocal_links() -> None:
     answer = "I propose research/readout.md and decisions/stop-trial.md after approval."
     score = release_simulation.score_simulation_assertions(sim, answer)
     assert score["ok"] is False
-    assert any("linked_research" in failure for failure in score["failures"])
+    assert any("linked_research" in review for review in score["reviews"])
 
 
 def test_assertion_schema_rejects_malformed_entries() -> None:

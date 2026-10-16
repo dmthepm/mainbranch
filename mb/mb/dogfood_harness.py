@@ -197,6 +197,7 @@ class HarnessState:
     fixture_repo: Path
     mb_path: Path
     failures: list[str] = field(default_factory=list)
+    reviews: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     commands: list[CommandResult] = field(default_factory=list)
     parsed_json: dict[str, Any] = field(default_factory=dict)
@@ -1152,6 +1153,29 @@ def transcript_text_from_payload(payload: dict[str, Any]) -> str:
     return "\n".join(chunk for chunk in chunks if chunk)
 
 
+def skill_invocations_from_payload(payload: dict[str, Any]) -> tuple[str, ...]:
+    """Read Skill tool-use blocks when the print payload includes them."""
+    routes: list[str] = []
+
+    def visit(value: Any) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+        elif isinstance(value, dict):
+            if value.get("type") == "tool_use" and value.get("name") == "Skill":
+                tool_input = value.get("input")
+                if isinstance(tool_input, dict):
+                    skill = tool_input.get("skill")
+                    if isinstance(skill, str):
+                        routes.append(skill if skill.startswith("/") else f"/{skill}")
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    visit(child)
+
+    visit(payload)
+    return tuple(routes)
+
+
 def _text_from_list(values: list[Any]) -> list[str]:
     chunks: list[str] = []
     for item in values:
@@ -1375,12 +1399,17 @@ def run_claude_print(
         else:
             text = ""
         assertion_score = release_simulation.score_simulation_assertions(
-            simulation, text, file_effects
+            simulation,
+            text,
+            file_effects,
+            skill_invocations_from_payload(payload) if payload is not None else (),
         )
         if simulation.assertions:
             turn["assertions"] = assertion_score
             for failure in assertion_score["failures"]:
                 state.fail(f"{simulation.id}: {failure}")
+            for review in assertion_score["reviews"]:
+                state.reviews.append(f"REVIEW {simulation.id}: {review}")
         if payload is None:
             turn["error"] = error
         turns.append(turn)
@@ -1863,6 +1892,10 @@ Evidence folder: local artifact; see harness output and summary.json
 
 {bullet_list(state.failures) if state.failures else "- None recorded by the harness."}
 
+### Simulation assertions needing hand grade
+
+{bullet_list(state.reviews) if state.reviews else "- None."}
+
 ### Warnings / Manual Follow-Up
 
 {bullet_list(state.warnings) if state.warnings else "- None."}
@@ -1936,8 +1969,10 @@ def summarize_mb_command_facts(state: HarnessState) -> dict[str, Any]:
 
 def write_summary(state: HarnessState, *, install_mode: str, mb_version: str) -> None:
     summary = {
-        "ok": not state.failures,
+        "ok": not state.failures and not state.reviews,
+        "needs_hand_grade": bool(state.reviews),
         "failures": state.failures,
+        "reviews": state.reviews,
         "warnings": state.warnings,
         "root": str(state.root),
         "evidence_dir": str(state.evidence_dir),
@@ -2026,6 +2061,10 @@ def run_harness(args: argparse.Namespace) -> int:
         for failure in state.failures:
             print(f"  - {failure}", file=sys.stderr)
         exit_code = 1
+    if state.reviews:
+        print("Simulations needing hand grade:")
+        for review in state.reviews:
+            print(f"  - {review}")
     if state.warnings:
         print("Warnings:")
         for warning in state.warnings:
