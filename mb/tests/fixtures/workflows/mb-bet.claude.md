@@ -54,6 +54,11 @@ This snapshot does not replace shipped `.claude/skills/mb-bet/SKILL.md`.
 2. Bet is a time-boxed wager, not an offer or push. Offers are durable things
    sold; pushes coordinate execution. Bets carry hypothesis, appetite, target,
    deadline, evidence, kill or double-down logic, and verdict.
+   For a current channel trial with a measurable target and review or cut point,
+   check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise
+   offer to frame one from known facts before execution. Ask only for a missing
+   target, review or cut point, or unclear owner, and get approval before writing.
+   Routine channel work without a wager stays in its channel workflow.
 3. Support new, update, close, list, and narrate modes. Create or edit
    `bets/YYYY-MM-DD-slug.md` only after approval, and keep the strict contract:
    frontmatter fields, body sections, typed links, reverse `linked_bets`, and

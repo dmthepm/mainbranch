@@ -429,6 +429,8 @@ def _apply_fixture_profile(repo: Path, profile: str) -> list[str]:
         return _apply_launch_readiness_fixture(repo)
     if profile == "rich_multi_offer_migration_repo":
         return _apply_rich_multi_offer_migration_repo(repo)
+    if profile == "existing_channel_trial_bet_fixture":
+        return _apply_existing_channel_trial_bet_fixture(repo)
     if profile == "keychain_prompt_pending_fixture":
         # The provider state lives in the manifest's recorded fact; the repo
         # stays untouched so no live command can reach a real keychain item.
@@ -520,6 +522,46 @@ Approved research note waiting for checkpoint planning and message validation.
         encoding="utf-8",
     )
     return ["left approved business-file changes dirty for checkpoint planning"]
+
+
+def _apply_existing_channel_trial_bet_fixture(repo: Path) -> list[str]:
+    bet = repo / "bets" / "2026-11-01-weekly-email-trial.md"
+    bet.parent.mkdir(parents=True, exist_ok=True)
+    bet.write_text(
+        """---
+status: open
+opened: 2026-11-01
+deadline: 2026-11-30
+appetite: "4 weekly sends"
+appetite_tier: small
+hypothesis: "If we send one useful email each week, more readers will join the waitlist."
+metric: "qualified waitlist signups"
+target: "20 qualified waitlist signups by November 30"
+result: ""
+owner: operator
+money_path:
+  required: false
+kill_rubric:
+  failure_signals: []
+  double_down_signals: []
+linked_decisions: []
+linked_research: []
+linked_pushes: []
+linked_campaigns: []
+linked_outcomes: []
+public: false
+channels: [email]
+tags: [trial]
+---
+
+# Weekly Email Trial
+
+Send one useful email each week through November 30. Review qualified
+waitlist signups against a target of 20, then continue or cut the trial.
+""",
+        encoding="utf-8",
+    )
+    return ["added an existing synthetic weekly email trial bet"]
 
 
 def _apply_launch_readiness_fixture(repo: Path) -> list[str]:

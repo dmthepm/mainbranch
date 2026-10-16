@@ -179,6 +179,15 @@ triggered kill, triggered double-down, close, update, and narrate moments
 before inventing bet state from prose. Use `onboarding` to resume setup without
 inventing a new interview.
 
+When the operator asks to run or continue a current channel trial with a
+measurable target and a review or cut point (date, spend cap, or number of posts
+or sends), check `brain.bets` and relevant `bets/` files for a bet that already
+covers it. Use and link that bet if found. Otherwise offer to frame one through
+`mb-bet` before execution, using the facts already given and asking only for a
+missing target, review or cut point, or owner when unclear. Ask before writing.
+A routine scheduled post, reply, or fix without a wager stays in its channel
+workflow.
+
 Data/ops surface routing: whose-data questions route to `mb spine declare` and
 `mb spine show` — the declaration is a committed repo fact that doctor grades,
 and `mb spine init --owned` is the triggered build path only, never a default

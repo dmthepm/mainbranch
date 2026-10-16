@@ -118,6 +118,8 @@ mb status --json --peek
    `brain.bets.exit_criteria` for active, due-soon, overdue, missing-exit,
    triggered kill, triggered double-down, close, update, and narrate moments
    before inventing bet state from prose.
+   For a measurable channel trial with a review or cut point, check `brain.bets`
+   and `bets/`; use a covering bet, or offer `/mb-bet` before execution.
    Use `topology.repo_boundary` when the operator is deciding whether work
    belongs in this business repo, a separate business repo, or a
    child repo.

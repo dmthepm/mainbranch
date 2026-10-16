@@ -16,6 +16,15 @@ from mb import dogfood_harness as harness
 from mb import release_simulation
 
 
+def test_existing_channel_trial_profile_contains_covering_bet(tmp_path: Path) -> None:
+    mutations = harness._apply_fixture_profile(tmp_path, "existing_channel_trial_bet_fixture")
+    bet = tmp_path / "bets" / "2026-11-01-weekly-email-trial.md"
+
+    assert mutations
+    assert bet.is_file()
+    assert "20 qualified waitlist signups" in bet.read_text(encoding="utf-8")
+
+
 def test_score_transcript_detects_core_runtime_behaviors() -> None:
     transcript = """
     /mb-start was discovered for Dogfood Studio.

@@ -56,6 +56,11 @@ Codex.
 3. Bet is a time-boxed wager, not an offer or push. Offers are durable things
    sold; pushes coordinate execution. Bets carry hypothesis, appetite, target,
    deadline, evidence, kill or double-down logic, and verdict.
+   For a current channel trial with a measurable target and review or cut point,
+   check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise
+   offer a bet plan from known facts before execution. Ask only for a missing
+   target, review or cut point, or unclear owner. Routine channel work without
+   a wager stays in its channel workflow; Codex keeps this route read-only.
 4. Guide new, update, close, list, and narrate modes from the shared contract.
    Codex may draft patch-shaped recommendations and exact file targets, then
    stop before changing files.

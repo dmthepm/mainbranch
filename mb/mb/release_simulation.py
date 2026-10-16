@@ -21,6 +21,7 @@ KNOWN_FIXTURE_PROFILES = frozenset(
         "dirty_checkpoint_fixture",
         "launch_readiness_fixture",
         "rich_multi_offer_migration_repo",
+        "existing_channel_trial_bet_fixture",
         "keychain_prompt_pending_fixture",
     }
 )

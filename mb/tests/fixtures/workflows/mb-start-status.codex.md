@@ -63,6 +63,7 @@ workflows are available in Codex.
 3. Use `ranked_actions`, `since_last_check`, `git_activity`, `journal`, `money_path`, `content_strategy`, `validation.file_contracts`, `onboarding`, `readiness`, `update`, `drift.items`, and `brain.bets` as cited facts. Recent activity and `since_last_check` answer what changed without a separate latest or changelog index.
 4. Route offer-shape gaps from `validation.file_contracts` to `mb-think` after hard gates, and ask before durable writes.
 5. Use due-soon and overdue bet deadlines, missing-exit criteria, triggered failure signals, and triggered double-down signals for update, kill, close, double-down, or narrate routing.
+For a current channel trial with a measurable target and review or cut point, check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise offer `mb-bet` before execution, ask only for a missing target, cut point, or unclear owner, and ask before writing. Routine channel work without a wager stays in its channel workflow.
 6. Present one clear business route and the signal behind it. Mutate the status marker only when the operator explicitly approves recording the daily check-in.
 7. Ask before business-file writes, checkpoints, repairs, updates, migrations, provider mutation, publishing, spend, customer contact, destructive operations, or public issue/proposal submission.
 

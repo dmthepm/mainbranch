@@ -114,10 +114,10 @@ invent `ready_for_launch` (valid states: `missing`, `blocked`,
 keyword-gate with `/mb-think`, create/select a launch push, build/check the
 lander with `/mb-site`, ads with `/mb-ads`, checkpoint approved artifacts.
 
-**Primitive routing:** When a live idea could be a bet, offer, push, proof, or
-decision, load `.claude/reference/business-primitives/offer-bet-push-proof.md`
-and `.claude/reference/business-primitives/setup-patterns.md`; route by business
-meaning before suggesting file moves.
+**Primitive routing:** For live ideas, read `.claude/reference/business-primitives/offer-bet-push-proof.md`
+and `.claude/reference/business-primitives/setup-patterns.md`. For a measurable
+channel trial with a review or cut point, check `brain.bets` and `bets/`.
+Use a covering bet, or offer `/mb-bet` before execution; ask before writes.
 
 **Data/ops surface routing:** whose-data questions → `mb spine declare`/
 `show`; money-path-overnight worries (real money flowing unattended) →
