@@ -46,6 +46,23 @@ mb doctor repair --apply
 mb update
 ```
 
+<!-- mainbranch:entry-rules:begin -->
+## Trials and readouts
+
+For a current experiment with a measurable target and a review or cut point,
+check existing bets first and reuse the matching bet. If none covers the work,
+offer to open one with `mb-bet` before doing the work.
+For an observation or readout, such as "the numbers show" or "this week's read",
+offer a short `research/` readout with summarized numbers, source, timeframe,
+caveat, and next question. Do not file the readout in `log/`.
+If the observation changes the plan, also offer a `decisions/` record. Link the
+readout and decision both ways with `linked_decisions` and `linked_research`,
+and link the bet or push that changes. For a status-only question, answer it
+without proposing records. Ask for approval before any write. Never copy raw
+provider rows, account IDs, or exported tables into the repo. See `/mb-start`,
+`/mb-bet`, and `/mb-think` for the full routes.
+<!-- mainbranch:entry-rules:end -->
+
 ## First-run setup intent
 
 When the operator pastes a setup guide, bootstrap prompt, or business/folder
