@@ -106,11 +106,13 @@ inspect their expected observations and prohibitions manually.
 
 Selected simulations also have an optional `assertions` list. Each item has a
 `kind` and, where needed, a `value` or `subject`. `route_required` and
-`route_forbidden` check a named `/mb-` route in that simulation's visible
-answer; `subject` narrows the check to lines about a topic such as clips.
+`route_forbidden` check a named `mb-` route, with or without a slash or Markdown
+formatting, in that simulation's visible answer. `subject` narrows the check to
+the clause, list item, or table row about a topic such as clips.
 `record_required` and `record_forbidden` check proposals in the answer and
 changed files under a named `research/`, `decisions/`, `log/`, or `bets/`
-prefix. `text_required` checks a literal answer phrase. `reciprocal_links`
+prefix. A proposal to open another bet also counts without a path. Negated
+proposals do not count. `text_required` checks a literal answer phrase. `reciprocal_links`
 checks for both link fields with repo-relative paths. `no_write` checks the
 simulation repo's changed files, and `forbidden_pattern` checks their contents.
 An assertion failure marks that simulation and the harness receipt failed,

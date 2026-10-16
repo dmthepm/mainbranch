@@ -367,8 +367,11 @@ def score_simulation_assertions(
     for assertion in simulation.assertions:
         kind, value = assertion.kind, assertion.value
         if kind.startswith("route_"):
-            lines = _relevant_lines(answer, assertion.subject)
-            found = any(value.lower() in line.lower() for line in lines)
+            clauses = _relevant_clauses(answer, assertion.subject)
+            route = re.compile(
+                rf"(?<![\w/-])/?{re.escape(value.lstrip('/'))}(?![\w-])", re.IGNORECASE
+            )
+            found = any(route.search(clause) for clause in clauses)
             ok = found if kind == "route_required" else not found
         elif kind.startswith("record_"):
             proposed = _proposed_record(answer, value)
@@ -405,28 +408,92 @@ def score_simulation_assertions(
     }
 
 
-def _relevant_lines(answer: str, subject: str) -> list[str]:
-    lines = [line for line in re.split(r"(?<=[.!?])\s+|\n+", answer) if line.strip()]
+def _assertion_clauses(answer: str) -> list[str]:
+    """Keep routes and record proposals in their own list item or table cell."""
+    clauses: list[str] = []
+    for line in answer.splitlines():
+        # A Markdown table row attaches its route to the subject in that row.
+        # Other delimiters separate independent claims.
+        if line.lstrip().startswith("|"):
+            clauses.append(line.strip(" |"))
+        else:
+            clauses.extend(
+                clause.strip()
+                for clause in re.split(r"(?<=[.!?])\s+|[;|]+|,\s*(?=but\b)", line)
+                if clause.strip()
+            )
+    return clauses
+
+
+def _relevant_clauses(answer: str, subject: str) -> list[str]:
+    clauses = _assertion_clauses(answer)
     if not subject:
-        return lines
-    return [line for line in lines if re.search(subject, line, re.IGNORECASE)]
+        return clauses
+    return [clause for clause in clauses if re.search(subject, clause, re.IGNORECASE)]
+
+
+_RECORD_PROPOSAL = re.compile(
+    r"\b(?:propos\w*|suggest\w*|recommend\w*|offer\w*|"
+    r"(?:could|can|should|may|would|will|i(?:'|’)d|let's|let us)\s+"
+    r"(?:i\s+)?(?:propos\w*|suggest\w*|recommend\w*|offer\w*|"
+    r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start|file)|"
+    r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start|file)\b",
+    re.IGNORECASE,
+)
+_RECORD_INTENT = re.compile(r"\b(?:record|file|readout|decision|bet|note|draft)\b", re.IGNORECASE)
+_RECORD_NEGATION = re.compile(
+    r"\b(?:no\s+(?:new\s+)?|not\s+|do\s+not\s+|don't\s+|"
+    r"without\s+|instead\s+of\s+|no\s+need\s+to\s+)",
+    re.IGNORECASE,
+)
+_PATHLESS_NEW_BET = re.compile(
+    r"\b(?:propos\w*|suggest\w*|recommend\w*|offer\w*|"
+    r"creat\w*|writ\w*|sav\w*|add\w*|draft\w*|open|start)\b"
+    r".{0,60}\b(?:a\s+new|another|duplicate)\s+bet\b",
+    re.IGNORECASE,
+)
 
 
 def _proposed_record(answer: str, prefix: str) -> bool:
-    for line in answer.splitlines():
-        if prefix not in line.lower():
-            continue
-        if re.search(
-            r"\b(?:do not|don't|without|no need to|won't)\b.{0,50}"
-            r"\b(?:propos|creat|writ|sav|add|draft)",
-            line,
-            re.IGNORECASE,
-        ):
-            continue
-        if re.search(
-            r"\b(?:propos\w*|creat\w*|writ\w*|sav\w*|add\w*|draft\w*)\b", line, re.IGNORECASE
+    for clause in _assertion_clauses(answer):
+        if (
+            prefix == "bets/"
+            and not _RECORD_NEGATION.search(clause)
+            and _PATHLESS_NEW_BET.search(clause)
         ):
             return True
+        for path in re.finditer(rf"(?<!\w){re.escape(prefix)}[\w./-]*", clause, re.IGNORECASE):
+            before = clause[: path.start()]
+            next_path = re.search(r"(?:research|decisions|log|bets)/", clause[path.end() :])
+            after = (
+                clause[path.end() : path.end() + next_path.start()]
+                if next_path
+                else clause[path.end() :]
+            )
+            if _RECORD_NEGATION.search(before) or re.search(
+                r"\b(?:is|are|was|were)?\s*not\s+(?:needed|required)\b", after, re.I
+            ):
+                continue
+            verbs = list(_RECORD_PROPOSAL.finditer(before))
+            if not verbs:
+                continue
+            for verb in reversed(verbs):
+                between = before[verb.end() :]
+                if len(between) > 100:
+                    continue
+                action = verb.group().lower()
+                # An ordinary content draft can cite an existing bet. It proposes
+                # a record only when the action names that record or its path.
+                lead = re.sub(r"^(?:\s*(?:a|an|the|new|short)\b)*\s*", "", between, flags=re.I)
+                if (
+                    action.startswith(
+                        ("draft", "creat", "writ", "sav", "add", "open", "start", "file")
+                    )
+                    and lead
+                    and not _RECORD_INTENT.search(between)
+                ):
+                    continue
+                return True
     return False
 
 
