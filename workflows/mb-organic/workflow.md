@@ -216,6 +216,8 @@ there.
 When creating or first writing a push, ask once:
 "Which bet does this push serve, and which existing decision or research supports it?"
 Offer active bets and recent decisions and research by name from status facts or files already read.
+If this is a measurable trial with a review or cut point and no covering bet,
+route to `mb-bet` before execution.
 Accept "none yet" and continue. For a deliberate one-off with no bet, write
 `linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
 chosen repo-relative paths in `linked_bets`, `linked_decisions`, and

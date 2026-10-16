@@ -76,6 +76,13 @@ or narrate a Main Branch bet. A bet is a time-boxed wager with an appetite,
 target, deadline, evidence path, and verdict. It is not an offer and it is not a
 push.
 
+Also use it when `mb-start` or a channel workflow finds a current trial with a
+measurable target and a review or cut point. Check `brain.bets` and relevant
+`bets/` files first. If one covers the trial, use and link it. Otherwise offer
+to create a bet from the facts already given; ask only for a missing target,
+review or cut point, or owner when unclear, and get approval before writing.
+Routine channel work without a wager stays in its channel workflow.
+
 Preserve these product distinctions:
 
 - Offer: the durable thing sold.

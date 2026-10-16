@@ -91,8 +91,7 @@ Shared modes: static, copy-only, image-only, hook-library, video-scripts,
 long-form-video, review, launch-plan, check, or account-context.
 These are the account-context modes and paid creative modes for this shared source.
 Use this routing language exactly when needed: route to `mb-think`; route to `mb-site`.
-Durable paid artifacts use
-`pushes/<YYYY-MM-DD-slug>/ads-batch-001.md`, push playbook runs, research, or
+Durable paid artifacts use `pushes/<YYYY-MM-DD-slug>/ads-batch-001.md`, push playbook runs, research, or
 decisions after approval. Google Ads Search uses the google-ads-search-launch
 playbook source. Upload assets, provider mutation, spend, publishing, account
 changes, GTM publishes, conversion uploads, and customer contact remain gated.
@@ -145,6 +144,8 @@ media_backend: ""    # optional hint; requires media_location
 When creating or first writing a push, ask once:
 "Which bet does this push serve, and which existing decision or research supports it?"
 Offer active bets and recent decisions and research by name from status facts or files already read.
+If this is a measurable trial with a review or cut point and no covering bet,
+route to `mb-bet` before execution.
 Accept "none yet" and continue. For a deliberate one-off with no bet, write
 `linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
 chosen repo-relative paths in `linked_bets`, `linked_decisions`, and

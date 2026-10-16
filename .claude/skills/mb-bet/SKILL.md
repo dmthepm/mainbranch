@@ -231,6 +231,11 @@ docs/business-connections.md and do not invent relationships from body links.
 ## Mode: new
 
 Use when the operator says they want to try, launch, test, prove, or make a bet.
+For a current channel trial with a measurable target and review or cut point,
+check `brain.bets` and `bets/` first. Use and link a covering bet. Otherwise
+offer to frame one from known facts before execution, asking only for a missing
+target, review or cut point, or unclear owner. Ask before writing. Routine
+channel work without a wager stays in its channel workflow.
 
 1. Ask only for missing essentials: hypothesis, appetite, appetite tier,
    exposure cap or MoneyPath anchor requirement, deadline, metric, target,

@@ -522,6 +522,8 @@ def _display_path(path: Path) -> str:
 _PUSH_LINK_STEP = """When creating or first writing a push, ask once:
 "Which bet does this push serve, and which existing decision or research supports it?"
 Offer active bets and recent decisions and research by name from status facts or files already read.
+If this is a measurable trial with a review or cut point and no covering bet,
+route to `mb-bet` before execution.
 Accept "none yet" and continue. For a deliberate one-off with no bet, write
 `linked_bets: []` and a one-line `no_bet_reason`. On an approved write, put the
 chosen repo-relative paths in `linked_bets`, `linked_decisions`, and
@@ -591,6 +593,11 @@ def _daily_codex_route_text(workflow: WorkflowSource) -> str:
             "5. Use due-soon and overdue bet deadlines, missing-exit criteria, triggered "
             "failure signals, and triggered double-down signals for update, kill, close, "
             "double-down, or narrate routing.\n"
+            "For a current channel trial with a measurable target and review or cut point, "
+            "check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise "
+            "offer `mb-bet` before execution, ask only for a missing target, cut point, or "
+            "unclear owner, and ask before writing. Routine channel work without a wager "
+            "stays in its channel workflow.\n"
             "6. Present one clear business route and the signal behind it. Mutate the "
             "status marker only when the operator explicitly approves recording the "
             "daily check-in.\n"
@@ -643,6 +650,11 @@ def _daily_claude_route_text(workflow: WorkflowSource) -> str:
             "5. Use due-soon and overdue bet deadlines, missing-exit criteria, triggered "
             "failure signals, and triggered double-down signals for update, kill, close, "
             "double-down, or narrate routing.\n"
+            "For a current channel trial with a measurable target and review or cut point, "
+            "check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise "
+            "offer `mb-bet` before execution, ask only for a missing target, cut point, or "
+            "unclear owner, and ask before writing. Routine channel work without a wager "
+            "stays in its channel workflow.\n"
             "6. Present one clear business route and the signal behind it. Mutate the "
             "status marker only when the operator explicitly approves recording the "
             "daily check-in.\n"
@@ -1104,6 +1116,11 @@ This snapshot does not replace shipped `.claude/skills/mb-bet/SKILL.md`.
 2. Bet is a time-boxed wager, not an offer or push. Offers are durable things
    sold; pushes coordinate execution. Bets carry hypothesis, appetite, target,
    deadline, evidence, kill or double-down logic, and verdict.
+   For a current channel trial with a measurable target and review or cut point,
+   check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise
+   offer to frame one from known facts before execution. Ask only for a missing
+   target, review or cut point, or unclear owner, and get approval before writing.
+   Routine channel work without a wager stays in its channel workflow.
 3. Support new, update, close, list, and narrate modes. Create or edit
    `bets/YYYY-MM-DD-slug.md` only after approval, and keep the strict contract:
    frontmatter fields, body sections, typed links, reverse `linked_bets`, and
@@ -1180,6 +1197,11 @@ Codex.
 3. Bet is a time-boxed wager, not an offer or push. Offers are durable things
    sold; pushes coordinate execution. Bets carry hypothesis, appetite, target,
    deadline, evidence, kill or double-down logic, and verdict.
+   For a current channel trial with a measurable target and review or cut point,
+   check `brain.bets` and `bets/` first. Use and link a covering bet; otherwise
+   offer a bet plan from known facts before execution. Ask only for a missing
+   target, review or cut point, or unclear owner. Routine channel work without
+   a wager stays in its channel workflow; Codex keeps this route read-only.
 4. Guide new, update, close, list, and narrate modes from the shared contract.
    Codex may draft patch-shaped recommendations and exact file targets, then
    stop before changing files.

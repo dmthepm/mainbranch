@@ -56,6 +56,26 @@ def test_release_simulation_tiers_have_expected_prompt_coverage() -> None:
     assert all(sim.must_observe for sim in prerelease)
 
 
+def test_channel_trial_simulations_cover_new_existing_and_routine_work() -> None:
+    by_id = {sim.id: sim for sim in release_simulation.simulations()}
+    new = by_id["channel_trial_new_bet"]
+    existing = by_id["channel_trial_existing_bet"]
+    routine = by_id["routine_channel_task_no_bet"]
+
+    assert set(new.tiers) == {"prerelease_candidate", "release_acceptance"}
+    assert set(existing.tiers) == {"prerelease_candidate"}
+    assert set(routine.tiers) == {"prerelease_candidate"}
+    assert new.fixture_profile == routine.fixture_profile == "fresh_sanitized_business_repo"
+    assert existing.fixture_profile == "existing_channel_trial_bet_fixture"
+    assert "ask_before_write" in new.expected_behaviors
+    assert "before execution" in " ".join(new.must_observe)
+    assert "without approval" in " ".join(new.must_not)
+    assert "bets/2026-11-01-weekly-email-trial.md" in " ".join(existing.must_observe)
+    assert "another bet file" in " ".join(existing.must_not)
+    assert "organic content" in " ".join(routine.must_observe)
+    assert "mb-bet" in " ".join(routine.must_not)
+
+
 def test_release_simulation_covers_ambiguous_mb_start_offer_choice() -> None:
     simulations = {
         sim.id: sim for sim in release_simulation.simulations_for_tier("prerelease_candidate")
