@@ -168,6 +168,23 @@ Use decisions when the work changes durable business truth. A decision should
 name options, rationale, tradeoffs, consequences, and the specific files that
 would change. Codify only after the operator accepts the direction.
 
+For a daily observation or readout, use research-only at the smallest useful
+depth: write a concise `research/` record with the observation, summarized
+numbers, source and timeframe, what the evidence supports, caveats, and the
+next question. Do not expand it into a full research project. If the operator
+also changes course, use decide mode in the same approved session: write the
+readout and decision after approval, set `linked_research` on the decision and
+`linked_decisions` on the research, and link the bet or push being changed when
+known. For a bet, use `linked_bets` on the new records and reverse
+`linked_research` or `linked_decisions` on the bet; for a push, use
+`linked_pushes` on the new records and reverse `linked_research` or
+`linked_decisions` on the push. Use repo-relative paths that
+`mb validate --cross-refs` checks. If the
+change alters a measurable trial's target or cut point, update or link the
+existing bet through `mb-bet` after approval before continuing the trial.
+Summarize provider numbers and cite their source; never save raw provider rows,
+account IDs, customer data, or exported tables in the business repo.
+
 When transcripts, authenticated community content, provider recordings,
 cloud-drive files, call notes, exported chats, or mixed private/business
 sources may become business memory, route through the source-ingestion privacy

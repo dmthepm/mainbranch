@@ -598,10 +598,17 @@ def _daily_codex_route_text(workflow: WorkflowSource) -> str:
             "offer `mb-bet` before execution, ask only for a missing target, cut point, or "
             "unclear owner, and ask before writing. Routine channel work without a wager "
             "stays in its channel workflow.\n"
-            "6. Present one clear business route and the signal behind it. Mutate the "
+            "6. Route an observation or readout to `mb-think` research-only for a short "
+            "evidence-backed readout. A changed course adds a linked decision in the same "
+            "approved session. Summarize numbers and cite sources; never save raw provider "
+            "rows, account IDs, customer data, or exported tables. A status-only question "
+            "gets a status answer without research or a decision. If the observation "
+            "changes a measurable trial target or cut point, update or link its existing "
+            "bet through `mb-bet` after approval before continuing.\n"
+            "7. Present one clear business route and the signal behind it. Mutate the "
             "status marker only when the operator explicitly approves recording the "
             "daily check-in.\n"
-            "7. Ask before business-file writes, checkpoints, repairs, updates, migrations, "
+            "8. Ask before business-file writes, checkpoints, repairs, updates, migrations, "
             "provider mutation, publishing, spend, customer contact, destructive operations, "
             "or public issue/proposal submission."
         )
@@ -655,10 +662,17 @@ def _daily_claude_route_text(workflow: WorkflowSource) -> str:
             "offer `mb-bet` before execution, ask only for a missing target, cut point, or "
             "unclear owner, and ask before writing. Routine channel work without a wager "
             "stays in its channel workflow.\n"
-            "6. Present one clear business route and the signal behind it. Mutate the "
+            "6. Route an observation or readout to `/mb-think` research-only for a short "
+            "evidence-backed readout. A changed course adds a linked decision in the same "
+            "approved session. Summarize numbers and cite sources; never save raw provider "
+            "rows, account IDs, customer data, or exported tables. A status-only question "
+            "gets a status answer without research or a decision. If the observation "
+            "changes a measurable trial target or cut point, update or link its existing "
+            "bet through `/mb-bet` after approval before continuing.\n"
+            "7. Present one clear business route and the signal behind it. Mutate the "
             "status marker only when the operator explicitly approves recording the "
             "daily check-in.\n"
-            "7. Ask before business-file writes, checkpoints, repairs, updates, migrations, "
+            "8. Ask before business-file writes, checkpoints, repairs, updates, migrations, "
             "provider mutation, publishing, spend, customer contact, destructive operations, "
             "or public issue/proposal submission."
         )
@@ -938,6 +952,18 @@ or available in Codex.
     return output
 
 
+def _think_observation_route(step: int, bet_route: str) -> str:
+    return (
+        f"{step}. For observations, ask before a concise sourced research-only readout; "
+        "changed steering adds a linked decision in the same approved session.\n"
+        "   Set decision `linked_research` and research `linked_decisions`, link a "
+        f"known bet or push, and update an existing trial bet through `{bet_route}` "
+        "after approval.\n"
+        "   Summarize numbers with source and caveat; exclude raw provider rows, "
+        "account IDs, customer data, and exported tables. Status-only stays status."
+    )
+
+
 def _render_think_claude_shell(workflow: WorkflowSource) -> str:
     """Render a Claude Code shell snapshot for the thinking workflow."""
 
@@ -979,14 +1005,15 @@ This snapshot does not replace shipped `.claude/skills/mb-think/SKILL.md`.
    caveats, promotion limits, and public/private handling.
 5. Write a decision when durable business truth changes. Codify only after the
    operator accepts the direction.
-6. For transcripts, authenticated community content, provider recordings, or
+{_think_observation_route(6, "/mb-bet")}
+7. For transcripts, authenticated community content, provider recordings, or
    mixed private/business sources, use manifest-first allow/skip filters before
    reading content. Route synthesized output, not raw payloads.
-7. For stale source, claim, proof, or angle cleanup, identify the stale item,
+8. For stale source, claim, proof, or angle cleanup, identify the stale item,
    find downstream usage, keep history auditable with a stale note, reconcile
    current truth after approval, record and codify the decision, then
    checkpoint only after approval.
-8. Ask for approval before creating or editing business files, promoting
+9. Ask for approval before creating or editing business files, promoting
    research into core truth, using structured collection, or saving a
    checkpoint.
 
@@ -1019,12 +1046,9 @@ Runtime support: `codex_cli: {workflow.runtime_support.get("codex_cli", "")}`
 Approval gates: {_inline_code_list(workflow.approval_gates)}
 Public/private boundaries: {_inline_code_list(workflow.public_private_boundaries)}
 
-Codex is first-class for the proven owner loop only. This guidance is generated
-from the engine workflow source for business-repo `AGENTS.md`; the business repo
-does not need to contain `{_display_path(workflow.path)}`. Treat this rendered
-route as the Codex shell for natural-language thinking tasks. It does not claim
-Claude Code runtime entrypoints work inside Codex or that all Main Branch
-workflows are available in Codex.
+Codex supports the proven owner loop. Use this generated `AGENTS.md` guidance
+as the Codex shell for natural-language thinking tasks. The business repo does
+not need to contain `{_display_path(workflow.path)}`. Claude Code entrypoints stay separate.
 
 ## Required mb Commands
 
@@ -1054,14 +1078,15 @@ workflows are available in Codex.
    caveats, promotion limits, and public/private handling.
 6. Write a decision when durable business truth changes. Codify only after the
    operator accepts the direction.
-7. For transcripts, authenticated community content, provider recordings, or
+{_think_observation_route(7, "mb-bet")}
+8. For transcripts, authenticated community content, provider recordings, or
    mixed private/business sources, use manifest-first allow/skip filters before
    reading content. Route synthesized output, not raw payloads.
-8. For stale source, claim, proof, or angle cleanup, identify the stale item,
+9. For stale source, claim, proof, or angle cleanup, identify the stale item,
    find downstream usage, keep history auditable with a stale note, reconcile
    current truth after approval, record and codify the decision, then
    checkpoint only after approval.
-9. Ask for approval before creating or editing business files, promoting
+10. Ask for approval before creating or editing business files, promoting
    research into core truth, using structured collection, opening public
    issues, publishing, provider mutation, spend, customer contact, or checkpoint.
 
