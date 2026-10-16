@@ -525,12 +525,12 @@ Approved research note waiting for checkpoint planning and message validation.
 
 
 def _apply_existing_channel_trial_bet_fixture(repo: Path) -> list[str]:
-    bet = repo / "bets" / "2026-11-01-weekly-email-trial.md"
+    bet = repo / "bets" / "2026-10-01-weekly-email-trial.md"
     bet.parent.mkdir(parents=True, exist_ok=True)
     bet.write_text(
         """---
 status: open
-opened: 2026-11-01
+opened: 2026-10-01
 deadline: 2026-11-30
 appetite: "4 weekly sends"
 appetite_tier: small

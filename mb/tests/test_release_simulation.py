@@ -70,7 +70,7 @@ def test_channel_trial_simulations_cover_new_existing_and_routine_work() -> None
     assert "ask_before_write" in new.expected_behaviors
     assert "before execution" in " ".join(new.must_observe)
     assert "without approval" in " ".join(new.must_not)
-    assert "bets/2026-11-01-weekly-email-trial.md" in " ".join(existing.must_observe)
+    assert "bets/2026-10-01-weekly-email-trial.md" in " ".join(existing.must_observe)
     assert "another bet file" in " ".join(existing.must_not)
     assert "organic content" in " ".join(routine.must_observe)
     assert "mb-bet" in " ".join(routine.must_not)

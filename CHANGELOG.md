@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+Business folders now guide every session to reuse a current bet for measurable trials and offer a short research readout, plus a linked decision when the numbers change the plan. An approved `mb update` adds the guidance to existing folders.
+
 ## [0.6.9] - 2026-10-16
 
 `/mb-start` and `/mb-think` now have guidance for turning a daily observation into a short research readout, and a change of plan into a decision linked to it, after your approval. In release testing it did not yet apply when a request skipped those skills; a fix is planned for the next release.

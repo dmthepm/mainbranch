@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 from argparse import Namespace
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -18,11 +19,18 @@ from mb import release_simulation
 
 def test_existing_channel_trial_profile_contains_covering_bet(tmp_path: Path) -> None:
     mutations = harness._apply_fixture_profile(tmp_path, "existing_channel_trial_bet_fixture")
-    bet = tmp_path / "bets" / "2026-11-01-weekly-email-trial.md"
+    bet = tmp_path / "bets" / "2026-10-01-weekly-email-trial.md"
 
     assert mutations
     assert bet.is_file()
     assert "20 qualified waitlist signups" in bet.read_text(encoding="utf-8")
+    opened = next(
+        line.removeprefix("opened: ")
+        for line in bet.read_text(encoding="utf-8").splitlines()
+        if line.startswith("opened: ")
+    )
+    assert date.fromisoformat(opened) <= date(2026, 10, 16)
+    assert "deadline: 2026-11-30" in bet.read_text(encoding="utf-8")
 
 
 def test_score_transcript_detects_core_runtime_behaviors() -> None:

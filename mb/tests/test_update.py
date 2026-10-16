@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from mb import __version__
+from mb import __version__, claude_guidance
 from mb import codex as codex_mod
 from mb import engine as engine_mod
 from mb import freshness as freshness_mod
@@ -2507,6 +2507,49 @@ def test_update_leaves_an_old_claude_md_conventions_line_alone(
     assert (business_repo / "CLAUDE.md").read_text(encoding="utf-8") == old
     changed = sorted(line[3:] for line in _git(business_repo, "status", "--porcelain").splitlines())
     assert "CLAUDE.md" not in changed
+
+
+def test_update_adds_entry_rules_to_069_claude_and_keeps_operator_notes(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path
+) -> None:
+    from mb.init import _read_template
+
+    template = _read_template("CLAUDE.md.tmpl")
+    start = template.index(claude_guidance.BEGIN)
+    end = template.index(claude_guidance.END, start) + len(claude_guidance.END)
+    old = template[:start] + template[end + 2 :]
+    old = "Operator preface.\n\n" + old + "\n\n## Operator notes\n\nKeep this.\n"
+    (business_repo / "CLAUDE.md").write_text(old, encoding="utf-8")
+    _commit_all(business_repo, "0.6.9 Claude guidance with operator notes")
+    calls: list[list[str]] = []
+    _wheel_update_env(monkeypatch, calls)
+
+    no_terminal = update_mod.run(repo=business_repo, interactive=False)
+    assert "CLAUDE.md" in no_terminal["surface_refresh"]["planned"]["tracked_files"]
+    assert (business_repo / "CLAUDE.md").read_text(encoding="utf-8") == old
+
+    accepted = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+    assert accepted["ok"] is True, accepted["errors"]
+    text = (business_repo / "CLAUDE.md").read_text(encoding="utf-8")
+    assert text.startswith("Operator preface.\n\n")
+    assert text.endswith("## Operator notes\n\nKeep this.\n")
+    assert text.count(claude_guidance.BEGIN) == text.count(claude_guidance.END) == 1
+    assert text.count("## Trials and readouts") == 1
+    assert claude_guidance.plan(business_repo) == (None, None)
+
+
+def test_claude_entry_rules_with_missing_end_marker_are_left_unchanged(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "CLAUDE.md"
+    broken = "# Business\n\n" + claude_guidance.BEGIN + "\nOperator text.\n"
+    path.write_text(broken, encoding="utf-8")
+    content, refusal = claude_guidance.plan(tmp_path)
+    assert content is None
+    assert refusal is not None and "incomplete" in refusal
+    assert path.read_text(encoding="utf-8") == broken
 
 
 def test_update_terminal_yes_applies_once_then_unattended_runs_need_no_consent(

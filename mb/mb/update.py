@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from mb import __version__
+from mb import __version__, claude_guidance
 from mb import codex as codex_mod
 from mb import unreadable as unreadable_mod
 from mb.doctor import _not_business_folder_guard, codex_repair_actions
@@ -679,7 +679,10 @@ def _link_new_repo_files(
 
 
 def _surface_consent(
-    link_plan: dict[str, Any], codex_plan: dict[str, Any], repo: Path
+    link_plan: dict[str, Any],
+    codex_plan: dict[str, Any],
+    repo: Path,
+    claude_content: str | None = None,
 ) -> dict[str, Any] | None:
     """The repo files the surface refresh would change, or None if unknown.
 
@@ -702,14 +705,20 @@ def _surface_consent(
         codex_changes.extend(_codex_new_repo_files(codex_plan, repo, codex_changes))
     link_writes = list(dict.fromkeys(item["path"] for item in link_changes))
     codex_writes = list(dict.fromkeys(item["path"] for item in codex_changes))
+    claude_changes = [{"path": "CLAUDE.md", "op": "modify"}] if claude_content is not None else []
     return {
         "codex_blocked": codex_blocked,
         "link_writes": link_writes,
         "codex_writes": codex_writes,
+        "claude_writes": ["CLAUDE.md"] if claude_changes else [],
         "tracked_changes": list(
-            {(c["path"], c["op"]): c for c in [*link_changes, *codex_changes]}.values()
+            {
+                (c["path"], c["op"]): c for c in [*link_changes, *codex_changes, *claude_changes]
+            }.values()
         ),
-        "tracked_files": list(dict.fromkeys([*link_writes, *codex_writes])),
+        "tracked_files": list(
+            dict.fromkeys([*link_writes, *codex_writes, *[c["path"] for c in claude_changes]])
+        ),
     }
 
 
@@ -794,7 +803,14 @@ def _predict_surface_consent(result: dict[str, Any], repo: Path, codex: dict[str
             raise
         result["warnings"].append(_unreadable_plan_warning(repo, "Codex guidance", exc))
         return
-    consent = _surface_consent(link_plan, codex_plan, repo)
+    try:
+        claude_content, claude_refusal = claude_guidance.plan(repo)
+    except (OSError, UnicodeError, ValueError) as exc:
+        result["warnings"].append(_unreadable_plan_warning(repo, "Claude guidance", exc))
+        return
+    if claude_refusal:
+        result["warnings"].append(claude_refusal)
+    consent = _surface_consent(link_plan, codex_plan, repo, claude_content)
     if consent is None or not consent["tracked_files"]:
         return
     planned = result["surface_refresh"]["planned"]
@@ -805,6 +821,8 @@ def _predict_surface_consent(result: dict[str, Any], repo: Path, codex: dict[str
         planned["apply_commands"].append(f"mb skill link{_repo_flag(repo)}")
     if consent["codex_writes"]:
         planned["apply_commands"].append(f"mb doctor repair{_repo_flag(repo)} --apply --only codex")
+    if consent["claude_writes"]:
+        planned["apply_commands"].append(_update_command(repo))
 
 
 def _codex_blocked_actions(plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1131,7 +1149,15 @@ def _refresh_surfaces(
     link_plan = link_plan or {}
     codex_plan = codex_plan or {}
 
-    consent = _surface_consent(link_plan, codex_plan, target_repo)
+    try:
+        claude_content, claude_refusal = claude_guidance.plan(target_repo)
+    except (OSError, UnicodeError, ValueError) as exc:
+        result["ok"] = False
+        result["errors"].append(f"Could not read CLAUDE.md for guidance refresh: {exc}")
+        return
+    if claude_refusal:
+        result["warnings"].append(claude_refusal)
+    consent = _surface_consent(link_plan, codex_plan, target_repo, claude_content)
     if consent is None:
         result["ok"] = False
         result["errors"].append(
@@ -1143,6 +1169,7 @@ def _refresh_surfaces(
     codex_blocked = consent["codex_blocked"]
     link_writes = consent["link_writes"]
     codex_writes = consent["codex_writes"]
+    claude_writes = consent["claude_writes"]
     tracked_changes = consent["tracked_changes"]
     tracked_files = consent["tracked_files"]
     planned["tracked_files"] = tracked_files
@@ -1161,7 +1188,7 @@ def _refresh_surfaces(
     link_apply_command = f"mb skill link{_repo_flag(target_repo)}"
     codex_apply_command = f"mb doctor repair{_repo_flag(target_repo)} --apply --only codex"
 
-    before = _tracked_snapshot(target_repo) if (apply_link or apply_codex) else None
+    before = _tracked_snapshot(target_repo) if (apply_link or apply_codex or approved) else None
 
     if not apply_link:
         surface["claude"] = {
@@ -1255,6 +1282,13 @@ def _refresh_surfaces(
             result["ok"] = False
             result["errors"].extend(codex_errors)
 
+    if claude_content is not None and approved:
+        claude_guidance.apply(target_repo, claude_content)
+        surface["claude_guidance"] = {"applied": True, "tracked_writes": claude_writes}
+    elif claude_writes:
+        surface["claude_guidance"] = {"applied": False, "tracked_writes": claude_writes}
+        planned["apply_commands"].append(_update_command(target_repo))
+
     if before is not None:
         after = _tracked_snapshot(target_repo)
         unapproved = (
@@ -1293,6 +1327,14 @@ def _refresh_surfaces(
         if not apply_codex and not codex_blocked:
             result["operator_actions"].append(
                 operator_action(codex_apply_command, codex_writes, SURFACE_CODEX_APPLY_NOTE)
+            )
+        if claude_writes and not approved:
+            result["operator_actions"].append(
+                operator_action(
+                    _update_command(target_repo),
+                    claude_writes,
+                    "Run interactively and approve the CLAUDE.md entry guidance refresh.",
+                )
             )
 
 

@@ -1170,7 +1170,7 @@
       ],
       "must_observe": [
         "Checks current bet facts and the bets/ record for the weekly email trial.",
-        "Names bets/2026-11-01-weekly-email-trial.md as the covering bet and uses or links it for the next send.",
+        "Names bets/2026-10-01-weekly-email-trial.md as the covering bet and uses or links it for the next send.",
         "Asks before any business-file write or email send."
       ],
       "must_not": [

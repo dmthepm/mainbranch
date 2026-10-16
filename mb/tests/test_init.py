@@ -185,6 +185,22 @@ def test_default_claude_operating_contract_matches_template() -> None:
     _assert_claude_md_primitive_routing_contract(_DEFAULT_CLAUDE)
 
 
+def test_business_repo_templates_load_entry_rules_once() -> None:
+    agents = _read_template("AGENTS.md.tmpl")
+    claude = _read_template("CLAUDE.md.tmpl")
+    heading = "## Trials and readouts"
+    for template in (agents, claude):
+        assert template.count(heading) == 1
+        assert "check existing bets first and reuse the matching bet" in template
+        assert "summarized numbers, source, timeframe" in template
+        assert "linked_decisions` and `linked_research" in template
+        assert "For a status-only question, answer it" in template
+        assert "Ask for approval before any write" in template
+        assert "account IDs, or exported tables" in template
+    assert "<!-- mainbranch:entry-rules:begin -->" in claude
+    assert "<!-- mainbranch:entry-rules:end -->" in claude
+
+
 def test_init_scaffolds_folders(tmp_path: Path) -> None:
     target = tmp_path / "acme"
     result = run(path=str(target), name="Acme Brewing")
