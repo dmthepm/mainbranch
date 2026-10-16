@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.11] - 2026-10-16
+
 ### Fixed
 
 - Ads skill descriptions send short sales-video clips and organic social cuts to `/mb-organic` while keeping paid video repurposing in `/mb-ads`.
