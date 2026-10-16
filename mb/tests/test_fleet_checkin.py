@@ -343,6 +343,26 @@ def test_no_relationship_gap_has_no_line_and_null_key(home: Path) -> None:
     assert "Links:" not in loop["text"]
 
 
+def test_info_only_relationship_gap_does_not_change_fleet_loop() -> None:
+    payload = _status_payload(
+        readiness={"level": "ready"},
+        relationship_health={
+            "gaps": [
+                {
+                    "id": "research_without_links",
+                    "severity": "info",
+                    "count": 1,
+                    "summary": "Older research has no business links.",
+                }
+            ]
+        },
+    )
+    loop = fleet_checkin._loop_section(payload, "2026-10-15")
+    assert loop["state"] == "ok"
+    assert loop["top_gap"] is None
+    assert "Links:" not in loop["text"]
+
+
 def test_top_gap_prefers_warning_and_preserves_status_order_for_ties() -> None:
     payload = _status_payload(
         relationship_health={

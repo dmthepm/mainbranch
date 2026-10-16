@@ -453,6 +453,22 @@ def test_ranker_surfaces_money_path_over_hygiene_but_keeps_blocker() -> None:
     assert "review_relationship_health" not in ids
 
 
+def test_info_only_relationship_gaps_do_not_become_daily_action() -> None:
+    report = _base_report()
+    report["relationship_health"] = {
+        "gaps": [
+            {
+                "id": "research_without_links",
+                "severity": "info",
+                "summary": "Older research has no business links.",
+            }
+        ]
+    }
+    assert "review_relationship_health" not in {
+        action["id"] for action in ranker.rank_status_report(report)
+    }
+
+
 def test_ranker_never_displaces_business_pressure_for_money_path() -> None:
     report = _base_report()
     report["drift"] = {

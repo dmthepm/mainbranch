@@ -2030,6 +2030,46 @@ def test_status_relationship_health_flags_active_bet_and_offer_gaps(
     assert "active bet(s) need a linked push" in human.stdout
 
 
+def test_relationship_health_notes_unlinked_decisions_and_older_research(tmp_path: Path) -> None:
+    repo = tmp_path / "business"
+    for folder in ("bets", "decisions", "research"):
+        (repo / folder).mkdir(parents=True)
+
+    def write(path: str, frontmatter: str) -> None:
+        (repo / path).write_text(f"---\n{frontmatter}---\n# Record\n", encoding="utf-8")
+
+    write("decisions/accepted.md", "status: accepted\n")
+    write("decisions/codified.md", "status: codified\n")
+    write("decisions/reverse-linked.md", "status: accepted\n")
+    write(
+        "decisions/research-linked.md",
+        "status: accepted\nlinked_research:\n  - research/linked.md\n",
+    )
+    write("decisions/proposed.md", "status: proposed\n")
+    write("decisions/superseded.md", "status: superseded\n")
+    write("bets/bet.md", "linked_decisions:\n  - decisions/reverse-linked.md\n")
+    for number in range(6):
+        write(f"research/old-{number}.md", "date: 2026-09-05\n")
+    write("research/recent.md", "date: 2026-10-05\n")
+    write("research/undated.md", "status: complete\n")
+    write("research/linked.md", "date: 2026-09-05\n")
+
+    health = status_mod._relationship_health(
+        repo, brain={"pushes": {"records": []}}, today=date(2026, 10, 15)
+    )
+    gaps = {item["id"]: item for item in health["gaps"]}
+    decisions = gaps["accepted_decisions_without_links"]
+    research = gaps["research_without_links"]
+    assert decisions["severity"] == research["severity"] == "info"
+    assert decisions["count"] == health["summary"]["accepted_decisions_without_links"] == 2
+    assert set(decisions["evidence"]) == {"decisions/accepted.md", "decisions/codified.md"}
+    assert research["count"] == health["summary"]["research_without_links"] == 6
+    assert len(research["records"]) == len(research["evidence"]) == 5
+    assert health["sections"]["research"]["without_links_total"] == 6
+    assert health["summary"]["warnings"] == 0
+    assert health["summary"]["info"] == 2
+
+
 def test_status_relationship_health_accepts_push_side_bet_links(
     tmp_path: Path, monkeypatch
 ) -> None:

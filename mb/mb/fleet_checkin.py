@@ -215,7 +215,7 @@ def _loop_section(status: dict[str, Any], as_of: str) -> dict[str, Any]:
     if title and level != "ready":
         text += f" Next: {title}."
     gaps = [_dict(item) for item in _list(_dict(status.get("relationship_health")).get("gaps"))]
-    gap = min(gaps, key=lambda item: 0 if item.get("severity") == "warn" else 1, default={})
+    gap = next((item for item in gaps if item.get("severity") == "warn"), {})
     summary = str(gap.get("summary") or "")
     count = _int(gap.get("count"))
     top_gap = (
