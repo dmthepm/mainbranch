@@ -2197,6 +2197,23 @@ def test_conversion_video_table_quotes_clips_row_and_scores_rows_separately() ->
     assert forbidden["state"] == "pass"
 
 
+def test_forbidden_route_excerpt_quotes_scored_row_when_subject_repeats() -> None:
+    sim = next(
+        item
+        for item in release_simulation.simulations()
+        if item.id == "conversion_video_natural_prompt_routing"
+    )
+    answer = (
+        '| "Make short clips from this sales video" | `/mb-organic`, clips |\n'
+        '| "Make short clips from this sales video" | `/mb-ads`, paid repurpose |'
+    )
+    score = release_simulation.score_simulation_assertions(sim, answer)
+    forbidden = next(check for check in score["checks"] if check["kind"] == "route_forbidden")
+    assert forbidden["state"] == "fail"
+    assert "/mb-ads" in forbidden["reason"]
+    assert "/mb-organic" not in forbidden["reason"]
+
+
 def test_readout_rejects_written_log_and_provider_identifier() -> None:
     sim = next(
         item for item in release_simulation.simulations() if item.id == "observation_readout_only"

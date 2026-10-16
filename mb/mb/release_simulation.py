@@ -591,9 +591,9 @@ def _assertion_excerpt(answer: str, value: str, subject: str, *, route: bool = F
     for clause in _assertion_clauses(answer):
         if route and subject and not re.search(subject, clause, re.I):
             continue
-        if (value and value.lstrip("/").lower() in clause.lower()) or (
-            subject and re.search(subject, clause, re.I)
-        ):
+        value_matches = bool(value and value.lstrip("/").lower() in clause.lower())
+        subject_matches = bool(subject and re.search(subject, clause, re.I))
+        if (value_matches or subject_matches) and (not route or value_matches):
             return f'"{clause[:120]}"'
     return '"no matching clause"'
 

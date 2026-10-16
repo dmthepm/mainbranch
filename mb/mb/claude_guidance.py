@@ -33,26 +33,29 @@ def plan(repo: Path) -> tuple[str | None, str | None]:
     path = repo / "CLAUDE.md"
     if not path.is_file():
         return None, None
-    existing = path.read_text(encoding="utf-8")
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        existing = handle.read()
     begins, ends = existing.count(BEGIN), existing.count(END)
     if begins != ends or begins > 1 or (begins and existing.index(BEGIN) > existing.index(END)):
         return (
             None,
             "CLAUDE.md entry rule markers are incomplete; restore both markers before refresh.",
         )
-    block = _current_block()
+    crlf_count = existing.count("\r\n")
+    newline = "\r\n" if crlf_count > existing.count("\n") - crlf_count else "\n"
+    block = _current_block().replace("\n", newline)
     if begins:
         start = existing.index(BEGIN)
         end = existing.index(END, start) + len(END)
         updated = existing[:start] + block + existing[end:]
     elif _OLD_SIGNATURE in existing and _OLD_ANCHOR in existing:
         start = existing.index(_OLD_ANCHOR)
-        updated = existing[:start] + block + "\n\n" + existing[start:]
+        updated = existing[:start] + block + newline * 2 + existing[start:]
     else:
-        updated = existing + ("\n" if existing.endswith("\n") else "\n\n") + block + "\n"
+        updated = existing + (newline if existing.endswith("\n") else newline * 2) + block + newline
         return updated, APPEND_NOTICE
     return (updated if updated != existing else None), None
 
 
 def apply(repo: Path, content: str) -> None:
-    atomic_write_text(repo / "CLAUDE.md", content)
+    atomic_write_text(repo / "CLAUDE.md", content, newline="")

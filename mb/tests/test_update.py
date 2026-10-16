@@ -2552,6 +2552,72 @@ def test_update_appends_entry_rules_to_hand_edited_claude_once_with_approval(
     assert path.read_text(encoding="utf-8") == applied
 
 
+def test_update_appends_entry_rules_to_crlf_claude_without_changing_operator_bytes(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path
+) -> None:
+    path = business_repo / "CLAUDE.md"
+    original = b"# My operating notes\r\n\r\nKeep this wording and spacing.\r\n"
+    path.write_bytes(original)
+    _commit_all(business_repo, "hand-edited CRLF guidance")
+    _wheel_update_env(monkeypatch, [])
+
+    accepted = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+    assert accepted["ok"] is True, accepted["errors"]
+    applied = path.read_bytes()
+    assert applied.startswith(original)
+    assert b"\n" not in applied.replace(b"\r\n", b"")
+    assert claude_guidance.BEGIN.encode() in applied[len(original) :]
+
+    second = update_mod.run(repo=business_repo, check=True)
+    assert "CLAUDE.md" not in second["surface_refresh"]["planned"]["tracked_files"]
+    assert path.read_bytes() == applied
+
+
+def test_claude_entry_rules_refresh_crlf_without_changing_surrounding_bytes(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "CLAUDE.md"
+    before = b"# Business\r\n\r\nOperator preface.\r\n"
+    after = b"\r\n## Operator notes\r\nKeep this.\r\n"
+    old_block = (
+        (claude_guidance.BEGIN + "\nOld entry rules.\n" + claude_guidance.END)
+        .encode()
+        .replace(b"\n", b"\r\n")
+    )
+    path.write_bytes(before + old_block + after)
+
+    content, refusal = claude_guidance.plan(tmp_path)
+    assert refusal is None and content is not None
+    claude_guidance.apply(tmp_path, content)
+    applied = path.read_bytes()
+    assert applied.startswith(before)
+    assert applied.endswith(after)
+    assert b"\n" not in applied.replace(b"\r\n", b"")
+    assert old_block not in applied
+    assert claude_guidance.plan(tmp_path) == (None, None)
+
+
+def test_claude_entry_rules_insert_at_crlf_069_anchor_without_changing_other_bytes(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "CLAUDE.md"
+    before = b"# Business\r\nMain Branch CLI facts are the source of truth for repo health.\r\n"
+    after = b"## First-run setup intent\r\nOperator notes.\r\n"
+    path.write_bytes(before + after)
+
+    content, refusal = claude_guidance.plan(tmp_path)
+    assert refusal is None and content is not None
+    claude_guidance.apply(tmp_path, content)
+    applied = path.read_bytes()
+    assert applied.startswith(before)
+    assert applied.endswith(after)
+    assert b"\n" not in applied.replace(b"\r\n", b"")
+    assert claude_guidance.BEGIN.encode() in applied[len(before) : -len(after)]
+    assert claude_guidance.plan(tmp_path) == (None, None)
+
+
 def test_claude_entry_rules_with_missing_end_marker_are_left_unchanged(
     tmp_path: Path,
 ) -> None:
