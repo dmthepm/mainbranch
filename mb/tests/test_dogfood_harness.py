@@ -1162,3 +1162,113 @@ def test_public_safe_refusal_fixture_has_no_release_framing(tmp_path: Path) -> N
         assert framing not in written[0].name.lower()
         assert framing not in text
     assert "sanitized" not in written[0].name.lower()
+
+
+def test_changed_file_effects_include_writes_and_deletions(tmp_path: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "research").mkdir()
+    (tmp_path / "research" / "old.md").write_text("old", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.test",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+    (tmp_path / "research" / "old.md").unlink()
+    (tmp_path / "log").mkdir()
+    (tmp_path / "log" / "note.md").write_text("TEST-ACCOUNT-1191", encoding="utf-8")
+
+    effects = harness.changed_file_effects(tmp_path)
+    assert effects["research/old.md"] == "[deleted file]"
+    assert effects["log/note.md"] == "TEST-ACCOUNT-1191"
+
+
+def test_dogfood_entrypoint_reports_missing_pyyaml_before_harness(tmp_path: Path) -> None:
+    import subprocess
+
+    script = Path(__file__).resolve().parents[2] / "scripts" / "claude-runtime-dogfood.py"
+    result = subprocess.run(
+        [sys.executable, "-S", str(script), "--help"],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "needs PyYAML" in result.stderr
+    assert "lock" not in result.stderr
+
+
+def test_run_claude_print_fails_simulation_assertion_in_result_and_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = harness.HarnessState(
+        engine_repo=tmp_path / "engine",
+        root=tmp_path,
+        evidence_dir=tmp_path / "evidence",
+        fixture_repo=tmp_path / "fixture",
+        mb_path=tmp_path / "venv" / "bin" / "mb",
+    )
+    state.fixture_repo.mkdir()
+    sim = release_simulation.Simulation(
+        id="status_only_no_record",
+        label="status-only",
+        title="Status",
+        tiers=("pr_smoke",),
+        prompt="How is the trial?",
+        expected_route=("sense",),
+        expected_behaviors=(),
+        must_observe=("status",),
+        must_not=(),
+        assertions=(release_simulation.SimulationAssertion("record_forbidden", "research/"),),
+    )
+
+    def fake_run_command(
+        state: harness.HarnessState,
+        label: str,
+        command: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        timeout: int | None = None,
+    ) -> harness.CommandResult:
+        del state, command, cwd, env, timeout
+        stdout = json.dumps(
+            {"result": {"content": [{"text": "I propose a research/readout.md file."}]}}
+        )
+        path = tmp_path / "response.json"
+        path.write_text(stdout, encoding="utf-8")
+        return harness.CommandResult(label, ["claude"], tmp_path, 0, stdout, "", path, path, path)
+
+    monkeypatch.setattr(shutil, "which", lambda _: "/usr/local/bin/claude")
+    monkeypatch.setattr(release_simulation, "simulations_for_tier", lambda _: (sim,))
+    monkeypatch.setattr(harness, "run_command", fake_run_command)
+    monkeypatch.setattr(harness, "claude_version", lambda: "fixture")
+    monkeypatch.setattr(
+        harness,
+        "materialize_fixture_profile",
+        lambda _state, _sim: {
+            "repo": str(state.fixture_repo),
+            "mutations": [],
+            "mb_command_facts": {},
+        },
+    )
+    monkeypatch.setattr(harness, "changed_file_effects", lambda _: {})
+
+    harness.run_claude_print(state, max_budget_usd="0.01", simulation_tier="pr_smoke")
+
+    assert state.claude["turns"][0]["assertions"]["ok"] is False
+    assert state.failures == ["status_only_no_record: forbidden research/ record proposal or write"]
+    receipt = harness.evidence_template(state, install_mode="editable", mb_version="mb 0.0")
+    assert state.failures[0] in receipt

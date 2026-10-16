@@ -1331,6 +1331,7 @@ def run_claude_print(
         )
         post_status = git_text(profile_repo, "status", "--short")
         post_diff = git_text(profile_repo, "diff", "--stat")
+        file_effects = changed_file_effects(profile_repo)
         profile_record["post_run_git_status"] = post_status
         profile_record["post_run_git_diff"] = post_diff
         write_json(
@@ -1372,6 +1373,15 @@ def run_claude_print(
             if text:
                 transcript_parts.append(f"## {simulation.label}\n\n{text.strip()}\n")
         else:
+            text = ""
+        assertion_score = release_simulation.score_simulation_assertions(
+            simulation, text, file_effects
+        )
+        if simulation.assertions:
+            turn["assertions"] = assertion_score
+            for failure in assertion_score["failures"]:
+                state.fail(f"{simulation.id}: {failure}")
+        if payload is None:
             turn["error"] = error
         turns.append(turn)
         if result.returncode != 0:
@@ -1437,6 +1447,10 @@ def run_claude_print(
                 "expected_behaviors": list(simulation.expected_behaviors),
                 "must_observe": list(simulation.must_observe),
                 "must_not": list(simulation.must_not),
+                "assertions": [
+                    {"kind": item.kind, "value": item.value, "subject": item.subject}
+                    for item in simulation.assertions
+                ],
             }
             for simulation in simulations
         ],
@@ -1444,6 +1458,31 @@ def run_claude_print(
         "transcript_excerpts": str(transcript_path),
         "rubric": rubric,
     }
+
+
+def changed_file_effects(repo: Path) -> dict[str, str]:
+    """Read changed regular files in a disposable simulation repo."""
+    effects: dict[str, str] = {}
+    status = git_text(repo, "status", "--porcelain", "--untracked-files=all")
+    for row in status.splitlines():
+        if len(row) < 4:
+            continue
+        relative = row[3:]
+        if " -> " in relative:
+            relative = relative.split(" -> ", 1)[1]
+        path = (repo / relative).resolve()
+        if not path.is_relative_to(repo.resolve()):
+            continue
+        if not path.exists():
+            effects[relative] = "[deleted file]"
+            continue
+        if not path.is_file():
+            continue
+        try:
+            effects[relative] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            effects[relative] = "[unreadable changed file]"
+    return effects
 
 
 def classify_print_grounding(

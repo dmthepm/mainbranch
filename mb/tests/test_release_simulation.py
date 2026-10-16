@@ -1786,3 +1786,98 @@ def test_checkpoint_guidance_points_repair_and_migration_at_accepted_verbs() -> 
     assert "mb checkpoint --validate" in router
     assert "`[fixed]`" in router
     assert "`[ran]`" in router
+
+
+@pytest.mark.parametrize(
+    ("simulation_id", "good", "bad", "bad_effects"),
+    [
+        (
+            "conversion_video_natural_prompt_routing",
+            "Short clips from the sales video route to /mb-organic. "
+            "Paid video ads route to /mb-ads.",
+            "Short clips from the sales video route to /mb-ads.",
+            {},
+        ),
+        (
+            "channel_trial_new_bet",
+            "I propose a bets/weekly-email-trial.md file for the measurable trial, after approval.",
+            "Start the weekly email now; no bet needed.",
+            {},
+        ),
+        (
+            "channel_trial_existing_bet",
+            "The covering bet is bets/2026-10-01-weekly-email-trial.md. Ask before the next send.",
+            "The covering bet is bets/2026-10-01-weekly-email-trial.md. "
+            "I propose a new bets/duplicate.md file.",
+            {},
+        ),
+        (
+            "routine_channel_task_no_bet",
+            "Route the weekly post to /mb-organic and ask before saving it.",
+            "Route the weekly post to /mb-bet and propose a bets/post.md file.",
+            {},
+        ),
+        (
+            "observation_readout_only",
+            "I propose a research/readout.md file with both weeks' signup and visit figures, "
+            "source, caveat and next question. May I write it?",
+            "I propose a research/readout.md file and a log/weekly-note.md file. May I write them?",
+            {},
+        ),
+        (
+            "observation_changed_course",
+            "I propose research/readout.md and decisions/stop-trial.md after approval. "
+            "Decision linked_research: [research/readout.md]. "
+            "Research linked_decisions: [decisions/stop-trial.md].",
+            "The rate changed from 8% to 3%; stop the trial. No files needed.",
+            {},
+        ),
+        (
+            "status_only_no_record",
+            "The current status shows the trial is steady. No new record is needed.",
+            "I propose a research/readout.md file from this status.",
+            {},
+        ),
+    ],
+)
+def test_targeted_simulation_assertions_reject_bad_and_accept_good(
+    simulation_id: str, good: str, bad: str, bad_effects: dict[str, str]
+) -> None:
+    sim = next(item for item in release_simulation.simulations() if item.id == simulation_id)
+    good_score = release_simulation.score_simulation_assertions(sim, good)
+    bad_score = release_simulation.score_simulation_assertions(sim, bad, bad_effects)
+    assert good_score["ok"] is True, good_score["failures"]
+    assert bad_score["ok"] is False
+    assert bad_score["failures"]
+
+
+def test_readout_rejects_written_log_and_provider_identifier() -> None:
+    sim = next(
+        item for item in release_simulation.simulations() if item.id == "observation_readout_only"
+    )
+    answer = "I propose a research/readout.md file after approval."
+    score = release_simulation.score_simulation_assertions(
+        sim, answer, {"log/weekly.md": "account_id: TEST-ACCOUNT-1191"}
+    )
+    assert score["ok"] is False
+    assert {item["kind"] for item in score["checks"] if not item["ok"]} == {
+        "record_forbidden",
+        "no_write",
+        "forbidden_pattern",
+    }
+
+
+def test_changed_course_requires_both_reciprocal_links() -> None:
+    sim = next(
+        item for item in release_simulation.simulations() if item.id == "observation_changed_course"
+    )
+    answer = "I propose research/readout.md and decisions/stop-trial.md after approval."
+    score = release_simulation.score_simulation_assertions(sim, answer)
+    assert score["ok"] is False
+    assert any("linked_research" in failure for failure in score["failures"])
+
+
+def test_assertion_schema_rejects_malformed_entries() -> None:
+    manifest = json.loads(json.dumps(release_simulation.load_manifest()))
+    manifest["simulations"][0]["assertions"] = [{"kind": "record_required", "value": "unknown/"}]
+    assert "invalid record prefix" in " ".join(release_simulation.validate_manifest(manifest))

@@ -40,6 +40,15 @@ class BehaviorCheck:
 
 
 @dataclass(frozen=True)
+class SimulationAssertion:
+    """A deterministic check scoped to one simulation."""
+
+    kind: str
+    value: str = ""
+    subject: str = ""
+
+
+@dataclass(frozen=True)
 class Simulation:
     """One operator-moment simulation prompt and expected behavior contract."""
 
@@ -52,6 +61,7 @@ class Simulation:
     expected_behaviors: tuple[str, ...]
     must_observe: tuple[str, ...]
     must_not: tuple[str, ...]
+    assertions: tuple[SimulationAssertion, ...] = ()
     fixture_profile: str = "fresh_sanitized_business_repo"
     recorded_facts: dict[str, Any] = field(default_factory=dict, compare=False, hash=False)
 
@@ -114,6 +124,7 @@ def simulations(manifest: dict[str, Any] | None = None) -> tuple[Simulation, ...
                 expected_behaviors=tuple(_str_list(item, "expected_behaviors")),
                 must_observe=tuple(_str_list(item, "must_observe")),
                 must_not=tuple(_str_list(item, "must_not")),
+                assertions=_parse_assertions(item),
                 fixture_profile=_required_str(item, "fixture_profile"),
                 recorded_facts=_dict(item, "recorded_facts"),
             )
@@ -257,7 +268,11 @@ def validate_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
     tier_ids = {str(item.get("id", "")) for item in _list(data, "tiers")}
     check_ids = {check.id for check in behavior_checks(data)}
     simulation_ids: set[str] = set()
-    for sim in simulations(data):
+    try:
+        parsed_simulations = simulations(data)
+    except ValueError as exc:
+        return [str(exc)]
+    for sim in parsed_simulations:
         if sim.id in simulation_ids:
             errors.append(f"duplicate simulation id: {sim.id}")
         simulation_ids.add(sim.id)
@@ -284,6 +299,164 @@ def validate_manifest(manifest: dict[str, Any] | None = None) -> list[str]:
             if sim_id not in simulation_ids:
                 errors.append(f"{tier_id} references unknown simulation {sim_id}")
     return errors
+
+
+_ASSERTION_KINDS = frozenset(
+    {
+        "route_required",
+        "route_forbidden",
+        "record_required",
+        "record_forbidden",
+        "text_required",
+        "reciprocal_links",
+        "no_write",
+        "forbidden_pattern",
+    }
+)
+_RECORD_PREFIXES = frozenset({"research/", "decisions/", "log/", "bets/"})
+
+
+def _parse_assertions(item: dict[str, Any]) -> tuple[SimulationAssertion, ...]:
+    raw = item.get("assertions", [])
+    sim_id = str(item.get("id", "unknown"))
+    if not isinstance(raw, list):
+        raise ValueError(f"{sim_id} assertions must be a list")
+    parsed: list[SimulationAssertion] = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict) or not isinstance(entry.get("kind"), str):
+            raise ValueError(f"{sim_id} assertion {index} needs a kind")
+        kind = entry["kind"]
+        value = entry.get("value", "")
+        subject = entry.get("subject", "")
+        if (
+            kind not in _ASSERTION_KINDS
+            or not isinstance(value, str)
+            or not isinstance(subject, str)
+        ):
+            raise ValueError(f"{sim_id} assertion {index} has invalid kind or fields")
+        needs_value = kind not in {"reciprocal_links", "no_write"}
+        if needs_value != bool(value.strip()):
+            raise ValueError(f"{sim_id} assertion {index} has invalid value")
+        if kind.startswith("record_") and value not in _RECORD_PREFIXES:
+            raise ValueError(f"{sim_id} assertion {index} has invalid record prefix")
+        if kind.startswith("route_") and not re.fullmatch(r"/mb-[a-z-]+", value):
+            raise ValueError(f"{sim_id} assertion {index} has invalid route")
+        if kind == "forbidden_pattern":
+            try:
+                re.compile(value)
+            except re.error as exc:
+                raise ValueError(f"{sim_id} assertion {index} has invalid pattern") from exc
+        if subject:
+            try:
+                re.compile(subject)
+            except re.error as exc:
+                raise ValueError(f"{sim_id} assertion {index} has invalid subject") from exc
+        if set(entry) - {"kind", "value", "subject"}:
+            raise ValueError(f"{sim_id} assertion {index} has unknown fields")
+        parsed.append(SimulationAssertion(kind, value, subject))
+    return tuple(parsed)
+
+
+def score_simulation_assertions(
+    simulation: Simulation, answer: str, file_effects: dict[str, str] | None = None
+) -> dict[str, Any]:
+    """Score explicit expectations against one answer and its changed files."""
+    effects = file_effects or {}
+    failures: list[str] = []
+    checks: list[dict[str, Any]] = []
+    for assertion in simulation.assertions:
+        kind, value = assertion.kind, assertion.value
+        if kind.startswith("route_"):
+            lines = _relevant_lines(answer, assertion.subject)
+            found = any(value.lower() in line.lower() for line in lines)
+            ok = found if kind == "route_required" else not found
+        elif kind.startswith("record_"):
+            proposed = _proposed_record(answer, value)
+            written = any(path.startswith(value) for path in effects)
+            found = proposed or written
+            ok = found if kind == "record_required" else not found
+        elif kind == "text_required":
+            ok = value.lower() in answer.lower()
+        elif kind == "reciprocal_links":
+            ok = _has_reciprocal_links(answer, effects)
+        elif kind == "no_write":
+            ok = not effects
+        else:
+            ok = not any(re.search(value, content, re.IGNORECASE) for content in effects.values())
+        reason = {
+            "route_required": f"expected {value} route",
+            "route_forbidden": f"forbidden {value} route",
+            "record_required": f"expected {value} record proposal or write",
+            "record_forbidden": f"forbidden {value} record proposal or write",
+            "text_required": f"expected answer to name {value}",
+            "reciprocal_links": "expected linked_research and linked_decisions paths",
+            "no_write": "changed files before approval",
+            "forbidden_pattern": "forbidden identifier in changed file",
+        }[kind]
+        checks.append({"kind": kind, "value": value, "ok": ok, "reason": reason})
+        if not ok:
+            failures.append(reason)
+    return {
+        "ok": not failures,
+        "passed": len(checks) - len(failures),
+        "total": len(checks),
+        "checks": checks,
+        "failures": failures,
+    }
+
+
+def _relevant_lines(answer: str, subject: str) -> list[str]:
+    lines = [line for line in re.split(r"(?<=[.!?])\s+|\n+", answer) if line.strip()]
+    if not subject:
+        return lines
+    return [line for line in lines if re.search(subject, line, re.IGNORECASE)]
+
+
+def _proposed_record(answer: str, prefix: str) -> bool:
+    for line in answer.splitlines():
+        if prefix not in line.lower():
+            continue
+        if re.search(
+            r"\b(?:do not|don't|without|no need to|won't)\b.{0,50}"
+            r"\b(?:propos|creat|writ|sav|add|draft)",
+            line,
+            re.IGNORECASE,
+        ):
+            continue
+        if re.search(
+            r"\b(?:propos\w*|creat\w*|writ\w*|sav\w*|add\w*|draft\w*)\b", line, re.IGNORECASE
+        ):
+            return True
+    return False
+
+
+_RESEARCH_PATH = re.compile(r"research/[a-zA-Z0-9_./-]+\.md")
+_DECISION_PATH = re.compile(r"decisions/[a-zA-Z0-9_./-]+\.md")
+
+
+def _has_reciprocal_links(answer: str, effects: dict[str, str]) -> bool:
+    """Find one decision/research pair whose link fields name each other."""
+    combined = answer + "\n" + "\n".join(effects.values())
+    research_paths = set(_RESEARCH_PATH.findall(combined)) | {
+        path for path in effects if path.startswith("research/")
+    }
+    decision_paths = set(_DECISION_PATH.findall(combined)) | {
+        path for path in effects if path.startswith("decisions/")
+    }
+    for research_path in research_paths:
+        for decision_path in decision_paths:
+            decision_source = effects.get(decision_path, answer)
+            research_source = effects.get(research_path, answer)
+            decision_links = re.search(r"linked_research\s*:\s*([^\n]+)", decision_source)
+            research_links = re.search(r"linked_decisions\s*:\s*([^\n]+)", research_source)
+            if (
+                decision_links
+                and research_links
+                and research_path in decision_links.group(1)
+                and decision_path in research_links.group(1)
+            ):
+                return True
+    return False
 
 
 # A refusal exempts a match only inside the clause that holds the match, and

@@ -53,7 +53,11 @@ release:
    the waiver, fallback evidence, and follow-up issue route.
 
 After the package is available to users, repeat release acceptance against a
-fresh PyPI install as final install verification:
+fresh PyPI install as final install verification.
+
+The Python environment that starts `scripts/claude-runtime-dogfood.py` needs
+`pyyaml` (`python -m pip install pyyaml`). The script checks this before the
+harness takes a shared lock. The installed `mb` package has its own dependencies.
 
 ```bash
 scripts/claude-runtime-dogfood.py --install-mode pypi --pypi-version X.Y.Z --run-claude-print --simulation-tier release_acceptance --max-budget-usd 0.75
@@ -97,9 +101,22 @@ The suite covers operator moments rather than raw commands:
 | Keychain prompt pending repair | Pre-release | Sense -> Ship | a provider whose saved credential macOS has not yet allowed mb to read routes to `mb connect repair --keychain` in a terminal, with no credential read, pasted, or put on a command line |
 
 Each prompt fixture has an expected-observation rubric in the manifest. The
-first six are ready for automated or manual prompt runs; the private-data and
-legacy-drift risk sims are specified so release reviewers can inspect them even
-when the first implementation only automates part of the suite.
+harness runs selected fixtures as print-mode proxy evidence, and reviewers
+inspect their expected observations and prohibitions manually.
+
+Selected simulations also have an optional `assertions` list. Each item has a
+`kind` and, where needed, a `value` or `subject`. `route_required` and
+`route_forbidden` check a named `/mb-` route in that simulation's visible
+answer; `subject` narrows the check to lines about a topic such as clips.
+`record_required` and `record_forbidden` check proposals in the answer and
+changed files under a named `research/`, `decisions/`, `log/`, or `bets/`
+prefix. `text_required` checks a literal answer phrase. `reciprocal_links`
+checks for both link fields with repo-relative paths. `no_write` checks the
+simulation repo's changed files, and `forbidden_pattern` checks their contents.
+An assertion failure marks that simulation and the harness receipt failed,
+with a one-line reason. Simulations without assertions keep their current
+generic scoring. These checks can only observe visible text and changed files;
+manual review still verifies actual skill invocation, approval, and intent.
 
 The harness materializes each simulation's `fixture_profile` before a
 print-mode run by copying the healthy disposable business repo into a
@@ -192,9 +209,9 @@ still not as interactive TUI proof.
 
 ## Transcript Review
 
-Do not stop at pass/fail. The keyword rubric in `rubric.json` is proxy
-evidence; the release question is whether Claude behaved like Main Branch in a
-normal owner session.
+Do not stop at pass/fail. The generic keyword rubric in `rubric.json` and the
+per-simulation assertions are proxy evidence. The release question is whether
+Claude behaved like Main Branch in a normal owner session.
 
 Review in two layers:
 
