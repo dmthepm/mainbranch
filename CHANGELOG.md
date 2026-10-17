@@ -13,6 +13,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb update` replaces the canned repair claim in business folders created by 0.6.9 and 0.6.10 after approval.
 - Repair guidance reports a completed repair only after its command succeeds, including in business folders updated from 0.6.11.
 - `mb update` asks operators to retry shortly when uv cannot yet find the just-published version PyPI reported.
 

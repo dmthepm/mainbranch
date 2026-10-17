@@ -54,6 +54,14 @@ _OLD_GENERATED_SECTION = (
     "baseline saved, GitHub backup connected when requested, checkpoint state, and\n"
     "next safe action. Put commands and git/GitHub details second.\n\n" + _OLD_RUNTIME_SECTION
 )
+_OLD_069_0610_REPAIR_CLAIM = (
+    "After repairing skill wiring, tell\n"
+    'the operator: "I repaired missing Main Branch start wiring in this business\n'
+    'folder; restart Claude Code from this repo and try `/mb-start` again."'
+)
+_OLD_069_0610_GENERATED_SECTION = _OLD_GENERATED_SECTION.replace(
+    _OLD_REPAIR_CLAIM, _OLD_069_0610_REPAIR_CLAIM
+)
 _NEW_REPAIR_GUIDANCE = (
     "Before an apply command succeeds,\n"
     "describe the repair as a proposed step. After it succeeds, say which command\n"
@@ -98,26 +106,34 @@ def _outside_fences(content: str, positions: list[int]) -> list[int]:
 
 
 def _replace_known_repair_paragraph(content: str, newline: str) -> tuple[str, str | None]:
-    old_section = _OLD_GENERATED_SECTION.replace("\n", newline)
-    old_claim = _OLD_REPAIR_CLAIM.replace("\n", newline)
-    positions: list[int] = []
-    at = 0
-    while (at := content.find(old_section, at)) != -1:
-        after = at + len(old_section)
-        if (at == 0 or content[at - 1] == "\n") and (
-            after == len(content) or content.startswith(newline, after)
-        ):
-            positions.append(at)
-        at += len(old_section)
-    outside = _outside_fences(content, positions)
+    targets = (
+        (_OLD_GENERATED_SECTION, _OLD_REPAIR_CLAIM),
+        (_OLD_069_0610_GENERATED_SECTION, _OLD_069_0610_REPAIR_CLAIM),
+    )
+    matches: list[tuple[int, str, str]] = []
+    for section, claim in targets:
+        old_section = section.replace("\n", newline)
+        old_claim = claim.replace("\n", newline)
+        at = 0
+        while (at := content.find(old_section, at)) != -1:
+            after = at + len(old_section)
+            if (at == 0 or content[at - 1] == "\n") and (
+                after == len(content) or content.startswith(newline, after)
+            ):
+                matches.append((at, old_section, old_claim))
+            at += len(old_section)
+    outside = _outside_fences(content, [at for at, _, _ in matches])
     if len(outside) == 1:
-        at = outside[0] + old_section.index(old_claim)
+        start, old_section, old_claim = next(match for match in matches if match[0] == outside[0])
+        at = start + old_section.index(old_claim)
         content = (
             content[:at]
             + _NEW_REPAIR_GUIDANCE.replace("\n", newline)
             + content[at + len(old_claim) :]
         )
-    if old_claim in content or "Until a repair command succeeds" in content:
+    if any(claim.replace("\n", newline) in content for _, claim in targets) or (
+        "Until a repair command succeeds" in content
+    ):
         return content, REPAIR_NOTICE
     return content, None
 
