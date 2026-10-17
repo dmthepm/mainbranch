@@ -127,9 +127,12 @@ def _uv_release_not_ready(result: subprocess.CompletedProcess[str], latest: str 
     """Recognize uv's missing pinned version after PyPI supplied that version."""
     if latest is None:
         return False
-    output = _command_output(result).lower()
-    package = f"mainbranch=={latest}".lower()
-    return package in output and ("no matching version" in output or "no version" in output)
+    output = _command_output(result)
+    pattern = (
+        rf"\bno (?:matching )?version(?: found)? for[ \t]+mainbranch=={re.escape(latest)}"
+        r"(?![\w.+-])"
+    )
+    return re.search(pattern, output, flags=re.IGNORECASE) is not None
 
 
 def _run_command(
