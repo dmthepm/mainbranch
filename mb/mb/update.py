@@ -132,6 +132,7 @@ def _uv_release_not_ready(result: subprocess.CompletedProcess[str], latest: str 
         rf"\bno (?:matching )?version(?: found)? for[ \t]+mainbranch=={re.escape(latest)}"
         r"(?![\w.+-])"
     )
+    # PyPI package names are case-insensitive, so accept MainBranch too.
     return re.search(pattern, output, flags=re.IGNORECASE) is not None
 
 
