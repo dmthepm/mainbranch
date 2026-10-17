@@ -1161,6 +1161,50 @@ def test_update_uv_install_failure_surfaces_command(monkeypatch: Any, tmp_path: 
     assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
 
 
+@pytest.mark.parametrize(
+    ("stderr", "release_not_ready"),
+    [
+        ("error: No matching version found for mainbranch==9.9.9", True),
+        ("error: No matching version found for mainbranch==8.8.8", False),
+        ("error: network unreachable for mainbranch==9.9.9", False),
+        ("error: No matching version found for otherpkg==1\nmainbranch==9.9.9", False),
+        ("error: No matching version found for mainbranch==9.9.90", False),
+    ],
+)
+def test_update_uv_just_published_retry_message(
+    monkeypatch: Any, tmp_path: Path, stderr: str, release_not_ready: bool
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return _completed(args, returncode=1, stderr=stderr)
+
+    monkeypatch.setattr(update_mod, "install_mode", lambda: "uv")
+    monkeypatch.setattr(update_mod, "engine_root", lambda: tmp_path / "_engine")
+    monkeypatch.setattr(update_mod, "_latest_pypi_version", lambda: "9.9.9")
+    monkeypatch.setattr("mb.update.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(update_mod, "_run_command", fake_run)
+
+    result = update_mod.run(
+        repo=tmp_path / "biz", interactive=True, confirm=lambda command, root: True
+    )
+
+    assert result["ok"] is False
+    assert result["upgrade_performed"] is False
+    assert result["new_version"] == result["old_version"]
+    assert _installer_calls(calls) == [["uv", "tool", "install", "--refresh", "mainbranch==9.9.9"]]
+    if release_not_ready:
+        assert result["errors"] == [
+            "Main Branch 9.9.9 is a new release and uv cannot find it yet. "
+            "Your current install is unchanged. Retry `mb update` in a few minutes."
+        ]
+        assert result["next_actions"] == []
+    else:
+        assert stderr in result["errors"][0]
+        assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
+
+
 def test_update_uv_missing_binary_returns_error(monkeypatch: Any, tmp_path: Path) -> None:
     monkeypatch.setattr(update_mod, "install_mode", lambda: "uv")
     monkeypatch.setattr(update_mod, "engine_root", lambda: tmp_path / "_engine")
@@ -2517,6 +2561,233 @@ def test_update_adds_entry_rules_to_069_claude_and_keeps_operator_notes(
     assert text.count(claude_guidance.BEGIN) == text.count(claude_guidance.END) == 1
     assert text.count("## Trials and readouts") == 1
     assert claude_guidance.plan(business_repo) == (None, None)
+
+
+def test_update_replaces_0611_repair_claim_outside_managed_block(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path
+) -> None:
+    from mb.init import _read_template
+
+    template = _read_template("CLAUDE.md.tmpl")
+    new = (
+        "Before an apply command succeeds,\n"
+        "describe the repair as a proposed step. After it succeeds, say which command\n"
+        "ran, then ask the operator to restart Claude Code from this repo and try\n"
+        "`/mb-start` again."
+    )
+    old = (
+        "Until a repair command succeeds,\n"
+        "describe the repair as proposed. After applying it, tell the operator:\n"
+        '"I repaired missing Main Branch start wiring in this business folder;\n'
+        'restart Claude Code from this repo and try `/mb-start` again."'
+    )
+    assert new in template
+    prior = template.replace(new, old) + "\n## Operator notes\n\nKeep this.\n"
+    (business_repo / "CLAUDE.md").write_text(prior, encoding="utf-8")
+    _commit_all(business_repo, "0.6.11 Claude guidance")
+    calls: list[list[str]] = []
+    _wheel_update_env(monkeypatch, calls)
+
+    check = update_mod.run(repo=business_repo, check=True)
+    assert "CLAUDE.md" in check["surface_refresh"]["planned"]["tracked_files"]
+    assert (business_repo / "CLAUDE.md").read_text(encoding="utf-8") == prior
+
+    result = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+    assert result["ok"] is True, result["errors"]
+    updated = (business_repo / "CLAUDE.md").read_text(encoding="utf-8")
+    assert old not in updated
+    assert new in updated
+    assert updated.endswith("## Operator notes\n\nKeep this.\n")
+    assert claude_guidance.plan(business_repo) == (None, None)
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_claude_guidance_replaces_one_exact_0611_paragraph(tmp_path: Path, newline: str) -> None:
+    from mb.init import _read_template
+
+    current = _read_template("CLAUDE.md.tmpl")
+    old = claude_guidance._OLD_REPAIR_CLAIM
+    new = claude_guidance._NEW_REPAIR_GUIDANCE
+    prior = current.replace(new, old).replace("\n", newline)
+    path = tmp_path / "CLAUDE.md"
+    path.write_bytes(prior.encode())
+
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert warning is None and planned is not None
+    assert planned == current.replace("\n", newline)
+    claude_guidance.apply(tmp_path, planned)
+    assert path.read_bytes() == current.replace("\n", newline).encode()
+    assert claude_guidance.plan(tmp_path) == (None, None)
+
+
+@pytest.mark.parametrize("fence", ["```text", "~~~text"])
+def test_claude_guidance_preserves_old_paragraph_in_fenced_example(
+    tmp_path: Path, fence: str
+) -> None:
+    from mb.init import _read_template
+
+    template = _read_template("CLAUDE.md.tmpl")
+    claim_at = template.index(claude_guidance._NEW_REPAIR_GUIDANCE)
+    current = template[
+        template.index("## First-run setup intent") : template.index("\n\n", claim_at)
+    ]
+    current = current.replace(
+        claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM
+    )
+    closing = fence[:3]
+    prior = f"# Operator notes\n\n{fence}\n\n{current}\n\n{closing}\n"
+    (tmp_path / "CLAUDE.md").write_text(prior, encoding="utf-8")
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert planned is not None
+    assert current in planned
+    assert warning is not None and "CLAUDE.md" in warning
+
+
+def test_update_check_warns_without_rewriting_fenced_repair_example(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path
+) -> None:
+    from mb.init import _read_template
+
+    template = _read_template("CLAUDE.md.tmpl")
+    old = template.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
+    claim_at = old.index(claude_guidance._OLD_REPAIR_CLAIM)
+    section = old[old.index("## First-run setup intent") : old.index("\n\n", claim_at)]
+    prior = f"# Operator notes\n\n```text\n\n{section}\n\n```\n"
+    path = business_repo / "CLAUDE.md"
+    path.write_text(prior, encoding="utf-8")
+    _commit_all(business_repo, "operator example")
+    _wheel_update_env(monkeypatch, [])
+
+    result = update_mod.run(repo=business_repo, check=True)
+    assert claude_guidance.REPAIR_NOTICE in result["warnings"]
+    assert path.read_text(encoding="utf-8") == prior
+
+
+def test_claude_guidance_preserves_paragraph_without_generated_section(tmp_path: Path) -> None:
+    from mb.init import _read_template
+
+    template = _read_template("CLAUDE.md.tmpl")
+    claim_at = template.index(claude_guidance._NEW_REPAIR_GUIDANCE)
+    old = template[template.rfind("\n\n", 0, claim_at) + 2 : template.index("\n\n", claim_at)]
+    old = old.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
+    prior = f"# Operator notes\n\n{old}\n"
+    (tmp_path / "CLAUDE.md").write_text(prior, encoding="utf-8")
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert planned is not None and old in planned
+    assert warning is not None and "CLAUDE.md" in warning
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_claude_guidance_replaces_only_real_section_beside_fenced_copy(
+    tmp_path: Path, newline: str
+) -> None:
+    from mb.init import _read_template
+
+    current = _read_template("CLAUDE.md.tmpl")
+    old = current.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
+    claim_at = old.index(claude_guidance._OLD_REPAIR_CLAIM)
+    section = old[old.index("## First-run setup intent") : old.index("\n\n", claim_at)]
+    fenced = f"```text\n{section}\n```\n"
+    prior = (old + "\n" + fenced).replace("\n", newline)
+    path = tmp_path / "CLAUDE.md"
+    path.write_bytes(prior.encode())
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert planned is not None
+    assert planned.count(claude_guidance._OLD_REPAIR_CLAIM.replace("\n", newline)) == 1
+    assert planned.endswith(fenced.replace("\n", newline))
+    assert warning is not None
+    claude_guidance.apply(tmp_path, planned)
+    assert claude_guidance.plan(tmp_path) == (None, warning)
+
+
+def test_claude_guidance_replaces_generated_section_at_eof_without_newline(tmp_path: Path) -> None:
+    from mb.init import _read_template
+
+    current = _read_template("CLAUDE.md.tmpl")
+    old = current.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
+    claim_at = old.index(claude_guidance._OLD_REPAIR_CLAIM)
+    section = old[old.index("## First-run setup intent") : old.index("\n\n", claim_at)]
+    path = tmp_path / "CLAUDE.md"
+    path.write_text(
+        old[: old.index(section)] + "```text\n" + section + "\n```\n\n" + section, encoding="utf-8"
+    )
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert warning is not None
+    assert planned is not None and planned.count(claude_guidance._OLD_REPAIR_CLAIM) == 1
+    assert planned.endswith(claude_guidance._NEW_REPAIR_GUIDANCE)
+    claude_guidance.apply(tmp_path, planned)
+    assert claude_guidance.plan(tmp_path)[0] is None
+
+
+@pytest.mark.parametrize("edit", ["duplicate_section", "operator_edit"])
+def test_claude_guidance_preserves_ambiguous_0611_paragraph(tmp_path: Path, edit: str) -> None:
+    from mb.init import _read_template
+
+    current = _read_template("CLAUDE.md.tmpl")
+    old = current.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
+    paragraph_end = old.index("\n\n", old.index(claude_guidance._OLD_REPAIR_CLAIM))
+    if edit == "duplicate_section":
+        section = old[old.index("## First-run setup intent") : paragraph_end]
+        prior = old + "\n\n" + section + "\n"
+    else:
+        prior = old.replace("The most common cause", "An operator's suspected cause")
+    path = tmp_path / "CLAUDE.md"
+    path.write_text(prior, encoding="utf-8")
+
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert planned is None
+    assert warning is not None and "CLAUDE.md" in warning
+    assert path.read_text(encoding="utf-8") == prior
+
+
+def test_claude_guidance_refreshes_markers_while_preserving_repeated_repair(
+    tmp_path: Path,
+) -> None:
+    from mb.init import _read_template
+
+    current = _read_template("CLAUDE.md.tmpl")
+    old = current.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
+    claim_at = old.index(claude_guidance._OLD_REPAIR_CLAIM)
+    paragraph = old[old.rfind("\n\n", 0, claim_at) + 2 : old.index("\n\n", claim_at)]
+    prior = old.replace("## Trials and readouts", "## Legacy trials") + "\n\n" + paragraph + "\n"
+    path = tmp_path / "CLAUDE.md"
+    path.write_text(prior, encoding="utf-8")
+
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert planned is not None and warning is not None
+    assert planned.count(paragraph) == 1
+    assert planned.count(claude_guidance._NEW_REPAIR_GUIDANCE) == 1
+    assert "## Legacy trials" not in planned
+    claude_guidance.apply(tmp_path, planned)
+    assert path.read_text(encoding="utf-8") == planned
+    assert claude_guidance.plan(tmp_path) == (None, warning)
+
+
+def test_claude_guidance_appends_markers_but_preserves_isolated_repair(
+    tmp_path: Path,
+) -> None:
+    from mb.init import _read_template
+
+    current = _read_template("CLAUDE.md.tmpl")
+    claim_at = current.index(claude_guidance._NEW_REPAIR_GUIDANCE)
+    paragraph = current[current.rfind("\n\n", 0, claim_at) + 2 : current.index("\n\n", claim_at)]
+    old_paragraph = paragraph.replace(
+        claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM
+    )
+    prior = ("# Operator notes\n\n" + old_paragraph + "\n\nKeep this.\n").replace("\n", "\r\n")
+    path = tmp_path / "CLAUDE.md"
+    path.write_bytes(prior.encode())
+
+    planned, warning = claude_guidance.plan(tmp_path)
+    assert planned is not None and warning == claude_guidance.REPAIR_NOTICE
+    assert old_paragraph.replace("\n", "\r\n") in planned
+    assert paragraph.replace("\n", "\r\n") not in planned
+    assert planned.startswith("# Operator notes\r\n\r\n")
+    assert "Keep this.\r\n" in planned
+    claude_guidance.apply(tmp_path, planned)
+    assert claude_guidance.plan(tmp_path) == (None, claude_guidance.REPAIR_NOTICE)
 
 
 def test_update_appends_entry_rules_to_hand_edited_claude_once_with_approval(

@@ -60,6 +60,9 @@ def _assert_claude_md_cli_first_contract(text: str) -> None:
     assert "business brain" in normalized
     assert "If `/mb-start` is not discoverable" in text
     assert "restart Claude Code from this repo and try" in text
+    assert "I repaired missing Main Branch start wiring" not in text
+    assert "Before an apply command succeeds" in text
+    assert "say which command" in text
     assert "business-owner language" in text
     assert "bets, goals, offers, pushes" in text
     assert "playbooks, outcomes" in text
