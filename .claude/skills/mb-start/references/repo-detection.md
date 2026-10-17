@@ -166,7 +166,7 @@ test -e "$REPO_PATH/.claude/skills/mb-start" && echo "START_BRIDGE_OK"
 
 **If bridge links missing** (but `additionalDirectories` exists): run the standard repair from [auto-heal.md](auto-heal.md), targeting `REPO_PATH`.
 
-Tell the user: "Repaired missing Main Branch bridge links in **[repo-name]**. Local custom skills are preserved."
+Before the repair command succeeds, describe the bridge repair as a proposed step. After it succeeds, name the command that ran, say the missing bridge links in **[repo-name]** were repaired, and ask the operator to restart Claude Code from that repo and try `/mb-start`.
 
 **If `/mb-start` was invoked from a Main Branch source checkout:** always run this verification block for the selected `REPO_PATH` before routing. This is the migration safety net for existing users.
 

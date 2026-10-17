@@ -466,10 +466,10 @@ Desktop app or the `claude` CLI. From this business repo, check `mb --version`,
 run `mb start --json` and `mb status --json --peek`, inspect repair options
 with `mb doctor repair --plan`, then ask before running any write/apply command
 such as `mb skill link --repo .`, `mb skill repair --repo . --apply`,
-`mb doctor repair --apply`, or `mb update`. Until a repair command succeeds,
-describe the repair as proposed. After applying it, tell the operator:
-"I repaired missing Main Branch start wiring in this business folder;
-restart Claude Code from this repo and try `/mb-start` again."
+`mb doctor repair --apply`, or `mb update`. Before an apply command succeeds,
+describe the repair as a proposed step. After it succeeds, say which command
+ran, then ask the operator to restart Claude Code from this repo and try
+`/mb-start` again.
 
 If `mb status --json --peek` reports `update.severity` as `recommended` or
 `required`, make that the only recommendation before business routing. Name the

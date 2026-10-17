@@ -117,6 +117,19 @@ GITHUB_RELEASE_API_URL_TEMPLATE = (
     "https://api.github.com/repos/noontide-co/mainbranch/releases/tags/oe-v{version}"
 )
 COMMAND_TIMEOUT_SECONDS = 120.0
+UV_RELEASE_NOT_READY_MESSAGE = (
+    "Main Branch {version} is a new release and uv cannot find it yet. "
+    "Your current install is unchanged. Retry `mb update` in a few minutes."
+)
+
+
+def _uv_release_not_ready(result: subprocess.CompletedProcess[str], latest: str | None) -> bool:
+    """Recognize uv's missing pinned version after PyPI supplied that version."""
+    if latest is None:
+        return False
+    output = _command_output(result).lower()
+    package = f"mainbranch=={latest}".lower()
+    return package in output and ("no matching version" in output or "no version" in output)
 
 
 def _run_command(
@@ -1569,8 +1582,11 @@ def run(
             if upgrade.returncode != 0:
                 result["ok"] = False
                 result["new_version"] = result["old_version"]
-                result["errors"].append(_command_error(uv_command, upgrade))
-                result["next_actions"].append(uv_command)
+                if _uv_release_not_ready(upgrade, latest):
+                    result["errors"].append(UV_RELEASE_NOT_READY_MESSAGE.format(version=latest))
+                else:
+                    result["errors"].append(_command_error(uv_command, upgrade))
+                    result["next_actions"].append(uv_command)
                 return result
             result["new_version"] = _version_from_mb_command() or result["old_version"]
             result["upgrade_performed"] = True

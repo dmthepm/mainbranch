@@ -11,6 +11,18 @@ BEGIN = "<!-- mainbranch:entry-rules:begin -->"
 END = "<!-- mainbranch:entry-rules:end -->"
 _OLD_ANCHOR = "## First-run setup intent"
 _OLD_SIGNATURE = "Main Branch CLI facts are the source of truth for repo health"
+_OLD_REPAIR_CLAIM = (
+    "Until a repair command succeeds,\n"
+    "describe the repair as proposed. After applying it, tell the operator:\n"
+    '"I repaired missing Main Branch start wiring in this business folder;\n'
+    'restart Claude Code from this repo and try `/mb-start` again."'
+)
+_NEW_REPAIR_GUIDANCE = (
+    "Before an apply command succeeds,\n"
+    "describe the repair as a proposed step. After it succeeds, say which command\n"
+    "ran, then ask the operator to restart Claude Code from this repo and try\n"
+    "`/mb-start` again."
+)
 APPEND_NOTICE = (
     "CLAUDE.md has no managed entry rule markers or known 0.6.9 anchor; "
     "mb update can append the marked entry rules after the operator's text with approval."
@@ -53,7 +65,8 @@ def plan(repo: Path) -> tuple[str | None, str | None]:
         updated = existing[:start] + block + newline * 2 + existing[start:]
     else:
         updated = existing + (newline if existing.endswith("\n") else newline * 2) + block + newline
-        return updated, APPEND_NOTICE
+        return updated.replace(_OLD_REPAIR_CLAIM, _NEW_REPAIR_GUIDANCE), APPEND_NOTICE
+    updated = updated.replace(_OLD_REPAIR_CLAIM, _NEW_REPAIR_GUIDANCE)
     return (updated if updated != existing else None), None
 
 

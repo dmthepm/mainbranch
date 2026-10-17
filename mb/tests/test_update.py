@@ -1161,6 +1161,48 @@ def test_update_uv_install_failure_surfaces_command(monkeypatch: Any, tmp_path: 
     assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
 
 
+@pytest.mark.parametrize(
+    ("stderr", "release_not_ready"),
+    [
+        ("error: No matching version found for mainbranch==9.9.9", True),
+        ("error: No matching version found for mainbranch==8.8.8", False),
+        ("error: network unreachable for mainbranch==9.9.9", False),
+    ],
+)
+def test_update_uv_just_published_retry_message(
+    monkeypatch: Any, tmp_path: Path, stderr: str, release_not_ready: bool
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return _completed(args, returncode=1, stderr=stderr)
+
+    monkeypatch.setattr(update_mod, "install_mode", lambda: "uv")
+    monkeypatch.setattr(update_mod, "engine_root", lambda: tmp_path / "_engine")
+    monkeypatch.setattr(update_mod, "_latest_pypi_version", lambda: "9.9.9")
+    monkeypatch.setattr("mb.update.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(update_mod, "_run_command", fake_run)
+
+    result = update_mod.run(
+        repo=tmp_path / "biz", interactive=True, confirm=lambda command, root: True
+    )
+
+    assert result["ok"] is False
+    assert result["upgrade_performed"] is False
+    assert result["new_version"] == result["old_version"]
+    assert _installer_calls(calls) == [["uv", "tool", "install", "--refresh", "mainbranch==9.9.9"]]
+    if release_not_ready:
+        assert result["errors"] == [
+            "Main Branch 9.9.9 is a new release and uv cannot find it yet. "
+            "Your current install is unchanged. Retry `mb update` in a few minutes."
+        ]
+        assert result["next_actions"] == []
+    else:
+        assert stderr in result["errors"][0]
+        assert "uv tool install --refresh mainbranch==9.9.9" in result["next_actions"]
+
+
 def test_update_uv_missing_binary_returns_error(monkeypatch: Any, tmp_path: Path) -> None:
     monkeypatch.setattr(update_mod, "install_mode", lambda: "uv")
     monkeypatch.setattr(update_mod, "engine_root", lambda: tmp_path / "_engine")
@@ -2516,6 +2558,46 @@ def test_update_adds_entry_rules_to_069_claude_and_keeps_operator_notes(
     assert text.endswith("## Operator notes\n\nKeep this.\n")
     assert text.count(claude_guidance.BEGIN) == text.count(claude_guidance.END) == 1
     assert text.count("## Trials and readouts") == 1
+    assert claude_guidance.plan(business_repo) == (None, None)
+
+
+def test_update_replaces_0611_repair_claim_outside_managed_block(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path
+) -> None:
+    from mb.init import _read_template
+
+    template = _read_template("CLAUDE.md.tmpl")
+    new = (
+        "Before an apply command succeeds,\n"
+        "describe the repair as a proposed step. After it succeeds, say which command\n"
+        "ran, then ask the operator to restart Claude Code from this repo and try\n"
+        "`/mb-start` again."
+    )
+    old = (
+        "Until a repair command succeeds,\n"
+        "describe the repair as proposed. After applying it, tell the operator:\n"
+        '"I repaired missing Main Branch start wiring in this business folder;\n'
+        'restart Claude Code from this repo and try `/mb-start` again."'
+    )
+    assert new in template
+    prior = template.replace(new, old) + "\n## Operator notes\n\nKeep this.\n"
+    (business_repo / "CLAUDE.md").write_text(prior, encoding="utf-8")
+    _commit_all(business_repo, "0.6.11 Claude guidance")
+    calls: list[list[str]] = []
+    _wheel_update_env(monkeypatch, calls)
+
+    check = update_mod.run(repo=business_repo, check=True)
+    assert "CLAUDE.md" in check["surface_refresh"]["planned"]["tracked_files"]
+    assert (business_repo / "CLAUDE.md").read_text(encoding="utf-8") == prior
+
+    result = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+    assert result["ok"] is True, result["errors"]
+    updated = (business_repo / "CLAUDE.md").read_text(encoding="utf-8")
+    assert old not in updated
+    assert new in updated
+    assert updated.endswith("## Operator notes\n\nKeep this.\n")
     assert claude_guidance.plan(business_repo) == (None, None)
 
 
