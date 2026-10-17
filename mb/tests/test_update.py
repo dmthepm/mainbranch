@@ -2603,6 +2603,142 @@ def test_update_replaces_0611_repair_claim_outside_managed_block(
     assert claude_guidance.plan(business_repo) == (None, None)
 
 
+_LEGACY_CLAUDE_FIXTURES = Path(__file__).parent / "fixtures" / "claude_guidance"
+_LEGACY_REPAIR_CLAIM = (
+    "After repairing skill wiring, tell\n"
+    'the operator: "I repaired missing Main Branch start wiring in this business\n'
+    'folder; restart Claude Code from this repo and try `/mb-start` again."'
+)
+
+
+def _released_legacy_section(tag: str) -> bytes:
+    template = (_LEGACY_CLAUDE_FIXTURES / f"{tag}-CLAUDE.md.tmpl").read_bytes()
+    start = template.index(b"## First-run setup intent")
+    end = template.index(_LEGACY_REPAIR_CLAIM.encode(), start) + len(_LEGACY_REPAIR_CLAIM)
+    return template[start:end]
+
+
+@pytest.mark.parametrize("tag", ["oe-v0.6.9", "oe-v0.6.10"])
+def test_legacy_repair_section_matches_released_template_bytes(tag: str) -> None:
+    template = (_LEGACY_CLAUDE_FIXTURES / f"{tag}-CLAUDE.md.tmpl").read_bytes()
+    rendered = (_LEGACY_CLAUDE_FIXTURES / f"{tag}-CLAUDE.md").read_bytes()
+    section = claude_guidance._OLD_069_0610_GENERATED_SECTION.encode()
+    assert section == _released_legacy_section(tag)
+    assert template.count(section) == 1
+    assert rendered.count(section) == 1
+
+
+def _legacy_claude_case(repo: Path, tag: str, newline: str) -> tuple[Path, bytes, bytes]:
+    source = (_LEGACY_CLAUDE_FIXTURES / f"{tag}-CLAUDE.md").read_bytes()
+    original = source.replace(b"\n", newline.encode())
+    baseline = (
+        _LEGACY_CLAUDE_FIXTURES
+        / f"{tag}-{'crlf' if newline == chr(13) + chr(10) else 'lf'}-base-CLAUDE.md"
+    ).read_bytes()
+    path = repo / "CLAUDE.md"
+    path.write_bytes(original)
+    _commit_all(repo, "Released Claude guidance")
+    return path, original, baseline
+
+
+@pytest.mark.parametrize("tag", ["oe-v0.6.9", "oe-v0.6.10"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_a1_legacy_update_changes_only_repair_claim_beyond_base_entry_rules(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tag: str, newline: str
+) -> None:
+    path, original, baseline = _legacy_claude_case(business_repo, tag, newline)
+    _wheel_update_env(monkeypatch, [])
+    old = _LEGACY_REPAIR_CLAIM.replace("\n", newline).encode()
+    new = claude_guidance._NEW_REPAIR_GUIDANCE.replace("\n", newline).encode()
+    assert original.count(old) == baseline.count(old) == 1
+
+    result = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+
+    assert result["ok"] is True, result["errors"]
+    assert path.read_bytes() == baseline.replace(old, new)
+
+
+@pytest.mark.parametrize("tag", ["oe-v0.6.9", "oe-v0.6.10"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_a2_legacy_update_second_approved_run_changes_nothing(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tag: str, newline: str
+) -> None:
+    path, _, _ = _legacy_claude_case(business_repo, tag, newline)
+    _wheel_update_env(monkeypatch, [])
+
+    def approve(_repo: Path, _files: list[str]) -> bool:
+        return True
+
+    first = update_mod.run(repo=business_repo, interactive=True, confirm_surfaces=approve)
+    assert first["ok"] is True, first["errors"]
+    assert claude_guidance._NEW_REPAIR_GUIDANCE.replace("\n", newline).encode() in path.read_bytes()
+    before = _git(business_repo, "diff", "--binary")
+
+    second = update_mod.run(repo=business_repo, interactive=True, confirm_surfaces=approve)
+
+    assert second["ok"] is True, second["errors"]
+    assert _git(business_repo, "diff", "--binary") == before
+
+
+@pytest.mark.parametrize("tag", ["oe-v0.6.9", "oe-v0.6.10"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_a3_legacy_update_preserves_fenced_indented_and_quoted_copies(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tag: str, newline: str
+) -> None:
+    path, original, _ = _legacy_claude_case(business_repo, tag, newline)
+    section = _released_legacy_section(tag).decode()
+    copies = (
+        (
+            "```text\n"
+            + section
+            + "\n```\n\n"
+            + "~~~text\n"
+            + section
+            + "\n~~~\n\n"
+            + "\n".join("    " + line for line in section.split("\n"))
+            + "\n\n"
+            + "\n".join("> " + line for line in section.split("\n"))
+            + "\n"
+        )
+        .replace("\n", newline)
+        .encode()
+    )
+    path.write_bytes(original + newline.encode() + copies)
+    _commit_all(business_repo, "Operator examples")
+    _wheel_update_env(monkeypatch, [])
+
+    result = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+
+    assert result["ok"] is True, result["errors"]
+    updated = path.read_bytes()
+    assert claude_guidance._NEW_REPAIR_GUIDANCE.replace("\n", newline).encode() in updated
+    assert updated.endswith(copies)
+
+
+@pytest.mark.parametrize("tag", ["oe-v0.6.9", "oe-v0.6.10"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_a4_legacy_update_check_and_unapproved_run_leave_file_untouched(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tag: str, newline: str
+) -> None:
+    path, original, baseline = _legacy_claude_case(business_repo, tag, newline)
+    _wheel_update_env(monkeypatch, [])
+    old = _LEGACY_REPAIR_CLAIM.replace("\n", newline).encode()
+    new = claude_guidance._NEW_REPAIR_GUIDANCE.replace("\n", newline).encode()
+    planned, _ = claude_guidance.plan(business_repo)
+    assert planned is not None and planned.encode() == baseline.replace(old, new)
+
+    checked = update_mod.run(repo=business_repo, check=True)
+    assert "CLAUDE.md" in checked["surface_refresh"]["planned"]["tracked_files"]
+    assert path.read_bytes() == original
+    unapproved = update_mod.run(repo=business_repo, interactive=False)
+    assert "CLAUDE.md" in unapproved["surface_refresh"]["planned"]["tracked_files"]
+    assert path.read_bytes() == original
+
+
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
 def test_claude_guidance_replaces_one_exact_0611_paragraph(tmp_path: Path, newline: str) -> None:
     from mb.init import _read_template
