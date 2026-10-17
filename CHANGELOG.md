@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.12] - 2026-10-17
+
 ### Fixed
 
 - `mb update` replaces the canned repair claim in business folders created by 0.6.9 and 0.6.10 after approval.
