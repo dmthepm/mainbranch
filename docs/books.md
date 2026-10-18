@@ -268,6 +268,7 @@ The shipped safe setup surfaces are:
 mb books check [REPO] [--fixture] [--fixture-path PATH] [--json]
 mb books status [REPO] [--json]
 mb books doctor [REPO] --plan [--json]
+mb books doctor --repo PATH [--doctor-timeout SECONDS] [--json]
 ```
 
 The shipped sample reporting surface is:
@@ -342,8 +343,17 @@ gaps:
 - move unsafe tracked finance artifacts out of the business repo.
 
 It does not apply repairs yet. The plan is designed for operator
-review and avoids printing private external vault paths or real
-financial data.
+review and avoids printing private external vault paths or real financial data.
+
+`mb books doctor --repo PATH` checks a private books repo against the
+[statement-anchored workflow](books-workflow.md). It checks the year entrypoint,
+typed root accounts, rules status, tracked evidence, manifest hashes, and
+commodity declarations. It runs the repo's declared doctor when hledger is
+available, then reports only its exit status and timing. The command also
+counts open and resolved blockers and summarizes a validated doctor receipt.
+Doctor output and absolute configured paths are never printed. A business repo
+may set `books_repo` in `core/finance/books.md` to use this mode without
+`--repo`. `--plan` keeps its existing setup-plan behavior.
 
 `mb books report monthly --sample` generates a beginner-safe monthly report
 from packaged fake hledger data through hledger. If hledger is unavailable, the

@@ -111,6 +111,49 @@ The [synthetic repo template](../mb/mb/_data/books/repo-template/README.md)
 shows the file shape and a small passing check. Its rows are invented and are
 only for learning and tests.
 
+## Read-only books doctor
+
+Run `mb books doctor --repo PATH` to check a books repo. Set `books_repo` in
+the business repo's `core/finance/books.md` to use `mb books doctor` from that
+repo. The configuration may use a relative or absolute path; output uses only
+a generic books repo label. The command checks the repo shape, runs the declared
+doctor when hledger is available, and counts blockers without printing their
+summaries. It never reads evidence bytes or writes to the books repo.
+
+Declare the doctor in a root `books.toml`:
+
+```toml
+[mb]
+doctor_command = "bin/books doctor"
+```
+
+If `books.toml` is absent, an executable `bin/books` supplies the same default
+command. The command runs from the books repo with standard input closed, no
+shell, a 600-second default timeout, and `PYTHONPATH` removed. Set
+`--doctor-timeout SECONDS` for a different positive timeout. Its standard
+output and standard error are discarded. When hledger is unavailable, the
+declared doctor is not run (reported as `not_run` at level `info`); shape
+checks and the receipt still work.
+
+An optional `reports/doctor-receipt.json` records a doctor run on another host:
+
+```json
+{
+  "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "finished_at": "2026-10-18T00:00:00Z",
+  "exit_code": 0,
+  "hledger_version": "hledger version",
+  "controls": 4
+}
+```
+
+Use exactly these five fields: a 40-character hex commit, an ISO 8601 time
+with timezone, an integer exit code, a hledger version string, and a
+nonnegative integer control count. The receipt is stale when its commit differs
+from the books repo HEAD. Invalid receipts produce a finding; unknown fields
+are never printed. This format records aggregate control status only, never
+transaction rows or doctor output.
+
 ## Keep Real Records Private
 
 The business repo holds safe policy and summaries. Real journals and detailed
