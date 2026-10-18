@@ -127,7 +127,15 @@ def test_b3_doctor_output_never_leaks(tmp_path: Path, monkeypatch: pytest.Monkey
         assert result.exit_code == 1
         assert "SECRET_PAYEE" not in result.output
         assert "123456789012" not in result.output
-        assert "3" in result.output
+    code, payload = _invoke(repo)
+    assert code == 1
+    assert payload["doctor"]["ran"] is True  # type: ignore[index]
+    assert payload["doctor"]["exit_code"] == 3  # type: ignore[index]
+    findings = cast(list[dict[str, str]], payload["findings"])
+    assert [(item["rule"], item["level"]) for item in findings] == [("doctor_failed", "error")]
+    human = RUNNER.invoke(app, ["books", "doctor", "--repo", str(repo)])
+    assert "[error] doctor_failed" in human.output
+    assert "exit 3" in human.output
     doctor.write_text("#!/bin/sh\nsleep 2\n")
     code, payload = _invoke(repo, "--doctor-timeout", "1")
     assert code == 1
@@ -136,7 +144,17 @@ def test_b3_doctor_output_never_leaks(tmp_path: Path, monkeypatch: pytest.Monkey
 
 def test_b4_doctor_repo_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path)
-    _fake_hledger(tmp_path, monkeypatch)
+    log = tmp_path / "commands.log"
+    shims = tmp_path / "shims"
+    shims.mkdir()
+    real_git = shutil.which("git")
+    assert real_git
+    (shims / "git").write_text(f'#!/bin/sh\necho "git $*" >> "{log}"\nexec "{real_git}" "$@"\n')
+    (shims / "hledger").write_text(f'#!/bin/sh\necho "hledger $*" >> "{log}"\nexit 0\n')
+    for shim in shims.iterdir():
+        shim.chmod(0o755)
+    (repo / "bin/books").write_text(f'#!/bin/sh\necho "doctor $*" >> "{log}"\nexit 0\n')
+    _git(repo, "commit", "-qam", "logging doctor")
     before = {
         str(path.relative_to(repo)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in repo.rglob("*")
@@ -151,7 +169,9 @@ def test_b4_doctor_repo_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyP
         return original_run(args, **kwargs)
 
     monkeypatch.setattr("mb.books_repo.subprocess.run", record_run)
-    code, _ = _invoke(repo)
+    with monkeypatch.context() as path_env:
+        path_env.setenv("PATH", f"{shims}:{os.environ['PATH']}")
+        code, _ = _invoke(repo)
     monkeypatch.setattr("mb.books_repo.subprocess.run", original_run)
     after = {
         str(path.relative_to(repo)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -166,6 +186,11 @@ def test_b4_doctor_repo_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyP
         ["git", "rev-parse", "HEAD"],
         ["bin/books", "doctor"],
     ]
+    ran = log.read_text().splitlines()
+    assert "doctor doctor" in ran
+    others = [line for line in ran if line != "doctor doctor"]
+    assert others
+    assert all(line.startswith(("git rev-parse", "git ls-files")) for line in others), others
 
 
 def test_b5_no_hledger_host_reads_receipt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -176,7 +201,10 @@ def test_b5_no_hledger_host_reads_receipt(tmp_path: Path, monkeypatch: pytest.Mo
     code, payload = _invoke(repo)
     assert code == 0
     assert payload["doctor"]["ran"] is False  # type: ignore[index]
+    assert payload["doctor"]["status"] == "not_run"  # type: ignore[index]
+    assert payload["doctor"]["level"] == "info"  # type: ignore[index]
     assert payload["doctor"]["reason"] == "hledger unavailable here"  # type: ignore[index]
+    assert not [item for item in _rules(payload)]
     receipt = repo / "reports/doctor-receipt.json"
     data = json.loads(receipt.read_text())
     data["commit"] = _git(repo, "rev-parse", "HEAD")

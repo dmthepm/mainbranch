@@ -132,7 +132,8 @@ command. The command runs from the books repo with standard input closed, no
 shell, a 600-second default timeout, and `PYTHONPATH` removed. Set
 `--doctor-timeout SECONDS` for a different positive timeout. Its standard
 output and standard error are discarded. When hledger is unavailable, the
-declared doctor is not run; shape checks and the receipt still work.
+declared doctor is not run (reported as `not_run` at level `info`); shape
+checks and the receipt still work.
 
 An optional `reports/doctor-receipt.json` records a doctor run on another host:
 

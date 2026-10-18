@@ -207,6 +207,8 @@ def _doctor(repo: Path, timeout: int) -> tuple[dict[str, Any], list[dict[str, st
     if not shutil.which("hledger"):
         return {
             "ran": False,
+            "status": "not_run",
+            "level": "info",
             "reason": "hledger unavailable here",
             "exit_code": None,
             "duration_s": 0.0,
@@ -350,7 +352,9 @@ def render(report: dict[str, Any]) -> None:
             f"Declared doctor: exit {doctor['exit_code']}, timed out: {doctor['timed_out']}."
         )
     else:
-        typer.echo(f"Declared doctor: not run ({doctor['reason']}).")
+        level = doctor.get("level")
+        prefix = f"[{level}] " if level else ""
+        typer.echo(f"{prefix}Declared doctor: not run ({doctor['reason']}).")
     if report["receipt"]:
         receipt = report["receipt"]
         typer.echo(f"Doctor receipt: stale: {receipt['stale']}; exit {receipt['exit_code']}.")
