@@ -15,6 +15,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - Read-only `mb books doctor --repo` checks a books repo's shape, runs its declared doctor, and summarizes a safe receipt and blocker counts.
 - A statement-anchored books workflow, decision, and synthetic hledger repo template for private bookkeeping.
+- `/mb-ads` reference on Google Ads access for agents: a Read only reader user, why the OAuth scope and a read-only tool are not the safety boundary, and a reviewed Google Ads Script with DRY_RUN graduation as the default agent write route.
 
 ## [0.6.12] - 2026-10-17
 

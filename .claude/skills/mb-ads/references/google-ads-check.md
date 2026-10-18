@@ -21,8 +21,11 @@ Conversions column counts only once purchase parity (T2) is green.
 Main Branch does not ship a Google Ads read adapter. Prefer
 [Google's official read-only Google Ads MCP server](https://developers.google.com/google-ads/api/docs/developer-toolkit/mcp-server)
 when the operator has set it up and approved its use. It can discover accessible
-accounts and run reporting queries; it cannot change campaigns. Otherwise,
-use the operator's Google Ads exports. Gather:
+accounts and run reporting queries; it cannot change campaigns, but that does
+not make the credential read only: see
+[google-ads-agent-access.md](google-ads-agent-access.md) for the reader user,
+roles and the Script write route. Otherwise, use the operator's Google Ads
+exports. Gather:
 
 - Google Ads campaign, product, search-term and keyword figures for yesterday,
   the last 7 days and since launch; use CSV exports as the fallback, especially
