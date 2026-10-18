@@ -93,4 +93,7 @@ A worked provider instance lives in
 publishing a GTM container, creating a Google Ads conversion action, uploading
 offline conversions, and launching/budget changes are each mutations that run
 this contract, with the live-API automation operator-gated until smoke
-evidence exists.
+evidence exists. For agent access to Google Ads (a Read only reader user, why
+the OAuth scope and a read-only tool are not the boundary, and a reviewed
+Google Ads Script as the default agent write route), see
+[google-ads-agent-access.md](../.claude/skills/mb-ads/references/google-ads-agent-access.md).

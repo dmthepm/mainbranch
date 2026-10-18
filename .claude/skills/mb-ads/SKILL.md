@@ -324,7 +324,7 @@ Detect what the user wants from natural language. Route internally to the right 
 | "analytics", "instrumentation", "GA4", "Google Analytics", "GTM", "Meta pixel", "HubSpot form", "Calendly", "booking link", "form test" | Instrumentation | Route through `/mb-site` and `mb site check`; no provider mutation. Real GA4 sessions/conversions: `mb google ga4 report --json`, see [references/ga4-search-reads.md](references/ga4-search-reads.md) |
 | "check launch", "how are ads doing", "continue or kill" | Launch Check | Read status/outcomes/operator exports, recommend continue/change/stop |
 | "weekly pack", "daily read", "stop rules", "day-14 verdict" | Launch Plan / Check | Meta pack loop: [references/meta-pack-loop.md](references/meta-pack-loop.md) |
-| "Google Ads daily check", "search terms", "negatives" | Launch Check | Scored rubric: [references/google-ads-check.md](references/google-ads-check.md) |
+| "Google Ads daily check", "search terms", "negatives", "Google Ads access", "Ads Script" | Launch Check | Scored rubric: [references/google-ads-check.md](references/google-ads-check.md); read/write access and roles: [references/google-ads-agent-access.md](references/google-ads-agent-access.md) |
 | "Check my ad performance", "what's working" | Account Check | Read-only Meta Ads context if `mb connect` and runtime tools are ready |
 | "Give me 5 variations of this winning ad" | Performance Iteration | Pull winner + generate variants if account context is ready |
 | "What's working before we create?" | Pre-Gen Account Check | Account overview + creative audit if account context is ready |
