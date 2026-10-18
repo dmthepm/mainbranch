@@ -144,6 +144,7 @@ operators ship creatives, SaaS founders ship features.
 - `/mb-ads`
 - `/mb-organic`
 - `/mb-site`
+- `/mb-books` (read-only close and reconciliation review)
 - `mb connect`
 - `mb checkpoint`
 - `mb doctor repair --plan` / `--apply` (Ship through Ops: cleaning up a stale
@@ -251,6 +252,7 @@ mirror loop names. There is no requirement for skill-to-loop 1:1 mapping.
 | `/mb-bet close` | Reflect | Pure verdict-rendering |
 | `/mb-bet narrate` | Reflect → Ship | Render the lesson, then publish it |
 | `/mb-site` | Ship | Build + deploy in one motion |
+| `/mb-books` | Sense, Reflect | Review private books readiness and close state |
 | `/mb-ads` | Ship (with Reflect-style review gates) | Draft + post |
 | `/mb-end` | Reflect (with optional Ship of the reflection) | Session crystallize |
 | `mb status` (CLI) | Sense | Daily briefing |

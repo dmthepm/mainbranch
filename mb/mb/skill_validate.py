@@ -82,6 +82,7 @@ _MAIN_BRANCH_SLASH_COMMAND_RE = re.compile(
 )
 _CLI_FIRST_WINDOW_LINES = 140
 _CLI_FIRST_REQUIRED_COMMANDS = {
+    "mb-books": ("mb books check", "mb books doctor --repo"),
     "mb-ads": ("mb status --json --peek",),
     "mb-bet": ("mb status --json --peek", "mb validate --cross-refs"),
     "mb-end": ("mb status --json --peek", "mb checkpoint --plan --json"),

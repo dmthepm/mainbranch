@@ -7,6 +7,10 @@ encrypted/off-platform vault storage. The
 sets the boundary: `mb books` checks and summarizes; the books repo and hledger
 own entries and controls.
 
+Use `/mb-books` to review setup, monthly close, reconciliation, and CPA
+handoff from safe `mb books` facts. It reads the private repo's protocol and
+blocker state but never posts entries or opens evidence bytes.
+
 ## Settle a Statement Period
 
 1. Pull the books repo before editing. Allow one writer in that repo at a time.

@@ -355,6 +355,11 @@ Doctor output and absolute configured paths are never printed. A business repo
 may set `books_repo` in `core/finance/books.md` to use this mode without
 `--repo`. `--plan` keeps its existing setup-plan behavior.
 
+Use `/mb-books` for read-only setup, monthly close and reconciliation review,
+or CPA handoff preparation. It starts with `mb books check` and the safe
+`mb books doctor --repo` summary, then follows the private books repo's own
+protocol. It does not post entries or read evidence bytes.
+
 `mb books report monthly --sample` generates a beginner-safe monthly report
 from packaged fake hledger data through hledger. If hledger is unavailable, the
 command fails with install guidance instead of falling back to a non-hledger
