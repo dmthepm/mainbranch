@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.13] - 2026-10-18
+
 ### Added
 
 - `/mb-books` guides private books setup, close and reconciliation review, and CPA handoff using safe checks and a synthetic repo cold-start guide.
