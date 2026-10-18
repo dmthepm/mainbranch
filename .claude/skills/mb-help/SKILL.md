@@ -44,6 +44,7 @@ for repair facts before giving prose-only advice.
 | Reels, TikTok, organic, /mb-organic | [organic-help.md](references/organic-help.md) |
 | Skool, community | [skool-help.md](references/skool-help.md) |
 | Wiki, atomic notes, publish, WikiLinks | Route to `/mb-wiki` |
+| Books, bookkeeping, monthly close, reconciliation, CPA handoff | Route to `/mb-books` after `mb books check` |
 | Launch readiness, Cloudflare, Wrangler, Shopify, Resend, smoke test, form test, booking link | Route to `/mb-site`; run `mb launch check` before launch-readiness advice |
 | Site, landing page, lander, minisite, website, about page video, deploy site, publish site, conversion endpoint, concept variations | Route to `/mb-site` (see [skills-guide.md](references/skills-guide.md) for the full one-flow walkthrough) |
 | Done, wrapping up, closing, end session, end of day | Route to `/mb-end` |

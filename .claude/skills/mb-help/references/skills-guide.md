@@ -77,6 +77,15 @@ accepts that change.
 - `/mb-bet list` - Summarize active bets and deadlines
 - `/mb-bet narrate` - Draft site, community, or social narration from repo truth
 
+### /mb-books - Books Review
+**Use when:** Setting up a private books repo, reviewing monthly close or
+reconciliation, or preparing a CPA handoff.
+
+**What it does:** Runs safe `mb books` checks, reads the books repo's process
+docs and blocker state, then summarizes close readiness without exposing raw
+records. Journal posting and evidence review stay with the private books
+workflow and operator.
+
 ---
 
 ### /mb-ads - Ad Generation and Review

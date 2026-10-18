@@ -171,13 +171,16 @@ Route:
 
 ### Bookkeeping, books, finance, accounting
 
-Signals: bookkeeping, books, finance, accounting, chart of accounts, P&L,
-ledger, bank statements, restricted finance child repo, restricted repo topology,
-hledger, receipts, tax, payroll, revenue report.
+Signals: bookkeeping, books, finance, accounting, monthly close,
+reconciliation, CPA handoff, chart of accounts, P&L, ledger, bank statements,
+restricted finance child repo, restricted repo topology, hledger, receipts,
+tax, payroll, revenue report.
 
 Route:
 
 - Run `mb books check "$REPO_PATH" --json` before inventing structure.
+- For books setup, monthly close review, reconciliation review, or CPA handoff,
+  route to `/mb-books` after the books check.
 - For betting, spend, or risk intent, start from `mb status --json --peek`.
   Read `money_path.policy` and `money_path.active_bets` before recommending
   execution. If an active bet is unanchored, over cap, or thresholds are

@@ -96,6 +96,7 @@ CLAUDE_SKILL_SOURCE_NAMES = (
     "mb-ads",
     "mb-organic",
     "mb-site",
+    "mb-books",
     "mb-wiki",
     "mb-skill-concept",
     "mb-skill-brief-draft",
@@ -121,6 +122,7 @@ CODEX_GLOBAL_SKILL_NAMES = (
     "mb-ads",
     "mb-organic",
     "mb-site",
+    "mb-books",
     "mb-wiki",
     "mb-skill-concept",
     "mb-skill-brief-draft",
@@ -168,6 +170,7 @@ CODEX_GLOBAL_SKILL_DESCRIPTIONS = {
     "mb-ads": "Plan ads and paid creative from Main Branch facts.",
     "mb-organic": "Plan organic content from Main Branch facts.",
     "mb-site": "Plan pages and site readiness from Main Branch facts.",
+    "mb-books": "Review private books readiness from safe Main Branch facts.",
     "mb-wiki": "Explain wiki support status for Main Branch.",
     "mb-skill-concept": "Plan a Main Branch skill concept.",
     "mb-skill-brief-draft": "Draft a Main Branch skill brief.",
@@ -205,6 +208,7 @@ CODEX_GLOBAL_SKILL_FACTS: dict[str, tuple[str, ...]] = {
         "mb checkpoint --plan --json",
     ),
     "mb-wiki": ("mb workflow list --runtime codex --json",),
+    "mb-books": ("mb books check . --json", 'mb books doctor --repo "$BOOKS_REPO" --json'),
     "mb-skill-concept": ("mb workflow list --runtime codex --json",),
     "mb-skill-brief-draft": ("mb workflow list --runtime codex --json",),
     "mb-skill-review": ("mb workflow list --runtime codex --json",),
@@ -223,6 +227,7 @@ CODEX_GLOBAL_SKILL_SUPPORT: dict[str, str] = {
     "mb-ads": "read_only_planning",
     "mb-organic": "read_only_planning",
     "mb-site": "read_only_planning",
+    "mb-books": "read_only_planning",
     "mb-wiki": "intentionally_unsupported",
     "mb-skill-concept": "intentionally_unsupported",
     "mb-skill-brief-draft": "intentionally_unsupported",
@@ -1073,6 +1078,26 @@ CODEX_WORKFLOW_INVENTORY: tuple[dict[str, Any], ...] = (
             "propose guarded file targets. No site writes, build, deploy, DNS, domain, "
             "publishing, provider mutation, account changes, spend, or customer contact "
             "is supported."
+        ),
+    },
+    {
+        "id": "books",
+        "label": "Private books review",
+        "surface_type": "skill",
+        "claude_surface": "/mb-books",
+        "claude_skill_sources": ("mb-books",),
+        "codex_status": "read_only_planning",
+        "source_status": "temporary_source_skill_mirror",
+        "codex_surface": "Read-only books review through global mb-books skill",
+        "codex_entrypoints": ("main-branch mb-books",),
+        "commands": ("mb books check . --json", 'mb books doctor --repo "$BOOKS_REPO" --json'),
+        "status_reason": (
+            "Codex has a safe read-only route but no shared workflow source or "
+            "runtime proof for books repo setup and close execution."
+        ),
+        "notes": (
+            "Use safe aggregate CLI facts. Do not read evidence bytes, quote doctor "
+            "output or financial details, post entries, or edit journals."
         ),
     },
     {
@@ -2479,6 +2504,15 @@ def render_codex_global_skill_md(name: str = CODEX_GLOBAL_SKILL_NAME) -> str:
                 "mb-help": (
                     "Show the supported, pending, and unsupported Codex workflow surfaces. "
                     "Do not claim parity for surfaces the inventory does not mark supported."
+                ),
+                "mb-books": (
+                    "From the business repo run `mb books check . --json`. Discover "
+                    "books_repo in core/finance/books.md or ask for its location, then "
+                    "run `mb books doctor --repo $BOOKS_REPO --json`. Review only "
+                    "aggregate close state and process docs. Never open evidence "
+                    "bytes, quote doctor output or financial details, post or edit "
+                    "journal entries, or run hledger import/add. Propose rules edits "
+                    "for operator approval in the private books repo."
                 ),
             }
             if name in supported_guidance:
