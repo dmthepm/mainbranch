@@ -1,0 +1,8 @@
+; MB-FIXTURE: invented generated source lane. Change rules and regenerate.
+2026-01-02 Sample sale
+    assets:bank:sample:checking      $50 = $50
+    income:sales                    $-50
+
+2026-01-31 Sample supplies
+    assets:bank:sample:checking     $-20 = $30
+    expenses:supplies                $20

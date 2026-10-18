@@ -1,0 +1,18 @@
+#!/bin/sh
+# MB-FIXTURE: synthetic doctor; no real ledger or evidence.
+set -eu
+
+case "${1:-}" in
+  doctor)
+    cd "$(dirname "$0")/.."
+    hledger --version
+    hledger -f 2026.journal check --strict
+    hledger -f 2026.journal check ordereddates
+    hledger -f checks/2026-close.journal check --strict
+    hledger -f checks/2026-close.journal check ordereddates
+    ;;
+  *)
+    printf '%s\n' 'Usage: bin/books doctor' >&2
+    exit 2
+    ;;
+esac

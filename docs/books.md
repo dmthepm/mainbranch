@@ -444,6 +444,7 @@ The setup path, when the time comes:
 
 ## Related
 
+- [Statement-anchored books workflow](books-workflow.md)
 - [mb books foundation decision](../decisions/2026-05-11-mb-books-foundation.md)
 - [hledger vs Beancount fit report](reports/2026-05-11-hledger-vs-beancount-fit.md)
 - [Workspace and sensitive-data boundary](../decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md)

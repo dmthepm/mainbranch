@@ -1,0 +1,2 @@
+; MB-FIXTURE: invented close candidate. Keep include order here.
+include ../2026.journal

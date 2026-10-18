@@ -1,0 +1,21 @@
+# MB-FIXTURE: invented import rules; no provider export included.
+# Status: template/fallback
+# Export shape: CSV with date, description, amount, balance.
+# Expected filename: sample-bank-YYYY-MM.csv
+# Date format: year-month-day. Positive amount increases checking.
+# Default unknown: expenses:unknown:sample-bank.
+# Transfer or clearing: assets:clearing:sample-bank.
+# Untrusted fields: description and category; check against statement.
+
+fields date, description, amount, balance
+date-format %Y-%m-%d
+currency $
+account1 assets:bank:sample:checking
+account2 expenses:unknown:sample-bank
+balance1 %balance
+
+if Sample sale
+  account2 income:sales
+
+if Sample supplies
+  account2 expenses:supplies
