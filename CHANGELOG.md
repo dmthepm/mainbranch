@@ -13,6 +13,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- Read-only `mb books doctor --repo` checks a books repo's shape, runs its declared doctor, and summarizes a safe receipt and blocker counts.
 - A statement-anchored books workflow, decision, and synthetic hledger repo template for private bookkeeping.
 
 ## [0.6.12] - 2026-10-17

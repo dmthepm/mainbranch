@@ -2742,8 +2742,47 @@ def books_doctor_cmd(
         help="Print a non-mutating repair plan. Required; apply is not implemented.",
     ),
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
+    books_repo: str = typer.Option("", "--repo", help="Books repo to inspect."),
+    doctor_timeout: int = typer.Option(
+        600, "--doctor-timeout", help="Declared doctor timeout in seconds."
+    ),
 ) -> None:
     """Plan safe books setup repairs without touching real ledger contents."""
+    from mb import books_repo as books_repo_mod
+
+    if books_repo and plan:
+        typer.echo("mb books doctor: choose --repo or --plan", err=True)
+        raise typer.Exit(2)
+    if doctor_timeout < 1 or (doctor_timeout != 600 and not books_repo):
+        typer.echo(
+            "mb books doctor: --doctor-timeout requires --repo and a positive number", err=True
+        )
+        raise typer.Exit(2)
+    if not plan and not books_repo:
+        policy = Path(repo) / "core/finance/books.md"
+        if policy.is_file():
+            fm, _ = books_mod._read_frontmatter(policy)
+            configured = fm.get("books_repo") or fm.get("vault_location")
+            if isinstance(configured, str) and configured.strip():
+                candidate = Path(configured.strip()).expanduser()
+                books_repo = str(candidate if candidate.is_absolute() else Path(repo) / candidate)
+    if books_repo:
+        target = Path(books_repo).expanduser()
+        if not target.is_dir():
+            typer.echo("mb books doctor: books repo is unavailable", err=True)
+            raise typer.Exit(2)
+        report = books_repo_mod.inspect(target.resolve(), doctor_timeout)
+        if json_out:
+            typer.echo(
+                _json_payload(
+                    report,
+                    command="mb books doctor --repo",
+                    schema_name="mainbranch.books.doctor.repo.result",
+                )
+            )
+        else:
+            books_repo_mod.render(report)
+        raise typer.Exit(0 if report["ok"] else 1)
     if not plan:
         message = "mb books doctor: --plan is required; apply is not implemented"
         if json_out:

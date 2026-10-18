@@ -12,3 +12,5 @@ never evidence bytes.
 
 Run `bin/books doctor` from this directory. It checks both entrypoints with
 hledger. See `docs/books-workflow.md` in Main Branch for the full operator loop.
+`books.toml` declares that doctor command. The sample receipt is stale until a
+test or operator records the checked commit after running doctor.
