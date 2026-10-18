@@ -44,6 +44,9 @@ as `active recurring`, `migration generator`, or `template/fallback`, plus the
 export shape, filename, date format, sign convention, default unknown account,
 transfer or clearing accounts, and fields that cannot be trusted without a
 statement. A fallback must remain visibly distinct from an active feed.
+The status may have a short trailing note after `.`, `;`, `,`, ` -`, or ` (`;
+for example, `# Status: migration generator. Used for historical imports`.
+Use one `Status:` line per rules file.
 
 Route unknown rows to named, visible accounts such as
 `expenses:unknown:source`, `liabilities:unknown:source`, or
@@ -111,6 +114,12 @@ mirror, source overlays, narrow adjustments, and named gap accounts. New years
 start from sources. Accountant adjustments go in dated files, separate from
 source lanes. Pin a stable hledger version and make doctor report it.
 
+Derived CSVs in `workpapers/` may be tracked. Keep source statements and raw
+exports outside the repo; PDFs and bank export formats under `workpapers/` are
+still flagged by `mb books doctor --repo`. A shared docs-only workspace with no
+tracked journals is reported as a workspace, while rules, manifests, and
+tracked evidence remain checked.
+
 The [synthetic repo template](../mb/mb/_data/books/repo-template/README.md)
 shows the file shape and a small passing check. Its rows are invented and are
 only for learning and tests.
@@ -123,6 +132,8 @@ repo. The configuration may use a relative or absolute path; output uses only
 a generic books repo label. The command checks the repo shape, runs the declared
 doctor when hledger is available, and counts blockers without printing their
 summaries. It never reads evidence bytes or writes to the books repo.
+Start with `mb books check` in the business repo; its human and JSON findings
+point to `/mb-books` for setup, monthly close, reconciliation, or CPA handoff.
 
 Declare the doctor in a root `books.toml`:
 

@@ -2045,6 +2045,26 @@ def run(
     }
 
 
+def add_check_next_step(report: dict[str, Any]) -> None:
+    """Add the skill pointer only to ``mb books check`` output."""
+    repo = Path(str(report["repo"]))
+    configured = (repo / "core/finance/books.md").is_file()
+    report["findings"].append(
+        _finding(
+            id="books-skill-next-step",
+            title="Books next step",
+            state="info",
+            detail="Use /mb-books for the next books workflow.",
+            audience="informational",
+            operator_summary=(
+                "Use /mb-books for monthly close, reconciliation, and CPA handoff."
+                if configured
+                else "Use /mb-books for bookkeeping setup."
+            ),
+        )
+    )
+
+
 def status(repo: str | Path = ".") -> dict[str, Any]:
     """Return read-only books setup and storage health.
 

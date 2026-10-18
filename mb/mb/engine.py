@@ -114,6 +114,12 @@ def bundled_skills() -> list[str]:
     return sorted(d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").is_file())
 
 
+def missing_bundled_links(repo: str | Path) -> list[str]:
+    """Bundled skills without a discoverable project-local skill link."""
+    links = Path(repo).resolve() / ".claude" / "skills"
+    return [name for name in bundled_skills() if not (links / name / "SKILL.md").is_file()]
+
+
 def legacy_skill_name(name: str) -> str:
     """Return the pre-prefix skill name for a bundled skill name."""
     return name[len(SKILL_PREFIX) :] if name.startswith(SKILL_PREFIX) else name

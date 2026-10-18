@@ -23,7 +23,7 @@ COMMIT = re.compile(r"^[0-9a-fA-F]{40}$")
 ROOT_TYPES = {"assets": "A", "liabilities": "L", "equity": "E", "income": "R", "expenses": "X"}
 RULE_STATUSES = {"active recurring", "migration generator", "template/fallback"}
 EVIDENCE_EXTENSIONS = {".pdf", ".ofx", ".qfx", ".qbo", ".qif", ".csv"}
-CSV_ALLOWED_DIRS = {"imports", "reports", "manifests"}
+CSV_ALLOWED_DIRS = {"imports", "reports", "manifests", "workpapers"}
 RECEIPT_KEYS = {"commit", "finished_at", "exit_code", "hledger_version", "controls"}
 
 
@@ -50,50 +50,60 @@ def _git(repo: Path, *args: str) -> str | None:
 
 def _shape(repo: Path, tracked: list[str]) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
-    entrypoints = sorted(
-        p for p in repo.iterdir() if p.is_file() and YEAR_ENTRYPOINT.fullmatch(p.name)
-    )
-    if not entrypoints:
+    if not any(Path(rel).suffix == ".journal" for rel in tracked):
         findings.append(
-            _finding("entrypoint_missing", ".", "Add a year journal at the books repo root.")
+            _finding(
+                "workspace_repo",
+                ".",
+                "No journals here; treated as a books workspace, not a ledger repo.",
+                level="info",
+            )
         )
+    else:
+        entrypoints = sorted(
+            p for p in repo.iterdir() if p.is_file() and YEAR_ENTRYPOINT.fullmatch(p.name)
+        )
+        if not entrypoints:
+            findings.append(
+                _finding("entrypoint_missing", ".", "Add a year journal at the books repo root.")
+            )
 
-    accounts = sorted(p for p in repo.glob("*-accounts.journal") if p.is_file())
-    typed: dict[str, str] = {}
-    commodities = 0
-    multi_currency = False
-    for path in accounts:
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-        except (OSError, UnicodeError):
-            lines = []
-        for line in lines:
-            match = re.match(
-                r"^\s*account\s+(assets|liabilities|equity|income|expenses)\s*;\s*type:\s*([A-Za-z])\b",
-                line,
+        accounts = sorted(p for p in repo.glob("*-accounts.journal") if p.is_file())
+        typed: dict[str, str] = {}
+        commodities = 0
+        multi_currency = False
+        for path in accounts:
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeError):
+                lines = []
+            for line in lines:
+                match = re.match(
+                    r"^\s*account\s+(assets|liabilities|equity|income|expenses)\s*;\s*type:\s*([A-Za-z])\b",
+                    line,
+                )
+                if match:
+                    typed[match.group(1)] = match.group(2).upper()
+                if re.match(r"^\s*commodity\s+\S", line):
+                    commodities += 1
+                    if commodities == 1 and "; mb-books: multi-currency" in line:
+                        multi_currency = True
+        if not accounts or any(typed.get(root) != kind for root, kind in ROOT_TYPES.items()):
+            findings.append(
+                _finding(
+                    "accounts_untyped",
+                    accounts[0].relative_to(repo).as_posix() if accounts else ".",
+                    "Declare type directives on all five root accounts.",
+                )
             )
-            if match:
-                typed[match.group(1)] = match.group(2).upper()
-            if re.match(r"^\s*commodity\s+\S", line):
-                commodities += 1
-                if commodities == 1 and "; mb-books: multi-currency" in line:
-                    multi_currency = True
-    if not accounts or any(typed.get(root) != kind for root, kind in ROOT_TYPES.items()):
-        findings.append(
-            _finding(
-                "accounts_untyped",
-                accounts[0].relative_to(repo).as_posix() if accounts else ".",
-                "Declare type directives on all five root accounts.",
+        if commodities > 1 and not multi_currency:
+            findings.append(
+                _finding(
+                    "commodity_extra",
+                    accounts[0].relative_to(repo).as_posix() if accounts else ".",
+                    "Declare multi-currency on the first commodity or use one commodity.",
+                )
             )
-        )
-    if commodities > 1 and not multi_currency:
-        findings.append(
-            _finding(
-                "commodity_extra",
-                accounts[0].relative_to(repo).as_posix() if accounts else ".",
-                "Declare multi-currency on the first commodity or use one commodity.",
-            )
-        )
 
     for path in sorted((repo / "rules").glob("*.rules")):
         if not path.is_file():
@@ -112,7 +122,14 @@ def _shape(repo: Path, tracked: list[str]) -> list[dict[str, str]]:
             findings.append(
                 _finding("rules_status_missing", rel, "Add a Status header to the rules file.")
             )
-        elif len(values) != 1 or values[0] not in RULE_STATUSES:
+        elif len(values) != 1 or not any(
+            values[0] == status
+            or any(
+                values[0].startswith(status + delimiter)
+                for delimiter in (".", ";", ",", " -", " (")
+            )
+            for status in RULE_STATUSES
+        ):
             findings.append(
                 _finding("rules_status_invalid", rel, "Use an allowed rules Status value.")
             )

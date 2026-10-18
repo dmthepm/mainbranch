@@ -2700,6 +2700,7 @@ def books_check_cmd(
         validate_fixture=validate_fixture or bool(fixture_path),
         fixture=fixture_path or None,
     )
+    books_mod.add_check_next_step(report)
     if json_out:
         typer.echo(
             _json_payload(
