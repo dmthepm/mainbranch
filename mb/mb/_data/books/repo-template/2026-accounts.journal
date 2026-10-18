@@ -1,0 +1,19 @@
+; MB-FIXTURE: invented account declarations, no balances.
+commodity $
+
+account assets                         ; type: A
+account assets:bank
+account assets:bank:sample
+account assets:bank:sample:checking
+account assets:clearing
+account assets:clearing:sample-bank
+account liabilities                    ; type: L
+account liabilities:unknown
+account liabilities:unknown:sample-bank
+account equity                         ; type: E
+account income                         ; type: R
+account income:sales
+account expenses                       ; type: X
+account expenses:supplies
+account expenses:unknown
+account expenses:unknown:sample-bank

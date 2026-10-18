@@ -1,0 +1,3 @@
+# MB-FIXTURE: invented pointer and hash; no evidence bytes.
+source_id,archive_pointer,sha256,proves
+sample-bank-2026-01,private-evidence/sample-bank/2026-01-statement.pdf,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,closing-balance

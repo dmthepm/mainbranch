@@ -11,6 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- A statement-anchored books workflow, decision, and synthetic hledger repo template for private bookkeeping.
+
 ## [0.6.12] - 2026-10-17
 
 ### Fixed
