@@ -143,7 +143,7 @@ def test_c5_books_close_simulation_registered() -> None:
     assert len(matches) == 1
     sim = matches[0]
     assert sim["label"] == "books-close"
-    assert sim["fixture_profile"] == "fresh_sanitized_business_repo"
+    assert sim["fixture_profile"] == "books_repo_fixture"
     assert sim["tiers"] == ["prerelease_candidate", "release_acceptance"]
     assert "/mb-books" in " ".join(sim["must_observe"])
     assert "mb books check" in " ".join(sim["must_observe"])

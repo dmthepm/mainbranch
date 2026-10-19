@@ -857,7 +857,7 @@
         "release_acceptance"
       ],
       "operator_moment": "The operator asks for a monthly close review of a private books repo.",
-      "fixture_profile": "fresh_sanitized_business_repo",
+      "fixture_profile": "books_repo_fixture",
       "prompt": "Please review this month's books close and tell me what is settled, blocked, and ready for CPA handoff. Keep the private records in the books repo.",
       "expected_route": [
         "sense",

@@ -1,6 +1,6 @@
 ---
 name: mb-books
-description: Review private books setup, monthly close, reconciliation, and CPA handoff from safe Main Branch facts.
+description: Review books setup, monthly books close, reconciliation, and CPA handoff; answer what is settled, blocked, and ready. Runs read-only `mb books check` and `mb books doctor --repo` for safe facts.
 loops: [sense, reflect]
 ---
 

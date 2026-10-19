@@ -23,6 +23,7 @@ KNOWN_FIXTURE_PROFILES = frozenset(
         "rich_multi_offer_migration_repo",
         "existing_channel_trial_bet_fixture",
         "keychain_prompt_pending_fixture",
+        "books_repo_fixture",
     }
 )
 # Recorded command facts a simulation may carry instead of running the command
