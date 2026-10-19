@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.14] - 2026-10-19
+
 ### Added
 
 - A configured synthetic books repo fixture lets `books-close` exercise books doctor during release simulations (#1222).
