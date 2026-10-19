@@ -11,6 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- Release simulation route assertions score a Markdown table row from its destination cell, so routes mentioned only in an explanation no longer count as the chosen route (#1228).
+
 ## [0.6.14] - 2026-10-19
 
 ### Added
