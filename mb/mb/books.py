@@ -2382,9 +2382,13 @@ def doctor_plan(repo: str | Path = ".") -> dict[str, Any]:
                 id="configure-private-books-vault-location",
                 title="Configure private books vault location",
                 state="warn",
-                reason=finding["operator_summary"],
+                # The plan output is a frozen contract; keep its pre-#1227 wording.
+                reason=(
+                    "Set vault_location in core/finance/books.md so the operator "
+                    "knows where the private books live."
+                ),
                 command=(
-                    "Set books_repo or vault_location in core/finance/books.md to a safe private "
+                    "Set vault_location in core/finance/books.md to a safe private "
                     "repo or vault label; keep raw finance data out of this repo."
                 ),
                 writes=["core/finance/books.md"],

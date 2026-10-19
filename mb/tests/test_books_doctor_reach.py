@@ -176,3 +176,22 @@ def test_g4_missing_thresholds_is_info(tmp_path: Path) -> None:
     policy.write_text("---\nstorage_mode: team-private-repo\n---\n", encoding="utf-8")
     missing_code, _ = _check(repo)
     assert missing_code == 0
+
+
+def test_g5_plan_vault_action_keeps_frozen_wording(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "business"
+    policy = repo / "core/finance/books.md"
+    policy.parent.mkdir(parents=True)
+    policy.write_text("---\nstorage_mode: team-private-repo\n---\n", encoding="utf-8")
+    monkeypatch.chdir(repo)
+    result = RUNNER.invoke(app, ["books", "doctor", "--plan", "--json"])
+    actions = {item["id"]: item for item in json.loads(result.output)["actions"]}
+    vault = actions["configure-private-books-vault-location"]
+    assert vault["reason"] == (
+        "Set vault_location in core/finance/books.md so the operator "
+        "knows where the private books live."
+    )
+    assert vault["command"] == (
+        "Set vault_location in core/finance/books.md to a safe private "
+        "repo or vault label; keep raw finance data out of this repo."
+    )
