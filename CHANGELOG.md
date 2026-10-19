@@ -11,6 +11,17 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb books check` names `/mb-books` for setup or close work, while `mb doctor`
+  and `mb status --json --peek` show bundled skill links missing from a business
+  folder and point to `mb skill link` (#1222).
+
+### Fixed
+
+- `mb books doctor --repo` accepts derived workpaper CSVs, recognizes docs-only
+  books workspaces, and allows a note after a valid rules Status (#1223).
+
 ## [0.6.13] - 2026-10-18
 
 ### Added

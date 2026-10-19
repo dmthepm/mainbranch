@@ -25,7 +25,7 @@ from mb import ranker as ranker_mod
 from mb import site as site_mod
 from mb import topology as topology_mod
 from mb import validate as validate_mod
-from mb.engine import install_mode, link_status, repo_flag
+from mb.engine import install_mode, link_status, missing_bundled_links, repo_flag
 from mb.freshness import (
     MODE_NEUTRAL_UPDATE_TEXT,
     REQUIRED_UPDATE_COMMANDS,
@@ -3883,6 +3883,7 @@ def _runtime(repo: Path) -> dict[str, Any]:
         },
         "skill_wiring": {
             **wiring,
+            "missing_bundled_links": missing_bundled_links(repo),
             "summary": wiring_summary,
             "repair": "" if wiring["ok"] else wiring_repair,
         },

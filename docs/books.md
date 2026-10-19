@@ -311,6 +311,10 @@ mb books exposure --repo . --active [--json]
 - emits a JSON envelope with `--json` for scripts and skills, with
   every finding carrying `audience` and `operator_summary` fields.
 
+The human and JSON findings name `/mb-books` as the next step. Use it for
+bookkeeping setup when there is no books policy, or for monthly close,
+reconciliation, and CPA handoff when a policy or `books_repo` is configured.
+
 `mb books status` shows readable setup/storage health:
 
 - hledger availability, without printing the local binary path;
@@ -354,6 +358,12 @@ counts open and resolved blockers and summarizes a validated doctor receipt.
 Doctor output and absolute configured paths are never printed. A business repo
 may set `books_repo` in `core/finance/books.md` to use this mode without
 `--repo`. `--plan` keeps its existing setup-plan behavior.
+
+The doctor treats a repo with no tracked `*.journal` files as a books workspace:
+it reports `workspace_repo` at info level and skips ledger entrypoint, typed
+account, and commodity checks. Rules, manifests, and tracked evidence are still
+checked. CSVs in `workpapers/` may hold derived tables; tracked PDFs and bank
+export formats there are still flagged as evidence.
 
 Use `/mb-books` for read-only setup, monthly close and reconciliation review,
 or CPA handoff preparation. It starts with `mb books check` and the safe

@@ -2004,6 +2004,23 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
             else ("warn" if not (repo / "CLAUDE.md").exists() else "error"),
         }
     )
+    if wiring_ok:
+        missing_links = engine_mod.missing_bundled_links(repo)
+        checks.append(
+            {
+                "name": "skill-links-current",
+                "ok": not missing_links,
+                "detail": (
+                    "All bundled skills are linked."
+                    if not missing_links
+                    else (
+                        "Missing bundled skill links: " + ", ".join(missing_links) + ". "
+                        f"Run `mb skill link{engine_mod.repo_flag(repo)}`."
+                    )
+                ),
+                "severity": "warn" if missing_links else "ok",
+            }
+        )
     if active_shadows or legacy_globals:
         checks.append(
             {
