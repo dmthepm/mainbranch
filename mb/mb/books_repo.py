@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from mb.books import _has_fixture_marker
+from mb.books import _has_fixture_marker, _read_frontmatter
 
 YEAR_ENTRYPOINT = re.compile(r"^[0-9]{4}\.journal$")
 SHA256 = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -323,6 +323,42 @@ def _doctor(repo: Path, timeout: int) -> tuple[dict[str, Any], list[dict[str, st
 
 def inspect(repo: Path, timeout: int = 600) -> dict[str, Any]:
     """Inspect one books repo without retaining private command output."""
+    policy = repo / "core/finance/books.md"
+    if policy.is_file():
+        fm, _ = _read_frontmatter(policy)
+        configured = str(fm.get("books_repo") or "").strip()
+        if configured:
+            candidate = Path(configured).expanduser()
+            target = candidate if candidate.is_absolute() else repo / candidate
+            if target.resolve() != repo.resolve():
+                return {
+                    "ok": False,
+                    "state": "warn",
+                    "safe_to_share": True,
+                    "summary": "This is the business repo; check the configured books repo.",
+                    "findings": [
+                        _finding(
+                            "business_repo_not_books_repo",
+                            "core/finance/books.md",
+                            "This is the business repo; the books repo is configured as "
+                            f"{configured}. "
+                            f"Run mb books doctor --repo {configured}.",
+                            level="warn",
+                        )
+                    ],
+                    "doctor": {
+                        "ran": False,
+                        "status": "not_run",
+                        "level": "warn",
+                        "reason": "business repo selected",
+                        "exit_code": None,
+                        "duration_s": 0.0,
+                        "timed_out": False,
+                    },
+                    "receipt": None,
+                    "blockers": {"open": 0, "resolved": 0},
+                    "repo": "business repo",
+                }
     tracked_text = _git(repo, "ls-files")
     head = _git(repo, "rev-parse", "HEAD")
     findings = _shape(repo, tracked_text.splitlines() if tracked_text is not None else [])

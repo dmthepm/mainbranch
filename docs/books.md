@@ -314,6 +314,10 @@ mb books exposure --repo . --active [--json]
 The human and JSON findings name `/mb-books` as the next step. Use it for
 bookkeeping setup when there is no books policy, or for monthly close,
 reconciliation, and CPA handoff when a policy or `books_repo` is configured.
+When `books_repo` is set, the next-step finding also names
+`mb books doctor --repo` with the value from `core/finance/books.md` and
+provides `doctor_command` in JSON. A `vault_location` that resolves to a
+directory gets the same doctor next step.
 
 `mb books status` shows readable setup/storage health:
 
@@ -323,7 +327,7 @@ reconciliation, and CPA handoff when a policy or `books_repo` is configured.
   business repo may be shown; external absolute vault paths are
   reported as external private paths instead of printed;
 - a warning when team/private or advanced storage mode is selected but
-  the policy does not name a safe private repo or vault label;
+  the policy names neither `books_repo` nor a safe `vault_location` label;
 - whether the configured local vault exists;
 - whether a private `main.journal` placeholder exists, without
   reading its contents;
@@ -355,9 +359,11 @@ typed root accounts, rules status, tracked evidence, manifest hashes, and
 commodity declarations. It runs the repo's declared doctor when hledger is
 available, then reports only its exit status and timing. The command also
 counts open and resolved blockers and summarizes a validated doctor receipt.
-Doctor output and absolute configured paths are never printed. A business repo
-may set `books_repo` in `core/finance/books.md` to use this mode without
-`--repo`. `--plan` keeps its existing setup-plan behavior.
+Doctor output is never printed. A business repo may set `books_repo` in
+`core/finance/books.md` to use this mode without `--repo`. If `--repo` points
+at that business repo instead of its configured books directory, doctor warns
+and names the configured `mb books doctor --repo` command. `--plan` keeps its
+existing setup-plan behavior.
 
 The doctor treats a repo with no tracked `*.journal` files as a books workspace:
 it reports `workspace_repo` at info level and skips ledger entrypoint, typed

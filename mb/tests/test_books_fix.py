@@ -145,8 +145,7 @@ def test_d4_books_check_names_mb_books(tmp_path: Path) -> None:
         else:
             assert other == {
                 "books-policy-ok": "ok",
-                "books-money-path-thresholds-missing": "ok",
-                "books-vault-location-missing": "warn",
+                "books-money-path-thresholds-missing": "info",
                 "chart-of-accounts-missing": "info",
                 "vault-ignore-rule-skipped": "info",
                 "unsafe-paths-clean": "ok",

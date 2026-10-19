@@ -13,6 +13,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb books check` points monthly close at the configured books repo, accepts
+  `books_repo` instead of a separate vault label, and marks missing spend
+  thresholds as informational. `mb books doctor --repo` warns when it is given
+  the business repo instead of the configured books repo (#1227).
 - Release simulation route assertions score a Markdown table row from its destination cell, so routes mentioned only in an explanation no longer count as the chosen route (#1228).
 
 ## [0.6.14] - 2026-10-19
