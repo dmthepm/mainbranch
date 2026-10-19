@@ -510,25 +510,70 @@ def _negation_scope(before: str) -> str:
 
 def _route_evidence(answer: str, value: str, subject: str) -> str:
     route = re.compile(rf"(?<![\w/-])/?{re.escape(value.lstrip('/'))}(?![\w-])", re.I)
+    any_route = re.compile(r"(?<![\w/-])/?mb-[\w-]+(?![\w-])", re.I)
     ambiguous = False
-    for clause in _assertion_clauses(answer):
-        if not route.search(clause):
-            continue
-        if subject and not re.search(subject, clause, re.I):
-            continue
-        for match in route.finditer(clause):
-            before = clause[: match.start()]
-            scope = _negation_scope(before)
-            if scope == "negative":
+    lines = answer.splitlines()
+    destination_column: int | None = None
+    for index, line in enumerate(lines):
+        if line.lstrip().startswith("|"):
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            separator = all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells)
+            if separator:
+                if index and lines[index - 1].lstrip().startswith("|"):
+                    headers = [
+                        re.sub(r"^[\s`*_]+|[\s`*_]+$", "", cell).lower()
+                        for cell in lines[index - 1].strip().strip("|").split("|")
+                    ]
+                    destination_column = next(
+                        (
+                            column
+                            for column, header in enumerate(headers)
+                            if re.fullmatch(r"goes\s+to|route|skill|destination", header)
+                        ),
+                        None,
+                    )
                 continue
-            if scope == "ambiguous":
-                ambiguous = True
+            if index + 1 < len(lines) and lines[index + 1].lstrip().startswith("|"):
+                next_cells = [
+                    cell.strip() for cell in lines[index + 1].strip().strip("|").split("|")
+                ]
+                if all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in next_cells):
+                    continue
+            clause = line.strip(" |")
+            if subject and not re.search(subject, clause, re.I):
                 continue
-            if "|" in clause or re.search(
-                r"\b(?:use|route|take|through|for|with|via)\b|:", before, re.I
-            ):
+            column = destination_column if destination_column is not None else 1
+            destination = cells[column] if column < len(cells) else ""
+            if not any_route.search(destination):
+                if any(any_route.search(cell) for cell in cells):
+                    ambiguous = True
+                continue
+            for match in route.finditer(destination):
+                scope = _negation_scope(destination[: match.start()])
+                if scope == "negative":
+                    continue
+                if scope == "ambiguous":
+                    ambiguous = True
+                    continue
                 return "positive"
-            ambiguous = True
+            continue
+        destination_column = None
+        for clause in _assertion_clauses(line):
+            if not route.search(clause):
+                continue
+            if subject and not re.search(subject, clause, re.I):
+                continue
+            for match in route.finditer(clause):
+                before = clause[: match.start()]
+                scope = _negation_scope(before)
+                if scope == "negative":
+                    continue
+                if scope == "ambiguous":
+                    ambiguous = True
+                    continue
+                if re.search(r"\b(?:use|route|take|through|for|with|via)\b|:", before, re.I):
+                    return "positive"
+                ambiguous = True
     return "ambiguous" if ambiguous else "absent"
 
 
