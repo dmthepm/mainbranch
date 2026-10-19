@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -15,11 +16,18 @@ from mb import __version__, codex, dogfood_harness, init, release_simulation, sk
 from mb.cli import app
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = "924784de"
+BASE_CLAUDE_SHA256 = "e8cdcbd134956f9538d56eb3240444a143810ea82a932abd234246bbf83b5ad5"
+BASE_AGENTS_SHA256 = "e7ec06820c3aee359759bef6b91493747e666e235a73996763004875c88389ea"
+BASE_MANIFEST_SHA256 = "c61fd488de25e59e4326aea0dbb93bb181924d601a2279437d6518c79dc798d5"
 
 
-def _base(path: str) -> str:
-    return subprocess.check_output(["git", "show", f"{BASE}:{path}"], cwd=ROOT, text=True)
+def _base_template(path: str, digest: str) -> str:
+    current = (ROOT / path).read_text()
+    added = [line for line in current.splitlines(keepends=True) if "mb-books" in line]
+    assert len(added) == 1
+    base = current.replace(added[0], "", 1)
+    assert hashlib.sha256(base.encode()).hexdigest() == digest
+    return base
 
 
 def _simulation() -> release_simulation.Simulation:
@@ -101,9 +109,11 @@ def test_e3_generated_guidance_names_mb_books(tmp_path: Path) -> None:
         "OWNER_SLUG": "business-owner",
         "STATUS_CONVENTIONS": init.status_conventions(),
     }
-    base_claude = init._render(_base("mb/mb/_data/templates/CLAUDE.md.tmpl"), mapping)
+    base_claude = init._render(
+        _base_template("mb/mb/_data/templates/CLAUDE.md.tmpl", BASE_CLAUDE_SHA256), mapping
+    )
     base_agents = codex._render(
-        _base("mb/mb/_data/templates/AGENTS.md.tmpl"),
+        _base_template("mb/mb/_data/templates/AGENTS.md.tmpl", BASE_AGENTS_SHA256),
         {
             "BUSINESS_NAME": "Fixture Business",
             "GH_USERNAME": "your-gh-username",
@@ -153,8 +163,16 @@ def test_e4_books_repo_fixture_materializes(tmp_path: Path) -> None:
 
 def test_e5_books_close_uses_books_repo_fixture(tmp_path: Path) -> None:
     path = "mb/mb/_data/release_simulations/manifest.json"
-    current = json.loads((ROOT / path).read_text())
-    base = json.loads(_base(path))
+    current_text = (ROOT / path).read_text()
+    assert current_text.count('"fixture_profile": "books_repo_fixture"') == 1
+    base_text = current_text.replace(
+        '"fixture_profile": "books_repo_fixture"',
+        '"fixture_profile": "fresh_sanitized_business_repo"',
+        1,
+    )
+    assert hashlib.sha256(base_text.encode()).hexdigest() == BASE_MANIFEST_SHA256
+    current = json.loads(current_text)
+    base = json.loads(base_text)
     current_by_id = {sim["id"]: sim for sim in current["simulations"]}
     base_by_id = {sim["id"]: sim for sim in base["simulations"]}
     assert current_by_id.keys() == base_by_id.keys()
