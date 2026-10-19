@@ -82,6 +82,17 @@ def _max_state(states: list[str]) -> str:
     return max(states, key=lambda state: STATE_ORDER.get(state, 3))
 
 
+def _books_state(findings: list[dict[str, Any]]) -> str:
+    """Keep optional spend guidance from changing books health."""
+    return _max_state(
+        [
+            finding["state"]
+            for finding in findings
+            if finding["id"] != "books-money-path-thresholds-missing"
+        ]
+    )
+
+
 def _finding(
     *,
     id: str,
@@ -306,7 +317,7 @@ def _money_path_threshold_findings(policy: dict[str, Any]) -> list[dict[str, Any
         _finding(
             id="books-money-path-thresholds-missing",
             title="MoneyPath appetite thresholds are missing",
-            state="ok",
+            state="info",
             detail=(
                 "core/finance/books.md does not declare money_path.appetite_thresholds. "
                 "Main Branch can still run, but material bets should ask for thresholds "
@@ -338,6 +349,8 @@ def _vault_info(repo: Path, fm: dict[str, Any]) -> dict[str, Any]:
     """
     storage_mode = _policy_storage_mode(fm)
     raw_location = str(fm.get("vault_location") or "").strip()
+    if storage_mode in NON_LOCAL_STORAGE_MODES and not raw_location:
+        raw_location = str(fm.get("books_repo") or "").strip()
     defaulted = False
     if not raw_location and storage_mode not in NON_LOCAL_STORAGE_MODES:
         raw_location = DEFAULT_BOOKS_VAULT_RELATIVE.as_posix()
@@ -545,7 +558,8 @@ def _status_extra_findings(
 def _non_local_vault_location_findings(fm: dict[str, Any]) -> list[dict[str, Any]]:
     storage_mode = _policy_storage_mode(fm)
     raw_location = str(fm.get("vault_location") or "").strip()
-    if storage_mode not in NON_LOCAL_STORAGE_MODES or raw_location:
+    books_repo = str(fm.get("books_repo") or "").strip()
+    if storage_mode not in NON_LOCAL_STORAGE_MODES or raw_location or books_repo:
         return []
     return [
         _finding(
@@ -559,11 +573,11 @@ def _non_local_vault_location_findings(fm: dict[str, Any]) -> list[dict[str, Any
             ),
             audience="operator_decision",
             operator_summary=(
-                "Set vault_location in core/finance/books.md so the operator "
-                "knows where the private books live."
+                "Set books_repo or vault_location in core/finance/books.md so the "
+                "operator knows where the private books live."
             ),
             repair=(
-                "Add a safe vault_location label to core/finance/books.md; "
+                "Add a safe books_repo or vault_location label to core/finance/books.md; "
                 "do not paste an absolute private path or real ledger data."
             ),
         )
@@ -2024,7 +2038,7 @@ def run(
         fixture_findings = _validate_fixture(fixture_path)
         findings.extend(fixture_findings)
 
-    state = _max_state([finding["state"] for finding in findings])
+    state = _books_state(findings)
     errors = [finding["operator_summary"] for finding in findings if finding["state"] == "error"]
     warnings = [finding["operator_summary"] for finding in findings if finding["state"] == "warn"]
 
@@ -2048,21 +2062,35 @@ def run(
 def add_check_next_step(report: dict[str, Any]) -> None:
     """Add the skill pointer only to ``mb books check`` output."""
     repo = Path(str(report["repo"]))
-    configured = (repo / "core/finance/books.md").is_file()
-    report["findings"].append(
-        _finding(
-            id="books-skill-next-step",
-            title="Books next step",
-            state="info",
-            detail="Use /mb-books for the next books workflow.",
-            audience="informational",
-            operator_summary=(
-                "Use /mb-books for monthly close, reconciliation, and CPA handoff."
-                if configured
-                else "Use /mb-books for bookkeeping setup."
-            ),
+    policy = repo / "core/finance/books.md"
+    configured = policy.is_file()
+    doctor_command = ""
+    if configured:
+        fm, _ = _read_frontmatter(policy)
+        books_repo = str(fm.get("books_repo") or "").strip()
+        vault_location = str(fm.get("vault_location") or "").strip()
+        location = books_repo or vault_location
+        if location:
+            candidate = Path(location).expanduser()
+            resolved = candidate if candidate.is_absolute() else repo / candidate
+            if books_repo or resolved.is_dir():
+                doctor_command = f"mb books doctor --repo {location}"
+    finding = _finding(
+        id="books-skill-next-step",
+        title="Books next step",
+        state="info",
+        detail="Use /mb-books for the next books workflow.",
+        audience="informational",
+        operator_summary=(
+            "Use /mb-books for monthly close, reconciliation, and CPA handoff."
+            if configured
+            else "Use /mb-books for bookkeeping setup."
         )
+        + (f" For close state, run {doctor_command}." if doctor_command else ""),
     )
+    if doctor_command:
+        finding["doctor_command"] = doctor_command
+    report["findings"].append(finding)
 
 
 def status(repo: str | Path = ".") -> dict[str, Any]:
@@ -2077,7 +2105,7 @@ def status(repo: str | Path = ".") -> dict[str, Any]:
     fm, _ = _detect_books_policy(repo_path)
     extra_findings = _status_extra_findings(repo_path, fm, check_report)
     findings = [*check_report["findings"], *extra_findings]
-    state = _max_state([finding["state"] for finding in findings])
+    state = _books_state(findings)
     errors = [finding["operator_summary"] for finding in findings if finding["state"] == "error"]
     warnings = [finding["operator_summary"] for finding in findings if finding["state"] == "warn"]
 
@@ -2356,7 +2384,7 @@ def doctor_plan(repo: str | Path = ".") -> dict[str, Any]:
                 state="warn",
                 reason=finding["operator_summary"],
                 command=(
-                    "Set vault_location in core/finance/books.md to a safe private "
+                    "Set books_repo or vault_location in core/finance/books.md to a safe private "
                     "repo or vault label; keep raw finance data out of this repo."
                 ),
                 writes=["core/finance/books.md"],
