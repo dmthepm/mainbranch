@@ -12,7 +12,15 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from mb import __version__, codex, dogfood_harness, init, release_simulation, skill_validate
+from mb import (
+    __version__,
+    books_repo,
+    codex,
+    dogfood_harness,
+    init,
+    release_simulation,
+    skill_validate,
+)
 from mb.cli import app
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -131,7 +139,7 @@ def test_e3_generated_guidance_names_mb_books(tmp_path: Path) -> None:
         assert not removed
 
 
-def test_e4_books_repo_fixture_materializes(tmp_path: Path) -> None:
+def test_e4_books_repo_fixture_materializes(tmp_path: Path, monkeypatch) -> None:
     business, books = _materialize(tmp_path)
     assert "books_repo: ../books" in (business / "core/finance/books.md").read_text()
     assert books.is_dir() and books.parent == tmp_path
@@ -142,6 +150,14 @@ def test_e4_books_repo_fixture_materializes(tmp_path: Path) -> None:
     )
     for name in ("README.md", "AGENTS.md", "2026.journal", "books.toml"):
         assert "MB-FIXTURE" in (books / name).read_text()[:1024]
+    inspected: list[Path] = []
+    real_inspect = books_repo.inspect
+
+    def _recording_inspect(target: Path, *args, **kwargs):
+        inspected.append(Path(target).resolve())
+        return real_inspect(target, *args, **kwargs)
+
+    monkeypatch.setattr(books_repo, "inspect", _recording_inspect)
     runner = CliRunner()
     explicit = runner.invoke(app, ["books", "doctor", "--repo", str(books), "--json"])
     previous = Path.cwd()
@@ -159,6 +175,7 @@ def test_e4_books_repo_fixture_materializes(tmp_path: Path) -> None:
             finding["rule"] for finding in report["findings"]
         }
     assert explicit_report["findings"] == configured_report["findings"]
+    assert inspected == [books.resolve(), books.resolve()]
 
 
 def test_e5_books_close_uses_books_repo_fixture(tmp_path: Path) -> None:
