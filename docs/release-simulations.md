@@ -130,7 +130,8 @@ print-mode run by copying the healthy disposable business repo into a
 per-simulation fixture repo and applying the profile mutation there. Current
 profiles include the healthy first-day repo, broken project-local skill wiring,
 synthetic private-data refusal material, legacy campaigns/schema drift, launch
-readiness gaps, and dirty approved business files for checkpoint planning.
+readiness gaps, a configured synthetic books repo for `books-close`, and dirty
+approved business files for checkpoint planning.
 
 Some states must not be created for real on the release machine. A
 simulation can carry `recorded_facts` in the manifest instead: the keychain

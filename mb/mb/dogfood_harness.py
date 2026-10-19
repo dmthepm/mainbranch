@@ -436,7 +436,49 @@ def _apply_fixture_profile(repo: Path, profile: str) -> list[str]:
         # The provider state lives in the manifest's recorded fact; the repo
         # stays untouched so no live command can reach a real keychain item.
         return ["recorded `mb connect status --json` fact; no repo or keychain mutation"]
+    if profile == "books_repo_fixture":
+        return _apply_books_repo_fixture(repo)
     raise ValueError(f"unknown fixture profile: {profile}")
+
+
+def _apply_books_repo_fixture(repo: Path) -> list[str]:
+    books = repo.parent / "books"
+    if books.exists():
+        raise ValueError("books fixture repo already exists")
+    policy = repo / "core" / "finance" / "books.md"
+    policy.parent.mkdir(parents=True, exist_ok=True)
+    policy.write_text(
+        "---\nstorage_mode: team-private-repo\nbooks_repo: ../books\n---\n",
+        encoding="utf-8",
+    )
+    template = Path(__file__).resolve().parent / "_data" / "books" / "repo-template"
+    shutil.copytree(template, books)
+    subprocess.run(["git", "init", "-q", str(books)], check=True)
+    subprocess.run(["git", "add", "-A"], cwd=books, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Fixture Author",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "[added] synthetic books fixture",
+        ],
+        cwd=books,
+        check=True,
+        env={
+            **os.environ,
+            "GIT_AUTHOR_DATE": "2026-01-01T00:00:00+0000",
+            "GIT_COMMITTER_DATE": "2026-01-01T00:00:00+0000",
+        },
+    )
+    return [
+        "configured core/finance/books.md for a sibling synthetic books repo",
+        "copied and committed the packaged books repo template inside the harness root",
+    ]
 
 
 def _apply_broken_skill_wiring_fixture(repo: Path) -> list[str]:

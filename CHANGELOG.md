@@ -13,9 +13,14 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- A configured synthetic books repo fixture lets `books-close` exercise books doctor during release simulations (#1222).
 - `mb books check` names `/mb-books` for setup or close work, while `mb doctor`
   and `mb status --json --peek` show bundled skill links missing from a business
   folder and point to `mb skill link` (#1222).
+
+### Changed
+
+- The books router, `/mb-books` skill description, and generated repo guidance name `/mb-books` for setup and close work (#1222).
 
 ### Fixed
 

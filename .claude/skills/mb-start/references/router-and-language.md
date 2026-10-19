@@ -171,8 +171,8 @@ Route:
 
 ### Bookkeeping, books, finance, accounting
 
-Signals: bookkeeping, books, finance, accounting, monthly close,
-reconciliation, CPA handoff, chart of accounts, P&L, ledger, bank statements,
+Signals: bookkeeping, books, books close, close the month, finance, accounting,
+monthly close, reconcile, reconciliation, CPA handoff, chart of accounts, P&L, ledger, bank statements,
 restricted finance child repo, restricted repo topology, hledger, receipts,
 tax, payroll, revenue report.
 

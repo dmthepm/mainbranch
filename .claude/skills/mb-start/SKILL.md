@@ -131,8 +131,8 @@ accounting, ledgers, statements, P&L, chart of accounts, tax, payroll, hledger,
 or a restricted `finance` child repo, run `mb books check "$REPO_PATH" --json`
 before drafting files. Keep raw private finance records out of the
 team-safe hub repo; use the books contract, `storage_mode`, and topology
-visibility (`restricted` or `local_only`) to route raw records.
-
+visibility (`restricted` or `local_only`) to route raw records. After `mb books check`,
+route books setup, monthly close, reconciliation, and CPA handoff to `/mb-books`; route tooling decisions to `/mb-think`.
 **Slug/destructive-operation guardrails:** Load
 `.claude/reference/business-primitives/slug-conventions.md` before naming
 business objects or topology entries, and
@@ -472,7 +472,7 @@ repair/update/drift, decide/codify/research, bets, launches, sites, ads, organic
 wiki, and help.
 
 Generic "set up" is not enough to route. Use the noun: repo setup routes to
-`/mb-setup`, bookkeeping setup runs `mb books check`, provider setup reads
+`/mb-setup`, bookkeeping setup runs `mb books check` then `/mb-books`, monthly close also routes to `/mb-books`, provider setup reads
 `mb connect`, and decision/tool setup routes to `/mb-think`.
 
 ---
