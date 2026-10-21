@@ -11,6 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- Hub defaults and inherited skills now explain where real data lives (#1231).
+
 ### Fixed
 
 - `mb books check` points monthly close at the configured books repo, accepts

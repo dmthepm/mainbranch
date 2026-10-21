@@ -312,6 +312,8 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 
 **Visibility, hosting, and checks**
 
+- For screenshots, fixtures and test content, follow `/mb-setup` `references/where-data-lives.md`.
+
 - Site repos default to **private**. Before creating a public site repo,
   ask one visibility question — see the engine docs
   (repo-visibility-rubric) for the rule and exact wording.

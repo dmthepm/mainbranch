@@ -30,6 +30,7 @@ for repair facts before giving prose-only advice.
 |----------|-----------|
 | Terminal, drag files, cd, business folder vs site folder | [terminal-basics.md](references/terminal-basics.md) |
 | Business folder, CLI, skills, linked site folder, system model | [system-model.md](references/system-model.md) |
+| Where should this go, real data, code repo, screenshots | `references/where-data-lives.md` in `/mb-setup` |
 | Philosophy, why, compound, passive memory | [philosophy.md](references/philosophy.md) |
 | /mb-think, research, decide, codify | [the-think-cycle.md](references/the-think-cycle.md) |
 | /mb-bet, bet, hypothesis, deadline, public narration, bet vs offer | [skills-guide.md](references/skills-guide.md) |

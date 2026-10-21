@@ -111,6 +111,8 @@ or long tweet threads into committed research files.
 
 ## Raw Findings
 
+Real material belongs in the hub; keep large customer datasets out. See `/mb-setup` `references/where-data-lives.md`.
+
 ### [Finding Area 1]
 
 [Detailed notes, quotes, data]
