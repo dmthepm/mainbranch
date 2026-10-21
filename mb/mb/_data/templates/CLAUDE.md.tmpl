@@ -63,6 +63,21 @@ and link the bet or push that changes. For a status-only question, answer it
 without proposing records. Ask for approval before any write. Never copy raw
 provider rows, account IDs, or exported tables into the repo. See `/mb-start`,
 `/mb-bet`, and `/mb-think` for the full routes.
+
+## Where data lives
+
+Code repos (the app, the site, tools) hold product code only: never customer
+data, customers' customers' data, photos or videos. Tests, fixtures and
+screenshots use invented values in the real case's shape. This business repo is
+the team's private memory, for the team and its agents only: real material
+belongs here (recordings, P&L, reviews, real examples), but no large customer
+datasets, because commits are never deleted. Media and screen recordings go on
+the tracker issue they explain. Customers' customers' data and sensitive
+categories (health, date of birth, ID photos, signatures, bank details) live
+only in production systems, encrypted. Real data flows up into this repo and
+the tracker, never down into a code repo; going down, it becomes an invented
+example of the same shape. The full rule: `/mb-setup` reference
+`where-data-lives.md`.
 <!-- mainbranch:entry-rules:end -->
 
 ## First-run setup intent

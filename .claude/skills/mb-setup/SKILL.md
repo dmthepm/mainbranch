@@ -122,7 +122,7 @@ operating notes. Default to a private repo and only switch to public when
 the source itself is intentionally public (open-source tool, template,
 demo, or build-in-public project). See
 [references/repo-visibility-rubric.md](references/repo-visibility-rubric.md).
-
+Use `references/where-data-lives.md` for the hub and child repo data boundaries.
 Where the repo lives — local-only, personal GitHub, free GitHub
 organization, or paid org — is a separate question from visibility. GitHub
 organizations can be free; do not imply that "org" means paid. Default to
