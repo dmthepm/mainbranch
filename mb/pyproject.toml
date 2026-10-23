@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mainbranch"
-version = "0.6.14"
+version = "0.6.15"
 description = "Main Branch engine umbrella - scaffolds, validates, and graphs business-as-files repos. Claude Code first, runtime-agnostic by design."
 readme = "README.md"
 requires-python = ">=3.10"
