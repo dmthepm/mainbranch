@@ -125,7 +125,5 @@ def test_g4_engine_doc_names_the_rule() -> None:
             "never down into a code repo",
         )
     )
-    unreleased = (
-        (ROOT / "CHANGELOG.md").read_text().split("## [Unreleased]", 1)[1].split("## [", 1)[0]
-    )
-    assert "#1231" in unreleased
+    # A release moves the entry out of [Unreleased], so look in the whole file.
+    assert "#1231" in (ROOT / "CHANGELOG.md").read_text()
