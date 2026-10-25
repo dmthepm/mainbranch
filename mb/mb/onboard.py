@@ -20,6 +20,7 @@ from mb import connect as connect_mod
 from mb import init as init_mod
 from mb import topology as topology_mod
 from mb.engine import link_skills, link_status, repo_flag, write_plugin_wiring
+from mb.gitignore import gitignore_problem
 
 LEVELS = {"beginner", "intermediate", "power"}
 MODES = {"new", "connect", "auto"}
@@ -375,6 +376,8 @@ def _state_path(repo: Path) -> Path:
 
 
 def _ensure_onboarding_gitignore(repo: Path) -> bool:
+    if gitignore_problem(repo):
+        return False
     gitignore = repo / ".gitignore"
     existing_text = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     entries = {line.strip() for line in existing_text.splitlines()}

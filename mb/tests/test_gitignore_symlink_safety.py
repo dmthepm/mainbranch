@@ -6,12 +6,13 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from mb import books, doctor, engine, migrate, status
+from mb import books, dashboard, doctor, engine, issue, migrate, onboard, status
 from mb.cli import app
 from mb.init import run as init_run
 from mb.migrations.base import MigrationInfo, MigrationPlan
@@ -203,3 +204,63 @@ def test_migration_still_plans_regular_gitignore(tmp_path: Path) -> None:
     migrate._ensure_gitignore_plan(repo, plans)
 
     assert [change.path for change in plans[0].changes] == [".gitignore"]
+
+
+@pytest.mark.parametrize("dangling", [False, True])
+@pytest.mark.parametrize(
+    "ensure", [onboard._ensure_onboarding_gitignore, issue.ensure_issue_gitignore]
+)
+def test_default_ignore_helpers_skip_unsafe_gitignore(
+    tmp_path: Path, dangling: bool, ensure: Callable[[Path], bool]
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    sentinel = _unsafe_gitignore(tmp_path, repo, dangling)
+
+    assert ensure(repo) is False
+    _assert_preserved(repo, sentinel, dangling)
+
+
+@pytest.mark.parametrize(
+    "ensure", [onboard._ensure_onboarding_gitignore, issue.ensure_issue_gitignore]
+)
+def test_default_ignore_helpers_still_append_to_regular_gitignore(
+    tmp_path: Path, ensure: Callable[[Path], bool]
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+
+    assert ensure(repo) is True
+    assert (repo / ".gitignore").read_text(encoding="utf-8").startswith("node_modules/\n")
+
+
+def test_dashboard_does_not_write_through_dangling_ignore_link(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    out_dir = repo / ".mb" / "dashboard"
+    out_dir.mkdir(parents=True)
+    target = tmp_path / "created-outside"
+    (out_dir / ".gitignore").symlink_to(target)
+    monkeypatch.setattr(dashboard, "collect", lambda root: {"repo": str(root)})
+    monkeypatch.setattr(dashboard, "render_html", lambda data: "<html></html>")
+
+    dashboard.build(repo, out_dir / "index.html")
+
+    assert (out_dir / ".gitignore").is_symlink()
+    assert not target.exists()
+
+
+def test_dashboard_still_writes_its_own_ignore_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    out_dir = repo / ".mb" / "dashboard"
+    repo.mkdir()
+    monkeypatch.setattr(dashboard, "collect", lambda root: {"repo": str(root)})
+    monkeypatch.setattr(dashboard, "render_html", lambda data: "<html></html>")
+
+    dashboard.build(repo, out_dir / "index.html")
+
+    assert (out_dir / ".gitignore").read_text(encoding="utf-8") == "*\n"

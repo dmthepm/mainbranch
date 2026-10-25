@@ -25,7 +25,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Security
 
-- Main Branch no longer follows a symlinked `.gitignore` when repairing, linking skills, initialising a repo, planning a migration or checking status.
+- Main Branch no longer follows a symlinked `.gitignore` anywhere it reads or writes one: repair, skill linking, init, migrations, status, onboarding, issue drafts and the dashboard.
 
 - `mb connect exec` refuses obvious environment-dump children (`printenv`,
   `env` without a command operand, and any `env -S` form) before reading a

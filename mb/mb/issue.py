@@ -17,6 +17,7 @@ from urllib.parse import quote
 from mb import __version__
 from mb import doctor as doctor_mod
 from mb.engine import install_mode
+from mb.gitignore import gitignore_problem
 
 PUBLIC_REPO = "noontide-co/mainbranch"
 ISSUE_DRAFTS_RELATIVE_PATH = Path(".mb") / "issue-drafts"
@@ -341,6 +342,8 @@ def _question_body(fields: dict[str, str]) -> tuple[str, dict[str, int]]:
 
 
 def ensure_issue_gitignore(repo: Path) -> bool:
+    if gitignore_problem(repo):
+        return False
     gitignore = repo / ".gitignore"
     existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     entries = {line.strip() for line in existing.splitlines()}
