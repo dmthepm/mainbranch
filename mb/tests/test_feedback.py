@@ -794,7 +794,7 @@ def test_unwritable_log_never_changes_the_refusal(
     baseline = runner.invoke(app, [*argv, "--repo", str(connect_env)])
     monkeypatch.delenv("MB_FEEDBACK_LOG")
     locked = state_home / "mainbranch"
-    locked.mkdir(parents=True)
+    locked.mkdir(parents=True, exist_ok=True)
     locked.chmod(0o500)
     try:
         result = runner.invoke(app, [*argv, "--repo", str(connect_env)])

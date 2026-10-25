@@ -1049,7 +1049,7 @@ def _write_user_scope(data: dict[str, Any]) -> Path:
     previous_mode = path.stat().st_mode & 0o777 if previous is not None else None
     path.parent.mkdir(parents=True, exist_ok=True)
     with suppress(OSError):
-        path.parent.chmod(0o700)
+        path.parent.chmod(stat.S_IMODE(path.parent.stat().st_mode) & 0o700)
     try:
         atomic_write_text(path, yaml.safe_dump(data, sort_keys=False), mode=0o600)
     except OSError as exc:
@@ -3563,7 +3563,7 @@ def write_release_audit(
     path = audit_path()
     try:
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        path.parent.chmod(0o700)
+        path.parent.chmod(stat.S_IMODE(path.parent.stat().st_mode) & 0o700)
         fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
         try:
             os.fchmod(fd, 0o600)

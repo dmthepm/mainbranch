@@ -80,7 +80,9 @@ def test_exec_environment_cli(
     assert ("MB_TEST_UNRELATED_SECRET" in child) == present
     assert child["CLOUDFLARE_API_TOKEN"] == SECRET
     for name in ("PATH", "HOME", "LC_ALL"):
-        assert child[name] == os.environ[name]
+        expected = os.environ[name]
+        actual = child[name]
+        assert actual == expected
     assert entries()[0]["flags"] == flags
 
 
@@ -292,3 +294,14 @@ def test_audit_scrubs_all_string_fields(repo: Path, monkeypatch: pytest.MonkeyPa
     )
     text = connect.audit_path().read_text()
     assert "fixture-token-for-scrubbing" not in text
+
+
+def test_audit_does_not_restore_directory_write_permission(repo: Path) -> None:
+    assert invoke(repo, "token").exit_code == 3
+    directory = connect.audit_path().parent
+    directory.chmod(0o500)
+    try:
+        assert invoke(repo, "token").exit_code == 3
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o500
+    finally:
+        directory.chmod(0o700)
