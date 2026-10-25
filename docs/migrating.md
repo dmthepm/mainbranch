@@ -237,6 +237,11 @@ That directory is local runtime state, not migration work. Current `mb init` and
 it in `git status`, run `mb skill link --repo .` before judging the migration
 diff.
 
+Main Branch only reads or edits a regular `.gitignore` inside the repo. If it
+is a symlink or another file type, doctor repair, skill linking and repo
+initialisation skip it and report a hint. Replace it with a regular file, then
+rerun the command. Other repairs and skill links still proceed.
+
 If Claude accidentally dirties an existing branch during discovery, stop before
 running layout migration. Move the already-written Main Branch repair work onto
 a branch, keep user-authored files separate, and do not commit local status

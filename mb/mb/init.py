@@ -21,6 +21,7 @@ from mb import team as team_mod
 from mb import validate as validate_mod
 from mb.durable import atomic_write_text
 from mb.engine import link_skills, write_plugin_wiring
+from mb.gitignore import gitignore_problem
 from mb.migrate import LATEST_SCHEMA_VERSION, SCHEMA_MARKER
 
 # The canonical business folders. Keep these stable unless a schema migration lands.
@@ -308,7 +309,9 @@ def run(
 
     gitignore_tmpl = _read_template(".gitignore.tmpl") or DEFAULT_GITIGNORE
     gitignore_path = target / ".gitignore"
-    if not gitignore_path.exists():
+    if problem := gitignore_problem(target):
+        warnings.append(problem)
+    elif not gitignore_path.exists():
         atomic_write_text(gitignore_path, _render(gitignore_tmpl, mapping))
         created.append(".gitignore")
 

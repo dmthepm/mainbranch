@@ -19,6 +19,7 @@ same Claude Code discovery surface for pipx users and clone-based users.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shlex
 import shutil
@@ -31,6 +32,7 @@ from typing import Any
 
 from mb import __version__
 from mb.durable import CorruptStateError, atomic_write_json, atomic_write_text, read_json_object
+from mb.gitignore import gitignore_problem
 
 SKILL_PREFIX = "mb-"
 PRIMARY_SKILL = "mb-start"
@@ -1013,16 +1015,22 @@ def _link_operations(target: Path, root: Path) -> dict[str, Any]:
 
     entries, retired = _link_gitignore_entries()
     gitignore = target / ".gitignore"
-    existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
-    existing_lines = set(existing.splitlines())
-    gitignore_add = [entry for entry in entries if entry not in existing_lines]
-    gitignore_remove = [entry for entry in retired if entry in existing_lines]
-    updated = _gitignore_text_after(existing, entries, retired)
-    if updated != existing:
-        operations.append(
-            {"op": "write", "path": str(gitignore), "rel": ".gitignore", "content": updated}
-        )
-
+    problem = gitignore_problem(target)
+    warnings = [problem] if problem else []
+    gitignore_add: list[str] = []
+    gitignore_remove: list[str] = []
+    if problem:
+        skipped.append(".gitignore")
+    else:
+        existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
+        existing_lines = set(existing.splitlines())
+        gitignore_add = [entry for entry in entries if entry not in existing_lines]
+        gitignore_remove = [entry for entry in retired if entry in existing_lines]
+        updated = _gitignore_text_after(existing, entries, retired)
+        if updated != existing:
+            operations.append(
+                {"op": "write", "path": str(gitignore), "rel": ".gitignore", "content": updated}
+            )
     global_dir = _personal_skills_dir()
     personal = _planned_personal_repairs(global_dir)
     backup_paths: dict[str, Path] = {}
@@ -1036,6 +1044,7 @@ def _link_operations(target: Path, root: Path) -> dict[str, Any]:
         "error": "",
         "operations": operations,
         "skipped": skipped,
+        "warnings": warnings,
         "gitignore_add": gitignore_add,
         "gitignore_remove": gitignore_remove,
         "personal_repairs": personal,
@@ -1074,6 +1083,8 @@ def plan_link_skills(repo: str | Path) -> dict[str, Any]:
     planned = _link_operations(target, root)
     if planned["error"]:
         return {**empty, "errors": [planned["error"]]}
+    for warning in planned["warnings"]:
+        logging.getLogger(__name__).warning(warning)
     operations = planned["operations"]
     tracked = consent_destinations(target, operations)
     return {
@@ -1083,6 +1094,7 @@ def plan_link_skills(repo: str | Path) -> dict[str, Any]:
             item["rel"] for item in operations if item["op"] in {"create_link", "replace_link"}
         ],
         "skipped": planned["skipped"],
+        "warnings": planned["warnings"],
         "removed_legacy": [
             item["rel"] for item in operations if item["op"] == "delete" and item["rel"]
         ],
@@ -1128,6 +1140,8 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
             "errors": [planned["error"]],
         }
 
+    for warning in planned["warnings"]:
+        logging.getLogger(__name__).warning(warning)
     (target / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
     created: list[str] = []
     linked: list[str] = []
@@ -1141,6 +1155,11 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
         if not rel:
             continue  # personal skill repairs run below, limited to the plan
         if op == "write":
+            if rel == ".gitignore" and (problem := gitignore_problem(target)):
+                skipped.append(rel)
+                planned["warnings"].append(problem)
+                logging.getLogger(__name__).warning(problem)
+                continue
             atomic_write_text(path, item["content"])
             created.append(rel)
         elif op == "delete":
@@ -1166,6 +1185,7 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
         "linked": linked,
         "copied": copied,
         "skipped": skipped,
+        "warnings": planned["warnings"],
         "removed_legacy": removed_legacy,
         "removed_stale_engine_paths": planned["removed_stale_engine_paths"],
         "errors": [],
