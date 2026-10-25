@@ -16,10 +16,7 @@ EMAIL = re.compile(r"[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}")
 DNS = re.compile(r"(?:[\w-]+\.)*ts\.net\.?", re.IGNORECASE)
 URL = re.compile(r"https?://[^\s\"'<>|]+", re.IGNORECASE)
 IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
-IPV6 = re.compile(
-    r"(?<![0-9a-fA-F:])(?:[0-9a-fA-F]{0,4}:){2,}"
-    r"[0-9a-fA-F:.]*(?:%[\w.-]+)?(?![0-9a-fA-F:])"
-)
+IPV6 = re.compile(r"[0-9a-fA-F:.]+(?:%[\w.-]+)?")
 IDENTITY_CLASSES = {
     "displayname": "user",
     "loginname": "user",
@@ -125,7 +122,35 @@ class Redactor:
                 return candidate
             return self.placeholder(candidate)
 
-        text = IPV6.sub(address, text)
+        def ipv6_run(match: re.Match) -> str:
+            run = match[0]
+            if run.count(":") < 2:
+                return run
+            pieces = []
+            cursor = 0
+            while cursor < len(run):
+                for start in range(cursor, len(run)):
+                    for end in range(len(run), start, -1):
+                        candidate = run[start:end]
+                        host = candidate.split("%", 1)[0]
+                        if host == "::" or host.count(":") < 2:
+                            continue
+                        try:
+                            ipaddress.IPv6Address(host)
+                        except ValueError:
+                            continue
+                        pieces.extend((run[cursor:start], self.placeholder(candidate)))
+                        cursor = end
+                        break
+                    else:
+                        continue
+                    break
+                else:
+                    pieces.append(run[cursor:])
+                    break
+            return "".join(pieces)
+
+        text = IPV6.sub(ipv6_run, text)
         text = IPV4.sub(address, text)
         return (
             text.replace("|", "\\|")
