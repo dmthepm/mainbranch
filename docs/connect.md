@@ -65,7 +65,8 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
   stderr belong to the command.
 - The exit code is the command's own; a command killed by a signal exits
   `128 + signal`, as in a shell. `mb connect exec` itself exits 1 when the
-  credential cannot be read, 2 for a refused request, and 127 when the
+  credential cannot be read or the caller policy is invalid, 2 for a usage
+  refusal, 3 for a caller-policy or environment-dump refusal, and 127 when the
   command is not found.
 - Default variable: the provider's own, which is its first registered
   environment variable (`CLOUDFLARE_API_TOKEN`, `GITHUB_TOKEN`,
@@ -106,15 +107,78 @@ flags. A later release will refuse noninteractive `--print`.
 Checks run in this order:
 
 1. Missing provider or `--json`: exit 2. JSON contains only an error envelope.
-2. Missing `--print`: exit 3, before provider lookup.
-3. Unknown provider or no secret slot: exit 2. Missing or unreadable
+2. Caller policy validation and checks, when configured: see [Caller policy](#caller-policy).
+3. Missing `--print`: exit 3, before provider lookup when no policy applies.
+4. Unknown provider or no secret slot: exit 2. Missing or unreadable
    credential: exit 1 with repair guidance on stderr.
-4. Audit write fails: exit 1, `audit_unavailable`, and no value is printed.
-5. Otherwise the raw value is written: exit 0.
+5. Audit write fails: exit 1, `audit_unavailable`, and no value is printed.
+6. Otherwise the raw value is written: exit 0.
 
 Scripts that redirected to a file without a flag must now explicitly pass
 `--print`, or move to `exec`. Scripts that relied on the full parent environment
 with `exec` can retain named variables with `--keep-env` or use `--inherit-env`.
+
+## Caller policy
+
+Optionally add `caller_policy` to the selected repo's `.mb/connect.yaml`:
+
+```yaml
+caller_policy:
+  callers:
+    claude: [stripe, google]
+    codex: [cloudflare-pages]
+  default: allow
+  working_dirs: [.]
+```
+
+`callers` maps process basenames to provider lists. Names must match
+`[A-Za-z0-9._-]{1,64}`. Provider aliases resolve to canonical ids, so
+`cloudflare-pages` permits `cloudflare`. Connected custom provider ids work too.
+Omit `callers` for an empty map. `default` is `allow` or `deny` and defaults to
+`allow`. Omit the entire block to keep the existing release behavior.
+Other top-level config keys survive connect and rotation writes.
+
+Main Branch walks up to eight ancestors, starting at its direct parent. It
+chooses the first basename listed in `callers`. With no match, it uses the
+direct parent's name and applies `default`. Unreadable process information
+resolves to an empty caller and applies `default`.
+
+Both `exec` and `token` check the policy before reading a credential:
+
+1. Validate the schema. Unknown keys, wrong types, invalid caller names or
+   unknown provider ids refuse with `caller_policy_invalid`, exit 1. The
+   message names the file and bad key without showing its value.
+2. If `working_dirs` is set, resolve the real current folder and require it
+   to be inside at least one allowed folder. Entries are relative to the
+   selected repo root or absolute. Symlinks follow their targets. An empty
+   list allows no folder. Failure is `caller_policy_working_dir`.
+3. A listed caller may release only its provider list, otherwise
+   `caller_policy_provider`. An unlisted caller follows `default`; `deny`
+   refuses with `caller_policy_caller`.
+
+The three check refusals in steps 2 and 3 exit 3, print no credential and
+start no child. For example, `default: deny` with only `claude: [stripe]`
+allows a matching ancestor to release Stripe and refuses unlisted callers.
+`working_dirs: [.]` allows the root and subfolders, including when selected
+with `--repo`, but refuses an actual current folder outside the root.
+
+An always-on `exec` rule refuses a child whose basename is `printenv`, or
+`env` with no command operand, with `exec_child_env_dump`, exit 3. Flags and
+assignments alone do not supply a command: `env -i` and `env FOO=1` refuse.
+`env FOO=1 true` and `/usr/bin/env true` run normally. Other child commands
+are not inspected. This guards against obvious mistakes; it is not a sandbox.
+
+Inspect the current policy and resolved caller with `mb connect policy`, or
+`mb connect policy --repo <folder> --json`. This read-only command reports
+absent, valid or invalid policy state, parsed fields or the validation error,
+and exits 1 only for invalid configuration.
+
+This policy is advisory: any process running as the same OS user can bypass it. Separate OS users give real separation.
+
+Each release audit line includes scrubbed `caller` and `policy`: `none` when
+no policy exists, `allowed` when policy checks pass, or `refused` for policy
+and child-rule refusals. Each refusal records one line with `result: refused`
+and its rule as `reason`. Existing audit failure behavior still applies.
 
 ## Local release audit
 
@@ -127,7 +191,8 @@ Fields are `ts` (UTC ISO-8601, seconds), `verb`, `provider`, `repo_id` (recorded
 config identity, empty when absent), `scope` (`repo`, `user`, or empty),
 `result` (`released`, `refused`, or `failed`), `reason` (rule name or empty),
 `exit_code`, `pid`, `ppid`, `parent` (parent executable basename, at most 64
-characters, empty when unknown), and sorted `flags` (`print`,
+characters, empty when unknown), `caller` (resolved caller, empty when unknown),
+`policy` (`none`, `allowed`, or `refused`), and sorted `flags` (`print`,
 `print_noninteractive`, `inherit_env`, `keep_env`). Strings pass through the
 feedback scrubber. The log contains no credential, credential hash or prefix,
 command arguments, environment values, or names passed to `--keep-env`.
