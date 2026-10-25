@@ -26,8 +26,9 @@ macOS build identification uses explicit macapp/macsys/-oss version metadata
 when available, otherwise "not checked". These are build hints, not proof of
 which of several installations is running. Variant background:
 https://tailscale.com/docs/concepts/macos-variants, checked 2026-10-25.
-Preference and version JSON fields can vary by build; absent fields remain
-unknown. AutoUpdate.Apply describes the daemon preference, not App Store or
+`tailscale debug prefs` is a debug interface, and the official CLI docs
+describe `tailscale status --json` output as unstable. Missing or changed fields
+are treated as "not checked". Preference and version JSON fields can vary by build. AutoUpdate.Apply describes the daemon preference, not App Store or
 system package-manager scheduling. Serve status may omit Services.
 
 ## Not used, unconfirmed

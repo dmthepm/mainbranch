@@ -9,68 +9,124 @@ import re
 import sys
 
 KEY = re.compile(
-    r'\b(?:(?:nodekey|mkey|discokey|nlpub|tlpub):[^\s"\'<>|,}]+|tskey-[\w-]+)', re.IGNORECASE
+    r"(?:(?:nodekey|mkey|discokey|nlpub|tlpub):[^\s\"'<>|,}]+|tskey-[\w-]+)",
+    re.IGNORECASE,
 )
 EMAIL = re.compile(r"[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}")
-DNS = re.compile(r"(?<![\w-])(?:[\w-]+\.)+ts\.net\.?", re.IGNORECASE)
-IP = re.compile(r"(?<![\w])(?:[0-9a-fA-F]*:[0-9a-fA-F:.%]+|(?:\d{1,3}\.){3}\d{1,3})(?:/\d+)?")
-IDENTITY_FIELDS = {
-    "hostname",
-    "dnsname",
-    "name",
-    "machine",
-    "host",
-    "loginname",
-    "email",
+DNS = re.compile(r"(?:[\w-]+\.)*ts\.net\.?", re.IGNORECASE)
+URL = re.compile(r"https?://[^\s\"'<>|]+", re.IGNORECASE)
+IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
+IPV6 = re.compile(
+    r"(?<![0-9a-fA-F:])(?:[0-9a-fA-F]{0,4}:){2,}"
+    r"[0-9a-fA-F:.]*(?:%[\w.-]+)?(?![0-9a-fA-F:])"
+)
+IDENTITY_CLASSES = {
+    "displayname": "user",
+    "loginname": "user",
+    "email": "user",
+    "profilepicurl": "url",
+    "id": "id",
+    "stableid": "id",
+    "nodeid": "id",
+    "publickey": "id",
+    "hostname": "node",
+    "dnsname": "node",
+    "certdomains": "node",
+    "magicdnssuffix": "tailnet",
+    "tailnetname": "tailnet",
+    "currenttailnet": "tailnet",
+    "tailnet": "tailnet",
+    "machine": "node",
+    "host": "node",
+    "name": "node",
+}
+TABLE_FIELDS = ("check", "location", "result", "safer", "docs")
+MACHINE_CHECKS = {
+    "Version and track",
+    "Tailscale SSH",
+    "Auto-update",
+    "Tailnet lock",
+    "OpenSSH listeners",
+    "Serve",
+    "Funnel",
+    "macOS build",
+}
+POLICY_CHECKS = {
+    "ssh-section",
+    "ssh-accept",
+    "wildcard",
+    "member-to-all",
+    "agent-to-admin",
+    "tag-without-owner",
+    "not checked",
+}
+DOCS = {
+    "https://tailscale.com/docs/reference/syntax/policy-file",
+    "https://tailscale.com/docs/features/tailscale-ssh",
 }
 
 
 class Redactor:
     def __init__(self, payload: object):
-        self.nodes: dict[str, str] = {}
-        self.users: dict[str, str] = {}
-        self.hosts: set[str] = set()
+        self.values: dict[str, str] = {}
+        self.counts: dict[str, int] = {}
         self.discover(payload)
+        self.identities = sorted(self.values, key=len, reverse=True)
 
-    def placeholder(self, value: str, user: bool = False) -> str:
-        mapping = self.users if user else self.nodes
-        normalized = value.rstrip(".").lower()
-        if normalized not in mapping:
-            mapping[normalized] = f"{'user' if user else 'node'}-{len(mapping) + 1}"
-        return mapping[normalized]
+    def placeholder(self, value: str, kind: str = "node") -> str:
+        normalized = value.lower()
+        if normalized not in self.values:
+            self.counts[kind] = self.counts.get(kind, 0) + 1
+            self.values[normalized] = f"{kind}-{self.counts[kind]}"
+        return self.values[normalized]
 
-    def discover(self, value: object) -> None:
+    def discover(self, value: object, context: str | None = None) -> None:
         if isinstance(value, dict):
             for key, child in value.items():
-                if str(key).lower() in IDENTITY_FIELDS and isinstance(child, str) and child:
-                    self.hosts.add(child)
-                self.discover(child)
+                field = str(key).lower()
+                kind = IDENTITY_CLASSES.get(field)
+                if field in {"user", "userprofiles"}:
+                    kind = "user"
+                    if isinstance(child, dict):
+                        for identity in child:
+                            self.placeholder(str(identity), "id")
+                if field == "name" and context in {"tailnet", "user"}:
+                    kind = context
+                self.discover(child, kind or context)
         elif isinstance(value, list):
             for child in value:
-                self.discover(child)
+                self.discover(child, context)
+        elif (
+            isinstance(value, (str, int))
+            and not isinstance(value, bool)
+            and context
+            and str(value)
+        ):
+            self.placeholder(str(value), context)
 
     def scrub(self, value: object) -> str:
         text = str(value)
-        text = KEY.sub("[key]", text)
-        text = EMAIL.sub(lambda m: self.placeholder(m[0], True), text)
+        # One substitution prevents replacements from modifying earlier placeholders.
+        if self.identities:
+            pattern = "|".join(re.escape(value) for value in self.identities)
+            text = re.sub(
+                pattern, lambda m: self.values[m[0].lower()], text, flags=re.IGNORECASE
+            )
+        text = URL.sub(lambda m: self.placeholder(m[0], "url"), text)
+        text = KEY.sub(lambda m: self.placeholder(m[0], "id"), text)
+        text = EMAIL.sub(lambda m: self.placeholder(m[0], "user"), text)
         text = DNS.sub(lambda m: self.placeholder(m[0]), text)
 
         def address(match: re.Match) -> str:
             candidate = match[0]
             try:
-                ipaddress.ip_interface(candidate.split("%", 1)[0])
+                ipaddress.ip_address(candidate.split("%", 1)[0])
             except ValueError:
                 return candidate
             return self.placeholder(candidate)
 
-        text = IP.sub(address, text)
-        for host in sorted(self.hosts, key=len, reverse=True):
-            text = re.sub(
-                r"(?<![\w-])" + re.escape(host) + r"(?![\w-])",
-                lambda m, host=host: self.placeholder(host, "@" in host),
-                text,
-                flags=re.IGNORECASE,
-            )
+        text = IPV6.sub(address, text)
+        text = IPV4.sub(address, text)
         return (
             text.replace("|", "\\|")
             .replace("\n", " ")
@@ -78,6 +134,55 @@ class Redactor:
             .replace("<", "&lt;")
             .replace(">", "&gt;")
         )
+
+
+def machine_result(check: str, value: object) -> str:
+    if check in {"Serve", "Funnel"} and isinstance(value, (dict, list)):
+        return (
+            "Configuration present; review forwarding warnings locally"
+            if value
+            else "No configuration returned"
+        )
+    if not isinstance(value, str):
+        return "not checked: unexpected field value"
+    if value.startswith("not checked:"):
+        return value
+    if check in {"Tailscale SSH", "Auto-update", "Tailnet lock"} and value in {
+        "on",
+        "off",
+    }:
+        return value
+    if check == "macOS build" and value in {
+        "standalone",
+        "App Store",
+        "open-source tailscaled",
+    }:
+        return value
+    if check == "Version and track" and re.fullmatch(
+        r"\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?; (?:current for track|"
+        r"differs from current track release|track currency not checked: upstream version unavailable)",
+        value,
+    ):
+        return value
+    if check == "OpenSSH listeners" and value.startswith("OpenSSH listening: "):
+        interfaces = set()
+        for listener in value.removeprefix("OpenSSH listening: ").split("; "):
+            try:
+                host, port = listener.split(", TCP ")
+                address = ipaddress.ip_address(host)
+                if not port.isdigit() or not 0 < int(port) < 65536:
+                    raise ValueError
+            except ValueError:
+                return "not checked: unexpected listener value"
+            interfaces.add(
+                "loopback"
+                if address.is_loopback
+                else "all interfaces"
+                if address.is_unspecified
+                else "specific interface"
+            )
+        return "OpenSSH listening: " + "; ".join(sorted(interfaces))
+    return "not checked: unexpected field value"
 
 
 def render(payload: dict) -> str:
@@ -89,20 +194,39 @@ def render(payload: dict) -> str:
         "| --- | --- | --- | --- | --- |",
     ]
     for row in payload.get("rows", []):
-        cells = []
-        for field in ("check", "location", "result", "safer", "docs"):
-            value = row.get(field, "")
-            # Serve/Funnel are arbitrary nested private configuration. Share counts only.
-            if isinstance(value, (dict, list)):
-                value = (
-                    "Configuration present; review forwarding warnings locally"
-                    if value
-                    else "No configuration returned"
-                )
-            cells.append(redactor.scrub(value))
+        if not isinstance(row, dict):
+            continue
+        check = row.get("check")
+        if not isinstance(check, str) or check not in MACHINE_CHECKS | POLICY_CHECKS:
+            continue
+        selected = {"check": check}
+        if check in MACHINE_CHECKS:
+            selected["result"] = machine_result(check, row.get("result"))
+        else:
+            for field in ("result", "safer"):
+                if isinstance(row.get(field), str):
+                    selected[field] = row[field]
+            location = row.get("location", "")
+            if isinstance(location, str) and re.fullmatch(
+                r"(?:policy|ssh|(?:ssh|acls|grants)\[\d+\](?:\.(?:src|dst)\[\d+\])?)",
+                location,
+            ):
+                selected["location"] = location
+            if isinstance(row.get("docs"), str) and row["docs"] in DOCS:
+                selected["docs"] = row["docs"]
+        cells = [
+            selected.get(field, "")
+            if field == "docs"
+            else redactor.scrub(selected.get(field, ""))
+            for field in TABLE_FIELDS
+        ]
         lines.append("| " + " | ".join(cells) + " |")
     lines.extend(["", "What to look at:", ""])
-    lines.extend("- " + redactor.scrub(note) for note in payload.get("notes", []))
+    lines.extend(
+        "- " + redactor.scrub(note)
+        for note in payload.get("notes", [])
+        if isinstance(note, str)
+    )
     return "\n".join(lines) + "\n"
 
 
