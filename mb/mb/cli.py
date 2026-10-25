@@ -2071,7 +2071,8 @@ def connect_cmd(
         "",
         help=(
             "Provider to connect, or `list` / `plan` / `status` / `doctor` / `hygiene` / "
-            "`identity` / `test` / `exec` / `rotate` / `token` / `audit` / `hydrate` / `repair`."
+            "`identity` / `test` / `exec` / `rotate` / `token` / `audit` / `policy` / "
+            "`hydrate` / `repair`."
         ),
     ),
     provider: str = typer.Argument(
@@ -2369,6 +2370,22 @@ def connect_cmd(
         else:
             connect_mod.render_hydrate_result(result)
         raise typer.Exit(0 if result["ok"] else 1)
+    if target == "policy":
+        result = connect_mod.caller_policy_status(repo)
+        if json_out:
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            state = (
+                "invalid" if not result["valid"] else "present" if result["exists"] else "absent"
+            )
+            typer.echo(f"Caller policy: {state}")
+            if result["error"]:
+                typer.echo(result["error"])
+            if result["policy"] is not None:
+                typer.echo(json.dumps(result["policy"], indent=2))
+            typer.echo(f"Caller: {result['caller']}")
+            typer.echo(result["advisory"])
+        raise typer.Exit(0 if result["valid"] else 1)
     if target == "audit":
         try:
             entries = connect_mod.read_release_audit(limit=limit, provider=audit_provider)
@@ -2427,11 +2444,7 @@ def connect_cmd(
                 inherit_env=inherit_env,
             )
         except ValueError as exc:
-            code = (
-                1
-                if isinstance(exc, connect_mod.ConnectRefusal) and exc.rule == "audit_unavailable"
-                else 2
-            )
+            code = connect_mod.release_refusal_exit_code(exc)
             _connect_error_exit("mb connect exec", exc, code=code, json_out=json_out)
         if outcome["error"]:
             typer.echo(f"mb connect exec: {outcome['error']}", err=True)
@@ -2486,13 +2499,7 @@ def connect_cmd(
         try:
             result = connect_mod.token_for_output(provider, repo, print_token=print_token)
         except connect_mod.ConnectRefusal as exc:
-            code = (
-                connect_mod.TOKEN_REFUSED_EXIT_CODE
-                if exc.rule == "token_print"
-                else 1
-                if exc.rule == "audit_unavailable"
-                else 2
-            )
+            code = connect_mod.release_refusal_exit_code(exc)
             _connect_error_exit("mb connect token", exc, code=code, json_out=json_out)
         except ValueError as exc:
             _connect_error_exit("mb connect token", exc, json_out=json_out)

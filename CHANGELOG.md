@@ -11,7 +11,23 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- Optional per-repo caller policy limits credential release by caller,
+  provider and working folder. `mb connect policy` shows the configuration
+  and resolved caller. Audit entries include `caller` and `policy`.
+  This policy is advisory: any process running as the same OS user can bypass it. Separate OS users give real separation.
+
+### Fixed
+
+- Connect and rotation writes preserve caller policy and other unknown
+  top-level configuration keys in `.mb/connect.yaml`.
+
 ### Security
+
+- `mb connect exec` refuses obvious environment-dump children (`printenv`,
+  `env` without a command operand, and any `env -S` form) before reading a
+  credential, exit 3.
 
 - Credential release through `mb connect exec` and `token` requires a scrubbed,
   private local audit entry and fails closed when the audit is unavailable.

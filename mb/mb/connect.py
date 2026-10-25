@@ -108,9 +108,9 @@ PROBE_PROVIDERS: frozenset[str] = frozenset(
 CONDITIONAL_PROBE_PROVIDERS: frozenset[str] = frozenset({"google"})
 
 
-# `mb connect token` without the explicit `--print` release flag.
+# `mb connect token` without `--print`, caller policy and env-dump refusals.
 # Distinct from 1 (credential missing or unreadable, store failure) and 2
-# (usage error or any other refusal), so a script can tell "refused by design"
+# (usage error or other refusals), so a script can tell "refused by design"
 # from "no credential". Stable: documented in docs/connect.md.
 TOKEN_REFUSED_EXIT_CODE = 3
 
@@ -828,6 +828,7 @@ def _read_config(repo: Path) -> dict[str, Any]:
     except (TypeError, ValueError):
         version = 1
     return {
+        **raw,
         "version": version,
         "repo_id": str(raw.get("repo_id") or ""),
         "repo_identity": raw.get("repo_identity")
@@ -3527,6 +3528,236 @@ def _audit_parent() -> str:
     return ""
 
 
+CALLER_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+CALLER_POLICY_ADVISORY = (
+    "This policy is advisory: any process running as the same OS user can bypass it. "
+    "Separate OS users give real separation."
+)
+
+
+def _process_info(pid: int) -> tuple[int, str]:
+    """Read one ancestor without command arguments or environment values."""
+    if sys.platform.startswith("linux"):
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        return int(fields[1]), Path(f"/proc/{pid}/comm").read_text().strip()
+    if sys.platform == "darwin":
+        proc = subprocess.run(
+            ["ps", "-o", "ppid=,comm=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        parent, name = proc.stdout.strip().split(maxsplit=1)
+        return int(parent), name
+    raise OSError("process information unavailable")
+
+
+def resolve_caller(
+    callers: dict[str, list[str]],
+    *,
+    process_table: Callable[[int], tuple[int, str]] | None = None,
+) -> str:
+    """Find the first listed ancestor, or use the direct parent's basename."""
+    read = process_table or _process_info
+    pid = os.getppid()
+    direct = ""
+    seen: set[int] = set()
+    try:
+        for level in range(8):
+            if pid <= 0 or pid in seen:
+                break
+            seen.add(pid)
+            pid, name = read(pid)
+            name = Path(name).name[:64]
+            if level == 0:
+                direct = name
+            if name in callers:
+                return name
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return ""
+    return direct
+
+
+def _invalid_caller_policy(path: Path, key: str) -> NoReturn:
+    from mb.feedback_scrub import scrub
+
+    _refuse(
+        "caller_policy_invalid",
+        f"caller_policy_invalid: {path}, bad key {scrub(key)[:128]}. "
+        "See `mb connect policy` and docs/connect.md.",
+    )
+
+
+def _caller_policy(repo: Path, config: dict[str, Any]) -> dict[str, Any] | None:
+    if "caller_policy" not in config:
+        return None
+    raw = config["caller_policy"]
+    path = repo / CONFIG_RELATIVE_PATH
+    if not isinstance(raw, dict):
+        _invalid_caller_policy(path, "caller_policy")
+    for key in raw:
+        if key not in {"callers", "default", "working_dirs"}:
+            _invalid_caller_policy(path, f"caller_policy.{key}")
+    default = raw.get("default", "allow")
+    if not isinstance(default, str) or default not in {"allow", "deny"}:
+        _invalid_caller_policy(path, "caller_policy.default")
+    callers = raw.get("callers", {})
+    if not isinstance(callers, dict):
+        _invalid_caller_policy(path, "caller_policy.callers")
+    parsed: dict[str, list[str]] = {}
+    for name, providers in callers.items():
+        if not isinstance(name, str) or not CALLER_NAME_RE.fullmatch(name):
+            _invalid_caller_policy(path, "caller_policy.callers")
+        if not isinstance(providers, list):
+            _invalid_caller_policy(path, "caller_policy.callers")
+        parsed[name] = []
+        for provider in providers:
+            if not isinstance(provider, str):
+                _invalid_caller_policy(path, "caller_policy.callers")
+            try:
+                parsed[name].append(resolve_provider(provider, repo).id)
+            except ValueError:
+                _invalid_caller_policy(path, "caller_policy.callers")
+    policy: dict[str, Any] = {"callers": parsed, "default": default}
+    if "working_dirs" in raw:
+        dirs = raw["working_dirs"]
+        if not isinstance(dirs, list) or any(
+            not isinstance(item, str) or not item or "\x00" in item for item in dirs
+        ):
+            _invalid_caller_policy(path, "caller_policy.working_dirs")
+        policy["working_dirs"] = dirs
+    return policy
+
+
+def caller_policy_status(repo: str | Path = ".") -> dict[str, Any]:
+    """Inspect policy and ancestry without reading credentials or writing files."""
+    target = Path(repo).resolve()
+    exists = False
+    policy = None
+    error = ""
+    try:
+        config = _read_config(target)
+        exists = "caller_policy" in config
+        policy = _caller_policy(target, config)
+    except (ValueError, OSError) as exc:
+        error = str(exc)
+    return {
+        "exists": exists,
+        "valid": not error,
+        "policy": policy,
+        "error": error,
+        "caller": resolve_caller(policy["callers"] if policy else {}),
+        "advisory": CALLER_POLICY_ADVISORY,
+    }
+
+
+def _check_caller_policy(status: dict[str, Any], provider: str, repo: str | Path) -> None:
+    if not status["valid"]:
+        if status["exists"]:
+            _refuse("caller_policy_invalid", status["error"])
+        # An unreadable config has no parsed policy. Preserve the existing
+        # token-print and config failure rules in the release path below.
+        return
+    policy = status["policy"]
+    if policy is None:
+        return
+    if "working_dirs" in policy:
+        root = Path(repo).resolve()
+        cwd = Path.cwd().resolve()
+        if not any(_is_within(cwd, (root / item).resolve()) for item in policy["working_dirs"]):
+            _refuse(
+                "caller_policy_working_dir",
+                "caller_policy_working_dir: current folder is outside the allowed folders. "
+                "See `mb connect policy` and docs/connect.md.",
+            )
+    caller = status["caller"]
+    if caller in policy["callers"]:
+        if resolve_provider(provider, repo).id not in policy["callers"][caller]:
+            _refuse(
+                "caller_policy_provider",
+                "caller_policy_provider: caller cannot release this provider. "
+                "See `mb connect policy` and docs/connect.md.",
+            )
+    elif policy["default"] == "deny":
+        _refuse(
+            "caller_policy_caller",
+            "caller_policy_caller: caller is not allowed. "
+            "See `mb connect policy` and docs/connect.md.",
+        )
+
+
+# `env` options that take an argument, short and long, as GNU getopt reads them.
+_ENV_SHORT_WITH_ARG = frozenset("uCSa")
+_ENV_LONG_WITH_ARG = ("unset", "chdir", "split-string", "argv0")
+
+
+def _env_has_command(args: list[str]) -> bool:
+    """Return whether ``env args`` names a command operand.
+
+    Follows GNU getopt: short options may be clustered (``-0u NAME``) and take
+    their argument from the rest of the cluster or the next word; long options
+    may be abbreviated (``--un NAME``) or carry ``=value``. Any ``-S`` /
+    ``--split-string`` form counts as no command: ``env`` re-splits that string
+    with its own quoting, comment and whitespace rules, which this guard does
+    not reproduce. Unknown options are skipped as flags.
+    """
+    rest = list(args)
+    options = True
+    while rest:
+        arg = rest.pop(0)
+        if options and arg == "--":
+            options = False
+        elif options and arg.startswith("--"):
+            name, eq, _value = arg[2:].partition("=")
+            takes = [long for long in _ENV_LONG_WITH_ARG if long.startswith(name)]
+            if takes and takes[0] == "split-string":
+                return False
+            if takes and not eq and rest:
+                rest.pop(0)
+        elif options and arg.startswith("-") and arg != "-":
+            for index, flag in enumerate(arg[1:], start=1):
+                if flag == "S":
+                    return False
+                if flag in _ENV_SHORT_WITH_ARG:
+                    if not arg[index + 1 :] and rest:
+                        rest.pop(0)
+                    break
+        elif (options and arg == "-") or ("=" in arg and arg.split("=", 1)[0]):
+            continue
+        else:
+            return True
+    return False
+
+
+def _check_exec_child(command: list[str]) -> None:
+    if not command:
+        return
+    name = Path(command[0]).name
+    dump = name == "printenv" or (name == "env" and not _env_has_command(command[1:]))
+    if dump:
+        _refuse(
+            "exec_child_env_dump",
+            "exec_child_env_dump: refusing an environment-dump child. "
+            "See `mb connect policy` and docs/connect.md.",
+        )
+
+
+def release_refusal_exit_code(exc: ValueError) -> int:
+    if isinstance(exc, ConnectRefusal):
+        if exc.rule in {"audit_unavailable", "caller_policy_invalid"}:
+            return 1
+        if exc.rule in {
+            "token_print",
+            "caller_policy_working_dir",
+            "caller_policy_provider",
+            "caller_policy_caller",
+            "exec_child_env_dump",
+        }:
+            return TOKEN_REFUSED_EXIT_CODE
+    return 2
+
+
 def write_release_audit(
     verb: str,
     provider: str,
@@ -3537,10 +3768,16 @@ def write_release_audit(
     exit_code: int = 0,
     scope: str = "",
     flags: list[str],
+    caller: str | None = None,
+    policy: str | None = None,
 ) -> None:
     """Append one scrubbed release decision before any credential leaves mb."""
     from mb.feedback_scrub import scrub
 
+    if caller is None or policy is None:
+        status = caller_policy_status(repo)
+        caller = status["caller"] if caller is None else caller
+        policy = ("allowed" if status["exists"] else "none") if policy is None else policy
     repo_id = ""
     with suppress(ValueError, OSError):
         repo_id = str(_read_config(Path(repo).resolve()).get("repo_id") or "")
@@ -3556,6 +3793,8 @@ def write_release_audit(
         "pid": os.getpid(),
         "ppid": os.getppid(),
         "parent": _audit_parent(),
+        "caller": caller,
+        "policy": policy,
         "flags": sorted(flags),
     }
     entry = {key: scrub(value) if isinstance(value, str) else value for key, value in entry.items()}
@@ -3585,24 +3824,27 @@ def release_attempt(
 ) -> Iterator[Callable[..., None]]:
     """Record exactly one decision, and keep refusal codes if logging fails."""
     recorded = False
+    status = caller_policy_status(repo)
+    policy = "allowed" if status["exists"] else "none"
 
     def record(**kwargs: Any) -> None:
         nonlocal recorded
         recorded = True
-        write_release_audit(verb, provider, repo, flags=flags, **kwargs)
+        write_release_audit(
+            verb, provider, repo, flags=flags, caller=status["caller"], policy=policy, **kwargs
+        )
 
     try:
+        _check_caller_policy(status, provider, repo)
         yield record
     except Exception as exc:
         if not recorded:
             refusal = isinstance(exc, ConnectRefusal)
-            code = (
-                TOKEN_REFUSED_EXIT_CODE
-                if isinstance(exc, ConnectRefusal) and verb == "token" and exc.rule == "token_print"
-                else 2
-                if isinstance(exc, ValueError)
-                else 1
-            )
+            code = release_refusal_exit_code(exc) if isinstance(exc, ValueError) else 1
+            if isinstance(exc, ConnectRefusal) and (
+                exc.rule.startswith("caller_policy_") or exc.rule == "exec_child_env_dump"
+            ):
+                policy = "refused"
             with suppress(ConnectRefusal):
                 record(
                     result="refused" if refusal else "failed",
@@ -3743,6 +3985,7 @@ def _exec_with_secret(
             "mb connect exec needs a command after `--`, for example "
             "`mb connect exec stripe -- stripe products list`.",
         )
+    _check_exec_child(command)
     name = exec_env_name(resolve_provider(provider_id, repo).id, env_name)
     for kept in keep_env or []:
         if not ENV_NAME_RE.fullmatch(kept):
