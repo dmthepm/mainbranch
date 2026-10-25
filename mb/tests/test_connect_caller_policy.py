@@ -206,6 +206,20 @@ def test_invalid_policy(
         ["env", "FOO-BAR=private-env-value"],
         ["env", "-u", "FOO"],
         ["env", "--", "FOO=1"],
+        ["env", "-0u", "FOO"],
+        ["env", "-iu", "FOO"],
+        ["env", "-0uFOO"],
+        ["env", "-iC", "/tmp"],
+        ["env", "-", "FOO=1"],
+        ["env", "--un", "FOO"],
+        ["env", "--unset=FOO"],
+        ["env", "--ch", "/tmp"],
+        ["env", "-S", "FOO=1"],
+        ["env", "-S", "-i FOO=1"],
+        ["env", "--split-string=-u FOO"],
+        ["env", "-S", "${UNSET_NAME}"],
+        ["env", "-S", "\\c"],
+        ["env", "-S", "'unbalanced"],
     ],
 )
 def test_child_dump_refusal(
@@ -222,7 +236,18 @@ def test_child_dump_refusal(
 
 
 @pytest.mark.parametrize(
-    "command", [["env", "FOO=1", "true"], ["/usr/bin/env", "true"], ["env", "-u", "FOO", "true"]]
+    "command",
+    [
+        ["env", "FOO=1", "true"],
+        ["/usr/bin/env", "true"],
+        ["env", "-u", "FOO", "true"],
+        ["env", "-iu", "FOO", "true"],
+        ["env", "-uFOO", "true"],
+        ["env", "--un", "FOO", "true"],
+        ["env", "-S", "FOO=1 true"],
+        ["env", "-S", "true"],
+        ["env", "--", "FOO=1", "true"],
+    ],
 )
 def test_env_with_child_allowed(repo: Path, command: list[str]) -> None:
     result = runner.invoke(app, ["connect", "exec", "stripe", "--repo", str(repo), "--", *command])

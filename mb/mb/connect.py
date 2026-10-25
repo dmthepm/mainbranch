@@ -3687,34 +3687,63 @@ def _check_caller_policy(status: dict[str, Any], provider: str, repo: str | Path
         )
 
 
+# `env` options that take an argument, short and long, as GNU getopt reads them.
+_ENV_SHORT_WITH_ARG = frozenset("uCSa")
+_ENV_LONG_WITH_ARG = ("unset", "chdir", "split-string", "argv0")
+
+
+def _env_has_command(args: list[str]) -> bool:
+    """Return whether ``env args`` names a command operand.
+
+    Follows GNU getopt: short options may be clustered (``-0u NAME``) and take
+    their argument from the rest of the cluster or the next word; long options
+    may be abbreviated (``--un NAME``) or carry ``=value``. ``-S`` splits its
+    argument into words that are read in place, so ``env -S 'FOO=1 cmd'`` names
+    ``cmd``. A split string using ``${VAR}`` expansion or backslash escapes, or
+    one that does not parse, counts as no command. Unknown options are skipped
+    as flags.
+    """
+    rest = list(args)
+    options = True
+    while rest:
+        arg = rest.pop(0)
+        split: str | None = None
+        if options and arg == "--":
+            options = False
+        elif options and arg.startswith("--"):
+            name, eq, value = arg[2:].partition("=")
+            takes = [long for long in _ENV_LONG_WITH_ARG if long.startswith(name)]
+            if takes:
+                if not eq:
+                    value = rest.pop(0) if rest else ""
+                if takes[0] == "split-string":
+                    split = value
+        elif options and arg.startswith("-") and arg != "-":
+            for index, flag in enumerate(arg[1:], start=1):
+                if flag in _ENV_SHORT_WITH_ARG:
+                    value = arg[index + 1 :] or (rest.pop(0) if rest else "")
+                    if flag == "S":
+                        split = value
+                    break
+        elif (options and arg == "-") or ("=" in arg and arg.split("=", 1)[0]):
+            continue
+        else:
+            return True
+        if split is not None:
+            if "${" in split or "\\" in split:
+                return False
+            try:
+                rest[:0] = shlex.split(split)
+            except ValueError:
+                return False
+    return False
+
+
 def _check_exec_child(command: list[str]) -> None:
     if not command:
         return
     name = Path(command[0]).name
-    dump = name == "printenv"
-    if name == "env":
-        args = iter(command[1:])
-        options = True
-        for arg in args:
-            if options and arg == "--":
-                options = False
-            elif options and arg in {
-                "-u",
-                "--unset",
-                "-C",
-                "--chdir",
-                "-S",
-                "--split-string",
-                "-a",
-                "--argv0",
-            }:
-                next(args, None)
-            elif options and arg.startswith("-") or "=" in arg and bool(arg.split("=", 1)[0]):
-                continue
-            else:
-                break
-        else:
-            dump = True
+    dump = name == "printenv" or (name == "env" and not _env_has_command(command[1:]))
     if dump:
         _refuse(
             "exec_child_env_dump",
