@@ -11,6 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- Read-only Claude Code tailnet machine and policy review skills with redacted reports; see [homelab skills](docs/homelab-skills.md).
+
 ## [0.6.16] - 2026-10-25
 
 ### Added

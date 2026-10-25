@@ -2,6 +2,8 @@
   <img src="docs/assets/main-branch-logo.png" alt="Main Branch logo" width="100" />
 </p>
 
+Main Branch also carries read-only `mb-homelab-*` skills for securing the machines that run your agents; they do not touch business data. See [homelab skills](docs/homelab-skills.md).
+
 <h1 align="center">Main Branch</h1>
 
 <p align="center"><strong>Give your AI the business brain it was missing.</strong></p>

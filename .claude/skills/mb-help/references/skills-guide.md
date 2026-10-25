@@ -1,5 +1,7 @@
 # Skills Guide: When to Use What
 
+Use `/mb-homelab-tailnet-audit` for local machine settings or `/mb-homelab-tailnet-policy-review` for a local policy file; both are read-only Claude Code skills with redacted reports.
+
 Skills are specialized workflows. Each one does something specific. This guide helps you pick the right one.
 
 ---
