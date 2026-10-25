@@ -56,7 +56,7 @@ claude mcp add apify -e APIFY_TOKEN=
 
 Your terminal should now show something like:
 ```
-claude mcp add apify -e APIFY_TOKEN=apify_api_51dJHCm5seER0o3n3re6pQT4EkxTtQ2p4oSl
+claude mcp add apify -e APIFY_TOKEN=apify_api_xxxxx
 ```
 
 **PIECE 3** — This is the tricky part. Do these in order:
