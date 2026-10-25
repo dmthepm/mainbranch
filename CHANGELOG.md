@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.16] - 2026-10-25
+
 ### Added
 
 - Optional per-repo caller policy limits credential release by caller,
