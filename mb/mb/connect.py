@@ -3697,46 +3697,36 @@ def _env_has_command(args: list[str]) -> bool:
 
     Follows GNU getopt: short options may be clustered (``-0u NAME``) and take
     their argument from the rest of the cluster or the next word; long options
-    may be abbreviated (``--un NAME``) or carry ``=value``. ``-S`` splits its
-    argument into words that are read in place, so ``env -S 'FOO=1 cmd'`` names
-    ``cmd``. A split string using ``${VAR}`` expansion, backslash escapes or
-    ``#`` (a comment to ``env``), or one that does not parse, counts as no
-    command. Unknown options are skipped
-    as flags.
+    may be abbreviated (``--un NAME``) or carry ``=value``. Any ``-S`` /
+    ``--split-string`` form counts as no command: ``env`` re-splits that string
+    with its own quoting, comment and whitespace rules, which this guard does
+    not reproduce. Unknown options are skipped as flags.
     """
     rest = list(args)
     options = True
     while rest:
         arg = rest.pop(0)
-        split: str | None = None
         if options and arg == "--":
             options = False
         elif options and arg.startswith("--"):
-            name, eq, value = arg[2:].partition("=")
+            name, eq, _value = arg[2:].partition("=")
             takes = [long for long in _ENV_LONG_WITH_ARG if long.startswith(name)]
-            if takes:
-                if not eq:
-                    value = rest.pop(0) if rest else ""
-                if takes[0] == "split-string":
-                    split = value
+            if takes and takes[0] == "split-string":
+                return False
+            if takes and not eq and rest:
+                rest.pop(0)
         elif options and arg.startswith("-") and arg != "-":
             for index, flag in enumerate(arg[1:], start=1):
+                if flag == "S":
+                    return False
                 if flag in _ENV_SHORT_WITH_ARG:
-                    value = arg[index + 1 :] or (rest.pop(0) if rest else "")
-                    if flag == "S":
-                        split = value
+                    if not arg[index + 1 :] and rest:
+                        rest.pop(0)
                     break
         elif (options and arg == "-") or ("=" in arg and arg.split("=", 1)[0]):
             continue
         else:
             return True
-        if split is not None:
-            if "${" in split or "\\" in split or "#" in split:
-                return False
-            try:
-                rest[:0] = shlex.split(split)
-            except ValueError:
-                return False
     return False
 
 

@@ -166,8 +166,8 @@ An always-on `exec` rule refuses a child whose basename is `printenv`, or
 `env` with no command operand, with `exec_child_env_dump`, exit 3. Flags and
 assignments alone do not supply a command: `env -i` and `env FOO=1` refuse.
 Option arguments are read the way `env` reads them, including clustered short
-options (`env -iu NAME`), abbreviated long options and the words of `-S`; a
-`-S` string that uses `${VAR}`, backslash escapes or `#` refuses.
+options (`env -iu NAME`) and abbreviated long options. Any `-S`
+(`--split-string`) form refuses; pass the command as separate words instead.
 `env FOO=1 true` and `/usr/bin/env true` run normally. Other child commands
 are not inspected. This guards against obvious mistakes; it is not a sandbox.
 

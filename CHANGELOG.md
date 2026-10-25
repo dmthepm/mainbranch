@@ -25,8 +25,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Security
 
-- `mb connect exec` refuses obvious environment-dump children (`printenv`
-  and `env` without a command operand) before reading a credential, exit 3.
+- `mb connect exec` refuses obvious environment-dump children (`printenv`,
+  `env` without a command operand, and any `env -S` form) before reading a
+  credential, exit 3.
 
 - Credential release through `mb connect exec` and `token` requires a scrubbed,
   private local audit entry and fails closed when the audit is unavailable.
