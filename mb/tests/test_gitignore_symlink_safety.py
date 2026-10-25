@@ -11,9 +11,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from mb import doctor, engine
+from mb import books, doctor, engine, migrate, status
 from mb.cli import app
 from mb.init import run as init_run
+from mb.migrations.base import MigrationInfo, MigrationPlan
 
 SENTINEL = b"private-sentinel-content\n"
 HINT = "Replace it with a regular file, then rerun."
@@ -148,3 +149,57 @@ def test_nonregular_gitignore_is_skipped(tmp_path: Path) -> None:
     assert result["ok"]
     assert any(HINT in warning for warning in result["warnings"])
     assert not any(op["path"] == str(path) for op in result["operations"])
+
+
+@pytest.mark.parametrize("dangling", [False, True])
+def test_status_marker_check_skips_unsafe_gitignore(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dangling: bool
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    sentinel = tmp_path / "sentinel"
+    if not dangling:
+        sentinel.write_text(status.LAST_STATUS_SEEN_GITIGNORE_ENTRY + "\n", encoding="utf-8")
+    (repo / ".gitignore").symlink_to(sentinel)
+    monkeypatch.setattr(status, "_which", lambda name: "")
+
+    state = status._marker_gitignore_state(repo)
+
+    assert state["ok"] is False
+    assert HINT in state["repair"]
+    assert (repo / ".gitignore").is_symlink()
+
+
+def test_books_entries_skip_symlinked_gitignore(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    sentinel = _unsafe_gitignore(tmp_path, repo, False)
+
+    assert books._gitignore_entries(repo) == set()
+    assert sentinel.read_bytes() == SENTINEL
+
+
+@pytest.mark.parametrize("dangling", [False, True])
+def test_migration_plans_no_write_through_unsafe_gitignore(tmp_path: Path, dangling: bool) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    sentinel = _unsafe_gitignore(tmp_path, repo, dangling)
+    info = MigrationInfo(id="t", name="t", from_version="0", to_version="1", description="t")
+    plans = [MigrationPlan(migration=info)]
+
+    migrate._ensure_gitignore_plan(repo, plans)
+
+    assert plans[0].changes == []
+    _assert_preserved(repo, sentinel, dangling)
+
+
+def test_migration_still_plans_regular_gitignore(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    info = MigrationInfo(id="t", name="t", from_version="0", to_version="1", description="t")
+    plans = [MigrationPlan(migration=info)]
+
+    migrate._ensure_gitignore_plan(repo, plans)
+
+    assert [change.path for change in plans[0].changes] == [".gitignore"]
