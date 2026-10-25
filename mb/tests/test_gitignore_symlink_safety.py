@@ -36,7 +36,10 @@ def _assert_preserved(repo: Path, sentinel: Path, dangling: bool) -> None:
 
 
 @pytest.mark.parametrize("dangling", [False, True])
-def test_doctor_repair_skips_link_and_applies_other_repairs(tmp_path: Path, dangling: bool) -> None:
+def test_doctor_repair_skips_link_and_applies_other_repairs(
+    tmp_path: Path, dangling: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(doctor, "_which", lambda name: f"/usr/bin/{name}")
     repo = tmp_path / "repo"
     init_run(path=str(repo), name="Test", infer_github_identity=False)
     (repo / ".gitignore").unlink()
