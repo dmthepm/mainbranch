@@ -15,8 +15,9 @@ import stat
 import subprocess
 import sys
 import urllib.parse
-from collections.abc import Callable
-from contextlib import ExitStack, suppress
+from collections import deque
+from collections.abc import Callable, Iterator
+from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -107,7 +108,7 @@ PROBE_PROVIDERS: frozenset[str] = frozenset(
 CONDITIONAL_PROBE_PROVIDERS: frozenset[str] = frozenset({"google"})
 
 
-# `mb connect token` without `--print` when stdout is a terminal or a pipe.
+# `mb connect token` without the explicit `--print` release flag.
 # Distinct from 1 (credential missing or unreadable, store failure) and 2
 # (usage error or any other refusal), so a script can tell "refused by design"
 # from "no credential". Stable: documented in docs/connect.md.
@@ -3470,6 +3471,211 @@ EXEC_FALLBACK_ENV = "MB_SECRET"
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
+# Parent variables retained by default when releasing a credential to a command.
+EXEC_ENV_ALLOWLIST = frozenset(
+    [
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "TERM",
+        "LANG",
+        "LANGUAGE",
+        "TZ",
+        "TMPDIR",
+        "XDG_RUNTIME_DIR",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "REQUESTS_CA_BUNDLE",
+        "CURL_CA_BUNDLE",
+        "NODE_EXTRA_CA_CERTS",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+    ]
+)
+
+
+def audit_path() -> Path:
+    return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / (
+        "mainbranch/connect-audit.jsonl"
+    )
+
+
+def _audit_parent() -> str:
+    try:
+        if sys.platform.startswith("linux"):
+            return Path(f"/proc/{os.getppid()}/comm").read_text().strip()[:64]
+        if sys.platform == "darwin":
+            value = subprocess.run(
+                ["ps", "-o", "comm=", "-p", str(os.getppid())],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            ).stdout.strip()
+            return Path(value).name[:64] if value else ""
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
+def write_release_audit(
+    verb: str,
+    provider: str,
+    repo: str | Path,
+    *,
+    result: str,
+    reason: str = "",
+    exit_code: int = 0,
+    scope: str = "",
+    flags: list[str],
+) -> None:
+    """Append one scrubbed release decision before any credential leaves mb."""
+    from mb.feedback_scrub import scrub
+
+    repo_id = ""
+    with suppress(ValueError, OSError):
+        repo_id = str(_read_config(Path(repo).resolve()).get("repo_id") or "")
+    entry: dict[str, Any] = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "verb": verb,
+        "provider": provider,
+        "repo_id": repo_id,
+        "scope": scope,
+        "result": result,
+        "reason": reason,
+        "exit_code": exit_code,
+        "pid": os.getpid(),
+        "ppid": os.getppid(),
+        "parent": _audit_parent(),
+        "flags": sorted(flags),
+    }
+    entry = {key: scrub(value) if isinstance(value, str) else value for key, value in entry.items()}
+    entry["flags"] = [scrub(flag) for flag in entry["flags"]]
+    path = audit_path()
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path.parent.chmod(0o700)
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+            line = (json.dumps(entry, ensure_ascii=True) + "\n").encode()
+            if os.write(fd, line) != len(line):
+                raise OSError("incomplete audit write")
+        finally:
+            os.close(fd)
+    except OSError:
+        _refuse("audit_unavailable", f"audit_unavailable: cannot write audit log in {path.parent}")
+
+
+@contextmanager
+def release_attempt(
+    verb: str,
+    provider: str,
+    repo: str | Path,
+    flags: list[str],
+) -> Iterator[Callable[..., None]]:
+    """Record exactly one decision, and keep refusal codes if logging fails."""
+    recorded = False
+
+    def record(**kwargs: Any) -> None:
+        nonlocal recorded
+        recorded = True
+        write_release_audit(verb, provider, repo, flags=flags, **kwargs)
+
+    try:
+        yield record
+    except Exception as exc:
+        if not recorded:
+            refusal = isinstance(exc, ConnectRefusal)
+            code = (
+                TOKEN_REFUSED_EXIT_CODE
+                if isinstance(exc, ConnectRefusal) and verb == "token" and exc.rule == "token_print"
+                else 2
+                if isinstance(exc, ValueError)
+                else 1
+            )
+            with suppress(ConnectRefusal):
+                record(
+                    result="refused" if refusal else "failed",
+                    reason=exc.rule
+                    if isinstance(exc, ConnectRefusal)
+                    else "invalid_request"
+                    if code == 2
+                    else "release_failed",
+                    exit_code=code,
+                )
+        raise
+
+
+def token_for_output(
+    provider: str,
+    repo: str | Path,
+    *,
+    print_token: bool,
+) -> dict[str, Any]:
+    flags = ["print"] if print_token else []
+    if print_token and not sys.stdin.isatty():
+        flags.append("print_noninteractive")
+    with release_attempt("token", provider, repo, flags) as record:
+        if not print_token:
+            shown = echoable_input(provider) or "<provider>"
+            _refuse(
+                "token_print",
+                "refusing raw secret output without --print. "
+                f"Use `mb connect exec {shown} -- <command>` "
+                "or choose its credential variable with --env NAME.",
+            )
+        result = read_token(provider, repo)
+        record(
+            result="released" if result["ok"] else "failed",
+            reason="" if result["ok"] else result["state"],
+            exit_code=0 if result["ok"] else 1,
+            scope=result.get("source", ""),
+        )
+    if "print_noninteractive" in flags:
+        print(
+            "mb connect token: --print without an interactive terminal is deprecated "
+            "and will be refused in a later release; use mb connect exec <provider> "
+            "--env NAME -- <command>",
+            file=sys.stderr,
+        )
+    return result
+
+
+def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str, Any]]:
+    from mb.feedback_scrub import scrub
+
+    try:
+        with audit_path().open() as stream:
+            entries = (json.loads(line) for line in stream if line.strip())
+            rows = list(
+                deque(
+                    (
+                        entry
+                        for entry in entries
+                        if not provider or entry.get("provider") == provider
+                    ),
+                    maxlen=limit,
+                )
+            )
+    except FileNotFoundError:
+        return []
+    # Keep display read-only and scrub strings again in case the file was edited.
+    return [
+        {key: scrub(value) if isinstance(value, str) else value for key, value in row.items()}
+        for row in rows
+    ]
+
+
 def exec_env_name(provider_id: str, override: str = "") -> str:
     """Name of the variable that carries the secret into the child."""
     registered = provider_map().get(provider_id)
@@ -3492,6 +3698,33 @@ def exec_with_secret(
     repo: str | Path = ".",
     *,
     env_name: str = "",
+    keep_env: list[str] | None = None,
+    inherit_env: bool = False,
+    runner: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run,
+) -> dict[str, Any]:
+    flags = (["keep_env"] if keep_env else []) + (["inherit_env"] if inherit_env else [])
+    with release_attempt("exec", provider_id, repo, flags) as record:
+        return _exec_with_secret(
+            provider_id,
+            command,
+            repo,
+            env_name=env_name,
+            keep_env=keep_env,
+            inherit_env=inherit_env,
+            record=record,
+            runner=runner,
+        )
+
+
+def _exec_with_secret(
+    provider_id: str,
+    command: list[str],
+    repo: str | Path = ".",
+    *,
+    env_name: str = "",
+    keep_env: list[str] | None = None,
+    inherit_env: bool = False,
+    record: Callable[..., None],
     runner: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run,
 ) -> dict[str, Any]:
     """Run ``command`` with the stored credential in its environment only.
@@ -3510,8 +3743,13 @@ def exec_with_secret(
             "mb connect exec needs a command after `--`, for example "
             "`mb connect exec stripe -- stripe products list`.",
         )
+    name = exec_env_name(resolve_provider(provider_id, repo).id, env_name)
+    for kept in keep_env or []:
+        if not ENV_NAME_RE.fullmatch(kept):
+            _refuse("exec_env_name", "--keep-env must be a shell variable name.")
+        if kept == name:
+            _refuse("exec_env_conflict", "--keep-env cannot name the provider credential variable.")
     result = read_token(provider_id, repo)
-    name = exec_env_name(str(result["provider"]), env_name)
     outcome: dict[str, Any] = {
         "ok": False,
         "provider": result["provider"],
@@ -3526,10 +3764,19 @@ def exec_with_secret(
     if not result["ok"]:
         outcome["error"] = result["error"]
         outcome["repair_command"] = result["repair_command"]
+        record(result="failed", reason=result["state"], exit_code=1, scope=result.get("source", ""))
         return outcome
-    env = dict(os.environ)
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if inherit_env
+        or key in EXEC_ENV_ALLOWLIST
+        or key.startswith("LC_")
+        or key in (keep_env or [])
+    }
     env[name] = result["token"]
     shown = echoable_input(command[0]) or HIDDEN_INPUT
+    record(result="released", scope=result.get("source", ""))
     try:
         completed = runner(command, env=env, check=False)
     except FileNotFoundError:
