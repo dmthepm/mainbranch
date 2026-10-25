@@ -3699,8 +3699,9 @@ def _env_has_command(args: list[str]) -> bool:
     their argument from the rest of the cluster or the next word; long options
     may be abbreviated (``--un NAME``) or carry ``=value``. ``-S`` splits its
     argument into words that are read in place, so ``env -S 'FOO=1 cmd'`` names
-    ``cmd``. A split string using ``${VAR}`` expansion or backslash escapes, or
-    one that does not parse, counts as no command. Unknown options are skipped
+    ``cmd``. A split string using ``${VAR}`` expansion, backslash escapes or
+    ``#`` (a comment to ``env``), or one that does not parse, counts as no
+    command. Unknown options are skipped
     as flags.
     """
     rest = list(args)
@@ -3730,7 +3731,7 @@ def _env_has_command(args: list[str]) -> bool:
         else:
             return True
         if split is not None:
-            if "${" in split or "\\" in split:
+            if "${" in split or "\\" in split or "#" in split:
                 return False
             try:
                 rest[:0] = shlex.split(split)

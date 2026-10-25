@@ -167,7 +167,7 @@ An always-on `exec` rule refuses a child whose basename is `printenv`, or
 assignments alone do not supply a command: `env -i` and `env FOO=1` refuse.
 Option arguments are read the way `env` reads them, including clustered short
 options (`env -iu NAME`), abbreviated long options and the words of `-S`; a
-`-S` string that uses `${VAR}` or backslash escapes refuses.
+`-S` string that uses `${VAR}`, backslash escapes or `#` refuses.
 `env FOO=1 true` and `/usr/bin/env true` run normally. Other child commands
 are not inspected. This guards against obvious mistakes; it is not a sandbox.
 

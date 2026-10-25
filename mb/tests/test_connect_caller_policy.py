@@ -220,6 +220,10 @@ def test_invalid_policy(
         ["env", "-S", "${UNSET_NAME}"],
         ["env", "-S", "\\c"],
         ["env", "-S", "'unbalanced"],
+        ["env", "-S", "# comment"],
+        ["env", "-S#comment"],
+        ["env", "--split=# comment"],
+        ["env", "-S", "FOO=1 # true"],
     ],
 )
 def test_child_dump_refusal(
