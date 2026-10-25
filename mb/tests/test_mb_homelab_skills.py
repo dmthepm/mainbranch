@@ -136,7 +136,7 @@ def test_a2_redaction_and_stability() -> None:
     text = " ".join(secrets)
     payload = {
         "identities": {"Self": {"HostName": "synthetic-desk"}},
-        "rows": [{"check": "Serve", "result": text}, {"check": "lock", "result": text}],
+        "rows": [{"check": "ssh-section", "result": text}, {"check": "wildcard", "result": text}],
         "notes": [text],
     }
     report = module.render(payload)
@@ -151,7 +151,7 @@ def test_a2_redaction_and_stability() -> None:
     values = [
         line.split(" | ")[2]
         for line in report.splitlines()
-        if line.startswith(("| Serve", "| lock"))
+        if line.startswith(("| ssh-section", "| wildcard"))
     ]
     assert values[0] == values[1]
     assert module.render({"rows": [{"result": {"private-name": "private-value"}}]})
@@ -319,3 +319,203 @@ def test_a1_missing_cli_exits_zero(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     )
     assert result.returncode == 0
     assert all("not checked" in row["result"] for row in json.loads(result.stdout)["rows"])
+
+
+IDENTITY_CASES = [
+    ({"DisplayName": "Synthetic Person"}, "Synthetic Person", "user"),
+    ({"LoginName": "owner@example.invalid"}, "owner@example.invalid", "user"),
+    (
+        {"ProfilePicURL": "https://photos.example.invalid/person.jpg"},
+        "https://photos.example.invalid/person.jpg",
+        "url",
+    ),
+    ({"User": "example-user"}, "example-user", "user"),
+    ({"User": {"Name": "example-person"}}, "example-person", "user"),
+    ({"UserProfiles": {"1234567": {"DisplayName": "example-profile"}}}, "example-profile", "user"),
+    ({"UserProfiles": {"1234567": {}}}, "1234567", "id"),
+    ({"ID": "opaque-id-abc"}, "opaque-id-abc", "id"),
+    ({"StableID": "stable-node-abc"}, "stable-node-abc", "id"),
+    ({"NodeID": 9876543}, "9876543", "id"),
+    ({"PublicKey": "opaque-public-key"}, "opaque-public-key", "id"),
+    ({"HostName": "synthetic-desk"}, "synthetic-desk", "node"),
+    ({"DNSName": "desk.example-tailnet.ts.net"}, "desk.example-tailnet.ts.net", "node"),
+    ({"CertDomains": ["desk.example.invalid"]}, "desk.example.invalid", "node"),
+    ({"MagicDNSSuffix": "example-tailnet.ts.net"}, "example-tailnet.ts.net", "tailnet"),
+    ({"CurrentTailnet": {"Name": "example-mesh.invalid"}}, "example-mesh.invalid", "tailnet"),
+    ({"TailnetName": "example-mesh"}, "example-mesh", "tailnet"),
+    ({"Tailnet": {"Name": "example-network"}}, "example-network", "tailnet"),
+]
+
+
+@pytest.mark.parametrize(("identities", "secret", "kind"), IDENTITY_CASES)
+def test_f1_identity_values_everywhere(identities, secret, kind) -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    # Repeat under a second key and embed without word boundaries in surviving fields.
+    payload = {
+        "identities": identities,
+        "rows": [
+            {
+                "check": "ssh-section",
+                "result": f"prefix{secret}suffix",
+                "safer": secret,
+                "unknown": secret,
+            }
+        ],
+        "notes": [secret, f"prefix{secret}suffix"],
+        "second_key": secret,
+    }
+    output = module.render(payload)
+    assert secret not in output
+    assert f"prefix{kind}-1suffix" in output
+    assert output.count(f"{kind}-1") == 4
+
+
+@pytest.mark.parametrize(
+    "secret",
+    [
+        "192.0.2.7",
+        "100.64.0.7",
+        "fd7a:115c:a1e0::7",
+        "2001:db8::7",
+        "2001:0db8:0000:0000:0000:0000:0000:0007",
+        "fe80::7%eth0",
+        "::1",
+        "::ffff:192.0.2.7",
+        "nodekey:abc123",
+        "mkey:abc123",
+        "discokey:abc123",
+        "nlpub:abc123",
+        "tlpub:abc123",
+        "tskey-auth-abc123",
+        "desk.example-tailnet.ts.net",
+        "owner@example.invalid",
+        "https://photos.example.invalid/unlabelled.jpg",
+        "http://example.invalid/page",
+    ],
+)
+def test_f1_patterns_in_free_text(secret: str) -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    output = module.render({"rows": [{"check": "wildcard", "result": secret}], "notes": [secret]})
+    assert secret not in output
+    assert re.search(r"(?:node|user|id|url)-\d+", output)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["prefix192.0.2.7suffix", "addr=192.0.2.7:41641", "[2001:db8::7]:443", "[fe80::7%eth0]:443"],
+)
+def test_f1_address_boundaries(text: str) -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    output = module.render({"notes": [text]})
+    assert "192.0.2.7" not in output
+    assert "2001:db8::7" not in output
+    assert "fe80::7" not in output
+    assert "node-1" in output
+
+
+def test_f1_longest_identity_first_and_repeat() -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    payload = {
+        "identities": {
+            "HostName": "example-host",
+            "DNSName": "example-host.mesh.invalid",
+            "DisplayName": "example-host",
+        },
+        "notes": ["prefixexample-host.mesh.invalidsuffix", "example-host"],
+    }
+    output = module.render(payload)
+    assert "prefixnode-2suffix" in output
+    assert "- node-1" in output
+    assert "example-host" not in output
+
+
+def test_f2_allowlisted_table_schema() -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    output = module.render(
+        {
+            "unknown": "unknown-top-level",
+            "rows": [
+                {"check": "unknown-check", "result": "unknown-result"},
+                {
+                    "check": "Tailscale SSH",
+                    "result": "on",
+                    "extra": "unknown-extra",
+                    "location": "unknown-location",
+                    "safer": "unknown-safer",
+                    "docs": "https://example.invalid/private",
+                },
+                {"check": "Auto-update", "result": "unexpected-value"},
+            ],
+            "notes": [{"extra": "unknown-note"}],
+        }
+    )
+    assert "| Tailscale SSH |  | on |  |  |" in output
+    assert "not checked: unexpected field value" in output
+    for value in (
+        "unknown-top-level",
+        "unknown-check",
+        "unknown-result",
+        "unknown-extra",
+        "unknown-location",
+        "unknown-safer",
+        "example.invalid",
+        "unexpected-value",
+        "unknown-note",
+    ):
+        assert value not in output
+
+
+def test_f1_final_identifying_values_sweep() -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    identities = [case[0] for case in IDENTITY_CASES]
+    secrets = [case[1] for case in IDENTITY_CASES]
+    secrets += [
+        "192.0.2.7",
+        "fd7a:115c:a1e0::7",
+        "nodekey:synthetic-secret",
+        "https://example.invalid/leftover",
+        "other.example.ts.net",
+    ]
+    text = " ".join(f"prefix{secret}suffix" for secret in secrets)
+    payload = {
+        "identities": identities,
+        "rows": [{"check": "wildcard", "result": text, "safer": text}],
+        "notes": [text],
+    }
+    output = module.render(payload)
+    assert "| wildcard" in output
+    for secret in secrets:
+        assert secret.lower() not in output.lower()
+
+
+@pytest.mark.parametrize(
+    ("check", "result", "expected"),
+    [
+        ("Serve", {"Web": {"private": "value"}}, "Configuration present"),
+        ("Funnel", {}, "No configuration returned"),
+        (
+            "OpenSSH listeners",
+            "OpenSSH listening: 127.0.0.1, TCP 22; 0.0.0.0, TCP 22",
+            "all interfaces; loopback",
+        ),
+        ("macOS build", "App Store", "App Store"),
+        ("Version and track", "1.2.3; current for track", "1.2.3; current for track"),
+    ],
+)
+def test_f2_machine_schema_preserves_facts(check, result, expected) -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    output = module.render({"rows": [{"check": check, "result": result}]})
+    assert expected in output
+
+
+def test_f2_policy_location_and_public_docs() -> None:
+    reviewer = load(POLICY / "scripts/review.py")
+    redactor = load(POLICY / "scripts/redact.py")
+    report = redactor.render(reviewer.review({"ssh": [{"action": "accept"}]}, [], []))
+    assert "| ssh-accept | ssh[0] |" in report
+    assert "https://tailscale.com/docs/features/tailscale-ssh" in report
+
+
+def test_f1_ipv4_octet_validation() -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    assert module.Redactor({}).scrub("prefix999.0.2.7suffix") == "prefix999.0.2.7suffix"
