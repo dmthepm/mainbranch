@@ -1899,7 +1899,7 @@ def test_connect_token_refuses_terminal_or_pipe_without_print(tmp_path: Path, mo
     assert result.stdout == ""
     assert "cf-test-token" not in result.output
     assert "mb connect exec cloudflare -- <command>" in result.stderr
-    assert "mb connect token cloudflare > file" in result.stderr
+    assert "--env NAME" in result.stderr
     assert "--print" in result.stderr
 
 
@@ -2002,7 +2002,7 @@ def test_connect_token_print_still_writes_to_a_real_pipe(tmp_path: Path, monkeyp
     assert completed.stdout == "cf-test-token"
 
 
-def test_connect_token_plain_file_redirect_needs_no_print_flag(tmp_path: Path, monkeypatch) -> None:
+def test_connect_token_plain_file_redirect_requires_print_flag(tmp_path: Path, monkeypatch) -> None:
     _local_secret_env(monkeypatch, tmp_path)
     repo = tmp_path / "biz"
     repo.mkdir()
@@ -2020,8 +2020,8 @@ def test_connect_token_plain_file_redirect_needs_no_print_flag(tmp_path: Path, m
             check=False,
         )
 
-    assert completed.returncode == 0
-    assert out.read_text() == "cf-test-token"
+    assert completed.returncode == 3
+    assert out.read_text() == ""
 
 
 def test_connect_token_refusal_comes_before_the_provider_lookup(

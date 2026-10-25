@@ -76,68 +76,75 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
 - `--repo` selects the business repo, and a user-scoped connection resolves
   from a worktree as it does for `status`.
 
+By default the command receives only these parent variables when present:
+`PATH HOME USER LOGNAME SHELL TERM LANG LANGUAGE TZ TMPDIR XDG_RUNTIME_DIR
+XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME SSL_CERT_FILE SSL_CERT_DIR
+REQUESTS_CA_BUNDLE CURL_CA_BUNDLE NODE_EXTRA_CA_CERTS HTTP_PROXY HTTPS_PROXY
+NO_PROXY http_proxy https_proxy no_proxy`, and every `LC_*` variable.
+The stored provider credential is added last, replacing any parent value.
+Use repeatable `--keep-env NAME` to retain other named variables, or
+`--inherit-env` for scripts that need the whole parent environment.
+`--keep-env` accepts shell variable names and refuses the provider variable
+with `exec_env_conflict`; use `--env NAME` to choose that variable.
+
 This is the path agents and scripts should use. What the command prints is
 still the command's business: avoid commands that echo their environment.
 
 ## Raw Read: `token`
 
-`mb connect token <provider>` prints the raw credential with no added newline.
-It refuses when stdout is a terminal or a pipe, because both put the secret
-into some other process's text: a transcript, a log, a variable an agent later
-prints. The refusal points at `exec` on stderr. A plain redirect to a file is
-neither, so it works without any flag:
+`mb connect token <provider> --print` explicitly releases the raw credential
+with no added newline. Without `--print`, it refuses every stdout destination,
+including a terminal, pipe, and regular file, with exit 3 and no stdout.
+Prefer `mb connect exec <provider> --env NAME -- <command>` so the command
+reads the credential from its environment.
 
-```bash
-mb connect token stripe > "$private_tmp/stripe-key"
-```
+With interactive stdin, `--print` writes the value as before. With
+noninteractive stdin, it still writes exactly the value, but emits a
+deprecation line on stderr and records `print_noninteractive` in the audit
+flags. A later release will refuse noninteractive `--print`.
 
-`--print` is needed only for a terminal or a pipe: it lifts the refusal there.
-Use it only when nothing reading that output is an agent or a log.
+Checks run in this order:
 
-Exit codes, stable for scripts. The checks run in this order, and the first
-that fails decides the code:
+1. Missing provider or `--json`: exit 2. JSON contains only an error envelope.
+2. Missing `--print`: exit 3, before provider lookup.
+3. Unknown provider or no secret slot: exit 2. Missing or unreadable
+   credential: exit 1 with repair guidance on stderr.
+4. Audit write fails: exit 1, `audit_unavailable`, and no value is printed.
+5. Otherwise the raw value is written: exit 0.
 
-1. Usage: no provider, or `--json`: exit 2.
-2. The stdout gate: stdout is a terminal or a pipe and `--print` was not
-   given: exit 3. This comes before any lookup, so a provider that is not
-   connected, or not even known, still exits 3 here.
-3. The lookup, only once the gate has passed: an unknown provider or one with
-   no secret slot exits 2; a provider that is not connected, a missing
-   credential, or a store that cannot read it exits 1 (stderr says which and
-   names the repair).
-4. Otherwise the value is written to stdout: exit 0.
+Scripts that redirected to a file without a flag must now explicitly pass
+`--print`, or move to `exec`. Scripts that relied on the full parent environment
+with `exec` can retain named variables with `--keep-env` or use `--inherit-env`.
 
-| Exit | Meaning |
-| --- | --- |
-| 0 | The value was written to stdout. |
-| 1 | After the stdout gate passed: no value (not connected, missing, or unreadable). |
-| 2 | Usage error, or a refusal other than the stdout gate (unknown provider, no secret slot). |
-| 3 | Refused by design: stdout is a terminal or a pipe and `--print` was not given. Checked before the provider is looked up. |
+## Local release audit
 
-`--json` is not supported: the token is the whole stdout contract. Passing it
-exits 2 and prints only a `json_not_supported` error envelope (see
-[JSON on failure](#json-on-failure)); the token is never in JSON.
+Each `exec` and `token` attempt appends one JSON line to
+`$XDG_STATE_HOME/mainbranch/connect-audit.jsonl`, defaulting to
+`~/.local/state/mainbranch/connect-audit.jsonl` on Linux and macOS.
+The directory has mode 0700 and the file 0600. The log stays local, outside git.
 
-### Breaking in 0.6.0 (not flagged at the time)
+Fields are `ts` (UTC ISO-8601, seconds), `verb`, `provider`, `repo_id` (recorded
+config identity, empty when absent), `scope` (`repo`, `user`, or empty),
+`result` (`released`, `refused`, or `failed`), `reason` (rule name or empty),
+`exit_code`, `pid`, `ppid`, `parent` (parent executable basename, at most 64
+characters, empty when unknown), and sorted `flags` (`print`,
+`print_noninteractive`, `inherit_env`, `keep_env`). Strings pass through the
+feedback scrubber. The log contains no credential, credential hash or prefix,
+command arguments, environment values, or names passed to `--keep-env`.
 
-0.6.0 made `mb connect token <provider>` refuse a terminal or a pipe. Scripts
-that captured the value through stdout stopped working, for example
-`TOKEN=$(mb connect token stripe)` (command substitution reads through a pipe)
-or `mb connect token stripe | tool`. Through 0.6.1 the refusal exited 2, the
-same code as usage errors; from 0.6.2 it exits 3, so a wrapper can tell
-"refused by design" from "no credential". To migrate:
+The release decision is written before stdout or child launch. A `released`
+entry's exit code is 0 for the release gate; the child can subsequently fail
+or return a different status. If the audit cannot be written, release fails
+closed with `audit_unavailable`, exit 1, and a message naming the log directory.
+A request already refused keeps its refusal exit code if logging also fails.
 
-- Run the command with the credential instead:
-  `mb connect exec <provider> -- <command>`. The value reaches only that
-  command's environment (see `exec` above).
-- Where a script must hold the raw value, prefer a plain redirect to a private
-  file: `mb connect token <provider> > file`. That needs no flag, because a
-  file is neither a terminal nor a pipe. Command substitution reads through a
-  pipe, so it needs `--print`: `TOKEN=$(mb connect token <provider> --print)`
-  works, but keeps the value in the shell.
+Read recent entries with `mb connect audit`, `mb connect audit --limit 50`,
+or `mb connect audit --provider stripe --json`. A missing log has no entries.
+The audit records releases by same-user processes that go through `mb`,
+not credential-store reads that bypass `mb`.
+Per-process separation requires a separate OS user.
 
-The product model behind this surface lives in
-[connection-model.md](connection-model.md).
+The product model lives in [connection-model.md](connection-model.md).
 
 ## Stored Is Not Verified
 

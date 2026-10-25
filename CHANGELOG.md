@@ -11,6 +11,28 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Security
+
+- Credential release through `mb connect exec` and `token` requires a scrubbed,
+  private local audit entry and fails closed when the audit is unavailable.
+  The audit covers releases through `mb`; per-process separation requires a
+  separate OS user.
+
+### Changed
+
+- `mb connect exec` passes a minimal parent environment by default. Retain
+  extra named variables with repeatable `--keep-env NAME`, or use
+  `--inherit-env` for the previous full environment behavior.
+- `mb connect token` requires `--print` for every output destination, including
+  regular files. Prefer `mb connect exec <provider> --env NAME -- <command>`.
+  `mb connect audit` reads recent local release decisions.
+
+### Deprecated
+
+- Noninteractive `mb connect token --print` still prints the value but now
+  warns on stderr and records `print_noninteractive`. A later release will
+  refuse `--print` without interactive stdin; migrate scripts to `exec`.
+
 ## [0.6.15] - 2026-10-23
 
 ### Added

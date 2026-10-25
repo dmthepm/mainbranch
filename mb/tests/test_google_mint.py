@@ -144,7 +144,20 @@ sys.exit(int(os.environ.get("CHILD_EXIT", "0")))
 def _exec(repo: Path, report: Path, *extra: str) -> Any:
     secrets = json.dumps({"minted": MINTED, "grant": list(GRANT_SENTINELS)})
     command = [sys.executable, "-c", CHILD, str(report), secrets, *extra]
-    return runner.invoke(app, ["connect", "exec", "google", "--repo", str(repo), "--", *command])
+    return runner.invoke(
+        app,
+        [
+            "connect",
+            "exec",
+            "google",
+            "--repo",
+            str(repo),
+            "--keep-env",
+            "CHILD_EXIT",
+            "--",
+            *command,
+        ],
+    )
 
 
 # --- Minting -----------------------------------------------------------------
@@ -209,7 +222,7 @@ def test_token_command_prints_only_the_minted_token(
 
     assert result.exit_code == 0, result.output
     assert result.stdout == MINTED
-    assert result.stderr == ""
+    assert "--print without an interactive terminal is deprecated" in result.stderr
 
 
 def test_token_command_still_refuses_a_terminal_without_print(

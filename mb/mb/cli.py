@@ -14,6 +14,7 @@ import os
 import shlex
 import sys
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, NoReturn, TypeVar, cast
@@ -758,6 +759,12 @@ CONNECT_EXEC_COMMAND_ARGUMENT = typer.Argument(
     help="With `mb connect exec <provider> --`, the command to run and its arguments.",
     show_default=False,
 )
+CONNECT_KEEP_ENV_OPTION = typer.Option(
+    None,
+    "--keep-env",
+    help="With exec, retain a named parent variable. Repeatable.",
+)
+
 CONNECT_METADATA_OPTION = typer.Option(
     [],
     "--metadata",
@@ -2064,7 +2071,7 @@ def connect_cmd(
         "",
         help=(
             "Provider to connect, or `list` / `plan` / `status` / `doctor` / `hygiene` / "
-            "`identity` / `test` / `exec` / `rotate` / `token` / `hydrate` / `repair`."
+            "`identity` / `test` / `exec` / `rotate` / `token` / `audit` / `hydrate` / `repair`."
         ),
     ),
     provider: str = typer.Argument(
@@ -2183,6 +2190,14 @@ def connect_cmd(
         "--env",
         help="With `mb connect exec`, the variable that carries the secret into the command.",
     ),
+    keep_env: list[str] | None = CONNECT_KEEP_ENV_OPTION,
+    inherit_env: bool = typer.Option(
+        False,
+        "--inherit-env",
+        help="With exec, retain the whole parent environment.",
+    ),
+    limit: int = typer.Option(20, "--limit", min=1, help="With audit, show the last N entries."),
+    audit_provider: str = typer.Option("", "--provider", help="With audit, filter by provider."),
     source: str = typer.Option(
         "",
         "--source",
@@ -2194,7 +2209,7 @@ def connect_cmd(
     print_token: bool = typer.Option(
         False,
         "--print",
-        help="With `mb connect token`, print even when stdout is a terminal or a pipe.",
+        help="With token, explicitly allow raw output. Noninteractive use is deprecated.",
     ),
     keychain: bool = typer.Option(
         False,
@@ -2354,7 +2369,44 @@ def connect_cmd(
         else:
             connect_mod.render_hydrate_result(result)
         raise typer.Exit(0 if result["ok"] else 1)
+    if target == "audit":
+        try:
+            entries = connect_mod.read_release_audit(limit=limit, provider=audit_provider)
+        except (OSError, ValueError):
+            _connect_failure(
+                "mb connect audit",
+                "cannot read audit log",
+                json_out=json_out,
+                exit_code=1,
+                state="audit_unavailable",
+            )
+        if json_out:
+            typer.echo(json.dumps(entries, indent=2))
+        elif not entries:
+            typer.echo("No audit entries.")
+        else:
+            typer.echo("TIME  VERB  PROVIDER  RESULT  REASON  EXIT")
+            for entry in entries:
+                typer.echo(
+                    "  ".join(
+                        str(entry.get(key, ""))
+                        for key in ("ts", "verb", "provider", "result", "reason", "exit_code")
+                    )
+                )
+        raise typer.Exit(0)
     if target == "exec":
+        if not provider or json_out:
+            flags = (["inherit_env"] if inherit_env else []) + (["keep_env"] if keep_env else [])
+            with suppress(connect_mod.ConnectRefusal):
+                connect_mod.write_release_audit(
+                    "exec",
+                    provider,
+                    repo,
+                    result="refused",
+                    reason="provider_required" if not provider else "json_not_supported",
+                    exit_code=2,
+                    flags=flags,
+                )
         if not provider:
             _connect_usage_exit("mb connect exec", "provider required", json_out=json_out)
         if json_out:
@@ -2366,9 +2418,21 @@ def connect_cmd(
                 state="json_not_supported",
             )
         try:
-            outcome = connect_mod.exec_with_secret(provider, command, repo, env_name=env_name)
+            outcome = connect_mod.exec_with_secret(
+                provider,
+                command,
+                repo,
+                env_name=env_name,
+                keep_env=keep_env,
+                inherit_env=inherit_env,
+            )
         except ValueError as exc:
-            _connect_error_exit("mb connect exec", exc, json_out=json_out)
+            code = (
+                1
+                if isinstance(exc, connect_mod.ConnectRefusal) and exc.rule == "audit_unavailable"
+                else 2
+            )
+            _connect_error_exit("mb connect exec", exc, code=code, json_out=json_out)
         if outcome["error"]:
             typer.echo(f"mb connect exec: {outcome['error']}", err=True)
             if outcome["repair_command"]:
@@ -2394,6 +2458,20 @@ def connect_cmd(
             raise typer.Exit(1)
         raise typer.Exit(1 if connect_mod.provider_needs_action(result["status"]) else 0)
     if target == "token":
+        if not provider or json_out:
+            flags = ["print"] if print_token else []
+            if print_token and not sys.stdin.isatty():
+                flags.append("print_noninteractive")
+            with suppress(connect_mod.ConnectRefusal):
+                connect_mod.write_release_audit(
+                    "token",
+                    provider,
+                    repo,
+                    result="refused",
+                    reason="provider_required" if not provider else "json_not_supported",
+                    exit_code=2,
+                    flags=flags,
+                )
         if not provider:
             _connect_usage_exit("mb connect token", "provider required", json_out=json_out)
         if json_out:
@@ -2406,26 +2484,16 @@ def connect_cmd(
                 state="json_not_supported",
             )
         try:
-            if not print_token and connect_mod.stdout_exposes_secret():
-                shown = connect_mod.echoable_input(provider) or "<provider>"
-                connect_mod._refuse(
-                    "token_print",
-                    "refusing to print the secret to a terminal or a pipe, where it lands "
-                    "in a transcript. Run the command with it instead: "
-                    f"`mb connect exec {shown} -- <command>`. A plain redirect to a file "
-                    f"needs no flag: `mb connect token {shown} > file`. `--print` is only "
-                    "for a terminal or a pipe, when no agent or log reads the output.",
-                )
+            result = connect_mod.token_for_output(provider, repo, print_token=print_token)
         except connect_mod.ConnectRefusal as exc:
-            # Its own exit code, so a script can tell this from a missing credential.
-            _connect_error_exit(
-                "mb connect token",
-                exc,
-                code=connect_mod.TOKEN_REFUSED_EXIT_CODE,
-                json_out=json_out,
+            code = (
+                connect_mod.TOKEN_REFUSED_EXIT_CODE
+                if exc.rule == "token_print"
+                else 1
+                if exc.rule == "audit_unavailable"
+                else 2
             )
-        try:
-            result = connect_mod.read_token(provider, repo)
+            _connect_error_exit("mb connect token", exc, code=code, json_out=json_out)
         except ValueError as exc:
             _connect_error_exit("mb connect token", exc, json_out=json_out)
         if not result["ok"]:
