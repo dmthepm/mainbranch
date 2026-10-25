@@ -1,5 +1,7 @@
 # Agent Instructions
 
+Main Branch also carries read-only `mb-homelab-*` skills for securing the machines that run your agents; they do not touch business data. See [homelab skills](docs/homelab-skills.md).
+
 Main Branch is public open-source infrastructure. Treat this file as the
 repo-level operating contract for Codex, Claude Code, and any other agent or
 human contributor working in this repository.
