@@ -519,3 +519,36 @@ def test_f2_policy_location_and_public_docs() -> None:
 def test_f1_ipv4_octet_validation() -> None:
     module = load(AUDIT / "scripts/redact.py")
     assert module.Redactor({}).scrub("prefix999.0.2.7suffix") == "prefix999.0.2.7suffix"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("pre2001:db8::7post", "prenode-1post"),
+        # The first valid start is 2001; the longest final hextet is 7bee.
+        ("cafe2001:db8::7beef", "cafenode-1f"),
+        ("pre2001:0db8:0000:0000:0000:0000:0000:0007post", "prenode-1post"),
+        ("pre::ffff:192.0.2.7post", "prnode-1post"),
+        # A glued hex e is itself a valid first hextet in these compressed forms.
+        ("pre::1post", "prnode-1post"),
+        ("prefe80::7%eth0post", "prenode-1"),
+        # Zone identifiers permit letters, so the suffix is part of the zone.
+        ("pre2001:db8::7%eth0post", "prenode-1"),
+        ("[fe80::7%eth0]:443", "[node-1]:443"),
+        ("2001:db8::7 and 2001:db8::8", "node-1 and node-2"),
+        ("12:30", "12:30"),
+        ("::", "::"),
+        # A six-group MAC has no valid IPv6 substring and stays unchanged.
+        ("aa:bb:cc:dd:ee:ff", "aa:bb:cc:dd:ee:ff"),
+    ],
+)
+def test_g1_ipv6_at_every_offset(text: str, expected: str) -> None:
+    module = load(AUDIT / "scripts/redact.py")
+    payload = {
+        "rows": [{"check": "wildcard", "result": text, "safer": text}],
+        "notes": [text],
+    }
+    output = module.render(payload)
+    assert f"| wildcard |  | {expected} | {expected} |  |" in output
+    assert f"- {expected}\n" in output
+    assert module.Redactor({}).scrub(text) == expected
