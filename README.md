@@ -133,6 +133,11 @@ and proposals directly:
 
 Run `mb --help` for the command list. See the [docs index](docs/README.md) for
 Google reads, books, provider connections, playbooks, and other references.
+
+Main Branch also carries read-only `mb-homelab-*` skills for securing the
+machines that run your agents; they do not touch business data. See
+[homelab skills](docs/homelab-skills.md).
+
 New contributors should read [CONTRIBUTING.md](CONTRIBUTING.md). Agents working
 on the engine follow [AGENTS.md](AGENTS.md) and the
 [cold-start contract](docs/agent-cold-start.md).
