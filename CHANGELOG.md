@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.15] - 2026-10-23
+
 ### Added
 
 - Hub defaults and inherited skills now explain where real data lives (#1231).

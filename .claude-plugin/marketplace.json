@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Main Branch — run a business from markdown files in git, with Claude Code as the operator surface.",
-    "version": "0.6.14"
+    "version": "0.6.15"
   },
   "plugins": [
     {
