@@ -32,6 +32,7 @@ from mb.freshness import (
     format_update_alert,
     package_update_status,
 )
+from mb.gitignore import gitignore_problem
 from mb.json_result import json_default
 
 IMPORTANT_DIRS = (
@@ -4063,6 +4064,8 @@ def _marker_path(repo: Path) -> Path:
 def _marker_gitignore_state(repo: Path) -> dict[str, Any]:
     gitignore = repo / ".gitignore"
     entry = LAST_STATUS_SEEN_GITIGNORE_ENTRY
+    if problem := gitignore_problem(repo):
+        return {"ok": False, "path": ".gitignore", "entry": entry, "repair": problem}
     if _which("git"):
         check = _run_command(["git", "check-ignore", entry], cwd=repo)
         if check["ok"]:

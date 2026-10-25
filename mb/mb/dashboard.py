@@ -17,6 +17,7 @@ import yaml
 from mb import __version__
 from mb import connect as connect_mod
 from mb import status as status_mod
+from mb.gitignore import gitignore_problem
 
 DASHBOARD_SCHEMA_VERSION = "0.1"
 DEFAULT_OUTPUT_PATH = Path(".mb") / "dashboard" / "index.html"
@@ -855,7 +856,7 @@ def build(repo: str | Path = ".", output: str | Path | None = None) -> dict[str,
     # and "committed_by_default: False" must be enforced by git, not prose.
     if _is_relative_to(output_path, root):
         ignore_path = output_path.parent / ".gitignore"
-        if not ignore_path.exists():
+        if not gitignore_problem(output_path.parent) and not ignore_path.exists():
             ignore_path.write_text("*\n", encoding="utf-8")
     return {
         "ok": True,

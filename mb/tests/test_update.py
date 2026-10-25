@@ -4303,14 +4303,22 @@ def test_check_predicts_the_consent_stop_of_an_unattended_run(
 
     predicted = checked["surface_refresh"]["planned"]
     actual = ran["surface_refresh"]["planned"]
+    if state in {"untracked_link", "dangling_link"}:
+        assert predicted == {"consent": "not_needed", "tracked_files": [], "apply_commands": []}
+        assert actual == {**predicted, "tracked_changes": []}
+        assert (business_repo / ".gitignore").is_symlink()
+        return
     assert actual["consent"] == "no_terminal"
     for key in ("consent", "tracked_files", "tracked_changes", "apply_commands"):
         assert predicted[key] == actual[key], key
     assert ".gitignore" in predicted["tracked_files"]
 
 
-def test_check_json_and_human_name_the_consent_stop(
-    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tmp_path: Path
+def test_check_json_and_human_skip_symlinked_gitignore(
+    monkeypatch: pytest.MonkeyPatch,
+    business_repo: Path,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     calls: list[list[str]] = []
     _wheel_update_env(monkeypatch, calls)
@@ -4321,10 +4329,10 @@ def test_check_json_and_human_name_the_consent_stop(
     human = runner.invoke(app, ["update", "--check", "--repo", str(business_repo)])
 
     planned = json.loads(as_json.stdout)["surface_refresh"]["planned"]
-    assert planned["consent"] == "no_terminal"
-    assert planned["tracked_changes"] == [{"path": ".gitignore", "op": "replace_link"}]
-    assert "would ask once before changing repo files: .gitignore (replace link)" in human.stdout
-    assert f"  mb skill link --repo {shlex.quote(str(business_repo))}" in human.stdout
+    assert as_json.exit_code == human.exit_code == 0
+    assert planned == {"consent": "not_needed", "tracked_files": [], "apply_commands": []}
+    assert "would ask once before changing repo files" not in human.stdout
+    assert "Replace it with a regular file, then rerun." in caplog.text
     assert os.path.islink(business_repo / ".gitignore")
     assert not (tmp_path / "elsewhere" / "missing").exists()
 
@@ -4470,6 +4478,7 @@ def test_check_does_not_crash_on_a_gitignore_it_cannot_read(
     kind: str,
     named: str,
     fix: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     if kind in MODE_000_KINDS and hasattr(os, "geteuid") and os.geteuid() == 0:
         pytest.skip("root can read a mode 000 file")
@@ -4500,6 +4509,14 @@ def test_check_does_not_crash_on_a_gitignore_it_cannot_read(
         "apply_commands": [],
     }
     warnings = [item for item in result["warnings"] if item.startswith("Could not read ")]
+    if kind == "folder":
+        assert not warnings
+        assert "Replace it with a regular file, then rerun." in caplog.text
+        assert (business_repo / ".gitignore").is_dir()
+        assert human.exception is None
+        assert human.exit_code == 0
+        assert calls == []
+        return
     assert len(warnings) == 1, result["warnings"]
     assert named in warnings[0]
     assert "cannot plan the skill link refresh" in warnings[0]

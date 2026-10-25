@@ -16,6 +16,7 @@ import yaml
 from mb import migrations
 from mb.durable import atomic_write_text
 from mb.engine import repo_flag
+from mb.gitignore import gitignore_problem
 from mb.migrations.base import MigrationInfo, MigrationPlan, PlannedChange
 
 ENVELOPE_SCHEMA = "mb.migrate"
@@ -374,7 +375,7 @@ def _remove_ignored_metadata_tree(path: Path) -> None:
 
 
 def _ensure_gitignore_plan(repo: Path, plans: list[MigrationPlan]) -> None:
-    if not plans:
+    if not plans or gitignore_problem(repo):
         return
     gitignore = repo / ".gitignore"
     text = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""

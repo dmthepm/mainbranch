@@ -34,6 +34,7 @@ from typing import Any
 import yaml
 
 from mb.engine import repo_flag
+from mb.gitignore import gitignore_problem
 
 STATE_ORDER = {"ok": 0, "info": 1, "warn": 2, "error": 3}
 AUDIENCE_VALUES = frozenset({"mechanical", "operator_decision", "informational"})
@@ -138,7 +139,7 @@ def _read_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
 
 def _gitignore_entries(repo: Path) -> set[str]:
     gitignore = repo / ".gitignore"
-    if not gitignore.exists():
+    if gitignore_problem(repo) or not gitignore.exists():
         return set()
     try:
         text = gitignore.read_text(encoding="utf-8")
