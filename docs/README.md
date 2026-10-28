@@ -75,6 +75,7 @@ Pick the route that matches what you are doing.
 ### Planned product shape
 
 - [`prd/`](prd/) — versioned PRDs (`v0-*.md`).
+- [`prd/v0-7-machine-doctor.md`](prd/v0-7-machine-doctor.md) — draft design for `mb machine doctor`: manifest, check registry, JSON and exit codes.
 
 ### Evidence
 
