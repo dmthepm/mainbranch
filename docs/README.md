@@ -21,6 +21,7 @@ Pick the route that matches what you are doing.
 ### Setting up a business repo
 
 - [`beginner-setup.md`](beginner-setup.md) — install, first run, first decision.
+- [`machine-setup.md`](machine-setup.md) — an always-on box for your agents: concepts, machine picks, Ubuntu and Omarchy, first week.
 - [`migrating.md`](migrating.md) — moving an older Main Branch layout forward.
 - [`compatibility.md`](compatibility.md) — supported OS, runtime, and adapter matrix.
 - [`repo-visibility-rubric.md`](repo-visibility-rubric.md) — public vs private repo guidance.

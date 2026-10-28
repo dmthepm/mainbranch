@@ -1,0 +1,223 @@
+# Machine Setup: An Always-On Box For Your Agents
+
+This guide is for operators who want their agents to keep working while the
+laptop is closed. You set up one small computer that stays on, run Main Branch
+and Claude Code there, and use your laptop and phone only to look in and steer.
+
+Read the concepts first. They decide most of the steps, and they stay the same
+whichever machine or operating system you pick.
+
+If you are brand new to Main Branch, start with
+[`beginner-setup.md`](beginner-setup.md) on your laptop. Come back here when
+you want the work to run without you.
+
+---
+
+## Part 1: Concepts
+
+### Foundation first, interface last
+
+Set up the parts that keep the work safe and running first: the machine, its
+accounts, sessions that survive a reboot, credentials, backups and updates.
+Pick how you talk to it last. The Claude app, a terminal, a text bot or a phone
+client are all interfaces, and you can swap them at any time. No update,
+restart or health check should depend on one of them.
+
+### The box works; the laptop is a remote control
+
+Start every agent session on the always-on box, never on the laptop. The
+laptop and phone only view and steer. The test is simple: close the laptop for
+30 minutes in the middle of a task, then reconnect. If anything stopped, the
+setup is not finished.
+
+### One user account per business
+
+Give each business its own Linux (or macOS) user account, with its own home
+folder, business repo, sign-ins and keys.
+
+- One business's agent cannot read another business's files or keys.
+- A mistake, a runaway test or a leaked key stays inside one account.
+- You can remove one business without touching the others.
+
+Running a single business? Still use a separate agent account, apart from your
+own login.
+
+### Admin account and agent accounts
+
+- **Your admin account** is the only one with `sudo`. You use it to install
+  system packages, change firewall rules and create users.
+- **Agent accounts** never have `sudo`. When an agent needs a root step, it
+  writes the exact command and you run it from the admin account.
+- Sign-ins are yours too. An agent can prepare a sign-in command; you complete
+  it.
+
+### Shared tools, private data
+
+Tools every account uses (a Python runtime, `uv`, `gh`, `hledger`, a terminal
+multiplexer) can be installed once in a shared, read-only location that the
+admin account owns. Data never goes there: repos, tokens, caches and
+transcripts stay in each account's home folder.
+
+### Sessions that survive a reboot
+
+Agents run inside a terminal multiplexer such as `tmux`, or Herdr if you want
+a client built for coding agents. Run the multiplexer as a systemd **user
+service** and turn on **linger** for that account, so it starts at boot and
+keeps running after everyone logs out. On a desktop Linux system, give it its
+own slice so the desktop's out-of-memory handling does not kill it along with
+the desktop apps.
+
+### One heavy job at a time
+
+Full test suites, builds and local transcription can take the machine down if
+several run at once. Cap them (worker count, memory) and let only one heavy
+job run at a time, through a shared lock or a simple queue. A small box is
+fine when heavy work takes turns.
+
+### Accounts talk through a gate, not shared folders
+
+When one business's agent needs something from another (a file, an answer, a
+hand-off), it goes through a gate that both sides trust: a small program that
+passes the message and logs it. Don't give accounts read access to each
+other's home folders to make this easier.
+
+### Credentials
+
+- Each key does one job: read-only when reading is enough, test mode until
+  live is needed, and its own key per machine and per agent account.
+- Set an expiry date when the vendor offers one.
+- Keep keys in the OS keychain or a password manager and hand them to one
+  command at a time (see [`connect.md`](connect.md)). Never put a key in a
+  repo, a chat, a screenshot or a prompt.
+- The box holds its own credentials. Closing the laptop must not break
+  anything on it.
+
+### Backups and updates
+
+- **Backups:** business repos push to GitHub, which is the first backup. Also
+  back up each account's home folder (keys and local state excluded or
+  encrypted) to a second place, and test a restore once.
+- **Updates:** keep the operating system on automatic security updates,
+  update Main Branch with `mb update`, and reboot on a schedule you choose. The
+  reboot test below is what makes scheduled reboots safe.
+
+### Mac or Linux for the box
+
+| | Linux (Ubuntu LTS, Omarchy) | macOS (Mac mini) |
+|---|---|---|
+| Runs with nobody logged in | Yes, with linger and user services | Needs care: user agents start at login, background work needs launchd setup |
+| Separate agent accounts | Standard | Possible; less common |
+| Remote admin | SSH | SSH or Screen Sharing |
+| Power draw | Low on mini PCs | Very low |
+| Best when | You want the most control per dollar | You already live on Apple and want iMessage-based tools |
+
+This guide's steps are written for Linux. A Mac mini works as the box, but
+plan extra time for running background services without a logged-in user.
+
+---
+
+## Part 2: Picking a machine
+
+Small and quiet is enough. Most of the work is waiting on the network. What
+matters most is RAM (agents, browsers and local tools add up), a fast SSD, and
+a BIOS setting that powers the machine back on after an outage.
+
+Prices and specs below were checked on vendor pages on 28 Oct 2026. Prices
+change; check before you buy.
+
+| Budget | Example | Notes |
+|---|---|---|
+| Used, low cost | Lenovo ThinkCentre Tiny or Dell OptiPlex Micro (8th gen Intel or newer) | Plenty for several businesses with 32 GB RAM. Buy the adapter wattage the vendor recommends for that CPU. |
+| New, mini PC | Lenovo ThinkCentre M70q Gen 4 | Up to 64 GB DDR4 in two slots, one M.2 plus one 2.5" bay. Lenovo certifies Ubuntu 22.04 LTS for it. |
+| New, mini PC | Beelink SER8, 32 GB / 1 TB | $859 on the vendor page. Two M.2 slots, 2.5 GbE, auto power-on. |
+| Apple | Mac mini (M6) | From $899 with 16 GB, configurable to 32 GB. About 4 W at idle. See the macOS notes above. |
+| Higher end | Framework Desktop | From $1,269 (32 GB). CPU and RAM are soldered, so buy the RAM you will need. |
+
+**A measured data point.** On a 2018 ThinkCentre Tiny (Intel i7-8700T,
+32 GB class), local transcription with faster-whisper large-v3-turbo on the
+CPU processed 1 hour of audio in about 25 minutes, peaking at 2.5 GB of RAM.
+That was one measurement on one file, but every new pick above has a faster
+CPU.
+
+**Power-on after an outage.** Set it in the BIOS before the box goes in a
+closet:
+
+- Lenovo: Power menu, *After Power Loss*, set to *Power On* (the default is
+  *Last State*).
+- Dell OptiPlex: *AC Recovery*, set to *Power On* (the default is *Power
+  Off*).
+
+---
+
+## Part 3: The operating system
+
+### Ubuntu LTS (recommended default)
+
+Use the server edition or a minimal desktop install, with full-disk
+encryption. You get long-term support, automatic security updates
+(`unattended-upgrades`) and AppArmor.
+
+### Omarchy (Arch-based)
+
+Omarchy is an Arch Linux setup with a rolling release, so updates arrive
+continuously instead of in yearly versions.
+
+- **Recognize it:** `/etc/os-release` has `ID=omarchy`, and
+  `pacman -Q omarchy` shows the installed package. On Omarchy 4 and later it
+  is a system package, so older checks for a folder in your home directory
+  give a false "no".
+- **Update it** with `omarchy update`, not raw `pacman -Syu`, so its own
+  migrations run.
+- **Lock the screen or turn off auto-login.** Omarchy logs in automatically
+  by default. On a box that is always on, that leaves an open desktop for
+  anyone who walks up. Turn on the idle lock in Omarchy's settings, or turn
+  off auto-login.
+- **Security modules differ.** There is no AppArmor; Landlock is available.
+  Checks written for Ubuntu's AppArmor don't apply.
+- Because it is rolling, check after each update that the multiplexer service
+  and your agents came back.
+
+### Managing it from a Mac
+
+Your MacBook is the remote control.
+
+- Connect over a private network such as Tailscale, so nothing on the box
+  listens on the open internet.
+- Use SSH with keys only and turn off password logins.
+- Open the multiplexer over SSH, or use Claude Code Remote Control from the
+  browser or the Claude app to steer a session that is running on the box.
+  See the Claude Code docs for its current requirements.
+
+---
+
+## Part 4: First week
+
+Have your agent prepare each command in a terminal pane. You read it and
+press Enter. Root steps run from your admin account.
+
+1. Install the OS with disk encryption. Set the BIOS to power on after an
+   outage.
+2. Install Tailscale on the box, the laptop and the phone. SSH by key only.
+3. Create your admin account and one agent account per business. No `sudo`
+   for agent accounts.
+4. Install shared tools once, read-only for agent accounts. In each agent
+   account, install Main Branch and set up the business repo
+   ([`beginner-setup.md`](beginner-setup.md)).
+5. Turn on linger for each agent account and run the multiplexer as a user
+   service.
+6. **Reboot test:** reboot the box, and from the laptop check that every
+   account's multiplexer came back without anyone logging in.
+7. Start one Claude Code session per business on the box. Reach it from the
+   laptop and from the phone. Keep the interface you like.
+8. **Lid-closed test:** start a capped test run, close the laptop for 30
+   minutes, reopen it and check that the run finished.
+9. Practice a key roll once with a fake key, so a real leak is routine.
+
+---
+
+## What comes next
+
+A read-only `mb machine doctor` is planned. It will check the items in this
+guide (accounts, linger, services, updates, power-on, screen lock) and report
+them as JSON with exit codes, without changing anything or using `sudo`.
+Until it ships, the reboot and lid-closed tests above are the check.
