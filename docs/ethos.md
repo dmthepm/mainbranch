@@ -170,9 +170,9 @@ autosave; it is durable business memory.
 
 Main Branch is not a hosted SaaS dashboard, chat client, background daemon,
 model host, vector database, scheduler, or hosted marketplace product today.
-Repo-local runtime marketplace metadata, such as the Codex plugin marketplace
-file generated into a business repo, is an adapter mechanism rather than a
-Main Branch marketplace business surface.
+Codex uses global Main Branch skills and generated `AGENTS.md` guidance.
+Business repos do not need repo-local Codex plugin or skill copies. Claude Code
+plugin wiring is a runtime adapter, not a hosted marketplace product.
 
 Those may become useful surfaces later. They earn their way in by preserving
 the same source of truth: the business repo, GitHub, git history, deterministic

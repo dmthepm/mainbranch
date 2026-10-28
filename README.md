@@ -24,7 +24,8 @@
   <a href="#what-it-actually-does">What it does</a> &middot;
   <a href="#named-workflows">Workflows</a> &middot;
   <a href="#works-with">Works with</a> &middot;
-  <a href="docs/beginner-setup.md">Beginner setup</a>
+  <a href="docs/beginner-setup.md">Beginner setup</a> &middot;
+  <a href="docs/README.md">Documentation guide</a>
 </p>
 
 ---
@@ -199,6 +200,11 @@ business memory at meaningful boundaries.
 
 Main Branch skills run multi-step workflows, not prompt snippets:
 
+Claude Code supports the production workflows below. Codex supports the daily
+loop; bet, ads, organic, site, and books routes are read-only planning. See
+[runtime compatibility](docs/compatibility.md) and run
+`mb workflow list --runtime codex --json` for exact route status.
+
 - **`/mb-think`** researches, sharpens offers, turns source material into
   decisions, analyzes sales videos, and cleans up stale claims.
 - **`/mb-ads`** creates paid creative: hooks, static ads, image prompts, video
@@ -249,7 +255,7 @@ spend, or account changes can be handled safely.
 | --- | --- |
 | **GitHub** | Backup, saved history, tasks/proposals, folder detection, and privacy-scrubbed public issue drafting. First-run setup can create and push a GitHub repo when you choose that path. |
 | **Cloudflare** | The default web launch path: domain and DNS work, websites, ad landing pages, Cloudflare Pages, and future Workers for small always-on business tasks. Tokens stay out of saved files, and deploys or account changes require approval. |
-| **Google / Workspace** | Planned optional connection for source material and metadata; durable summaries belong back in the folder. |
+| **Google / Workspace** | Read-only Search Console and GA4 commands through `mb google` after setup. Broader Workspace source ingestion remains planned; durable summaries belong back in the folder. |
 | **Google Ads / GTM** | Checks whether a site is ready to measure paid traffic. Publishing tags, creating conversions, uploading data, changing budgets, or launching campaigns requires separate approval. |
 | **Meta Ads** | Read-only account summaries after setup. No campaign editing, budget changes, or launch claim. |
 | **Bookkeeping** | Plain-file bookkeeping for owners who want to stop depending on QuickBooks-style software. Uses hledger under the hood, keeps raw ledgers private, tracks bet exposure, and can show sample monthly reports. |

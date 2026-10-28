@@ -11,12 +11,14 @@ and the changelog lives in `../CHANGELOG.md`.
 
 Pick the route that matches what you are doing.
 
-### New here (cold start)
+### Start as an owner
 
-- [`ethos.md`](ethos.md) — product principles, source-of-truth model, and runtime stance.
-- [`operator-loops.md`](operator-loops.md) — Sense / Decide / Ship / Reflect workflow taxonomy.
-- [`roadmap.md`](roadmap.md) — current public direction.
-- [`beginner-setup.md`](beginner-setup.md) — human setup walkthrough.
+1. [Set up your business folder](beginner-setup.md).
+2. [Run today](beginner-setup.md#after-setup) with a request about your business.
+3. [Learn the operating loops](operator-loops.md) as you work.
+
+For product principles and direction, read [ethos](ethos.md) and the
+[roadmap](roadmap.md). Contributors can use the engine route below.
 
 ### Setting up a business repo
 

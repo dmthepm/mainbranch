@@ -195,6 +195,11 @@ In Claude Code, run:
 /mb-start
 ```
 
+Claude Code supports the production workflows below. Codex supports the daily
+loop; bet, ads, organic, site, and books routes are read-only planning. See
+[runtime compatibility](compatibility.md) and run
+`mb workflow list --runtime codex --json` for exact route status.
+
 `/mb-start` checks what changed, what matters, and what to do next. It can route
 you into setup, thinking, ads, organic content, site work, bookkeeping checks,
 repairs, updates, or closing a session.
@@ -228,7 +233,7 @@ tools carefully so each one has a clear job and a safe boundary.
 | --- | --- |
 | **GitHub** | Backup, saved history, shared tasks/proposals, and a copy of the business brain AI tools can read. |
 | **Cloudflare** | Domains, DNS, websites, ad landing pages, Cloudflare Pages, and future Workers for small always-on business tasks. |
-| **Google / Workspace** | Planned optional connection for source material and metadata; durable summaries belong back in the folder. |
+| **Google / Workspace** | Read-only Search Console and GA4 commands through `mb google` after setup. Broader Workspace source ingestion remains planned; durable summaries belong back in the folder. |
 | **Google Ads / GTM** | Checks whether a site is ready to measure paid traffic. Publishing tags, creating conversions, changing budgets, or launching campaigns requires separate approval. |
 | **Meta Ads** | Read-only account summaries after setup. No campaign editing, budget changes, or launch claim. |
 | **Bookkeeping** | Plain-file bookkeeping for owners who want to stop depending on QuickBooks-style software. Uses hledger under the hood and keeps raw ledgers private. |

@@ -253,7 +253,7 @@ mirror loop names. There is no requirement for skill-to-loop 1:1 mapping.
 | `/mb-bet narrate` | Reflect → Ship | Render the lesson, then publish it |
 | `/mb-site` | Ship | Build + deploy in one motion |
 | `/mb-books` | Sense, Reflect | Review private books readiness and close state |
-| `/mb-ads` | Ship (with Reflect-style review gates) | Draft + post |
+| `/mb-ads` | Ship (with Reflect-style review gates) | Draft creative and review before approval |
 | `/mb-end` | Reflect (with optional Ship of the reflection) | Session crystallize |
 | `mb status` (CLI) | Sense | Daily briefing |
 | `mb checkpoint` | Ship | The saved checkpoint is itself a Ship event |
@@ -274,8 +274,8 @@ loops: [decide, reflect, ship]
 ---
 ```
 
-This lets `mb status` and downstream tooling reason about loop coverage
-without parsing prose.
+`mb skill validate` checks loop declarations and their names today.
+Status grouping and downstream use of loop coverage are future work.
 
 ## Applying the loops
 
