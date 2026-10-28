@@ -33,11 +33,34 @@ setup is not finished.
 ### One user account per business
 
 Give each business its own Linux (or macOS) user account, with its own home
-folder, business repo, sign-ins and keys.
+folder, business repo, sign-ins and keys. Make the home folder private (only
+its owner can open it) and give each account its own private temporary
+folder. Creating the account alone doesn't do this; check the permissions.
 
-- One business's agent cannot read another business's files or keys.
-- A mistake, a runaway test or a leaked key stays inside one account.
-- You can remove one business without touching the others.
+With private homes, separate accounts give you:
+
+- one business's agent can't read another business's private files or keys;
+- a mistake, a runaway test or a leaked key is far more likely to stay inside
+  one account;
+- you can remove one business without touching the others.
+
+Separate accounts are a strong wall between neighbours, not separate
+machines. They don't protect against:
+
+- a shared kernel, CPU, memory and disk: one account can still slow or crash
+  the box for everyone;
+- a shared network: every account can reach the same local services, other
+  accounts' local ports, your home network and the internet;
+- local services that every account can talk to, some of which act with more
+  authority than the caller;
+- anything in a world-readable place, such as system service definitions:
+  never put a secret there;
+- root: your admin account, or anyone who gains root, can read every
+  account.
+
+Controls that narrow these gaps (per-account network fences, process
+restrictions, a reviewed local gate) are still in design and are not part of
+this guide.
 
 Running a single business? Still use a separate agent account, apart from your
 own login.
@@ -68,7 +91,8 @@ a client built for coding agents. Run the multiplexer as a systemd **user
 service** and turn on **linger** for that account, so it starts at boot and
 keeps running after everyone logs out. Give each account its own slice with
 memory and process limits, sized from the box's RAM with room left for the
-system, so one business can't starve the others or the desktop.
+system, so one business is much less likely to starve the others or the
+desktop.
 
 ### One heavy job at a time
 
@@ -81,10 +105,14 @@ is fine when heavy work takes turns.
 
 ### Accounts talk through a gate, not shared folders
 
-When one business's agent needs something from another (a file, an answer, a
-hand-off), it goes through a gate that both sides trust: a small program that
-passes the message and logs it. Don't give accounts read access to each
-other's home folders to make this easier.
+Don't give accounts read access to each other's home folders, and don't
+set up a shared folder that several accounts write to. Anything one agent
+drops there, another may act on.
+
+The intended pattern is a gate: a small program with a narrow, fixed set of
+messages that stamps who sent each one. That gate is deferred: it needs its
+own reviewed design and is not part of this setup yet. Until then, when one
+business needs something from another, you carry it across yourself.
 
 ### Credentials
 
@@ -126,8 +154,11 @@ other's home folders to make this easier.
 
 This guide's steps are written for Linux. A Mac mini works as the box for one
 business, but plan extra time for running background services without a
-logged-in user. macOS has no per-account memory caps like Linux's, so for
-several businesses that must stay apart, use Linux.
+logged-in user. For several businesses, Linux gives you more to work with,
+such as per-account memory caps. Choosing Linux doesn't separate the
+businesses by itself: the limits under
+[One user account per business](#one-user-account-per-business) apply on
+both.
 
 ---
 
@@ -172,9 +203,21 @@ Use the server edition or a minimal desktop install, with full-disk
 encryption. You get long-term support, automatic security updates
 (`unattended-upgrades`, with automatic reboot left off) and AppArmor.
 
-Unlock the disk with the TPM and keep the passphrase as a recovery key in
-your password manager. With a passphrase alone, the box waits at the prompt
-after every reboot or power cut, and the reboot test fails.
+Disk unlock is a trade-off between coming back alone and protecting a
+stolen box:
+
+- **Passphrase only:** a stolen box stays locked, but the box waits at the
+  prompt after every reboot or power cut, and the reboot test fails.
+- **TPM unlock:** the box comes back by itself. It protects a stolen box only
+  if the boot chain is verified: Secure Boot on, and the key enrolled through
+  your distribution's supported procedure so the TPM releases it only to the
+  expected, measured boot. A TPM unlock without that can hand the disk to
+  whoever boots the box. Anyone with physical access still gets more chances
+  than with a passphrase.
+- **Either way:** keep the recovery key in your password manager, and read it
+  back from a second device before you rely on unattended reboots. A
+  firmware or BIOS update can make the TPM refuse and fall back to the
+  recovery key, so do those only when you are at the machine.
 
 ### Omarchy (Arch-based)
 
@@ -195,6 +238,11 @@ continuously instead of in yearly versions.
   by default. On a box that is always on, that leaves an open desktop for
   anyone who walks up. Turn auto-login off and turn on the idle lock. The
   desktop is your session only; agents never run in it.
+- **Disk unlock.** The same trade-off as Ubuntu applies. On Arch-based
+  systems, TPM unlock is often set up with Secure Boot off, which binds the key
+  to less of the boot chain. If you can't set it up with Secure Boot, a
+  passphrase is the safer choice, and the box will wait for you after a
+  reboot.
 - **Security modules differ.** There is no AppArmor; Landlock is available.
   Checks written for Ubuntu's AppArmor don't apply.
 - Because it is rolling, check after each update that the multiplexer service
@@ -204,9 +252,20 @@ continuously instead of in yearly versions.
 
 Your MacBook is the remote control.
 
-- Connect over a private network such as Tailscale, so nothing on the box
-  listens on the open internet. Use Tailscale as the network only and log in
-  with OpenSSH, not Tailscale's own SSH feature.
+- Connect over a private network such as Tailscale. Use Tailscale as the
+  network only and log in with OpenSSH, not Tailscale's own SSH feature.
+- **Installing Tailscale doesn't close anything else.** `sshd`, a dev server
+  or any other program can still listen on the box's other network
+  interfaces. The box needs an inbound firewall that:
+  - denies incoming connections by default;
+  - allows SSH only from your tailnet, or narrower, from the devices you
+    administer from;
+  - is changed only while you keep a tested way back in (a working session
+    or the console), so you never lock yourself out by removing the broad
+    rule first.
+
+  The exact firewall rules depend on your system; this guide doesn't ship
+  them yet. Dev servers and debug ports should listen on loopback only.
 - Use SSH with keys only and turn off password logins. Keep the admin key on
   the Mac, ideally in a password manager that approves each use.
 - If you need the screen, reach a VNC server that listens only on the box's
@@ -222,11 +281,16 @@ Your MacBook is the remote control.
 Have your agent prepare each command in a terminal pane. You read it and
 press Enter. Root steps run from your admin account.
 
-1. Install the OS with disk encryption that unlocks without you (see Part 3).
-   Set the BIOS to power on after an outage.
+1. Install the OS with disk encryption, and choose how it unlocks (see
+   Part 3). Set the BIOS to power on after an outage. Read the disk recovery
+   key back from a second device.
 2. Install Tailscale on the box, the laptop and the phone. SSH by key only.
+   Set up the inbound firewall described in
+   [Managing it from a Mac](#managing-it-from-a-mac), keeping a tested way
+   back in.
 3. Create your admin account and one agent account per business. No `sudo`
-   for agent accounts.
+   for agent accounts. Check that each home folder and temporary folder is
+   private.
 4. Install shared tools once, read-only for agent accounts. In each agent
    account, install Main Branch and set up the business repo
    ([`beginner-setup.md`](beginner-setup.md)).
