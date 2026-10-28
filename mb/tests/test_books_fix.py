@@ -38,6 +38,13 @@ def _repo(path: Path, *, template: bool = False) -> Path:
     return path
 
 
+def _hledger(monkeypatch: pytest.MonkeyPatch, path: str | None) -> None:
+    real = shutil.which
+    monkeypatch.setattr(
+        "mb.books_repo.shutil.which", lambda name: path if name == "hledger" else real(name)
+    )
+
+
 def _books_doctor(repo: Path) -> tuple[int, list[dict[str, str]]]:
     result = RUNNER.invoke(app, ["books", "doctor", "--repo", str(repo), "--json"])
     return result.exit_code, json.loads(result.output)["findings"]
@@ -66,7 +73,22 @@ def test_d1_workpapers_csv_is_not_evidence(tmp_path: Path) -> None:
     assert code == 1 and [item["rule"] for item in findings] == ["evidence_tracked"]
 
 
-def test_d2_docs_only_repo_is_a_workspace(tmp_path: Path) -> None:
+def test_d2_workspace_is_ok_when_hledger_is_installed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _hledger(monkeypatch, "/usr/bin/hledger")
+    repo = _repo(tmp_path / "workspace")
+    (repo / "AGENTS.md").write_text("# Workspace\n")
+    _commit(repo)
+    code, findings = _books_doctor(repo)
+    assert code == 0 and [(item["rule"], item["level"]) for item in findings] == [
+        ("workspace_repo", "info")
+    ]
+
+
+def test_d2_docs_only_repo_is_a_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Shape rules only: keep the ledger doctor out whether or not hledger is installed.
+    _hledger(monkeypatch, None)
     repo = _repo(tmp_path / "workspace")
     (repo / "AGENTS.md").write_text("# Workspace\n")
     (repo / "docs").mkdir()

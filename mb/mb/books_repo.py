@@ -375,8 +375,20 @@ def inspect(repo: Path, timeout: int = 600) -> dict[str, Any]:
                 "Replace the invalid doctor receipt with the documented shape.",
             )
         )
-    doctor, doctor_findings = _doctor(repo, timeout)
-    findings.extend(doctor_findings)
+    if any(item["rule"] == "workspace_repo" for item in findings):
+        # A workspace holds no journals, so there is no ledger doctor to run.
+        doctor: dict[str, Any] = {
+            "ran": False,
+            "status": "not_run",
+            "level": "info",
+            "reason": "no journals here",
+            "exit_code": None,
+            "duration_s": 0.0,
+            "timed_out": False,
+        }
+    else:
+        doctor, doctor_findings = _doctor(repo, timeout)
+        findings.extend(doctor_findings)
     ok = not any(item["level"] == "error" for item in findings)
     return {
         "ok": ok,
