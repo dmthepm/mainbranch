@@ -197,15 +197,18 @@ closet:
 
 Plan backups in three layers. Each one covers a failure the others don't.
 
-1. **A local backup drive, from a different brand than the box's own disk.**
-   Two disks from the same maker and batch can share a defect. With a
-   different brand, a single failure can't take both. Copy onto it every
-   night.
+1. **A local backup drive, from a different model or batch than the box's
+   own disk.** Two disks from the same batch can share a defect, so a
+   different maker or batch lowers that risk. It doesn't protect against a
+   shared power fault, a deletion or a compromised box; that's what the
+   off-site copy is for. Copy onto it every night.
 2. **An off-site copy, kept no matter what.** A local drive doesn't survive a
    fire, a theft or a power surge that takes out the box. Use an encrypted,
    versioned backup tool with a cloud storage bucket (for example restic with
    Backblaze B2), so deleted or damaged files can be restored from an earlier
-   night.
+   night. Keep the backup password somewhere separate and recoverable, such
+   as your password manager: without it the encrypted copy can't be read.
+   Test a restore from another machine, without the box.
 3. **Restore drills.** A backup counts only after you have restored from it.
    Restore a real folder from each layer before any business data goes on
    the box, then on a schedule.
@@ -215,9 +218,11 @@ Plan backups in three layers. Each one covers a failure the others don't.
 - Mount it by its filesystem UUID, not by a device name like `/dev/sdb`,
   which can change between boots.
 - Check its health (SMART) regularly. Many USB enclosures hide SMART data.
-  Pick an enclosure whose USB bridge chip is listed in the smartmontools USB
-  database, or test it when it arrives: if `smartctl` can't read the drive's
-  health through it, return it.
+  An enclosure whose USB bridge is listed in the smartmontools USB database
+  is a good sign, not a guarantee. Test your actual enclosure and drive when
+  they arrive: if `smartctl` can't read the drive's health through it, return
+  it. Readable health data warns you early; it doesn't make a drive
+  reliable.
 - Have the nightly copy fail loudly if the drive is missing or not mounted,
   so it never fills the box's own disk instead.
 
