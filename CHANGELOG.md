@@ -11,6 +11,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `docs/machine-setup.md`: how to run your agents on an always-on box
+  you steer from a laptop or phone, covering concepts, machine picks,
+  Ubuntu and Omarchy, and a first-week checklist.
+
 ### Changed
 
 - Clarify runtime workflow limits, current local dashboard and Google reads,
