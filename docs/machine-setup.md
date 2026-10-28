@@ -46,33 +46,38 @@ own login.
 
 - **Your admin account** is the only one with `sudo`. You use it to install
   system packages, change firewall rules and create users.
-- **Agent accounts** never have `sudo`. When an agent needs a root step, it
-  writes the exact command and you run it from the admin account.
+- **Agent accounts** never have `sudo`, and none is in a powerful group such
+  as `sudo`, `adm` or `docker` (membership in `docker` is effectively root).
+  When an agent needs a root step, it writes the exact command and you run it
+  from the admin account. `sudo` always asks for your password.
 - Sign-ins are yours too. An agent can prepare a sign-in command; you complete
   it.
 
 ### Shared tools, private data
 
 Tools every account uses (a Python runtime, `uv`, `gh`, `hledger`, a terminal
-multiplexer) can be installed once in a shared, read-only location that the
-admin account owns. Data never goes there: repos, tokens, caches and
-transcripts stay in each account's home folder.
+multiplexer) can be installed once in a shared tree that root owns and no other account
+can write to. Pin each tool to an exact version (never `latest`) and put the
+tree first on every account's PATH. Data never goes there: repos, tokens,
+caches and transcripts stay in each account's home folder.
 
 ### Sessions that survive a reboot
 
 Agents run inside a terminal multiplexer such as `tmux`, or Herdr if you want
 a client built for coding agents. Run the multiplexer as a systemd **user
 service** and turn on **linger** for that account, so it starts at boot and
-keeps running after everyone logs out. On a desktop Linux system, give it its
-own slice so the desktop's out-of-memory handling does not kill it along with
-the desktop apps.
+keeps running after everyone logs out. Give each account its own slice with
+memory and process limits, sized from the box's RAM with room left for the
+system, so one business can't starve the others or the desktop.
 
 ### One heavy job at a time
 
 Full test suites, builds and local transcription can take the machine down if
-several run at once. Cap them (worker count, memory) and let only one heavy
-job run at a time, through a shared lock or a simple queue. A small box is
-fine when heavy work takes turns.
+several run at once. Use one lock for heavy work, shared by every account
+including yours, so only one heavy job runs at a time. Run each job with its
+own memory cap and time limit, so a runaway job is killed alone. Never hold
+the lock while waiting on a model, a dev server or a watch mode. A small box
+is fine when heavy work takes turns.
 
 ### Accounts talk through a gate, not shared folders
 
@@ -95,11 +100,17 @@ other's home folders to make this easier.
 ### Backups and updates
 
 - **Backups:** business repos push to GitHub, which is the first backup. Also
-  back up each account's home folder (keys and local state excluded or
-  encrypted) to a second place, and test a restore once.
-- **Updates:** keep the operating system on automatic security updates,
-  update Main Branch with `mb update`, and reboot on a schedule you choose. The
-  reboot test below is what makes scheduled reboots safe.
+  back up every account's home folder, plus a record of users, groups and
+  permissions, to a place off the box (keys and local state excluded or
+  encrypted). Pass one real restore test before any business data goes on the
+  box, then repeat it on a schedule.
+- **Updates:** on Ubuntu LTS, security updates install automatically but the
+  box never reboots itself; on a rolling release such as Omarchy, nothing
+  updates by itself and you run the full update about weekly (see Part 3).
+  Update Main Branch with `mb update`, turn off agents' self-update, and
+  reboot in a window you choose. Firmware and BIOS updates happen only with
+  you at the machine. The reboot test below is what makes scheduled reboots
+  safe.
 
 ### Mac or Linux for the box
 
@@ -111,8 +122,10 @@ other's home folders to make this easier.
 | Power draw | Low on mini PCs | Very low |
 | Best when | You want the most control per dollar | You already live on Apple and want iMessage-based tools |
 
-This guide's steps are written for Linux. A Mac mini works as the box, but
-plan extra time for running background services without a logged-in user.
+This guide's steps are written for Linux. A Mac mini works as the box for one
+business, but plan extra time for running background services without a
+logged-in user. macOS has no per-account memory caps like Linux's, so for
+several businesses that must stay apart, use Linux.
 
 ---
 
@@ -155,7 +168,11 @@ closet:
 
 Use the server edition or a minimal desktop install, with full-disk
 encryption. You get long-term support, automatic security updates
-(`unattended-upgrades`) and AppArmor.
+(`unattended-upgrades`, with automatic reboot left off) and AppArmor.
+
+Unlock the disk with the TPM and keep the passphrase as a recovery key in
+your password manager. With a passphrase alone, the box waits at the prompt
+after every reboot or power cut, and the reboot test fails.
 
 ### Omarchy (Arch-based)
 
@@ -167,11 +184,15 @@ continuously instead of in yearly versions.
   is a system package, so older checks for a folder in your home directory
   give a false "no".
 - **Update it** with `omarchy update`, not raw `pacman -Syu`, so its own
-  migrations run.
-- **Lock the screen or turn off auto-login.** Omarchy logs in automatically
+  migrations run. Nothing updates by itself: run it about weekly, never
+  upgrade a single package on its own, and reboot after a kernel, systemd or
+  glibc update. It takes a filesystem snapshot first, so a bad update can be
+  rolled back. Treat the AUR as untrusted code, and keep it out of the shared
+  tools.
+- **Turn off auto-login and lock the screen.** Omarchy logs in automatically
   by default. On a box that is always on, that leaves an open desktop for
-  anyone who walks up. Turn on the idle lock in Omarchy's settings, or turn
-  off auto-login.
+  anyone who walks up. Turn auto-login off and turn on the idle lock. The
+  desktop is your session only; agents never run in it.
 - **Security modules differ.** There is no AppArmor; Landlock is available.
   Checks written for Ubuntu's AppArmor don't apply.
 - Because it is rolling, check after each update that the multiplexer service
@@ -182,8 +203,12 @@ continuously instead of in yearly versions.
 Your MacBook is the remote control.
 
 - Connect over a private network such as Tailscale, so nothing on the box
-  listens on the open internet.
-- Use SSH with keys only and turn off password logins.
+  listens on the open internet. Use Tailscale as the network only and log in
+  with OpenSSH, not Tailscale's own SSH feature.
+- Use SSH with keys only and turn off password logins. Keep the admin key on
+  the Mac, ideally in a password manager that approves each use.
+- If you need the screen, reach a VNC server that listens only on the box's
+  loopback through an SSH forward. Never open a VNC port.
 - Open the multiplexer over SSH, or use Claude Code Remote Control from the
   browser or the Claude app to steer a session that is running on the box.
   See the Claude Code docs for its current requirements.
@@ -195,8 +220,8 @@ Your MacBook is the remote control.
 Have your agent prepare each command in a terminal pane. You read it and
 press Enter. Root steps run from your admin account.
 
-1. Install the OS with disk encryption. Set the BIOS to power on after an
-   outage.
+1. Install the OS with disk encryption that unlocks without you (see Part 3).
+   Set the BIOS to power on after an outage.
 2. Install Tailscale on the box, the laptop and the phone. SSH by key only.
 3. Create your admin account and one agent account per business. No `sudo`
    for agent accounts.
@@ -212,6 +237,8 @@ press Enter. Root steps run from your admin account.
 8. **Lid-closed test:** start a capped test run, close the laptop for 30
    minutes, reopen it and check that the run finished.
 9. Practice a key roll once with a fake key, so a real leak is routine.
+10. Set up backups and pass one restore test before real business data goes
+    on the box.
 
 ---
 
