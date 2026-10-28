@@ -11,11 +11,13 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.17] - 2026-10-28
+
 ### Added
 
 - `docs/machine-setup.md`: how to run your agents on an always-on box
   you steer from a laptop or phone, covering concepts, machine picks,
-  Ubuntu and Omarchy, and a first-week checklist.
+  backup storage, Ubuntu and Omarchy, and a first-week checklist.
 - A synthetic working-day walkthrough showing owner prompts, approval, a saved
   decision, and the next session using that lesson, with a first useful result
   at the end of beginner setup.
@@ -24,7 +26,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - Clarify runtime workflow limits, current local dashboard and Google reads,
   lane delivery authority, and owner-first documentation routes.
-
 - Main Branch now lives at https://github.com/dmthepm/mainbranch. Links,
   package metadata, the update check, the issue helper and the plugin
   marketplace name point there. The old `noontide-co/mainbranch` address
