@@ -214,9 +214,10 @@ Plan backups in three layers. Each one covers a failure the others don't.
 
 - Mount it by its filesystem UUID, not by a device name like `/dev/sdb`,
   which can change between boots.
-- Check its health (SMART) regularly. Many USB enclosures hide SMART data, so
-  choose one whose USB bridge passes it through on Linux, and confirm that
-  `smartctl` can read the drive before you rely on it.
+- Check its health (SMART) regularly. Many USB enclosures hide SMART data.
+  Pick an enclosure whose USB bridge chip is listed in the smartmontools USB
+  database, or test it when it arrives: if `smartctl` can't read the drive's
+  health through it, return it.
 - Have the nightly copy fail loudly if the drive is missing or not mounted,
   so it never fills the box's own disk instead.
 
@@ -225,7 +226,7 @@ October 2026. Drive prices have been moving quickly, so check before you buy.
 
 | Option | Example | Notes |
 |---|---|---|
-| Recommended | A NAS-rated CMR drive, such as WD Red Plus 8 TB (WD80EFPX), in a single-bay USB enclosure that passes SMART | About $260 to $355 for the bare drive, plus the enclosure. Rated for long running hours. |
+| Recommended | A NAS-rated CMR drive, such as WD Red Plus 8 TB (WD80EFPX), in a single-bay USB enclosure that passes SMART | CMR, rated for 180 TB a year of workload, 3-year warranty. About $260 to $375 for the bare drive, plus the enclosure. |
 | Simpler | A desktop external drive, such as WD Elements 8 TB | About $380 to $420. Fine for a nightly copy that lets the drive spin down between runs. Check its SMART reporting the same way. |
 | Only if USB proves unreliable | A 2-bay NAS with mirrored drives | Costs and maintenance go up. A mirror protects against one drive failing, but it is not a backup on its own: keep the off-site copy. |
 
