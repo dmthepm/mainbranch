@@ -127,6 +127,8 @@ You do not need to make terminal commands your daily workflow.
 
 Use either Claude Code or Codex. Both start from the same business folder.
 Step-by-step walkthrough: [docs/beginner-setup.md](docs/beginner-setup.md).
+Then follow [a working day](docs/working-day.md), from an owner question to a
+saved lesson the next session uses.
 
 ### Backup and sync
 

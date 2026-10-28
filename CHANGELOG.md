@@ -16,6 +16,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - `docs/machine-setup.md`: how to run your agents on an always-on box
   you steer from a laptop or phone, covering concepts, machine picks,
   Ubuntu and Omarchy, and a first-week checklist.
+- A synthetic working-day walkthrough showing owner prompts, approval, a saved
+  decision, and the next session using that lesson, with a first useful result
+  at the end of beginner setup.
 
 ### Changed
 
