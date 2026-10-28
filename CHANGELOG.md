@@ -13,6 +13,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Changed
 
+- Clarify runtime workflow limits, current local dashboard and Google reads,
+  lane delivery authority, and owner-first documentation routes.
+
 - Main Branch now lives at https://github.com/dmthepm/mainbranch. Links,
   package metadata, the update check, the issue helper and the plugin
   marketplace name point there. The old `noontide-co/mainbranch` address

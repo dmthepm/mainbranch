@@ -157,7 +157,7 @@ topology/status/graph facts, child repo descriptors, reusable playbooks,
 runtime dogfood, connected-account readiness, and issue/friction capture. Link specific
 issue numbers only after verifying their state on GitHub.
 
-Anti-scope for v0.3.x:
+Current boundaries:
 
 - no dashboard as source of truth;
 - no broad multi-runtime support claims;
@@ -165,15 +165,19 @@ Anti-scope for v0.3.x:
 - no automatic model invocation from `mb`;
 - no provider setup that stores secrets in repo files.
 
-## Soon: Dashboard, Sidecars, And Multi-Repo Views
+## Next: Dashboard extensions, sidecars, and multi-repo views
 
 Once the daily operating loop is boring, Main Branch should make the broader
 business system easier to see without replacing the repo or deterministic CLI
 facts as source of truth.
 
-Planned scope:
+`mb dashboard build` and `mb dashboard open` already provide a local read-only
+HTML view over repo facts. They do not provide a hosted service or background
+agent. `mb google` provides read-only Search Console and GA4 commands after
+setup; broader Workspace source ingestion remains planned.
 
-- a small read-only local dashboard over existing JSON outputs;
+Planned extensions:
+
 - visual multi-repo inventory for business repos, site repos, offer repos, and
   sensitive/private repos, with explicit access boundaries;
 - a dashboard map of repos, pushes, bets, commits, issues, PRs, checkpoints,
@@ -188,8 +192,8 @@ Planned scope:
 
 Candidate directions stay candidates until a decision, adapter, and smoke
 evidence promote them. That includes dashboard write surfaces, broader provider
-mutation, social scheduling rails, growth automation execution, and non-Claude
-runtime adapters. Future dashboard writes should be narrow, schema-backed, and
+mutation, social scheduling rails, growth automation execution, and broader
+runtime adapters beyond the supported Claude Code and Codex daily routes. Future dashboard writes should be narrow, schema-backed, and
 approval-gated, not free-form chat state or a second source of truth.
 
 Anti-scope:
@@ -225,9 +229,9 @@ local operational state outside git, and live process state only when explicit.
 
 Likely directions:
 
-- runtime adapters for Codex, Cursor, OpenClaw, Hermes, Paperclip-adjacent
+- deeper Codex production workflows and adapters for Cursor, OpenClaw, Hermes, Paperclip-adjacent
   orchestration, and local runtimes;
-- dashboard/server mode as an optional local or self-hosted view over repo
+- extensions beyond the local read-only dashboard, including optional server views over repo
   truth, graph output, GitHub, and connected tools;
 - structured data layer for metrics, ads, analytics, P&L, and ledgers, with
   explicit access boundaries before sensitive financial/legal data is surfaced;

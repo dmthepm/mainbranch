@@ -127,9 +127,11 @@ Fleets of subagents amplify a business loop only when they cannot silently
 lose work. The contract, dictated repeatedly by operators before it was
 written down:
 
-- **Commit before return.** A subagent that wrote files commits and pushes
-  them before reporting back; the orchestrator verifies the commit exists
-  rather than trusting the report.
+- **Deliver within the assignment.** Follow the assignment's authority to edit,
+  save checkpoints, push, or open proposals. An edits-only lane returns its
+  files; a read-only lane returns its findings. Commit and push only when
+  authorized. The orchestrator verifies the actual files or saved work before
+  accepting the report.
 - **Worktree per file-mutating agent.** Parallel agents that mutate files
   are isolated in their own worktrees; they never share a checkout.
 - **Liveness over silence.** Long-running agents are checked for liveness;
