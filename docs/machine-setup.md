@@ -107,8 +107,10 @@ other's home folders to make this easier.
 - **Updates:** on Ubuntu LTS, security updates install automatically but the
   box never reboots itself; on a rolling release such as Omarchy, nothing
   updates by itself and you run the full update about weekly (see Part 3).
-  Update Main Branch with `mb update`, turn off agents' self-update, and
-  reboot in a window you choose. Firmware and BIOS updates happen only with
+  Turn off agents' self-update and move tool versions one at a time, testing
+  after each; on a box with a shared tool tree, update Main Branch by moving
+  its pin there rather than running `mb update` in each account. Reboot in a
+  window you choose. Firmware and BIOS updates happen only with
   you at the machine. The reboot test below is what makes scheduled reboots
   safe.
 
