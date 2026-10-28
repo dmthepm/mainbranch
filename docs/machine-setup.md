@@ -193,6 +193,48 @@ closet:
 - Dell OptiPlex: *AC Recovery*, set to *Power On* (the default is *Power
   Off*).
 
+### Backup storage
+
+Plan backups in three layers. Each one covers a failure the others don't.
+
+1. **A local backup drive, from a different model or batch than the box's
+   own disk.** Two disks from the same batch can share a defect, so a
+   different maker or batch lowers that risk. It doesn't protect against a
+   shared power fault, a deletion or a compromised box; that's what the
+   off-site copy is for. Copy onto it every night.
+2. **An off-site copy, kept no matter what.** A local drive doesn't survive a
+   fire, a theft or a power surge that takes out the box. Use an encrypted,
+   versioned backup tool with a cloud storage bucket (for example restic with
+   Backblaze B2), so deleted or damaged files can be restored from an earlier
+   night. Keep the backup password somewhere separate and recoverable, such
+   as your password manager: without it the encrypted copy can't be read.
+   Test a restore from another machine, without the box.
+3. **Restore drills.** A backup counts only after you have restored from it.
+   Restore a real folder from each layer before any business data goes on
+   the box, then on a schedule.
+
+**Set up the local drive so you notice when it fails:**
+
+- Mount it by its filesystem UUID, not by a device name like `/dev/sdb`,
+  which can change between boots.
+- Check its health (SMART) regularly. Many USB enclosures hide SMART data.
+  An enclosure whose USB bridge is listed in the smartmontools USB database
+  is a good sign, not a guarantee. Test your actual enclosure and drive when
+  they arrive: if `smartctl` can't read the drive's health through it, return
+  it. Readable health data warns you early; it doesn't make a drive
+  reliable.
+- Have the nightly copy fail loudly if the drive is missing or not mounted,
+  so it never fills the box's own disk instead.
+
+**Drive picks.** Prices were seen at large US retailers in August to
+October 2026. Drive prices have been moving quickly, so check before you buy.
+
+| Option | Example | Notes |
+|---|---|---|
+| Recommended | A NAS-rated CMR drive, such as WD Red Plus 8 TB (WD80EFPX), in a single-bay USB enclosure that passes SMART | CMR, rated for 180 TB a year of workload, 3-year warranty. About $260 to $375 for the bare drive, plus the enclosure. |
+| Simpler | A desktop external drive, such as WD Elements 8 TB | About $380 to $420. Fine for a nightly copy that lets the drive spin down between runs. Check its SMART reporting the same way. |
+| Only if USB proves unreliable | A 2-bay NAS with mirrored drives | Costs and maintenance go up. A mirror protects against one drive failing, but it is not a backup on its own: keep the off-site copy. |
+
 ---
 
 ## Part 3: The operating system
