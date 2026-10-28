@@ -2275,8 +2275,8 @@ def render_codex_plugin_manifest() -> str:
             "and business-repo guidance."
         ),
         "author": {"name": "Noontide"},
-        "homepage": "https://github.com/noontide-co/mainbranch",
-        "repository": "https://github.com/noontide-co/mainbranch",
+        "homepage": "https://github.com/dmthepm/mainbranch",
+        "repository": "https://github.com/dmthepm/mainbranch",
         "license": "MIT",
         "keywords": ["main-branch", "mainbranch", "business-memory"],
         "interface": {
@@ -2291,7 +2291,7 @@ def render_codex_plugin_manifest() -> str:
             "developerName": "Noontide",
             "category": "Productivity",
             "capabilities": ["Interactive", "Read", "Write"],
-            "websiteURL": "https://github.com/noontide-co/mainbranch",
+            "websiteURL": "https://github.com/dmthepm/mainbranch",
             "defaultPrompt": [
                 "Use /mb-start to start this Main Branch business day",
                 "Use /mb-help to show supported Main Branch Codex commands",

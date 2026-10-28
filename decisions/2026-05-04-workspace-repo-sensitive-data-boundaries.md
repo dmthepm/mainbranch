@@ -8,10 +8,10 @@ linked_decisions:
   - decisions/2026-05-02-github-native-business-os.md
   - decisions/2026-05-04-sidecar-enrichment-cli-contract.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/274
-  - https://github.com/noontide-co/mainbranch/issues/275
-  - https://github.com/noontide-co/mainbranch/issues/120
-  - https://github.com/noontide-co/mainbranch/issues/128
+  - https://github.com/dmthepm/mainbranch/issues/274
+  - https://github.com/dmthepm/mainbranch/issues/275
+  - https://github.com/dmthepm/mainbranch/issues/120
+  - https://github.com/dmthepm/mainbranch/issues/128
 participants: [Devon, Codex]
 tags: [v0-3, state-model, workspace, dashboard, privacy, markdown]
 ---

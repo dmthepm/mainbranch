@@ -751,7 +751,7 @@ secret values, ids, or item names.
 
 This is the **business folder** (operating memory) for [Business Name].
 
-It uses [Main Branch](https://github.com/noontide-co/mainbranch): the `mb`
+It uses [Main Branch](https://github.com/dmthepm/mainbranch): the `mb`
 CLI checks facts and the skills turn those facts into business work.
 
 ### Setup

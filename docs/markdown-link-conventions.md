@@ -77,7 +77,7 @@ Allowed external references:
 
 ```yaml
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/274
+  - https://github.com/dmthepm/mainbranch/issues/274
 ```
 
 Use external URLs for public issue, PR, release, or source links. Use
@@ -234,7 +234,7 @@ the same as access.
 Use public URLs when the target is public:
 
 ```markdown
-See [Main Branch issue #274](https://github.com/noontide-co/mainbranch/issues/274).
+See [Main Branch issue #274](https://github.com/dmthepm/mainbranch/issues/274).
 ```
 
 Use a plain-text repo/path reference when the target may be private and

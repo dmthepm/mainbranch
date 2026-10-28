@@ -1,7 +1,7 @@
 ---
 title: Legacy business repo migration dogfood
 date: 2026-05-04
-linked_issue: https://github.com/noontide-co/mainbranch/issues/222
+linked_issue: https://github.com/dmthepm/mainbranch/issues/222
 linked_linear: MAIN-193
 release: v0.2.3
 status: completed
@@ -25,17 +25,17 @@ contain legacy setup language.
 
 Follow-up issues:
 
-- [#242](https://github.com/noontide-co/mainbranch/issues/242) - Make `mb
+- [#242](https://github.com/dmthepm/mainbranch/issues/242) - Make `mb
   migrate check` privacy-safe for legacy repo diffs.
-- [#243](https://github.com/noontide-co/mainbranch/issues/243) - Honor or
+- [#243](https://github.com/dmthepm/mainbranch/issues/243) - Honor or
   reject root `--repo` for `mb migrate status`.
-- [#244](https://github.com/noontide-co/mainbranch/issues/244) - Clean stale
+- [#244](https://github.com/dmthepm/mainbranch/issues/244) - Clean stale
   engine paths when repairing Claude Code skill wiring.
-- [#245](https://github.com/noontide-co/mainbranch/issues/245) - Skip OS
+- [#245](https://github.com/dmthepm/mainbranch/issues/245) - Skip OS
   metadata files during path migration.
-- [#246](https://github.com/noontide-co/mainbranch/issues/246) - Add repair path
+- [#246](https://github.com/dmthepm/mainbranch/issues/246) - Add repair path
   for legacy frontmatter validation failures after migration.
-- [#247](https://github.com/noontide-co/mainbranch/issues/247) - Remove legacy
+- [#247](https://github.com/dmthepm/mainbranch/issues/247) - Remove legacy
   setup copy from bundled skills.
 
 ## Scope Tested

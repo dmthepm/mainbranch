@@ -1,7 +1,7 @@
 ---
 title: Meta Ads connect setup UX notes
 date: 2026-05-12
-linked_issue: https://github.com/noontide-co/mainbranch/issues/542
+linked_issue: https://github.com/dmthepm/mainbranch/issues/542
 linked_linear: MAIN-350
 release: unreleased
 status: notes

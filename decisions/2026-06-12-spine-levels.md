@@ -4,7 +4,7 @@ date: 2026-06-12
 status: proposed
 topic: Spine levels — the contact+event spine as a declared position
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/814
+  - https://github.com/dmthepm/mainbranch/issues/814
 participants: [Devon, Claude]
 tags: [spine, contacts, events, data-ownership, mcp, levels]
 ---

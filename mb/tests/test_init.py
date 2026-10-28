@@ -31,7 +31,7 @@ def _assert_claude_md_cli_first_contract(text: str) -> None:
     # Hybrid plugin rail (Stage 3 / #924): the plugin is durable across Claude
     # Desktop + terminal, while the project-local bridge preserves the friendly
     # `/mb-start` user command.
-    assert "claude plugin marketplace add noontide-co/mainbranch" in text
+    assert "claude plugin marketplace add dmthepm/mainbranch" in text
     assert "normal user command stays `/mb-start`" in text
     assert "/mainbranch:mb-start" in text
     assert "plugin smoke/diagnostic command" in text

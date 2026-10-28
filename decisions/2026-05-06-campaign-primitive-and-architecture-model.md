@@ -5,9 +5,9 @@ status: accepted
 agent_visibility: historical_context_only
 topic: Campaign primitive and architecture model
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/321
-  - https://github.com/noontide-co/mainbranch/issues/323
-  - https://github.com/noontide-co/mainbranch/issues/324
+  - https://github.com/dmthepm/mainbranch/issues/321
+  - https://github.com/dmthepm/mainbranch/issues/323
+  - https://github.com/dmthepm/mainbranch/issues/324
 linked_decisions:
   - decisions/2026-05-06-business-repo-folder-model-reference-deprecation.md
   - decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md

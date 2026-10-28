@@ -4,7 +4,7 @@ date: 2026-05-13
 status: accepted
 topic: Provider CLI/API and mb wrapper boundary
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/585
+  - https://github.com/dmthepm/mainbranch/issues/585
 linked_decisions:
   - decisions/2026-05-04-sidecar-enrichment-cli-contract.md
   - decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md

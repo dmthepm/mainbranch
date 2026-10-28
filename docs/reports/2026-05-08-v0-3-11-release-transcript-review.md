@@ -89,7 +89,7 @@ slash-command discovery.
 ## Follow-Up Route
 
 - Keep this note attached to
-  [#426](https://github.com/noontide-co/mainbranch/issues/426) as the
+  [#426](https://github.com/dmthepm/mainbranch/issues/426) as the
   release-candidate transcript review for the branch.
 - Open a focused harness/runtime issue only if the final PyPI
   release-acceptance run still denies read-only `mb` grounding commands after

@@ -2597,7 +2597,7 @@ def test_status_since_last_check_includes_grouped_journal(tmp_path: Path, monkey
         "pushes/workshop/push.md",
         "# Workshop\n",
         "[shipped] workshop lander",
-        "Refs:\n- pushes/workshop/push.md\n- https://github.com/noontide-co/mainbranch/issues/303",
+        "Refs:\n- pushes/workshop/push.md\n- https://github.com/dmthepm/mainbranch/issues/303",
     )
     second = runner.invoke(app, ["status", str(repo), "--json", "--peek"])
 
@@ -3385,11 +3385,11 @@ def test_status_empty_bet_deadline_does_not_fall_back_to_opened_filename(tmp_pat
 
 
 def test_status_low_level_helpers_handle_edge_cases(tmp_path: Path, monkeypatch) -> None:
-    assert status_mod._repo_full_name("git@github.com:noontide-co/mainbranch.git") == (
-        "noontide-co/mainbranch"
+    assert status_mod._repo_full_name("git@github.com:dmthepm/mainbranch.git") == (
+        "dmthepm/mainbranch"
     )
-    assert status_mod._repo_full_name("https://github.com/noontide-co/mainbranch.git") == (
-        "noontide-co/mainbranch"
+    assert status_mod._repo_full_name("https://github.com/dmthepm/mainbranch.git") == (
+        "dmthepm/mainbranch"
     )
     assert status_mod._repo_full_name("https://github.com/noontide-co/some.io.git") == (
         "noontide-co/some.io"
@@ -3580,11 +3580,11 @@ def test_status_github_authenticated_branches(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr(status_mod, "_gh_json", fake_gh_json)
     github = status_mod._github(
         tmp_path,
-        {"remote": "https://github.com/noontide-co/mainbranch.git"},
+        {"remote": "https://github.com/dmthepm/mainbranch.git"},
     )
 
     assert github["authenticated"] is True
-    assert github["repo"] == "noontide-co/mainbranch"
+    assert github["repo"] == "dmthepm/mainbranch"
     assert github["assigned_issues"][0]["number"] == 173
     assert github["sections"]["assigned_tasks"][0]["type"] == "task"
     assert github["summary"]["assigned_tasks"] == 1
@@ -3683,7 +3683,7 @@ def test_status_github_activity_business_sections(tmp_path: Path, monkeypatch) -
     monkeypatch.setattr(status_mod, "_gh_json", fake_gh_json)
     github = status_mod._github(
         tmp_path,
-        {"remote": "https://github.com/noontide-co/mainbranch.git"},
+        {"remote": "https://github.com/dmthepm/mainbranch.git"},
     )
 
     sections = github["sections"]
@@ -4401,7 +4401,7 @@ def test_status_runtime_claude_repair_is_plugin_first_when_missing(
 
     claude_code = report["runtime"]["claude_code"]
     assert claude_code["found"] is False
-    assert "noontide-co/mainbranch" in claude_code["repair"]
+    assert "dmthepm/mainbranch" in claude_code["repair"]
     assert "Claude Desktop" in claude_code["repair"]
 
 

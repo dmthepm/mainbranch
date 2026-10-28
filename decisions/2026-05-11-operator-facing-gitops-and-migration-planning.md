@@ -4,7 +4,7 @@ date: 2026-05-11
 status: accepted
 topic: Operator-facing GitOps and major migration planning
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/463
+  - https://github.com/dmthepm/mainbranch/issues/463
 linked_decisions:
   - decisions/2026-05-01-mb-cli-vs-agent-workflows-boundary.md
   - decisions/2026-05-02-github-native-business-os.md
@@ -345,7 +345,7 @@ Revisit if any of these turn out to be wrong:
 
 ## Related links
 
-- [GitOps issue #463](https://github.com/noontide-co/mainbranch/issues/463)
+- [GitOps issue #463](https://github.com/dmthepm/mainbranch/issues/463)
 - [CLI vs agent workflows boundary](2026-05-01-mb-cli-vs-agent-workflows-boundary.md)
 - [Operator loops taxonomy](2026-05-05-operator-loops-taxonomy.md)
 - [Operator-readable git history](2026-05-05-operator-readable-git-history.md)

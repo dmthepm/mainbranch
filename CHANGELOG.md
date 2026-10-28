@@ -11,6 +11,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Changed
+
+- Main Branch now lives at https://github.com/dmthepm/mainbranch. Links,
+  package metadata, the update check, the issue helper and the plugin
+  marketplace name point there. The old `noontide-co/mainbranch` address
+  redirects, so existing installs keep working. Repos whose plugin wiring names
+  the old address still count as wired and are not rewritten. Generated repo
+  guidance names the new address, so `mb update` may offer a guidance refresh.
+
 ## [0.6.16] - 2026-10-25
 
 ### Added
@@ -1750,7 +1759,7 @@ of cold-eyes onboard fixes.
 
 - Claude Code plugin distribution is now a real, installable rail:
   `.claude-plugin/marketplace.json` ships in the repo and the wheel
-  (`claude plugin marketplace add noontide-co/mainbranch` works), and
+  (`claude plugin marketplace add dmthepm/mainbranch` works), and
   `mb skill link --plugin` writes worktree-durable plugin wiring into the
   business repo's tracked `.claude/settings.json` (parallel to the symlink
   rail). Skill discovery survives fresh worktrees once the plugin is
@@ -4522,7 +4531,7 @@ sections below cover what shipped in PRs #114 / #115 / #116 / #117 /
 ### Added — final public release prep (PRs #153 / #160 / #161)
 
 - **MIT LICENSE** at repo root for the public release.
-- **Public repo metadata and docs** moved to `noontide-co/mainbranch`.
+- **Public repo metadata and docs** moved to `dmthepm/mainbranch`.
   README, beginner setup, package URLs, publish workflow comments, and
   template docs now point at the new public repo path.
 - **PyPI trusted-publisher target** locked to

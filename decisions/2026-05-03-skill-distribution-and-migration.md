@@ -4,10 +4,10 @@ date: 2026-05-03
 status: accepted
 topic: Skill distribution and runtime migration model
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/236
-  - https://github.com/noontide-co/mainbranch/issues/234
-  - https://github.com/noontide-co/mainbranch/issues/237
-  - https://github.com/noontide-co/mainbranch/issues/238
+  - https://github.com/dmthepm/mainbranch/issues/236
+  - https://github.com/dmthepm/mainbranch/issues/234
+  - https://github.com/dmthepm/mainbranch/issues/237
+  - https://github.com/dmthepm/mainbranch/issues/238
 participants: [Devon, Codex]
 tags: [v0-2, skills, runtime-adapters, claude-code, migration, decision]
 ---
@@ -134,7 +134,7 @@ because the issue explicitly disallows rewriting wiring in this PR — but
 the destination should not drift.
 
 [skills-docs]: https://code.claude.com/docs/en/skills
-[issue-234]: https://github.com/noontide-co/mainbranch/issues/234
+[issue-234]: https://github.com/dmthepm/mainbranch/issues/234
 
 ### Evidence From Peer Claude Code Skill Repos
 
@@ -303,8 +303,8 @@ Anthropic's plugin surfaces. This is the highest-leverage exposure
 channel for new audiences who already use Claude Code and browse for
 plugins. Recommendation: **target this as the durable destination.**
 Main Branch should publish its plugin manifest at
-`noontide-co/mainbranch` and let users install via
-`/plugin marketplace add noontide-co/mainbranch`. Discoverability,
+`dmthepm/mainbranch` and let users install via
+`/plugin marketplace add dmthepm/mainbranch`. Discoverability,
 trust signal, and namespacing all come for free.
 
 **Vercel's `npx skills@latest` CLI.** A generic agent-skills installer
@@ -344,7 +344,7 @@ shipping a Node-side installer.
 
 **Exposure read-through.** The plugin marketplace is the strongest
 discoverability bet that does not depend on the maintainer's existing
-audience. Publishing under `noontide-co/mainbranch` puts Main Branch in
+audience. Publishing under `dmthepm/mainbranch` puts Main Branch in
 the same surface where new Claude Code users find compound engineering
 and similar tools. Three things compound this: a clean plugin manifest,
 a vendor prefix (or namespace) that does not embarrass us when listed
@@ -391,7 +391,7 @@ below; the praise was set aside.
   Secondary community hubs reportedly include `buildwithclaude.com`,
   `claudepluginhub.com`, and `claudemarketplaces.com`; verifying their
   reach is not load-bearing for this decision. **Implication:**
-  publishing under `noontide-co/mainbranch` reaches the in-app Discover
+  publishing under `dmthepm/mainbranch` reaches the in-app Discover
   surface only if the marketplace is added by the user (which `mb` can
   automate). Reach into the official `claude-plugins-official` listing
   is gated by Anthropic approval.
@@ -768,21 +768,21 @@ Kill the plugin path, or defer it, if:
 
 Concrete follow-ups should be separate from this decision:
 
-1. Implement [#234](https://github.com/noontide-co/mainbranch/issues/234):
+1. Implement [#234](https://github.com/dmthepm/mainbranch/issues/234):
    stale global Claude Code skill shadow detection and safe
    migration.
-2. Add [#237](https://github.com/noontide-co/mainbranch/issues/237): a Claude
+2. Add [#237](https://github.com/dmthepm/mainbranch/issues/237): a Claude
    Code plugin packaging spike with fresh-repo and migrated-repo runtime smoke.
-3. Define [#238](https://github.com/noontide-co/mainbranch/issues/238): the
+3. Define [#238](https://github.com/dmthepm/mainbranch/issues/238): the
    first runtime adapter contract document or JSON shape before adding Codex,
    Cursor, OpenClaw, Hermes, Paperclip-adjacent orchestration, or local runtime
    behavior.
-4. Implement [#240](https://github.com/noontide-co/mainbranch/issues/240):
+4. Implement [#240](https://github.com/dmthepm/mainbranch/issues/240):
    rename bundled skills to a `mb-` vendor prefix alongside the #237
    plugin spike. Include a slash-alias smoke if Claude Code supports it;
    otherwise document the one-time UX change. Pattern reference:
    Compound Engineering's CI-enforced `ce-` prefix.
-5. Implement [#241](https://github.com/noontide-co/mainbranch/issues/241):
+5. Implement [#241](https://github.com/dmthepm/mainbranch/issues/241):
    add bundled-skill-name lint to `mb` so future skills cannot ship
    without the chosen prefix (mirrors Compound Engineering's "test:
    enforce ce- prefix on skills and agents" gate).

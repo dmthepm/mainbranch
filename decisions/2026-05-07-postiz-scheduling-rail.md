@@ -8,7 +8,7 @@ linked_decisions:
   - decisions/2026-05-04-sidecar-enrichment-cli-contract.md
   - decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/352
+  - https://github.com/dmthepm/mainbranch/issues/352
 participants: [Devon, Codex]
 tags: [v0-3, integrations, social, postiz, onboarding, self-hosting]
 ---

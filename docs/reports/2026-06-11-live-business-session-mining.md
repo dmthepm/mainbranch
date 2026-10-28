@@ -2,7 +2,7 @@
 
 > Source: an 11-day continuous Claude Code operating session on a real
 > business we built and operate. Business-identifying details are removed;
-> the full named teardown lives in the paid community. Synthesis date: 2026-06-11. Engine repo: `noontide-co/mainbranch`.
+> the full named teardown lives in the paid community. Synthesis date: 2026-06-11. Engine repo: `dmthepm/mainbranch`.
 
 ## What this is
 

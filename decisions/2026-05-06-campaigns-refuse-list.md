@@ -4,7 +4,7 @@ date: 2026-05-06
 status: accepted
 topic: Campaigns refuse-list — fields the engine will not add
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/328
+  - https://github.com/dmthepm/mainbranch/issues/328
 linked_decisions:
   - decisions/2026-05-06-campaign-primitive-and-architecture-model.md
   - decisions/2026-05-06-main-branch-operating-spine.md

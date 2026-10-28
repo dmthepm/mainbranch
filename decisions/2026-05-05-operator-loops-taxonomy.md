@@ -7,7 +7,7 @@ linked_decisions:
   - decisions/2026-05-02-github-native-business-os.md
   - decisions/2026-05-01-mb-cli-vs-agent-workflows-boundary.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/306
+  - https://github.com/dmthepm/mainbranch/issues/306
 participants: [Devon, Claude (8 research subagents across 2 rounds)]
 tags: [v0-3, loops, taxonomy, architecture, foundation]
 ---

@@ -8,8 +8,8 @@ linked_decisions:
   - decisions/2026-05-04-skill-cli-runtime-adapter-contract.md
   - decisions/2026-05-13-shared-workflow-source-and-runtime-shells.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/236
-  - https://github.com/noontide-co/mainbranch/issues/237
+  - https://github.com/dmthepm/mainbranch/issues/236
+  - https://github.com/dmthepm/mainbranch/issues/237
 participants: [Devon, Claude]
 tags: [skills, runtime-adapters, claude-code, plugins, distribution, worktrees]
 ---

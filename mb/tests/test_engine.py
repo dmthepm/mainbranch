@@ -548,7 +548,7 @@ def test_plugin_wiring_write_and_status(tmp_path: Path) -> None:
     settings = json_mod.loads((tmp_path / ".claude" / "settings.json").read_text(encoding="utf-8"))
     assert settings["extraKnownMarketplaces"]["mainbranch"]["source"] == {
         "source": "github",
-        "repo": "noontide-co/mainbranch",
+        "repo": "dmthepm/mainbranch",
     }
     assert settings["enabledPlugins"]["mainbranch@mainbranch"] is True
 
@@ -558,6 +558,27 @@ def test_plugin_wiring_write_and_status(tmp_path: Path) -> None:
 
     assert engine_mod.plugin_wiring_status(tmp_path)["wired"] is True
     assert engine_mod.link_status(tmp_path)["plugin"]["wired"] is True
+
+
+def test_plugin_wiring_accepts_pre_move_repo_without_rewriting(tmp_path: Path) -> None:
+    import json as json_mod
+
+    path = tmp_path / ".claude" / "settings.json"
+    path.parent.mkdir(parents=True)
+    legacy = {
+        "extraKnownMarketplaces": {
+            "mainbranch": {"source": {"source": "github", "repo": "noontide-co/mainbranch"}}
+        },
+        "enabledPlugins": {"mainbranch@mainbranch": True},
+    }
+    path.write_text(json_mod.dumps(legacy), encoding="utf-8")
+
+    assert engine_mod.plugin_wiring_status(tmp_path)["wired"] is True
+
+    result = engine_mod.write_plugin_wiring(tmp_path)
+    assert result["ok"] is True
+    assert result["changed"] is False
+    assert json_mod.loads(path.read_text(encoding="utf-8")) == legacy
 
 
 def test_plugin_wiring_preserves_existing_settings(tmp_path: Path) -> None:
@@ -583,7 +604,7 @@ def test_plugin_wiring_preserves_existing_settings(tmp_path: Path) -> None:
     assert settings["permissions"]["allow"] == ["Bash(ls:*)"]
     assert settings["extraKnownMarketplaces"]["other"]["source"]["repo"] == "a/b"
     assert settings["extraKnownMarketplaces"]["mainbranch"]["source"]["repo"] == (
-        "noontide-co/mainbranch"
+        "dmthepm/mainbranch"
     )
 
 

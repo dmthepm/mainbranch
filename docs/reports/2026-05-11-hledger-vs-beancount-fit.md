@@ -1,7 +1,7 @@
 ---
 title: hledger vs Beancount fit for mb books
 date: 2026-05-11
-linked_issue: https://github.com/noontide-co/mainbranch/issues/483
+linked_issue: https://github.com/dmthepm/mainbranch/issues/483
 linked_linear: MAIN-320
 release: unscheduled
 status: complete

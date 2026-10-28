@@ -1406,7 +1406,11 @@ def install_mode() -> str:
 
 
 PLUGIN_MARKETPLACE_NAME = "mainbranch"
-PLUGIN_REPO = "noontide-co/mainbranch"
+PLUGIN_REPO = "dmthepm/mainbranch"
+# The engine moved from noontide-co to dmthepm on 28 Oct 2026. GitHub redirects
+# the old name, so repos wired before the move stay wired; rewriting their
+# tracked settings would only churn every business repo.
+PLUGIN_REPO_ALIASES = (PLUGIN_REPO, "noontide-co/mainbranch")
 PLUGIN_ENABLE_KEY = "mainbranch@mainbranch"
 PLUGIN_INSTALL_COMMAND = (
     "claude plugin marketplace update mainbranch && "
@@ -1436,7 +1440,7 @@ def plugin_wiring_status(repo: str | Path) -> dict[str, Any]:
     marketplace_known = bool(
         isinstance(source, dict)
         and source.get("source") == "github"
-        and source.get("repo") == PLUGIN_REPO
+        and source.get("repo") in PLUGIN_REPO_ALIASES
     )
     enabled_plugins = settings.get("enabledPlugins")
     plugin_enabled = bool(
@@ -1697,7 +1701,10 @@ def write_plugin_wiring(repo: str | Path) -> dict[str, Any]:
     if not isinstance(marketplaces, dict):
         marketplaces = {}
         settings["extraKnownMarketplaces"] = marketplaces
-    marketplaces[PLUGIN_MARKETPLACE_NAME] = {"source": {"source": "github", "repo": PLUGIN_REPO}}
+    if not before["marketplace_known"]:
+        marketplaces[PLUGIN_MARKETPLACE_NAME] = {
+            "source": {"source": "github", "repo": PLUGIN_REPO}
+        }
     enabled = settings.setdefault("enabledPlugins", {})
     if not isinstance(enabled, dict):
         enabled = {}

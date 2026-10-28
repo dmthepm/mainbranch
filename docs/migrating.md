@@ -332,7 +332,7 @@ that link step, Main Branch also moves provably stale or broken personal
 symlinks with Main Branch skill names into a timestamped backup.
 
 If you use the Claude Code plugin rail, also re-add the Main Branch plugin after
-updating (`claude plugin marketplace add noontide-co/mainbranch`) and restart
+updating (`claude plugin marketplace add dmthepm/mainbranch`) and restart
 Claude Code. The symlink repair path remains the fallback and repair path; the
 plugin is the more durable route for fresh Claude Code worktrees.
 

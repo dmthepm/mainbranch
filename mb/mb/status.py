@@ -3877,9 +3877,9 @@ def _runtime(repo: Path) -> dict[str, Any]:
             else (
                 "The `claude` CLI is not on PATH — fine for the Claude Desktop app: "
                 "install the Main Branch plugin from + -> Plugins -> "
-                "`noontide-co/mainbranch`. For terminal use, install the CLI "
+                "`dmthepm/mainbranch`. For terminal use, install the CLI "
                 "(https://claude.ai/install), then "
-                "`claude plugin marketplace add noontide-co/mainbranch`."
+                "`claude plugin marketplace add dmthepm/mainbranch`."
             ),
         },
         "skill_wiring": {

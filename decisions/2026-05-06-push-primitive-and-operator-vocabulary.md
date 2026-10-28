@@ -4,9 +4,9 @@ date: 2026-05-06
 status: accepted
 topic: Push primitive, operator vocabulary, and campaign compatibility
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/329
-  - https://github.com/noontide-co/mainbranch/issues/323
-  - https://github.com/noontide-co/mainbranch/issues/324
+  - https://github.com/dmthepm/mainbranch/issues/329
+  - https://github.com/dmthepm/mainbranch/issues/323
+  - https://github.com/dmthepm/mainbranch/issues/324
 linked_decisions:
   - decisions/2026-05-06-campaign-primitive-and-architecture-model.md
   - decisions/2026-05-06-main-branch-operating-spine.md
@@ -35,9 +35,9 @@ guessing:
 4. How existing `campaigns/` records keep working.
 
 It is decision-only. Deterministic implementation lives in
-[#323](https://github.com/noontide-co/mainbranch/issues/323).
+[#323](https://github.com/dmthepm/mainbranch/issues/323).
 Skill / runtime / migration code lives in
-[#324](https://github.com/noontide-co/mainbranch/issues/324).
+[#324](https://github.com/dmthepm/mainbranch/issues/324).
 
 ## 1. Canonical Engine Primitive
 

@@ -38,7 +38,7 @@ if [[ -z "$TARGET_DIR" ]]; then
 fi
 
 # Template repo URLs
-TEMPLATE_REPO="https://github.com/noontide-co/mainbranch-site-template-${TEMPLATE}.git"
+TEMPLATE_REPO="https://github.com/dmthepm/mainbranch-site-template-${TEMPLATE}.git"
 
 # --- Check prerequisites ---
 

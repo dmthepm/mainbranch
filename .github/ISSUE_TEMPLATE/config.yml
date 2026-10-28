@@ -1,13 +1,13 @@
 blank_issues_enabled: false
 contact_links:
   - name: Setup or usage help
-    url: https://github.com/noontide-co/mainbranch/blob/main/SUPPORT.md
+    url: https://github.com/dmthepm/mainbranch/blob/main/SUPPORT.md
     about: Read SUPPORT.md first — it routes you to the narrowest path for your problem.
   - name: Beginner setup walkthrough
-    url: https://github.com/noontide-co/mainbranch/blob/main/docs/beginner-setup.md
+    url: https://github.com/dmthepm/mainbranch/blob/main/docs/beginner-setup.md
     about: Step-by-step setup for new members.
   - name: Security report
-    url: https://github.com/noontide-co/mainbranch/blob/main/SECURITY.md
+    url: https://github.com/dmthepm/mainbranch/blob/main/SECURITY.md
     about: Do not file a public issue. See SECURITY.md for the private reporting paths.
   - name: Main Branch community (Skool)
     url: https://skool.com/main

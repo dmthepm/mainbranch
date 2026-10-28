@@ -22,7 +22,7 @@ _OLD_RUNTIME_SECTION = (
     "If `/mb-start` is not discoverable or Claude Code reports `Unknown command:\n"
     "/mb-start`, do not improvise from memory. The most common cause is that the\n"
     "Main Branch plugin is not installed or enabled — install it with\n"
-    "`claude plugin marketplace add noontide-co/mainbranch` and enable it (this\n"
+    "`claude plugin marketplace add dmthepm/mainbranch` and enable it (this\n"
     "works in the Claude Desktop app and the terminal). If you need to prove the\n"
     "plugin itself loaded, use the namespaced `/mainbranch:mb-start` command. If you\n"
     "are in a cloud/web session, plugins are unavailable there — use the Claude\n"

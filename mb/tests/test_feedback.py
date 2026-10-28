@@ -366,9 +366,7 @@ def test_every_secret_shape_is_scrubbed_in_every_field(state_home: Path, shape: 
 
 
 def test_scrub_keeps_ordinary_urls_and_words() -> None:
-    text = (
-        "see https://github.com/noontide-co/mainbranch/issues/986?tab=comments and the token flow"
-    )
+    text = "see https://github.com/dmthepm/mainbranch/issues/986?tab=comments and the token flow"
     assert feedback_mod.scrub(text) == text
 
 
@@ -414,11 +412,11 @@ def test_path_scrub_keeps_urls_slash_commands_and_home_tilde(
     home = tmp_path / "someone"
     monkeypatch.setenv("HOME", str(home))
     text = (
-        "run /mb-start, see https://github.com/noontide-co/mainbranch/blob/main/docs/feedback.md "
+        "run /mb-start, see https://github.com/dmthepm/mainbranch/blob/main/docs/feedback.md "
         f"and file://x.test/a/b, and {home}/biz/x.md, and/or 1/2"
     )
     assert feedback_mod.scrub(text) == (
-        "run /mb-start, see https://github.com/noontide-co/mainbranch/blob/main/docs/feedback.md "
+        "run /mb-start, see https://github.com/dmthepm/mainbranch/blob/main/docs/feedback.md "
         "and file://x.test/a/b, and ~/biz/x.md, and/or 1/2"
     )
 
@@ -600,7 +598,7 @@ def test_repo_kind_is_unknown_when_the_classifier_fails(
         "set max_tokens=100 and tokenizer=bpe",
         "author=Ana design=x signed=yes",
         "see ./docs/feedback.md and core/offer.md, and/or run /mb-start",
-        "file://x.test/a/b and https://github.com/noontide-co/mainbranch/pull/989",
+        "file://x.test/a/b and https://github.com/dmthepm/mainbranch/pull/989",
     ],
 )
 def test_scrub_keeps_ordinary_metadata(text: str) -> None:

@@ -376,7 +376,7 @@ Your business as files. Claude reads these; you edit them; git remembers them.
 Main Branch CLI facts are the source of truth for repo health, setup, runtime
 wiring, updates, graph/status signals, provider readiness, and repair paths.
 Main Branch installs as a Claude Code plugin
-(`claude plugin marketplace add noontide-co/mainbranch`, then enable it). The
+(`claude plugin marketplace add dmthepm/mainbranch`, then enable it). The
 plugin is the durable cross-surface rail, and `mb init` / `mb onboard` also
 keep the project-local bridge so the normal user command stays `/mb-start`.
 Plugin-native skills are namespaced, so `/mainbranch:mb-start` is the direct
@@ -476,7 +476,7 @@ next safe action. Put commands and git/GitHub details second.
 If `/mb-start` is not discoverable or Claude Code reports `Unknown command:
 /mb-start`, do not improvise from memory. The most common cause is that the
 Main Branch plugin is not installed or enabled — install it with
-`claude plugin marketplace add noontide-co/mainbranch` and enable it (this
+`claude plugin marketplace add dmthepm/mainbranch` and enable it (this
 works in the Claude Desktop app and the terminal). If you need to prove the
 plugin itself loaded, use the namespaced `/mainbranch:mb-start` command. If you
 are in a cloud/web session, plugins are unavailable there — use the Claude

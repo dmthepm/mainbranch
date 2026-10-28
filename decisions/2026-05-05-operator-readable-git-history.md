@@ -9,8 +9,8 @@ linked_decisions:
 linked_docs:
   - docs/operator-loops.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/300
-  - https://github.com/noontide-co/mainbranch/issues/306
+  - https://github.com/dmthepm/mainbranch/issues/300
+  - https://github.com/dmthepm/mainbranch/issues/306
 participants: [Devon, Codex]
 tags: [v0-3, git-history, checkpoints, operator-loops, reflect]
 ---
@@ -161,7 +161,7 @@ Next:
 Refs:
 - bets/2026-05-06-workshop-waitlist.md
 - decisions/2026-05-05-workshop-price.md
-- https://github.com/noontide-co/mainbranch/issues/300
+- https://github.com/dmthepm/mainbranch/issues/300
 ```
 
 Use `Refs:` when the commit touches or advances a durable object with an

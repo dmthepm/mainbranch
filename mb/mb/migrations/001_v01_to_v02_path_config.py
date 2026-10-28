@@ -55,7 +55,7 @@ date: 2026-05-02
 status: accepted
 topic: Main Branch v0.2 path migration
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/175
+  - https://github.com/dmthepm/mainbranch/issues/175
 ---
 
 # Main Branch v0.2 Path Migration

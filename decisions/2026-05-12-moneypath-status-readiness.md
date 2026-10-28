@@ -4,7 +4,7 @@ date: 2026-05-12
 status: accepted
 topic: MoneyPath status readiness model
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/528
+  - https://github.com/dmthepm/mainbranch/issues/528
 linked_decisions:
   - decisions/2026-05-01-mb-cli-vs-agent-workflows-boundary.md
   - decisions/2026-05-06-push-primitive-and-operator-vocabulary.md

@@ -19,7 +19,7 @@ from mb import doctor as doctor_mod
 from mb.engine import install_mode
 from mb.gitignore import gitignore_problem
 
-PUBLIC_REPO = "noontide-co/mainbranch"
+PUBLIC_REPO = "dmthepm/mainbranch"
 ISSUE_DRAFTS_RELATIVE_PATH = Path(".mb") / "issue-drafts"
 ISSUE_DRAFTS_GITIGNORE_ENTRY = ".mb/issue-drafts/"
 ISSUE_KINDS = {"bug", "feature", "question"}

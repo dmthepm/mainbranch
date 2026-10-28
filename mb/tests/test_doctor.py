@@ -2284,7 +2284,7 @@ def test_doctor_claude_code_detail_is_plugin_first_when_missing(
 
     check = next(c for c in report["checks"] if c["name"] == "claude-code")
     assert check["ok"] is False
-    assert "noontide-co/mainbranch" in check["detail"]
+    assert "dmthepm/mainbranch" in check["detail"]
 
 
 def test_doctor_claude_code_detail_is_path_when_present(tmp_path: Path, monkeypatch) -> None:

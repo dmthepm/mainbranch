@@ -4,7 +4,7 @@ date: 2026-05-13
 status: accepted
 topic: Agentic security review sidecars for releases and pull requests
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/554
+  - https://github.com/dmthepm/mainbranch/issues/554
 linked_decisions:
   - decisions/2026-05-11-supply-chain-security-gates.md
   - decisions/2026-05-11-repo-setup-visibility-and-checks-model.md

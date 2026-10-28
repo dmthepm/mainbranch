@@ -4,10 +4,10 @@ date: 2026-05-11
 status: accepted
 topic: How Main Branch connects notes, data, and history
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/468
-  - https://github.com/noontide-co/mainbranch/issues/469
-  - https://github.com/noontide-co/mainbranch/issues/470
-  - https://github.com/noontide-co/mainbranch/issues/471
+  - https://github.com/dmthepm/mainbranch/issues/468
+  - https://github.com/dmthepm/mainbranch/issues/469
+  - https://github.com/dmthepm/mainbranch/issues/470
+  - https://github.com/dmthepm/mainbranch/issues/471
 linked_decisions:
   - decisions/2026-05-09-obsidian-first-class-viewer.md
   - decisions/2026-05-02-github-native-business-os.md

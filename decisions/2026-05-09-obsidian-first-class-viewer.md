@@ -4,7 +4,7 @@ date: 2026-05-09
 status: accepted
 topic: Obsidian as a first-class optional viewer
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/455
+  - https://github.com/dmthepm/mainbranch/issues/455
 linked_decisions:
   - decisions/2026-05-08-business-repo-topology-map.md
   - decisions/2026-05-06-main-branch-operating-spine.md

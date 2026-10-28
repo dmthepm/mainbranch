@@ -248,5 +248,5 @@ Likely directions:
 - [business-file-contracts.md](business-file-contracts.md) for file-contract
   shape, guided-route findings, and covered/deferred contracts.
 - [CHANGELOG.md](../CHANGELOG.md) for what actually shipped.
-- [GitHub issues](https://github.com/noontide-co/mainbranch/issues) for
+- [GitHub issues](https://github.com/dmthepm/mainbranch/issues) for
   durable public work threads.
