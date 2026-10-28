@@ -18,8 +18,9 @@ Approve this shape before any code lands:
 2. a **fixed check registry** in `mb` code that uses the pack's check ids,
    where every default check maps to a section of
    [`docs/machine-setup.md`](../machine-setup.md);
-3. a **doctor JSON payload and exit codes**, with two proposals for security
-   review: `not_verified` as exit `3`, and an `attested` state.
+3. a **doctor JSON payload and exit codes**: exit precedence `2` > `1` > `3`
+   > `0`, where `3` means incomplete, and `attested` is owner evidence that
+   never counts as a pass.
 
 Design only. No code ships with this PRD.
 
@@ -56,15 +57,38 @@ What follows from them:
   `not_verified` (reason `needs_root`).
 - Doctor writes nothing and makes no network calls. Local sockets owned by an
   installed tool (`tailscale`) are reads.
-- Doctor never runs a tool to ask its version. A tool's version comes from its
-  install metadata on disk.
+- **Trusted executables only.**
+  - Doctor runs only system binaries from a fixed, per-OS allowlist of
+    absolute paths (for example `/usr/bin/systemctl`, `/usr/bin/lsblk`,
+    `/usr/bin/pacman`, `/usr/bin/pmset`). It never looks a name up on `PATH`.
+  - Before running one, doctor resolves symlinks and requires the real file
+    and every ancestor directory to be owned by root and not writable by
+    group or others. Otherwise the read is `not_verified`, reason
+    `untrusted_executable`.
+  - It never runs anything from the shared tool tree or from a path that
+    comes from a manifest, and never runs a tool to ask its version. Versions
+    come from install metadata or the package database.
+- **Bounded, confined file reads.**
+  - A read resolves the path, then requires the resolved path to stay inside
+    the registry's fixed prefix for that read (manifest-supplied paths
+    included).
+  - Reads open regular files only (no FIFOs, devices or sockets), with
+    `O_NOFOLLOW` on the last component, under a byte cap.
+  - Permission checks use `lstat`. A symlink where a directory or file is
+    expected is `not_verified`, reason `ambiguous_config`.
+- **Minimal environment.** Probes get a fixed environment: `LC_ALL=C`,
+  `PATH=/usr/bin:/bin`, and for `systemctl --user` only the running user's
+  own `XDG_RUNTIME_DIR`. Each probe has a 5 s timeout, and the run has an
+  overall timeout. A timed-out probe gives `not_verified`, reason
+  `probe_timeout`.
 - Each read keeps only named fields under a byte cap. No read needs a secret
   value, and none returns raw command output.
 - A manifest value reaches a probe's argv only as one whole element, and only
-  after schema validation. It never becomes `argv[0]` or a flag. Paths from
-  the manifest are read only under the fixed prefixes the schema allows.
-- Probes run with `LC_ALL=C`, a 5 s per-probe timeout and an overall timeout.
-  A timed-out probe gives `not_verified`, reason `probe_timeout`.
+  after schema validation. It never becomes `argv[0]` or a flag.
+- **Escaped display.** Text that came from a manifest (account names, skip
+  reasons, attestation notes) is limited to printable characters and 200
+  characters, and has control and escape sequences stripped before it
+  reaches a terminal. JSON output escapes it as usual.
 
 ## Platform detection
 
@@ -89,7 +113,20 @@ draft 2020-12, `manifest_version: 1`), with the engine deltas below. The pack
 names no file location, so this one is a proposal:
 `/etc/mainbranch/machine.json`, owned by root, readable by all, writable only
 through the admin's `sudo`. Agent accounts read it and can't change it, so an
-agent can't weaken its own checks. `--manifest PATH` overrides the location.
+agent can't weaken its own checks.
+
+- **Default path, trusted.**
+  - The file must be a regular file, not a symlink, owned by root and not
+    writable by group or others.
+  - Every ancestor directory up to `/` must be owned by root and not
+    writable by group or others.
+  - If any of that fails, `manifest.integrity` fails, no other checks run,
+    and the exit code is `1`.
+- **`--manifest PATH`, caller-selected.** The manifest is reported as
+  `"source": "caller_selected"`. Results are against a policy the caller
+  chose, not the machine's. `manifest.integrity` is `not_verified`, reason
+  `caller_selected_policy`, so such a run never exits `0`. Use it for
+  drafts and fixtures, not as an assurance.
 
 The pack's sections stay as they are: `labels`, `host`, `owner`,
 `businesses`, `shared_tools`, `runtime`, `remote_access`, `heavy_work`,
@@ -123,21 +160,45 @@ Engine-only `checks` section:
     {"id": "remote_access.tailscale-serve-named", "reason": "No Serve or Funnel on this box"}
   ],
   "attest": [
-    {"id": "host.power-on-after-loss", "answer": "yes", "date": "2026-10-28"},
-    {"id": "backups.restore-tested", "answer": "yes", "date": "2026-10-20"}
+    {"id": "host.power-on-after-loss", "read": "bios_power_on", "answer": "yes", "at": "2026-10-28T18:30:00Z"},
+    {"id": "backups.restore-tested", "read": "restore_test_attested", "answer": "yes", "at": "2026-10-20T09:00:00Z"}
   ]
 }
 ```
 
-- `skip` needs a reason. A skipped check is reported as `skipped` and never
-  counts as passing. Advanced checks can't be listed: a manifest can never
-  accept or reject them.
-- `attest` is accepted only for checks the registry marks as owner
-  attestations (`as: owner-attests`). `answer: "no"` gives `fail`.
-  `answer: "yes"` gives `attested` (proposal, see exit codes), and `fail` if
-  the date is older than the check's age limit from the manifest (for
-  example `backups.restore_test.max_age_days`). Attesting any other check is
-  a manifest error.
+- **`skip`** needs a reason.
+  - A skipped check is reported as `skipped` and never counts as passing.
+  - Skipping a baseline check that applies to this platform keeps the run
+    incomplete (exit `3`).
+  - Advanced checks can't be listed: a manifest can never accept or reject
+    them.
+- **`attest`** is keyed by check id and read name.
+  - The registry marks individual reads `attestable`, each with its own
+    expiry rule. Attesting a read that isn't attestable is a manifest error
+    (exit `2`).
+  - `at` is an RFC 3339 UTC timestamp. One in the future is a manifest error.
+- **Outcome of an attestable read:**
+
+  | Manifest says | Read outcome |
+  |---|---|
+  | Nothing for this read | `not_verified`, reason `attestation_missing` |
+  | `answer: "no"` | `fail` |
+  | `answer: "yes"`, within its expiry | `attested`: recorded owner evidence, shown as NOT VERIFIED (owner attested). Never `pass`. |
+  | `answer: "yes"`, past its expiry | `not_verified`, reason `attestation_stale` |
+  | `answer: "yes"`, past its expiry, where the attested fact is itself an age (`backups.fresh`, `backups.restore-tested`) | `fail` |
+
+- **Expiry rules**, compared at the precision of `at`:
+
+  | Read | Expires after |
+  |---|---|
+  | `backups.fresh` | `backups.max_age_hours`, in hours |
+  | `backups.restore-tested` | `restore_test.max_age_days` |
+  | BIOS power-on | 180 days |
+  | Firmware not auto-applied | 180 days |
+  | Sudoers reads | 90 days |
+  | Off-box LUKS header copy | 365 days |
+
+  No attestation lasts forever.
 
 Nothing from our own machine is in the engine's manifest or fixtures. The
 examples use the pack's synthetic names (`box-01`, `admin`, `biz-a-agent`)
@@ -172,6 +233,12 @@ role's checks as `not_verified`, reason `other_account`, so nothing silently
 disappears. A full picture means running doctor in the admin account and
 in each agent account. Combining those runs is a follow-up.
 
+A result always names its scope. Exit `0` means "every applicable baseline
+check visible to this account passed", never "the machine is healthy". The
+JSON carries `scope` and `run_as`. Human output says, for example, "All
+checks visible to `biz-a-agent` passed (scope: self; owner checks not
+run)".
+
 Columns: **U** Ubuntu LTS, **O** Omarchy, **M** macOS. `—` means not
 applicable on that OS. `att` means an owner attestation. `NV` means always
 `not_verified` there.
@@ -180,10 +247,10 @@ applicable on that OS. `att` means an owner attestation. `NV` means always
 
 | id | Src | Section | U | O | M | As | Reads; verdict |
 |---|---|---|---|---|---|---|---|
-| `host.os-release` | pack | [part-3-the-operating-system](../machine-setup.md#part-3-the-operating-system) | ✓ | ✓ | NV | any | Platform detection matches `host.os`. Fails on an interim Ubuntu release or a mismatch. On macOS it is `not_verified` (`platform_partial`), because the Linux controls don't apply there. Install-media check: `att`. |
+| `host.os-release` | pack | [part-3-the-operating-system](../machine-setup.md#part-3-the-operating-system) | ✓ | ✓ | NV | any | Platform detection matches `host.os`. Fails on an interim Ubuntu release or a mismatch. On macOS it is `not_verified` (`platform_partial`), because the Linux controls don't apply there. Install-media verification is an install-time step, not a doctor read. |
 | `host.no-sleep` | pack | [the-box-works-the-laptop-is-a-remote-control](../machine-setup.md#the-box-works-the-laptop-is-a-remote-control) | ✓ | ✓ | ✓ | any | `systemctl is-enabled` of the sleep, suspend and hibernate targets: pass only if all are `masked`. macOS: `pmset -g` `sleep 0`. |
-| `host.power-on-after-loss` | engine | [part-2-picking-a-machine](../machine-setup.md#part-2-picking-a-machine) | att | att | ✓ | owner-attests | BIOS isn't readable from Linux. macOS: `pmset -g` `autorestart 1`. Pack: `host.power.after_power_loss`. |
-| `host.disk-luks2-tpm` | pack | [ubuntu-lts-recommended-default](../machine-setup.md#ubuntu-lts-recommended-default) | ✓ | — | — | any | `lsblk -J`: a `crypt` device in `/`'s ancestry. `/etc/crypttab`: a `tpm2-device` option matches `host.disk.encryption`. LUKS2 header version: `not_verified` (`needs_root`). Off-box header copy: `att`. |
+| `host.power-on-after-loss` | engine | [part-2-picking-a-machine](../machine-setup.md#part-2-picking-a-machine) | att | att | ✓ | owner-attests | Attestable read `bios_power_on` (180 days): BIOS isn't readable from Linux. macOS: `pmset -g` `autorestart 1`, no attestation. Pack: `host.power.after_power_loss`. |
+| `host.disk-luks2-tpm` | pack | [ubuntu-lts-recommended-default](../machine-setup.md#ubuntu-lts-recommended-default) | ✓ | — | — | any | `lsblk -J`: a `crypt` device in `/`'s ancestry. `/etc/crypttab`: a `tpm2-device` option matches `host.disk.encryption`. LUKS2 header version: `not_verified` (`needs_root`). Attestable read `header_offbox` (365 days). `does_not_prove`: that the TPM binding covers a verified boot chain (Secure Boot state and PCR policy need root). |
 | `host.disk-luks2-tpm-arch` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | — | ✓ | — | any | `lsblk -J` as above, plus `/etc/crypttab.initramfs` or `/proc/cmdline` against `host.disk.encryption`. `luks2-passphrase` with `unattended_boot: false` passes (the pack's Omarchy example). |
 | `host.disk-filevault` | engine | [mac-or-linux-for-the-box](../machine-setup.md#mac-or-linux-for-the-box) | — | — | ✓ | any | `fdesetup status` says FileVault is on. |
 | `host.desktop-no-autologin` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | ✓ | — | ✓ | any | U: `/etc/gdm3/custom.conf` `AutomaticLoginEnable`. M: `com.apple.loginwindow autoLoginUser` absent. `not_applicable` when `host.desktop.session` is `none` and no display manager is installed. |
@@ -194,8 +261,8 @@ applicable on that OS. `att` means an owner attestation. `NV` means always
 
 | id | Src | Section | U | O | M | As | Reads; verdict |
 |---|---|---|---|---|---|---|---|
-| `owner.sudo-needs-password` | pack | [admin-account-and-agent-accounts](../machine-setup.md#admin-account-and-agent-accounts) | ✓+att | ✓+att | — | owner | Read: `owner.user` exists and is in `sudo` (U) or `wheel` (O). Attest: no `NOPASSWD` rule, because sudoers is root-only. |
-| `owner.no-sudo-into-business` | pack | [admin-account-and-agent-accounts](../machine-setup.md#admin-account-and-agent-accounts) | att | att | — | owner-attests | Sudoers is root-only. `does_not_prove`: root can still become any user (the admin stays trusted). |
+| `owner.sudo-needs-password` | pack | [admin-account-and-agent-accounts](../machine-setup.md#admin-account-and-agent-accounts) | ✓+att | ✓+att | — | owner | Read `owner_in_admin_group`: `owner.user` exists and is in `sudo` (U) or `wheel` (O). Attestable read `no_nopasswd` (90 days): sudoers is root-only. |
+| `owner.no-sudo-into-business` | pack | [admin-account-and-agent-accounts](../machine-setup.md#admin-account-and-agent-accounts) | att | att | — | owner-attests | Attestable read `no_runas_business` (90 days): sudoers is root-only. `does_not_prove`: root can still become any user (the admin stays trusted). |
 | `businesses.users-and-homes` | pack | [one-user-account-per-business](../machine-setup.md#one-user-account-per-business) | ✓ | ✓ | — | any + each-business | any: each user exists with its declared uid, inside `uid_range`; its home `stat` is `0700` and owned by it. each-business: umask `077`; no other business's home is listable. |
 | `businesses.no-privileged-groups` | pack | [admin-account-and-agent-accounts](../machine-setup.md#admin-account-and-agent-accounts) | ✓ | ✓ | — | any | Group lists: no business user in `sudo`, `adm`, `wheel`, `docker`, `lxd` or the owner's group. `does_not_prove`: a sudoers user rule (root-only). |
 | `businesses.private-tmpdir` | pack | [shared-tools-private-data](../machine-setup.md#shared-tools-private-data) | ✓ | ✓ | — | each-business | `$TMPDIR` is set, owned by the user, mode `0700`. |
@@ -225,15 +292,15 @@ applicable on that OS. `att` means an owner attestation. `NV` means always
 
 | id | Src | Section | U | O | M | As | Reads; verdict |
 |---|---|---|---|---|---|---|---|
-| `backups.fresh` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | att | att | — | owner-attests | The backup host is off the box. A dated attestation fails past `backups.max_age_hours`. |
-| `backups.restore-tested` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | ✓/att | ✓/att | — | owner | Reads `restore_test.record` (date and result only) if readable; otherwise uses the dated attestation. Fails past `max_age_days`. |
+| `backups.fresh` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | att | att | — | owner-attests | Attestable read `last_backup` (`max_age_hours`): the backup host is off the box. Stale means `fail`. |
+| `backups.restore-tested` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | ✓/att | ✓/att | — | owner | Read `restore_test_record`: `restore_test.record` (date and result only) if readable. Otherwise attestable read `restore_test_attested` (`max_age_days`). Stale means `fail`. |
 
 ### Remote access
 
 | id | Src | Section | U | O | M | As | Reads; verdict |
 |---|---|---|---|---|---|---|---|
 | `remote_access.sshd-keys-only` | pack | [managing-it-from-a-mac](../machine-setup.md#managing-it-from-a-mac) | ✓ | ✓ | ✓ | any | `sshd_config` and `sshd_config.d/*.conf`: password and keyboard-interactive off, pubkey on. `Match` blocks or an outside `Include`: `not_verified` (`ambiguous_config`). `sshd -T` needs root and isn't used. |
-| `remote_access.tailscale-version` | pack | [managing-it-from-a-mac](../machine-setup.md#managing-it-from-a-mac) | ✓ | ✓ | ✓ | any | `tailscale version` is at least `min_version`. `tailscale status --json` `BackendState` is `Running`. A missing CLI or denied socket: `not_verified`. |
+| `remote_access.tailscale-version` | pack | [managing-it-from-a-mac](../machine-setup.md#managing-it-from-a-mac) | ✓ | ✓ | NV | any | Version from the package database, not by running Tailscale (`dpkg-query -W tailscale` on U, `pacman -Q tailscale` on O), at least `min_version`. `tailscale status --json` (allowlisted system binary) `BackendState` is `Running`. A missing package or denied socket: `not_verified`. |
 | `remote_access.tailscale-no-ssh` | pack | [managing-it-from-a-mac](../machine-setup.md#managing-it-from-a-mac) | ✓ | ✓ | — | any | Tailscale prefs `RunSSH` is false. Denied: `not_verified`. |
 | `remote_access.tailscale-serve-named` | pack | [managing-it-from-a-mac](../machine-setup.md#managing-it-from-a-mac) | ✓ | ✓ | — | any | `tailscale serve status --json` ports are within `serve_ports`, and Funnel is off. Denied: `not_verified`. |
 | `remote_access.offbox-listeners` | pack | [managing-it-from-a-mac](../machine-setup.md#managing-it-from-a-mac) | ✓ | ✓ | — | any | `/proc/net/tcp` and `tcp6` (uid column, no root): no listener off loopback except sshd's port and tailscaled. |
@@ -248,8 +315,8 @@ applicable on that OS. `att` means an owner attestation. `NV` means always
 | `hardening.aur-reviewed` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | — | ✓ | — | any | `pacman -Qm` (foreign packages) is a subset of `aur_packages_reviewed`. |
 | `hardening.reboot-pending` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | ✓ | — | — | any | `/var/run/reboot-required`. `warn`. |
 | `hardening.reboot-pending-arch` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | — | ✓ | — | any | `/usr/lib/modules/$(uname -r)` is missing. `warn`. `does_not_prove`: a systemd or glibc update since boot. |
-| `hardening.firmware-manual` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | att | att | — | owner-attests | No automatic firmware apply. |
-| `manifest.integrity` | engine | [admin-account-and-agent-accounts](../machine-setup.md#admin-account-and-agent-accounts) | ✓ | ✓ | — | any | The running account can't write the manifest or its directory. With no manifest: `not_verified`, reason `no_manifest`, and only the checks that need no manifest values run. |
+| `hardening.firmware-manual` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | att | att | — | owner-attests | Attestable read `no_auto_firmware` (180 days). |
+| `manifest.integrity` | engine | [admin-account-and-agent-accounts](../machine-setup.md#admin-account-and-agent-accounts) | ✓ | ✓ | — | any | Default path: a regular file, not a symlink, root-owned, with every ancestor root-owned and not writable by group or others; it fails otherwise. `--manifest`: `not_verified`, reason `caller_selected_policy`. No manifest: `not_verified`, reason `no_manifest`, and only checks that need no manifest values run. |
 
 ### Not in the default set
 
@@ -383,14 +450,21 @@ The third result is trimmed to the fields that differ. The second shows the
 Field rules:
 
 - `state` is one of `pass`, `fail`, `warn`, `not_verified`, `attested`,
-  `skipped`, `not_applicable`. A check's state is the worst of its reads.
-  `severity` is what a failure would be.
+  `skipped`, `not_applicable`. `severity` is what a failure would be.
+- A check with several reads takes the worst read, in this order: `fail`,
+  `not_verified`, `attested`, `warn`, `pass`. Every read keeps its own
+  outcome in `reads`, so an attested read never turns into a pass, and a
+  passing read never hides a failed one.
+- `attested` is displayed as "NOT VERIFIED (owner attested)" with the
+  attestation time. In JSON and in `summary` it stays separate from both
+  `pass` and `not_verified`.
 - `reason` is set for every state except `pass` and `fail`, from a fixed
   enum: `needs_root`, `platform_unsupported`, `platform_partial`,
   `ambiguous_platform`, `ambiguous_config`, `probe_missing`,
-  `probe_timeout`, `probe_error`, `owner_attests`, `other_account`,
-  `no_manifest`, `skipped_by_manifest`, `advanced_pending`, `no_section`,
-  `location_unknown`. Reasons are never free text, so no stray paths or
+  `probe_timeout`, `probe_error`, `untrusted_executable`, `owner_attested`,
+  `attestation_missing`, `attestation_stale`, `other_account`, `no_manifest`,
+  `caller_selected_policy`, `skipped_by_manifest`, `advanced_pending`,
+  `no_section`, `location_unknown`. Reasons are never free text, so no stray paths or
   output leak.
 - `observed` holds only the parsed fields that a read selects: booleans,
   numbers, enums, modes. Never raw output, file contents, environment values
@@ -409,27 +483,39 @@ Field rules:
 
 ### Exit codes
 
+Exit codes follow a fixed precedence: `2`, then `1`, then `3`, then `0`.
+The first that applies wins.
+
 | Code | Meaning | `ok` |
 |---|---|---|
-| `0` | Healthy: no `fail` and no `not_verified`. `warn`, `attested`, `skipped` and `not_applicable` are allowed. | `true` |
-| `1` | At least one `fail`. | `false` |
-| `2` | Usage error, invalid or unreadable manifest, or internal error. No verdict. | `false` |
-| `3` | No `fail`, but at least one `not_verified`. | `false` |
+| `2` | Error: usage error, invalid or unreadable manifest, or internal error. No verdict. | `false` |
+| `1` | Failure: at least one `fail`. | `false` |
+| `3` | Incomplete: no `fail`, but at least one applicable baseline check is `not_verified`, `attested` or `skipped`. | `false` |
+| `0` | Every applicable baseline check in this run's scope passed. `warn` is allowed. | `true` |
 
-Proposals for security review:
+Exit meanings are specific to each command. Here, `3` means the run was
+incomplete, the difference between "failed" and "couldn't fully verify".
+Security approved it on 28 Oct 2026.
 
-- **Exit `3`.** It's new for `mb`, which elsewhere uses `0`/`1`/`2`. Without
-  it, a script that only checks for exit `0` would read "couldn't check" as
-  "healthy".
-- **`attested`.** It's never `pass`. It exists so exit `0` is reachable on
-  Linux, where some baseline facts can only be confirmed by the owner (BIOS
-  power-on, sudoers, an off-box backup). This follows the pack's
-  `owner-attests` checks, with one difference: the answer lives in the
-  admin-owned manifest, because doctor writes nothing. A "no" fails, and a
-  stale date fails.
+These don't block exit `0`:
 
-Expected today: Omarchy boxes exit `3` until the idle-lock location is
-confirmed. macOS always exits `3` (`host.os-release` is `platform_partial`).
+- `not_applicable` checks (another OS, or a desktop check when there is no
+  desktop);
+- advanced checks, which are outside the accepted baseline and never run.
+
+`attested` is recorded owner evidence, never a pass. It is shown as NOT
+VERIFIED (owner attested), counted on its own, and keeps the run at exit `3`.
+It follows the pack's `owner-attests` checks, with one difference: the
+answer lives in the root-owned manifest, because doctor writes nothing.
+
+So in practice, a Linux box with any owner-attested baseline fact (BIOS
+power-on, sudoers, an off-box backup) exits `3`, never `0`. That's
+deliberate: the owner sees which facts rest on their word. A consumer
+that wants "nothing failed" checks for exit codes `0` and `3`.
+
+Expected today: every Linux box exits `3` because of its attested reads.
+Omarchy boxes also have `host.screen-lock` NOT VERIFIED. macOS always exits
+`3` (`host.os-release` is `platform_partial`).
 
 ## Validation plan for the code batch
 
@@ -447,7 +533,25 @@ confirmed. macOS always exits `3` (`host.os-release` is `platform_partial`).
 - Static test:
   - no `shell=True` in machine-doctor code;
   - no `sudo`, `pkexec`, `doas` or `su` in any probe argv;
-  - no probe runs a path that comes from a manifest.
+  - no probe runs a path that comes from a manifest;
+  - every executable is an absolute path on the per-OS allowlist.
+- Trust tests:
+  - a user-writable binary placed earlier on `PATH` is never run;
+  - an allowlisted path whose real file, or an ancestor directory, is
+    group- or other-writable gives `untrusted_executable`;
+  - a `restore_test.record` symlinked outside its prefix is refused;
+  - a FIFO is never opened;
+  - a manifest account name or note containing escape sequences prints
+    inert.
+- Exit and attestation tests:
+  - precedence `2` > `1` > `3` > `0`;
+  - an attested, skipped or `not_verified` applicable baseline check never
+    gives `0`;
+  - an attestation that is missing, in the future, stale or "no" gives the
+    outcome in the attestation table;
+  - attesting a read that isn't attestable is a manifest error;
+  - `--manifest` never gives `0`;
+  - an untrusted default manifest fails with no other checks run.
 - Fixture tests per platform, from synthetic `os-release`, `lsblk`,
   `/proc/net/tcp`, `sshd_config`, `pacman.log` and `pmset` samples.
 - Real runs:
@@ -458,11 +562,12 @@ confirmed. macOS always exits `3` (`host.os-release` is `platform_partial`).
 
 ## Open questions
 
-1. Exit `3` and `attested`: proposals for security review (above).
+1. Exit `3` (approved) and `attested` (accepted only as non-passing
+   evidence): applied as ruled in the security review of 28 Oct 2026.
 2. `/etc/mainbranch/machine.json` as the default location: a proposal. The
    pack names none.
 3. Where does Omarchy 4 keep its idle-lock setting? `host.screen-lock` is
    NOT VERIFIED on Omarchy until it's confirmed.
 4. The v0-7 target in this file name is tentative.
 
-Next: security reviews the two proposals; then the code batch on #1248.
+Next: security re-reviews this revision; then the code batch on #1248.
