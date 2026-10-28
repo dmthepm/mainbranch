@@ -20,6 +20,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   the old address still count as wired and are not rewritten. Generated repo
   guidance names the new address, so `mb update` may offer a guidance refresh.
 
+### Fixed
+
+- `mb books doctor --repo` on a books workspace (no journals) no longer
+  reports a missing doctor command when `hledger` is installed.
+
 ## [0.6.16] - 2026-10-25
 
 ### Added
