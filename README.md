@@ -9,9 +9,9 @@
 <p align="center"><em>One folder for your offers, proof, research, decisions, launches, ads, pages, bets, and lessons, readable by Claude Code, Codex, and you.</em></p>
 
 <p align="center">
-  <a href="https://github.com/noontide-co/mainbranch/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/noontide-co/mainbranch?style=social"></a>
+  <a href="https://github.com/dmthepm/mainbranch/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/dmthepm/mainbranch?style=social"></a>
   <a href="https://pypi.org/project/mainbranch/"><img alt="PyPI" src="https://img.shields.io/pypi/v/mainbranch?label=PyPI"></a>
-  <a href="https://github.com/noontide-co/mainbranch/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/noontide-co/mainbranch/ci.yml?label=CI"></a>
+  <a href="https://github.com/dmthepm/mainbranch/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/dmthepm/mainbranch/ci.yml?label=CI"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <img alt="Claude Code" src="https://img.shields.io/badge/Claude%20Code-supported-black">
   <img alt="Codex" src="https://img.shields.io/badge/Codex-supported-blue">
@@ -80,7 +80,7 @@ this:
 
 ```text
 I want Main Branch: AI business memory I own as files in one folder
-(https://github.com/noontide-co/mainbranch). First read the entire README (fetch the raw file if your tools summarize),
+(https://github.com/dmthepm/mainbranch). First read the entire README (fetch the raw file if your tools summarize),
 then explore the repo enough to understand the architecture (the mb CLI is
 the deterministic control plane; skills are the judgment layer; my business
 lives in its own folder, never in the engine; bets, research, decisions,
@@ -412,7 +412,7 @@ that write approved business artifacts back into files you own.
 **I'm stuck.** In Claude Code, type `/mb-start` again. In Codex, use the global
 `mb-start` skill again. If `/mb-start` is not found at all, the Main Branch
 plugin may not be installed — add it with `claude plugin marketplace add
-noontide-co/mainbranch`, enable it, and restart Claude Code. The plugin-native
+dmthepm/mainbranch`, enable it, and restart Claude Code. The plugin-native
 diagnostic command is `/mainbranch:mb-start`; the friendly `/mb-start` command
 comes from the project-local bridge Main Branch keeps wired for users.
 
@@ -499,8 +499,8 @@ choices: [docs/dependency-choices.md](docs/dependency-choices.md).
 ## Community
 
 - [Skool community](https://skool.com/main) - watch us build with Main Branch
-- [GitHub Issues](https://github.com/noontide-co/mainbranch/issues) - bugs, feature requests and ideas
-- [Good first issues](https://github.com/noontide-co/mainbranch/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) - small, scoped issues for a first pull request
+- [GitHub Issues](https://github.com/dmthepm/mainbranch/issues) - bugs, feature requests and ideas
+- [Good first issues](https://github.com/dmthepm/mainbranch/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) - small, scoped issues for a first pull request
 
 ---
 

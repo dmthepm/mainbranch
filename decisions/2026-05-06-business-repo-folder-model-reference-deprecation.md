@@ -4,7 +4,7 @@ date: 2026-05-06
 status: accepted
 topic: Business repo folder model and reference deprecation
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/318
+  - https://github.com/dmthepm/mainbranch/issues/318
 linked_decisions:
   - decisions/2026-04-29-mb-vip-v0-1-0-master.md
 ---

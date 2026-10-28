@@ -87,7 +87,7 @@ claims.
 ## Follow-Up Route
 
 - Keep
-  [#539](https://github.com/noontide-co/mainbranch/issues/539) as the next
+  [#539](https://github.com/dmthepm/mainbranch/issues/539) as the next
   focused branch: make `/mb-start` route path-to-money prompts through
   `money_path` facts before freeform offer/ladder/decision file interpretation.
 - Keep the fix public-safe: no raw Noontide transcript text, no private

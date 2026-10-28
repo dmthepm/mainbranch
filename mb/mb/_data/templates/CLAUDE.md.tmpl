@@ -7,7 +7,7 @@ Your business as files. Claude reads these; you edit them; git remembers them.
 Main Branch CLI facts are the source of truth for repo health, setup, runtime
 wiring, updates, graph/status signals, provider readiness, and repair paths.
 Main Branch installs as a Claude Code plugin
-(`claude plugin marketplace add noontide-co/mainbranch`, then enable it). The
+(`claude plugin marketplace add dmthepm/mainbranch`, then enable it). The
 plugin is the durable cross-surface rail, and `mb init` / `mb onboard` also
 keep the project-local bridge so the normal user command stays `/mb-start`.
 Plugin-native skills are namespaced, so `/mainbranch:mb-start` is the direct
@@ -107,7 +107,7 @@ next safe action. Put commands and git/GitHub details second.
 If `/mb-start` is not discoverable or Claude Code reports `Unknown command:
 /mb-start`, do not improvise from memory. The most common cause is that the
 Main Branch plugin is not installed or enabled — install it with
-`claude plugin marketplace add noontide-co/mainbranch` and enable it (this
+`claude plugin marketplace add dmthepm/mainbranch` and enable it (this
 works in the Claude Desktop app and the terminal). If you need to prove the
 plugin itself loaded, use the namespaced `/mainbranch:mb-start` command. If you
 are in a cloud/web session, plugins are unavailable there — use the Claude
@@ -288,7 +288,7 @@ are the official relationships `mb graph` and `mb validate --cross-refs` read.
 Author them only from evidence in the repo or from explicit operator
 instruction; do not invent relationships to make the graph look fuller.
 Use the connection decision matrix before editing relationships:
-https://github.com/noontide-co/mainbranch/blob/main/docs/business-connections.md
+https://github.com/dmthepm/mainbranch/blob/main/docs/business-connections.md
 
 When a file declares typed edges in frontmatter, mirror them in a body
 `## Related links` section using **Markdown relative links** so the same
@@ -302,7 +302,7 @@ and ask before applying `mb doctor repair --apply`; repair adds missing
 body links from frontmatter and does not update frontmatter
 from body-only links.
 See the engine doc
-[`docs/markdown-link-conventions.md`](https://github.com/noontide-co/mainbranch/blob/main/docs/markdown-link-conventions.md)
+[`docs/markdown-link-conventions.md`](https://github.com/dmthepm/mainbranch/blob/main/docs/markdown-link-conventions.md)
 for the full rules.
 
 Obsidian is an optional viewer over the same files `mb` validates. Do
@@ -348,4 +348,4 @@ mb educational <topic>   # read why we picked the defaults we did
 `@{{GH_USERNAME}}`
 
 For the engine docs (skills, vocabulary, the v0.1 master decision), see
-https://github.com/noontide-co/mainbranch.
+https://github.com/dmthepm/mainbranch.

@@ -1,7 +1,7 @@
 ---
 title: Meta Ads readiness dogfood and read-only summary design
 date: 2026-05-13
-linked_issue: https://github.com/noontide-co/mainbranch/issues/581
+linked_issue: https://github.com/dmthepm/mainbranch/issues/581
 linked_linear: MAIN-366
 release: unreleased
 status: complete
@@ -239,7 +239,7 @@ The summary must avoid:
 ## Follow-Up Implementation
 
 Implementation is tracked in
-[GitHub issue #582 / MAIN-367](https://github.com/noontide-co/mainbranch/issues/582).
+[GitHub issue #582 / MAIN-367](https://github.com/dmthepm/mainbranch/issues/582).
 It is scoped to `mb ads meta summary --json`, focused tests, and a read-only
 smoke path. It does not include mutation, dashboards, durable performance
 caches, or broad reporting imports.

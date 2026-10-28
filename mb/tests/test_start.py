@@ -414,7 +414,7 @@ def test_start_degrades_when_claude_is_missing(tmp_path: Path, monkeypatch) -> N
     # terminal). Still blocks the terminal handoff, but no longer claims a bare
     # "Install Claude Code" CLI step is the only path.
     repair = claude_check["repair"]
-    assert "noontide-co/mainbranch" in repair
+    assert "dmthepm/mainbranch" in repair
     assert "Claude Desktop" in repair
     assert "plugin" in repair.lower()
 
@@ -659,5 +659,5 @@ def test_start_runtime_guidance_is_plugin_first(tmp_path: Path, monkeypatch) -> 
     guidance = report["runtime"]["guidance"]
     assert "normal Claude Code command remains /mb-start" in guidance
     assert "/mainbranch:mb-start" in guidance
-    assert "claude plugin marketplace add noontide-co/mainbranch" in guidance
+    assert "claude plugin marketplace add dmthepm/mainbranch" in guidance
     assert "cloud" in guidance.lower()

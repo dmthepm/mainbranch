@@ -7,9 +7,9 @@ linked_decisions:
   - decisions/2026-05-01-mb-cli-vs-agent-workflows-boundary.md
   - decisions/2026-05-04-sidecar-enrichment-cli-contract.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/279
-  - https://github.com/noontide-co/mainbranch/issues/273
-  - https://github.com/noontide-co/mainbranch/issues/89
+  - https://github.com/dmthepm/mainbranch/issues/279
+  - https://github.com/dmthepm/mainbranch/issues/273
+  - https://github.com/dmthepm/mainbranch/issues/89
 participants: [Devon, Codex]
 tags: [v0-4, google-ads, gtm, conversion-tracking, integrations, sites]
 ---

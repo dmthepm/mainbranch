@@ -4,7 +4,7 @@ date: 2026-05-11
 status: accepted
 topic: First registry shape for portable business data sources
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/470
+  - https://github.com/dmthepm/mainbranch/issues/470
 linked_decisions:
   - decisions/2026-05-11-connecting-notes-data-and-history.md
   - decisions/2026-05-09-obsidian-first-class-viewer.md

@@ -4,7 +4,7 @@ date: 2026-05-07
 status: accepted
 topic: Work continuity, hidden technical memory, and task model
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/371
+  - https://github.com/dmthepm/mainbranch/issues/371
 linked_decisions:
   - decisions/2026-05-02-github-native-business-os.md
   - decisions/2026-05-04-sidecar-enrichment-cli-contract.md

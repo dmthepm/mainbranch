@@ -1,7 +1,7 @@
 # Codex Stage 1 Dogfood Report
 
 This is a public-safe dogfood note for
-[MAIN-304 / #453](https://github.com/noontide-co/mainbranch/issues/453) after
+[MAIN-304 / #453](https://github.com/dmthepm/mainbranch/issues/453) after
 the `mainbranch 0.3.19` package publish. It is not a raw Codex transcript. It
 avoids local paths, account data, private business context, and long excerpts.
 
@@ -14,8 +14,8 @@ avoids local paths, account data, private business context, and long excerpts.
   Codex CLI smoke in an existing business repo, and Codex prompt-input
   inspection
 - Codex Mac app and Codex cloud: not exercised in this round
-- Related implementation: [#405](https://github.com/noontide-co/mainbranch/issues/405)
-  and [PR #456](https://github.com/noontide-co/mainbranch/pull/456)
+- Related implementation: [#405](https://github.com/dmthepm/mainbranch/issues/405)
+  and [PR #456](https://github.com/dmthepm/mainbranch/pull/456)
 - Public/private boundary: sanitized summary only
 
 ## Deterministic Package Fixture
@@ -119,7 +119,7 @@ Codex workflow surface exists and has runtime smoke evidence.
 ## Follow-Up Route
 
 The right next decision/design issue for moving Codex support forward is
-[MAIN-302 / #451](https://github.com/noontide-co/mainbranch/issues/451):
+[MAIN-302 / #451](https://github.com/dmthepm/mainbranch/issues/451):
 decide the native workflow architecture before selected workflow ports move
 into implementation. It should use this dogfood evidence to decide:
 
@@ -135,7 +135,7 @@ into implementation. It should use this dogfood evidence to decide:
   lifecycle start/end before broader skill parity.
 
 After MAIN-302 decides that architecture,
-[#125](https://github.com/noontide-co/mainbranch/issues/125) can become an
+[#125](https://github.com/dmthepm/mainbranch/issues/125) can become an
 implementation slice for selected Codex workflow ports instead of a broad
 compatibility bucket.
 

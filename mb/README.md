@@ -1,6 +1,6 @@
 # mainbranch (`mb`)
 
-Engine umbrella for [Main Branch](https://github.com/noontide-co/mainbranch) — scaffolds, validates, and graphs business-as-files repos.
+Engine umbrella for [Main Branch](https://github.com/dmthepm/mainbranch) — scaffolds, validates, and graphs business-as-files repos.
 
 This package is the Python entry point. Workflows, playbooks, educational
 content, and consumer-repo templates ship as bundled package data. Today, the
@@ -61,7 +61,7 @@ upgrading.
 
 If you installed Main Branch as a Claude Code plugin, package updates do not
 change the plugin that Claude Code has already loaded. After updating, re-add the
-Main Branch plugin (`claude plugin marketplace add noontide-co/mainbranch`) and
+Main Branch plugin (`claude plugin marketplace add dmthepm/mainbranch`) and
 restart Claude Code.
 
 ## Status

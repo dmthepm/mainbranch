@@ -15,7 +15,7 @@ for those surfaces.
 | Install mode | `pipx install mainbranch` | Official public install path. `mb update` upgrades it for you. |
 | Other install modes | `uv tool install mainbranch`, `pip install mainbranch` | Work, but are not the documented path. `mb update` upgrades a uv tool install only after an explicit yes, and prints the upgrade command for any other wheel install. |
 | Developer mode | Git clone | For contributors who want to edit the engine or skills. |
-| Agent runtime | Claude Code | Supported through the Main Branch plugin (`claude plugin marketplace add noontide-co/mainbranch`, then enable). The plugin is the primary rail and works in both the Claude Desktop app and the terminal `claude` CLI; it survives git worktrees. Project-local slash-skill wiring remains a fallback. Cloud/web Claude sessions cannot load plugins. |
+| Agent runtime | Claude Code | Supported through the Main Branch plugin (`claude plugin marketplace add dmthepm/mainbranch`, then enable). The plugin is the primary rail and works in both the Claude Desktop app and the terminal `claude` CLI; it survives git worktrees. Project-local slash-skill wiring remains a fallback. Cloud/web Claude sessions cannot load plugins. |
 | Codex CLI | Supported | Fresh business repos include `AGENTS.md`; global Main Branch `mb-*` skills install once per user under `~/.codex/skills` and route through deterministic `mb` facts. `mb workflow list --runtime codex` exposes supported, pending, and unsupported workflow surfaces. |
 | Cursor, OpenClaw, Hermes, Paperclip-adjacent orchestration, local LLMs | Roadmap | `mb` is runtime-agnostic by design, but these adapters are not supported yet. |
 
@@ -244,7 +244,7 @@ scriptable scaffold primitive without the human setup flow.
 For contributors:
 
 ```bash
-git clone https://github.com/noontide-co/mainbranch.git
+git clone https://github.com/dmthepm/mainbranch.git
 cd mainbranch
 ```
 

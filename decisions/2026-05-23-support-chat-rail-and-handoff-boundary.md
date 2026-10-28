@@ -4,8 +4,8 @@ date: 2026-05-23
 status: accepted
 topic: Support chat rail and handoff boundary
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/615
-  - https://github.com/noontide-co/mainbranch/issues/662
+  - https://github.com/dmthepm/mainbranch/issues/615
+  - https://github.com/dmthepm/mainbranch/issues/662
 linked_decisions:
   - decisions/2026-05-04-skill-cli-runtime-adapter-contract.md
   - decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md

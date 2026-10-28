@@ -8,7 +8,7 @@ linked_decisions:
   - decisions/2026-05-03-skill-distribution-and-migration.md
   - decisions/2026-05-04-skill-cli-runtime-adapter-contract.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/401
+  - https://github.com/dmthepm/mainbranch/issues/401
 participants: [Devon, Codex]
 tags: [runtime-adapters, codex, skills, cli, decision-needed]
 ---

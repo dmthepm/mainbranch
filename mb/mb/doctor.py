@@ -1893,9 +1893,9 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
             or (
                 "claude CLI not on PATH. Main Branch runs as a Claude Code plugin "
                 "in the Claude Desktop app too — install it (+ -> Plugins -> "
-                "noontide-co/mainbranch), or for terminal use install the CLI "
+                "dmthepm/mainbranch), or for terminal use install the CLI "
                 "(https://claude.ai/install) then "
-                "`claude plugin marketplace add noontide-co/mainbranch`."
+                "`claude plugin marketplace add dmthepm/mainbranch`."
             ),
         }
     )

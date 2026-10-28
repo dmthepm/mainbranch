@@ -1,7 +1,7 @@
 ---
 title: books operator UX spec for sample reports
 date: 2026-05-13
-linked_issue: https://github.com/noontide-co/mainbranch/issues/560
+linked_issue: https://github.com/dmthepm/mainbranch/issues/560
 linked_linear: MAIN-357
 release: unscheduled
 status: complete

@@ -412,7 +412,7 @@ This is the quality bar: an LLM that produces the same minisite twice on the sam
 - `noontide-co/noontide-ops` `decisions/2026-04-27-credential-provisioning.md`
 
 **Onboarding:**
-- Main Branch issue [#94](https://github.com/noontide-co/mainbranch/issues/94) — V1 onboarding pinned current-state
+- Main Branch issue [#94](https://github.com/dmthepm/mainbranch/issues/94) — V1 onboarding pinned current-state
 
 ---
 

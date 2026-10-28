@@ -94,7 +94,7 @@ claims.
 ## Follow-Up Route
 
 - Treat
-  [#604](https://github.com/noontide-co/mainbranch/issues/604) as the
+  [#604](https://github.com/dmthepm/mainbranch/issues/604) as the
   historical route from this review. It has since landed; open a fresh focused
   issue for any new owner-language misses.
 - Keep the fix public-safe: no raw transcript dumps, private paths, local

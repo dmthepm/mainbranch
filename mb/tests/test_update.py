@@ -229,7 +229,7 @@ def test_update_check_pipx_does_not_run_commands(monkeypatch: Any, tmp_path: Pat
         lambda version: {
             "version": version,
             "tag": f"oe-v{version}",
-            "url": f"https://github.com/noontide-co/mainbranch/releases/tag/oe-v{version}",
+            "url": f"https://github.com/dmthepm/mainbranch/releases/tag/oe-v{version}",
             "name": f"Main Branch {version}",
             "published_at": "2026-05-15T00:00:00Z",
             "summary": "Test release summary.",
@@ -844,7 +844,7 @@ def test_update_json_cli_envelope(monkeypatch: Any, tmp_path: Path) -> None:
         lambda version: {
             "version": version,
             "tag": f"oe-v{version}",
-            "url": f"https://github.com/noontide-co/mainbranch/releases/tag/oe-v{version}",
+            "url": f"https://github.com/dmthepm/mainbranch/releases/tag/oe-v{version}",
             "name": "",
             "published_at": "",
             "summary": "Release notes from GitHub.",
@@ -1494,7 +1494,7 @@ def test_update_render_human_check_and_error(capsys: Any) -> None:
             "new_version": "0.2.0",
             "skills_relinked_count": 3,
             "release": {
-                "url": "https://github.com/noontide-co/mainbranch/releases/tag/oe-v0.2.0",
+                "url": "https://github.com/dmthepm/mainbranch/releases/tag/oe-v0.2.0",
                 "summary": "Release context.",
                 "available": True,
             },
@@ -1508,9 +1508,7 @@ def test_update_render_human_check_and_error(capsys: Any) -> None:
 
     assert "install mode: clone" in output
     assert "version: 0.1.2 -> 0.2.0" in output
-    assert (
-        "release notes: https://github.com/noontide-co/mainbranch/releases/tag/oe-v0.2.0" in output
-    )
+    assert "release notes: https://github.com/dmthepm/mainbranch/releases/tag/oe-v0.2.0" in output
     assert "release summary: Release context." in output
     assert "would refresh 3 skill link(s)" in output
     assert "error: boom" in output
@@ -1526,7 +1524,7 @@ def test_update_render_human_check_labels_unavailable_release_url(capsys: Any) -
             "new_version": "0.2.0",
             "skills_relinked_count": 0,
             "release": {
-                "url": "https://github.com/noontide-co/mainbranch/releases/tag/oe-v0.2.0",
+                "url": "https://github.com/dmthepm/mainbranch/releases/tag/oe-v0.2.0",
                 "summary": "Fallback summary should not print.",
                 "available": False,
                 "source": "github_release_unavailable",
@@ -1541,7 +1539,7 @@ def test_update_render_human_check_labels_unavailable_release_url(capsys: Any) -
 
     assert "release notes:" not in output
     assert (
-        "expected release notes URL: https://github.com/noontide-co/mainbranch/releases/tag/oe-v0.2.0"
+        "expected release notes URL: https://github.com/dmthepm/mainbranch/releases/tag/oe-v0.2.0"
         in output
     )
     assert "Fallback summary should not print." not in output
@@ -1556,7 +1554,7 @@ def test_update_render_human_check_skips_current_release_url(capsys: Any) -> Non
             "new_version": "0.2.0",
             "skills_relinked_count": 0,
             "release": {
-                "url": "https://github.com/noontide-co/mainbranch/releases/tag/oe-v0.2.0",
+                "url": "https://github.com/dmthepm/mainbranch/releases/tag/oe-v0.2.0",
                 "available": False,
                 "source": "not_newer",
             },
@@ -1884,7 +1882,7 @@ def _rc_sees_release(monkeypatch: Any, tmp_path: Path, installed: str, latest: s
         return {
             "version": version,
             "tag": f"oe-v{version}",
-            "url": f"https://github.com/noontide-co/mainbranch/releases/tag/oe-v{version}",
+            "url": f"https://github.com/dmthepm/mainbranch/releases/tag/oe-v{version}",
             "name": f"Main Branch {version}",
             "published_at": "2026-10-01T00:00:00Z",
             "summary": "Test release summary.",

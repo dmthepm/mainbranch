@@ -4,7 +4,7 @@ date: 2026-05-11
 status: accepted
 topic: Supply-chain security gates for releases and dependencies
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/491
+  - https://github.com/dmthepm/mainbranch/issues/491
 linked_decisions:
   - decisions/2026-05-11-repo-setup-visibility-and-checks-model.md
   - decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md

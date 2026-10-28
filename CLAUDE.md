@@ -8,7 +8,7 @@ repo.
 
 ## Repository Role
 
-This is the public `noontide-co/mainbranch` engine repository. It contains the
+This is the public `dmthepm/mainbranch` engine repository. It contains the
 `mb` CLI, bundled agent-runtime skills, docs, fixtures, tests, and release
 metadata.
 

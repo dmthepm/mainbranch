@@ -4,7 +4,7 @@ date: 2026-05-11
 status: accepted
 topic: First scheduled data sync pattern for business repos
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/471
+  - https://github.com/dmthepm/mainbranch/issues/471
 linked_decisions:
   - decisions/2026-05-11-data-source-registry.md
   - decisions/2026-05-11-connecting-notes-data-and-history.md

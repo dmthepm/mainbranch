@@ -196,7 +196,7 @@ def test_issue_open_submits_with_gh_when_reviewed(tmp_path: Path, monkeypatch) -
         return subprocess.CompletedProcess(
             args,
             0,
-            stdout="https://github.com/noontide-co/mainbranch/issues/999\n",
+            stdout="https://github.com/dmthepm/mainbranch/issues/999\n",
             stderr="",
         )
 

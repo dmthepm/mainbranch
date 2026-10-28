@@ -8,7 +8,7 @@ linked_decisions:
   - decisions/2026-05-02-github-native-business-os.md
   - decisions/2026-05-04-skill-cli-runtime-adapter-contract.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/265
+  - https://github.com/dmthepm/mainbranch/issues/265
 participants: [Devon, Codex]
 tags: [v0-3, sidecars, integrations, cli, context, product-boundary]
 ---

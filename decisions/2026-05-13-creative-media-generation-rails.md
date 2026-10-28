@@ -436,8 +436,8 @@ Primary/current sources checked on 2026-05-13:
 
 - Add the combined creative asset generation readiness rail before any `mb
   connect` provider state or motion/template support claim:
-  https://github.com/noontide-co/mainbranch/issues/569
+  https://github.com/dmthepm/mainbranch/issues/569
 - The standalone deterministic motion-template follow-up was superseded by the
   combined readiness rail so provider images and deterministic templates share
   one artifact metadata contract:
-  https://github.com/noontide-co/mainbranch/issues/568
+  https://github.com/dmthepm/mainbranch/issues/568

@@ -1,7 +1,7 @@
 ---
 title: Postiz scheduling rail smoke
 date: 2026-05-07
-linked_issue: https://github.com/noontide-co/mainbranch/issues/352
+linked_issue: https://github.com/dmthepm/mainbranch/issues/352
 linked_linear: MAIN-257
 release: v0.3.x
 status: partial

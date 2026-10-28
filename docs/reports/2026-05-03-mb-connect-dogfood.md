@@ -1,7 +1,7 @@
 ---
 title: mb connect real-credential dogfood
 date: 2026-05-03
-linked_issue: https://github.com/noontide-co/mainbranch/issues/224
+linked_issue: https://github.com/dmthepm/mainbranch/issues/224
 linked_linear: MAIN-195
 release: v0.2.3
 status: completed
@@ -23,11 +23,11 @@ beginner or onboarding agent to trust that a provider-specific sync will work.
 
 Follow-up issues:
 
-- [#227](https://github.com/noontide-co/mainbranch/issues/227) - Add GitHub
+- [#227](https://github.com/dmthepm/mainbranch/issues/227) - Add GitHub
   auth and repo context to `mb connect`.
-- [#228](https://github.com/noontide-co/mainbranch/issues/228) - Add
+- [#228](https://github.com/dmthepm/mainbranch/issues/228) - Add
   `mb connect test` / provider validation.
-- [#229](https://github.com/noontide-co/mainbranch/issues/229) - Improve
+- [#229](https://github.com/dmthepm/mainbranch/issues/229) - Improve
   `mb connect` repair JSON for onboarding agents.
 
 ## Scope Tested

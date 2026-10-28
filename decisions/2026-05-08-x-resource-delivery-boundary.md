@@ -9,7 +9,7 @@ linked_decisions:
   - decisions/2026-05-07-growth-automation-playbook-addons.md
   - decisions/2026-05-07-postiz-scheduling-rail.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/351
+  - https://github.com/dmthepm/mainbranch/issues/351
 participants: [Devon, Codex]
 tags: [v0-3, integrations, social, provider-boundary, x, playbooks]
 ---

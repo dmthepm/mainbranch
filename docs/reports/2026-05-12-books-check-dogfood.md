@@ -1,7 +1,7 @@
 ---
 title: mb books check hledger cleanup dogfood
 date: 2026-05-12
-linked_issue: https://github.com/noontide-co/mainbranch/issues/501
+linked_issue: https://github.com/dmthepm/mainbranch/issues/501
 release: next patch candidate after v0.3.16
 status: complete
 tags: [bookkeeping, dogfood, hledger, package-smoke]

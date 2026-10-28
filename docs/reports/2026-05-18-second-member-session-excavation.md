@@ -4,7 +4,7 @@
 
 - Date reviewed: 2026-05-18
 - Source session dates: 2026-05-16 through 2026-05-18
-- Issue: [#653](https://github.com/noontide-co/mainbranch/issues/653)
+- Issue: [#653](https://github.com/dmthepm/mainbranch/issues/653)
 - Linear: MAIN-408
 - Evidence level: sanitized review of a private member/customer agent session
   export, subagent logs, tool outputs, and app/runtime logs
@@ -47,14 +47,14 @@ mutation gates, and secret hygiene ahead of broader automation claims.
 
 | Priority | Area | Finding | Evidence Type | Route |
 |---|---|---|---|---|
-| P0 | Runtime discovery | A Claude worktree launched without working Main Branch skill links, so `/mb-start` was unknown until repair ran. | Session export, runtime metadata | [#655](https://github.com/noontide-co/mainbranch/issues/655) |
-| P0 | Secret hygiene | A provider smoke/debug path retrieved a credential from local secret storage and exposed credential material in the private transcript. | Session export, tool output | [#658](https://github.com/noontide-co/mainbranch/issues/658) |
-| P0 | Provider mutation safety | Real external-account writes happened during the session, while broader CRM/ads/email/provider writes rely on conversational approval rather than a reusable Main Branch mutation contract. | Session export, tool output | [#656](https://github.com/noontide-co/mainbranch/issues/656) |
-| P1 | Transcript/source privacy | Meeting, call, Drive, and authenticated-community sources produced valuable material but required manual skip filters and manifest-first handling for mixed private/business accounts. | Session export, tool output | [#657](https://github.com/noontide-co/mainbranch/issues/657) |
-| P1 | Connector readiness | Claude.ai connectors, Claude Code tools, plugins, local CLIs, API keys, and `mb connect` rails were repeatedly conflated during setup. | Session export, runtime/tool metadata | [#654](https://github.com/noontide-co/mainbranch/issues/654), [#636](https://github.com/noontide-co/mainbranch/issues/636) |
-| P1 | Dashboard/approval loop | The operator explicitly wants a morning snapshot plus approval queue over activity, tasks, email/social drafts, provider facts, and decisions. | Session export, closing reflection | [#599](https://github.com/noontide-co/mainbranch/issues/599) |
-| P1 | Repo boundary | The operator needs a durable choice for linked repos across related businesses, landing pages, finance, and course operations. | Session export, closing reflection | [#631](https://github.com/noontide-co/mainbranch/issues/631) |
-| P1 | Stale-source cleanup | Corrections to ownership, roles, positioning, retired angles, and campaign assumptions required cross-file reconciliation. | Session export, generated history | [#630](https://github.com/noontide-co/mainbranch/issues/630) |
+| P0 | Runtime discovery | A Claude worktree launched without working Main Branch skill links, so `/mb-start` was unknown until repair ran. | Session export, runtime metadata | [#655](https://github.com/dmthepm/mainbranch/issues/655) |
+| P0 | Secret hygiene | A provider smoke/debug path retrieved a credential from local secret storage and exposed credential material in the private transcript. | Session export, tool output | [#658](https://github.com/dmthepm/mainbranch/issues/658) |
+| P0 | Provider mutation safety | Real external-account writes happened during the session, while broader CRM/ads/email/provider writes rely on conversational approval rather than a reusable Main Branch mutation contract. | Session export, tool output | [#656](https://github.com/dmthepm/mainbranch/issues/656) |
+| P1 | Transcript/source privacy | Meeting, call, Drive, and authenticated-community sources produced valuable material but required manual skip filters and manifest-first handling for mixed private/business accounts. | Session export, tool output | [#657](https://github.com/dmthepm/mainbranch/issues/657) |
+| P1 | Connector readiness | Claude.ai connectors, Claude Code tools, plugins, local CLIs, API keys, and `mb connect` rails were repeatedly conflated during setup. | Session export, runtime/tool metadata | [#654](https://github.com/dmthepm/mainbranch/issues/654), [#636](https://github.com/dmthepm/mainbranch/issues/636) |
+| P1 | Dashboard/approval loop | The operator explicitly wants a morning snapshot plus approval queue over activity, tasks, email/social drafts, provider facts, and decisions. | Session export, closing reflection | [#599](https://github.com/dmthepm/mainbranch/issues/599) |
+| P1 | Repo boundary | The operator needs a durable choice for linked repos across related businesses, landing pages, finance, and course operations. | Session export, closing reflection | [#631](https://github.com/dmthepm/mainbranch/issues/631) |
+| P1 | Stale-source cleanup | Corrections to ownership, roles, positioning, retired angles, and campaign assumptions required cross-file reconciliation. | Session export, generated history | [#630](https://github.com/dmthepm/mainbranch/issues/630) |
 | P2 | Provider roadmap | Google, YouTube, Zoom, Fireflies, Drive, Resend, Meta, Cloudflare, Cal.com, HubSpot, Stripe, Aircall, and Microsoft document surfaces all have pull. | Session export | Backlog by provider; split only after support boundary and smoke target are clear. |
 | P2 | Remote/mobile capture | The operator wants mobile note capture and remote approvals during long-running work. | Session export | Roadmap signal; do not claim Main Branch support yet. |
 | P2 | Email/content operations | Resend plus CRM plus approval flow suggests a future daily email/social draft queue. | Session export | Route through dashboard/content queue work when scoped. |
@@ -118,15 +118,15 @@ P0 and P1 findings now have concrete public routes:
 
 | Issue | Owner Loop | Validation Need |
 |---|---|---|
-| [#655](https://github.com/noontide-co/mainbranch/issues/655) | Sense / Decide | Claude worktree fixture or runtime smoke for missing skill wiring and repair |
-| [#658](https://github.com/noontide-co/mainbranch/issues/658) | Ship | Secret-redaction tests or provider smoke review proving no token echo |
-| [#656](https://github.com/noontide-co/mainbranch/issues/656) | Ship | Provider write plan/apply contract plus at least one smoke or fixture path |
-| [#657](https://github.com/noontide-co/mainbranch/issues/657) | Sense / Decide / Reflect | Manifest-first ingestion workflow with skip filters and privacy gates |
-| [#654](https://github.com/noontide-co/mainbranch/issues/654) | Sense / Ship | Connector-readiness guidance and smoke expectations by connector type |
-| [#636](https://github.com/noontide-co/mainbranch/issues/636) | Sense / Decide / Ship | Shared workflow source architecture should include connector readiness and safety gates |
-| [#599](https://github.com/noontide-co/mainbranch/issues/599) | Sense / Decide | Read-only dashboard fixture with provider readiness and next-action facts |
-| [#631](https://github.com/noontide-co/mainbranch/issues/631) | Decide | First-run repo-boundary decision helper |
-| [#630](https://github.com/noontide-co/mainbranch/issues/630) | Sense / Decide / Reflect | Stale-source reconciliation workflow |
+| [#655](https://github.com/dmthepm/mainbranch/issues/655) | Sense / Decide | Claude worktree fixture or runtime smoke for missing skill wiring and repair |
+| [#658](https://github.com/dmthepm/mainbranch/issues/658) | Ship | Secret-redaction tests or provider smoke review proving no token echo |
+| [#656](https://github.com/dmthepm/mainbranch/issues/656) | Ship | Provider write plan/apply contract plus at least one smoke or fixture path |
+| [#657](https://github.com/dmthepm/mainbranch/issues/657) | Sense / Decide / Reflect | Manifest-first ingestion workflow with skip filters and privacy gates |
+| [#654](https://github.com/dmthepm/mainbranch/issues/654) | Sense / Ship | Connector-readiness guidance and smoke expectations by connector type |
+| [#636](https://github.com/dmthepm/mainbranch/issues/636) | Sense / Decide / Ship | Shared workflow source architecture should include connector readiness and safety gates |
+| [#599](https://github.com/dmthepm/mainbranch/issues/599) | Sense / Decide | Read-only dashboard fixture with provider readiness and next-action facts |
+| [#631](https://github.com/dmthepm/mainbranch/issues/631) | Decide | First-run repo-boundary decision helper |
+| [#630](https://github.com/dmthepm/mainbranch/issues/630) | Sense / Decide / Reflect | Stale-source reconciliation workflow |
 
 P2/P3 items stay in this report until a narrower issue can own them. Do not
 bundle all providers, remote control, dashboard writes, ad creation, and

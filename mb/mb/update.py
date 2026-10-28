@@ -114,7 +114,7 @@ LATEST_UNKNOWN_MESSAGE = (
     "with an older version. Check your connection, then run `{retry}` again."
 )
 GITHUB_RELEASE_API_URL_TEMPLATE = (
-    "https://api.github.com/repos/noontide-co/mainbranch/releases/tags/oe-v{version}"
+    "https://api.github.com/repos/dmthepm/mainbranch/releases/tags/oe-v{version}"
 )
 COMMAND_TIMEOUT_SECONDS = 120.0
 UV_RELEASE_NOT_READY_MESSAGE = (

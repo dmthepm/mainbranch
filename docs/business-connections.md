@@ -50,7 +50,7 @@ linked_research:
 linked_pushes:
   - pushes/2026-05-10-google-ads-test/push.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/468
+  - https://github.com/dmthepm/mainbranch/issues/468
 ```
 
 Good typed links:
@@ -171,8 +171,8 @@ Use GitHub links when they explain why work changed:
 
 ```yaml
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/468
-  - https://github.com/noontide-co/mainbranch/pull/467
+  - https://github.com/dmthepm/mainbranch/issues/468
+  - https://github.com/dmthepm/mainbranch/pull/467
 ```
 
 A decision can link the PR that implemented it. A PR can link the decision it

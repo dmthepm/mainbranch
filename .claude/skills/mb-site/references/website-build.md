@@ -54,7 +54,7 @@ cd [location]
 
 **5. Add template as upstream.**
 ```bash
-git remote add upstream https://github.com/noontide-co/mainbranch-site-template-[saas|high-ticket].git
+git remote add upstream https://github.com/dmthepm/mainbranch-site-template-[saas|high-ticket].git
 git fetch upstream
 git merge upstream/main --allow-unrelated-histories -m "Initial template merge"
 ```

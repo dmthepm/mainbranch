@@ -8,7 +8,7 @@ not a private Claude transcript and does not claim interactive TUI smoke.
 ## Evidence Set
 
 - Date: 2026-05-08
-- Issue: [#379](https://github.com/noontide-co/mainbranch/issues/379)
+- Issue: [#379](https://github.com/dmthepm/mainbranch/issues/379)
 - Source: sanitized fixture review, not raw runtime output
 - Fixture identity: Dogfood Studio sample business repo
 - Evidence level: sanitized fixture review
@@ -50,7 +50,7 @@ Review:
 
 Issue route:
 
-- Use open [#356](https://github.com/noontide-co/mainbranch/issues/356) when
+- Use open [#356](https://github.com/dmthepm/mainbranch/issues/356) when
   the miss is a ghost route or docs naming unavailable slash commands.
 - Open a focused runtime smoke issue if the repaired flow still fails in the
   interactive Claude Code TUI.
@@ -84,11 +84,11 @@ Review:
 
 Issue route:
 
-- Use open [#350](https://github.com/noontide-co/mainbranch/issues/350) when
+- Use open [#350](https://github.com/dmthepm/mainbranch/issues/350) when
   the miss exposes unclear push/playbook routing.
 - Open a focused `/mb-start` or generated-instructions follow-up if the same
   weak routing appears after closed
-  [#353](https://github.com/noontide-co/mainbranch/issues/353).
+  [#353](https://github.com/dmthepm/mainbranch/issues/353).
 
 ## Finding 3: Checkpoint Discipline
 
@@ -121,12 +121,12 @@ Issue route:
 
 ## Follow-Up Recommendations
 
-- Keep closed [#364](https://github.com/noontide-co/mainbranch/issues/364) as
+- Keep closed [#364](https://github.com/dmthepm/mainbranch/issues/364) as
   historical harness context only; open a new focused harness issue if manual
   review findings need a structured generated artifact beyond the current
   `evidence-template.md`.
-- Use open [#357](https://github.com/noontide-co/mainbranch/issues/357) and
-  [#358](https://github.com/noontide-co/mainbranch/issues/358) when a transcript
+- Use open [#357](https://github.com/dmthepm/mainbranch/issues/357) and
+  [#358](https://github.com/dmthepm/mainbranch/issues/358) when a transcript
   shows Claude lacked deterministic relationship or status facts.
 - Do not paste raw transcripts into public issues. Post short summaries,
   sanitized excerpts, severity, category, likely fix type, and the minimal

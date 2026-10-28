@@ -84,7 +84,7 @@ Claude Code loads skill discovery at session start, so relinking usually
 requires a restart before the slash command appears.
 
 If the plugin itself needs verification, install or refresh it with
-`claude plugin marketplace add noontide-co/mainbranch`, enable it, restart or
+`claude plugin marketplace add dmthepm/mainbranch`, enable it, restart or
 run `/reload-plugins`, and check `/mainbranch:mb-start`. Do not replace the
 user-facing `/mb-start` guidance with the namespaced command unless the bridge
 contract is intentionally removed.

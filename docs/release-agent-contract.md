@@ -220,7 +220,7 @@ diff touches plugin wiring, the marketplace/plugin manifests, or the runtime
 guidance that routes operators to the plugin, the release driver must run a
 manual plugin-load smoke before publishing and record it as a validation line:
 
-- `claude plugin marketplace add noontide-co/mainbranch`, enable the plugin,
+- `claude plugin marketplace add dmthepm/mainbranch`, enable the plugin,
   then confirm the plugin-native `/mainbranch:mb-start` (and one other
   `/mainbranch:mb-*` skill) resolves in **both** the Claude Desktop app
   **and** the terminal `claude` CLI;

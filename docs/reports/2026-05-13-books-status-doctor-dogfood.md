@@ -1,7 +1,7 @@
 ---
 title: mb books status and doctor plan dogfood
 date: 2026-05-13
-linked_issue: https://github.com/noontide-co/mainbranch/issues/510
+linked_issue: https://github.com/dmthepm/mainbranch/issues/510
 release: next patch candidate after v0.3.19
 status: complete
 tags: [bookkeeping, dogfood, hledger, privacy]

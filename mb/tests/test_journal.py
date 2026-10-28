@@ -55,7 +55,7 @@ def test_parse_refs_supports_business_objects_and_github_issues() -> None:
                 "- pushes/workshop/push.md",
                 "- decisions/2026-05-05-price.md",
                 "- campaigns/legacy/campaign.md",
-                "- https://github.com/noontide-co/mainbranch/issues/303",
+                "- https://github.com/dmthepm/mainbranch/issues/303",
             ]
         )
     )

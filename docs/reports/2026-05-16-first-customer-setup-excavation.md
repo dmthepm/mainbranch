@@ -4,7 +4,7 @@
 
 - Date reviewed: 2026-05-16
 - Source session date: 2026-05-14
-- Issue: [#622](https://github.com/noontide-co/mainbranch/issues/622)
+- Issue: [#622](https://github.com/dmthepm/mainbranch/issues/622)
 - Linear: MAIN-386
 - Evidence level: sanitized review of a real customer setup transcript, agent
   session export, and generated business-repo history
@@ -54,14 +54,14 @@ the next action is safe.
 
 | Priority | Area | Finding | Evidence Type | Route |
 |---|---|---|---|---|
-| P0 | Setup routing | Full-guide paste plus business intent was misread as "save this guide" before the operator corrected it. | Session export, transcript | [#625](https://github.com/noontide-co/mainbranch/issues/625) |
-| P0 | Onboarding/git setup | `mb onboard --push` stalled on generated `.mb/` state and required manual git repair. | Session export, command output | [#626](https://github.com/noontide-co/mainbranch/issues/626) |
-| P0 | Checkpoint quality | Accidental scratch files entered the generated business repo history. | Generated repo history | [#627](https://github.com/noontide-co/mainbranch/issues/627) |
-| P0 | Status JSON | Status JSON hit a `date` serialization traceback. | Session export, command output | [#628](https://github.com/noontide-co/mainbranch/issues/628) |
-| P0 | Proof/legal safety | Strong proof existed but was not permissioned for public marketing; readiness did not make permission collection the hard next action. | Generated files, closing reflection | [#629](https://github.com/noontide-co/mainbranch/issues/629) |
-| P1 | Stale-source cleanup | Mixed source material included old offer details and a retired angle that needed cross-file reconciliation. | Transcript, generated decisions | [#630](https://github.com/noontide-co/mainbranch/issues/630) |
-| P1 | Repo boundary | The customer needed rules for one business repo vs separate linked repos. | Transcript | [#631](https://github.com/noontide-co/mainbranch/issues/631) |
-| P1 | Beginner explanations | Updates, local edits, saved checkpoints, GitHub backup, runtime cost, and support boundaries needed live explanation. | Transcript | [#632](https://github.com/noontide-co/mainbranch/issues/632) |
+| P0 | Setup routing | Full-guide paste plus business intent was misread as "save this guide" before the operator corrected it. | Session export, transcript | [#625](https://github.com/dmthepm/mainbranch/issues/625) |
+| P0 | Onboarding/git setup | `mb onboard --push` stalled on generated `.mb/` state and required manual git repair. | Session export, command output | [#626](https://github.com/dmthepm/mainbranch/issues/626) |
+| P0 | Checkpoint quality | Accidental scratch files entered the generated business repo history. | Generated repo history | [#627](https://github.com/dmthepm/mainbranch/issues/627) |
+| P0 | Status JSON | Status JSON hit a `date` serialization traceback. | Session export, command output | [#628](https://github.com/dmthepm/mainbranch/issues/628) |
+| P0 | Proof/legal safety | Strong proof existed but was not permissioned for public marketing; readiness did not make permission collection the hard next action. | Generated files, closing reflection | [#629](https://github.com/dmthepm/mainbranch/issues/629) |
+| P1 | Stale-source cleanup | Mixed source material included old offer details and a retired angle that needed cross-file reconciliation. | Transcript, generated decisions | [#630](https://github.com/dmthepm/mainbranch/issues/630) |
+| P1 | Repo boundary | The customer needed rules for one business repo vs separate linked repos. | Transcript | [#631](https://github.com/dmthepm/mainbranch/issues/631) |
+| P1 | Beginner explanations | Updates, local edits, saved checkpoints, GitHub backup, runtime cost, and support boundaries needed live explanation. | Transcript | [#632](https://github.com/dmthepm/mainbranch/issues/632) |
 | P2 | Source ingestion | The customer wanted calls, live chats, video transcripts, SOPs, screenshots, and voice notes routed into durable memory. | Transcript | Backlog; should become separate ingestion issues when scoped by source type. |
 | P2 | Provider readiness | The customer asked about video, research, web, email, social scheduling, CRM, banking, and dashboard rails. | Transcript | Backlog; split only when each provider support boundary and smoke plan is clear. |
 | P2 | Review gate | The customer wanted final human approval before content leaves the system. | Transcript | Backlog; likely belongs with push/content review queue work. |
@@ -114,14 +114,14 @@ P0 and P1 findings now have concrete public issues:
 
 | Issue | Owner Loop | Validation Need |
 |---|---|---|
-| [#625](https://github.com/noontide-co/mainbranch/issues/625) | Sense / Decide | Runtime or fixture prompt for full-guide paste recognition |
-| [#626](https://github.com/noontide-co/mainbranch/issues/626) | Ship | Fixture repo smoke for `mb onboard --github <owner/repo> --push` |
-| [#627](https://github.com/noontide-co/mainbranch/issues/627) | Ship / Reflect | Checkpoint plan/hook tests with suspicious scratch files |
-| [#628](https://github.com/noontide-co/mainbranch/issues/628) | Sense | Status JSON regression test with date-valued facts |
-| [#629](https://github.com/noontide-co/mainbranch/issues/629) | Decide / Ship | MoneyPath/proof fixture plus skill routing review |
-| [#630](https://github.com/noontide-co/mainbranch/issues/630) | Sense / Decide / Reflect | Stale-source workflow fixture or manual smoke |
-| [#631](https://github.com/noontide-co/mainbranch/issues/631) | Decide | First-run guidance/template review; fixture if generated guidance changes |
-| [#632](https://github.com/noontide-co/mainbranch/issues/632) | Sense / Decide | Docs and runtime-guidance review; smoke if slash/guidance changes |
+| [#625](https://github.com/dmthepm/mainbranch/issues/625) | Sense / Decide | Runtime or fixture prompt for full-guide paste recognition |
+| [#626](https://github.com/dmthepm/mainbranch/issues/626) | Ship | Fixture repo smoke for `mb onboard --github <owner/repo> --push` |
+| [#627](https://github.com/dmthepm/mainbranch/issues/627) | Ship / Reflect | Checkpoint plan/hook tests with suspicious scratch files |
+| [#628](https://github.com/dmthepm/mainbranch/issues/628) | Sense | Status JSON regression test with date-valued facts |
+| [#629](https://github.com/dmthepm/mainbranch/issues/629) | Decide / Ship | MoneyPath/proof fixture plus skill routing review |
+| [#630](https://github.com/dmthepm/mainbranch/issues/630) | Sense / Decide / Reflect | Stale-source workflow fixture or manual smoke |
+| [#631](https://github.com/dmthepm/mainbranch/issues/631) | Decide | First-run guidance/template review; fixture if generated guidance changes |
+| [#632](https://github.com/dmthepm/mainbranch/issues/632) | Sense / Decide | Docs and runtime-guidance review; smoke if slash/guidance changes |
 
 P2/P3 items stay in this report until an active issue can own a narrow slice.
 Do not bundle provider rails, dashboards, and playbook marketplace direction

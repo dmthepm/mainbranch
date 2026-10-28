@@ -57,7 +57,7 @@ strongest model with extra reasoning) and paste this:
 
 ```text
 I want Main Branch: AI business memory I own as files in one folder
-(https://github.com/noontide-co/mainbranch). First read the entire README (fetch the raw file if your tools summarize),
+(https://github.com/dmthepm/mainbranch). First read the entire README (fetch the raw file if your tools summarize),
 then explore the repo enough to understand the architecture (the mb CLI is
 the deterministic control plane; skills are the judgment layer; my business
 lives in its own folder, never in the engine; bets, research, decisions,
@@ -203,7 +203,7 @@ In Codex, use the global `mb-start` skill instead of typing the slash command.
 
 If `/mb-start` does not appear in Claude Code, the Main Branch plugin may not be
 installed or enabled yet, or the project-local bridge may need repair. Add the
-plugin with `claude plugin marketplace add noontide-co/mainbranch`, enable it,
+plugin with `claude plugin marketplace add dmthepm/mainbranch`, enable it,
 and restart Claude Code from this folder. The plugin works in both the Claude
 Desktop app and the terminal. For direct plugin diagnostics, use
 `/mainbranch:mb-start`.
@@ -261,7 +261,7 @@ checks for important updates at the beginning of a Claude Code session.
 
 If you installed Main Branch as a Claude Code plugin, package updates do not
 change the plugin that Claude Code has already loaded. After updating, re-add the
-Main Branch plugin (`claude plugin marketplace add noontide-co/mainbranch`) and
+Main Branch plugin (`claude plugin marketplace add dmthepm/mainbranch`) and
 restart Claude Code.
 
 Power users can run the same update path from a business folder:
@@ -385,7 +385,7 @@ the URL spelling.
   English.
 - **In the community:** post with a screenshot of the exact error.
 - **For contributors:** open an issue at
-  [https://github.com/noontide-co/mainbranch/issues](https://github.com/noontide-co/mainbranch/issues).
+  [https://github.com/dmthepm/mainbranch/issues](https://github.com/dmthepm/mainbranch/issues).
 - **Platform support:** see [compatibility](compatibility.md).
 
 ---

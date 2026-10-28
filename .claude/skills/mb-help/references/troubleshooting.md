@@ -30,7 +30,7 @@ claude --version
 Use the public Main Branch repo:
 
 **Fix:**
-1. Open `https://github.com/noontide-co/mainbranch` in your browser
+1. Open `https://github.com/dmthepm/mainbranch` in your browser
 2. Confirm the URL is typed exactly in GitHub Desktop or terminal
 3. Try cloning again
 
@@ -69,7 +69,7 @@ xcode-select --install
 Same as the 404 error above. Use the public repo URL:
 
 ```text
-https://github.com/noontide-co/mainbranch
+https://github.com/dmthepm/mainbranch
 ```
 
 ---
@@ -84,7 +84,7 @@ Main Branch ships as a Claude Code plugin — this is the most common reason the
 skills are missing. Install it once and enable it:
 
 ```bash
-claude plugin marketplace add noontide-co/mainbranch
+claude plugin marketplace add dmthepm/mainbranch
 ```
 
 The plugin works in both the Claude Desktop app and the terminal `claude` CLI,

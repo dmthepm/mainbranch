@@ -7,7 +7,7 @@ linked_decisions:
   - decisions/2026-05-08-codex-adapter-plan.md
   - decisions/2026-05-13-shared-workflow-source-and-runtime-shells.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/709
+  - https://github.com/dmthepm/mainbranch/issues/709
 participants: [Devon, Codex]
 tags: [runtime-adapters, codex, skills, plugins]
 ---

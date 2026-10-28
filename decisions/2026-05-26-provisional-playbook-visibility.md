@@ -7,8 +7,8 @@ linked_decisions:
   - decisions/2026-05-07-growth-automation-playbook-addons.md
   - decisions/2026-05-13-shared-workflow-source-and-runtime-shells.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/753
-  - https://github.com/noontide-co/mainbranch/issues/743
+  - https://github.com/dmthepm/mainbranch/issues/753
+  - https://github.com/dmthepm/mainbranch/issues/743
 participants: [Devon, Codex]
 tags: [playbooks, workflows, codex, claude-code, packaging]
 ---

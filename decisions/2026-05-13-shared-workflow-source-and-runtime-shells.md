@@ -9,10 +9,10 @@ linked_decisions:
   - decisions/2026-05-08-codex-adapter-plan.md
   - decisions/2026-05-13-shared-workflow-corpus-and-native-runtime-renderers.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/583
-  - https://github.com/noontide-co/mainbranch/issues/451
-  - https://github.com/noontide-co/mainbranch/issues/453
-  - https://github.com/noontide-co/mainbranch/issues/125
+  - https://github.com/dmthepm/mainbranch/issues/583
+  - https://github.com/dmthepm/mainbranch/issues/451
+  - https://github.com/dmthepm/mainbranch/issues/453
+  - https://github.com/dmthepm/mainbranch/issues/125
 participants: [Devon, Codex]
 tags: [runtime-adapters, codex, claude-code, workflows, shared-workflow-source]
 ---

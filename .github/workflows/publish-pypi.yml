@@ -5,8 +5,8 @@ name: publish-pypi
 # Triggered by a GitHub Release (not raw tag-push). Requires the `pypi`
 # GitHub Environment with at least one required reviewer.
 #
-# OIDC claim must match the pending publisher:
-#   owner=noontide-co, repo=mainbranch, workflow=publish-pypi.yml, env=pypi.
+# OIDC claim must match the trusted publisher:
+#   owner=dmthepm, repo=mainbranch, workflow=publish-pypi.yml, env=pypi.
 #
 # Publish release: tag `oe-vMAJOR.MINOR.PATCH` and use the Releases UI only
 # after the package-visible release gate in docs/release-simulations.md has

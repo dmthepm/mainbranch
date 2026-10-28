@@ -78,9 +78,9 @@ claims.
 ## Follow-Up Route
 
 - Attach this note to
-  [#521](https://github.com/noontide-co/mainbranch/issues/521) as the
+  [#521](https://github.com/dmthepm/mainbranch/issues/521) as the
   post-release transcript audit.
 - Track the repeated print-mode resume failures and read-only
   permission-denial distortion in
-  [#526](https://github.com/noontide-co/mainbranch/issues/526) before the next
+  [#526](https://github.com/dmthepm/mainbranch/issues/526) before the next
   package-visible release relies on release-acceptance proxy evidence.

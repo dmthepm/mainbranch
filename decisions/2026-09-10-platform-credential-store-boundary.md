@@ -4,7 +4,7 @@ date: 2026-09-10
 status: accepted
 topic: Platform credential-store boundary
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/959
+  - https://github.com/dmthepm/mainbranch/issues/959
 linked_decisions:
   - decisions/2026-05-13-provider-cli-api-wrapper-boundary.md
 linked_docs:

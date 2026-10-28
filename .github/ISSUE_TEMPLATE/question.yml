@@ -8,7 +8,7 @@ body:
       value: |
         **Before filing — try the right channel first:**
 
-        - **Setup help?** Read [SUPPORT.md](https://github.com/noontide-co/mainbranch/blob/main/SUPPORT.md) and [docs/beginner-setup.md](https://github.com/noontide-co/mainbranch/blob/main/docs/beginner-setup.md).
+        - **Setup help?** Read [SUPPORT.md](https://github.com/dmthepm/mainbranch/blob/main/SUPPORT.md) and [docs/beginner-setup.md](https://github.com/dmthepm/mainbranch/blob/main/docs/beginner-setup.md).
         - **Main Branch member?** Post in the Skool community — that is where operator-specific help lives.
         - **Still here?** File only if the answer would benefit future readers searching the issue tracker.
 

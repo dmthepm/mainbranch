@@ -207,9 +207,9 @@ def _build_checks(
             if claude_path
             else (
                 "Install Main Branch as a Claude Code plugin. Claude Desktop app: "
-                "+ -> Plugins -> `noontide-co/mainbranch`. Terminal: install the "
+                "+ -> Plugins -> `dmthepm/mainbranch`. Terminal: install the "
                 "claude CLI (https://claude.ai/install), then `claude plugin "
-                "marketplace add noontide-co/mainbranch`."
+                "marketplace add dmthepm/mainbranch`."
             ),
         },
         {
@@ -515,7 +515,7 @@ def run(repo: str = ".", launch: bool = False) -> dict[str, Any]:
                 "plugins. The normal Claude Code command remains /mb-start via "
                 "the project-local bridge; the direct plugin smoke command is "
                 "/mainbranch:mb-start. If neither appears, install the plugin: "
-                "`claude plugin marketplace add noontide-co/mainbranch`."
+                "`claude plugin marketplace add dmthepm/mainbranch`."
             ),
             "skill_wiring": wiring,
             "codex_cli": codex,

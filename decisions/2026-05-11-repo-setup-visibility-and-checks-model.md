@@ -4,7 +4,7 @@ date: 2026-05-11
 status: accepted
 topic: Repo setup, visibility, and checks model
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/477
+  - https://github.com/dmthepm/mainbranch/issues/477
 linked_decisions:
   - decisions/2026-05-02-github-native-business-os.md
   - decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md

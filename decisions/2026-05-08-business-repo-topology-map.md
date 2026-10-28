@@ -4,7 +4,7 @@ date: 2026-05-08
 status: accepted
 topic: Business repo topology map
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/406
+  - https://github.com/dmthepm/mainbranch/issues/406
 linked_decisions:
   - decisions/2026-05-04-workspace-repo-sensitive-data-boundaries.md
   - decisions/2026-05-06-business-repo-folder-model-reference-deprecation.md
@@ -626,18 +626,18 @@ Open or update follow-up issues for these slices:
 
 1. **Topology registry schema and validator.** Add `core/operations/repo-topology.md`
    validation, safe visibility classes, role/lifecycle enums, and link checks.
-   Tracked in [#416](https://github.com/noontide-co/mainbranch/issues/416).
+   Tracked in [#416](https://github.com/dmthepm/mainbranch/issues/416).
 2. **General child repo descriptor.** Extend the existing site-repo
    `.mainbranch/source.json` pattern into the role-neutral
    `.mainbranch/repo.json` descriptor without breaking site workflows. Tracked
-   in [#417](https://github.com/noontide-co/mainbranch/issues/417).
+   in [#417](https://github.com/dmthepm/mainbranch/issues/417).
 3. **Status and graph topology facts.** Add additive JSON sections for topology
    role, parent, child counts, stale descriptors, repo nodes, and safe edges.
-   Tracked in [#418](https://github.com/noontide-co/mainbranch/issues/418).
+   Tracked in [#418](https://github.com/dmthepm/mainbranch/issues/418).
 4. **Generated instructions and skills.** Teach `/mb-start`, `/mb-help`,
    `/mb-site`, and generated business `CLAUDE.md` to use the topology model and
    avoid destructive repo/offer moves. Coordinate the offer/bet parts with
-   [#411](https://github.com/noontide-co/mainbranch/issues/411).
+   [#411](https://github.com/dmthepm/mainbranch/issues/411).
 5. **Doctor repair plan.** Add preview-first topology drift checks and unsafe
    private-metadata warnings. This is untracked as a standalone follow-up until
    the registry and descriptor contracts in #416 and #417 land.

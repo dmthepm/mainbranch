@@ -7,13 +7,13 @@ linked_decisions:
   - decisions/2026-05-01-mb-cli-vs-agent-workflows-boundary.md
   - decisions/2026-05-03-skill-distribution-and-migration.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/220
-  - https://github.com/noontide-co/mainbranch/issues/225
-  - https://github.com/noontide-co/mainbranch/issues/238
-  - https://github.com/noontide-co/mainbranch/issues/131
-  - https://github.com/noontide-co/mainbranch/issues/124
-  - https://github.com/noontide-co/mainbranch/issues/177
-  - https://github.com/noontide-co/mainbranch/issues/127
+  - https://github.com/dmthepm/mainbranch/issues/220
+  - https://github.com/dmthepm/mainbranch/issues/225
+  - https://github.com/dmthepm/mainbranch/issues/238
+  - https://github.com/dmthepm/mainbranch/issues/131
+  - https://github.com/dmthepm/mainbranch/issues/124
+  - https://github.com/dmthepm/mainbranch/issues/177
+  - https://github.com/dmthepm/mainbranch/issues/127
 participants: [Devon, Codex]
 tags: [v0-2, cli, skills, runtime-adapters, claude-code, workflow-boundary]
 ---

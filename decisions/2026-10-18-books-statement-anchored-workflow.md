@@ -4,7 +4,7 @@ date: 2026-10-18
 status: accepted
 topic: Statement-anchored books workflow
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/128
+  - https://github.com/dmthepm/mainbranch/issues/128
 linked_decisions:
   - decisions/2026-05-11-mb-books-foundation.md
 linked_docs:

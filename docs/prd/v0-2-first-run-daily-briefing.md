@@ -5,11 +5,11 @@ date: 2026-05-02
 release: v0.2.0
 linked_decision: decisions/2026-05-02-github-native-business-os.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/173
-  - https://github.com/noontide-co/mainbranch/issues/184
-  - https://github.com/noontide-co/mainbranch/issues/185
-  - https://github.com/noontide-co/mainbranch/issues/186
-  - https://github.com/noontide-co/mainbranch/issues/174
+  - https://github.com/dmthepm/mainbranch/issues/173
+  - https://github.com/dmthepm/mainbranch/issues/184
+  - https://github.com/dmthepm/mainbranch/issues/185
+  - https://github.com/dmthepm/mainbranch/issues/186
+  - https://github.com/dmthepm/mainbranch/issues/174
 related_prds:
   - docs/prd/v0-2-agent-workflow-and-evals.md
 ---

@@ -7,10 +7,10 @@ linked_decisions:
   - decisions/2026-05-04-skill-cli-runtime-adapter-contract.md
   - decisions/2026-05-08-codex-adapter-plan.md
 linked_issues:
-  - https://github.com/noontide-co/mainbranch/issues/451
-  - https://github.com/noontide-co/mainbranch/issues/453
-  - https://github.com/noontide-co/mainbranch/issues/539
-  - https://github.com/noontide-co/mainbranch/issues/125
+  - https://github.com/dmthepm/mainbranch/issues/451
+  - https://github.com/dmthepm/mainbranch/issues/453
+  - https://github.com/dmthepm/mainbranch/issues/539
+  - https://github.com/dmthepm/mainbranch/issues/125
 participants: [Devon, Codex]
 tags: [runtime-adapters, codex, claude-code, skills, workflows, renderer]
 ---
@@ -72,10 +72,10 @@ This decision does not:
 Stage 1 Codex evidence is now strong enough to design the next layer, not
 strong enough to claim workflow parity.
 
-- [MAIN-279 / #405](https://github.com/noontide-co/mainbranch/issues/405)
+- [MAIN-279 / #405](https://github.com/dmthepm/mainbranch/issues/405)
   shipped the experimental Codex CLI-first adapter: generated business-repo
   `AGENTS.md`, Codex readiness facts, and `mb doctor repair` coverage.
-- [MAIN-304 / #453](https://github.com/noontide-co/mainbranch/issues/453)
+- [MAIN-304 / #453](https://github.com/dmthepm/mainbranch/issues/453)
   dogfooded `mainbranch 0.3.19` and recorded that Codex can be grounded by
   generated `AGENTS.md` plus deterministic `mb` facts.
 - The dogfood report
@@ -84,7 +84,7 @@ strong enough to claim workflow parity.
   mutate repos, but it did not prove native Codex skills, Claude-style
   installed command parity, Mac app support, cloud support, or selected
   production workflow ports.
-- [MAIN-349 / #539](https://github.com/noontide-co/mainbranch/issues/539)
+- [MAIN-349 / #539](https://github.com/dmthepm/mainbranch/issues/539)
   proved the Claude Code side of the same handoff shape: `/mb-start`
   path-to-money prompts should start from `money_path` facts, carry the
   MoneyPath snapshot into `/mb-think`, and use runtime evidence before
@@ -351,7 +351,7 @@ Validation:
 
 ### Stage D: Selected Workflow Port
 
-Only after Stage C, use [#125](https://github.com/noontide-co/mainbranch/issues/125)
+Only after Stage C, use [#125](https://github.com/dmthepm/mainbranch/issues/125)
 for selected workflow ports such as fuller `/mb-think` or `/mb-site`.
 
 Validation must name the exact workflows and runtimes that passed smoke. Docs

@@ -31,7 +31,7 @@ For the supported Claude Code slash-command behavior, read
 
 | Need | Best place |
 |---|---|
-| Bug in `mb` or bundled skills | [GitHub Issues](https://github.com/noontide-co/mainbranch/issues) |
+| Bug in `mb` or bundled skills | [GitHub Issues](https://github.com/dmthepm/mainbranch/issues) |
 | Setup help as a Main Branch member | [Skool community](https://skool.com/main) |
 | Feature request or roadmap discussion | GitHub Issues |
 | Security concern | Private report; see [SECURITY.md](SECURITY.md) |

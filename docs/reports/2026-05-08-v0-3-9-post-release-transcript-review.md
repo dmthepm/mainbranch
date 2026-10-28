@@ -2,7 +2,7 @@
 
 This is a public-safe release review note seeded from the v0.3.9 post-release
 simulation described in
-[#394](https://github.com/noontide-co/mainbranch/issues/394). It is not a raw
+[#394](https://github.com/dmthepm/mainbranch/issues/394). It is not a raw
 Claude transcript. It avoids local paths, account data, private business
 context, and long excerpts.
 
@@ -41,7 +41,7 @@ Likely fix types: `harness_gap`, `runtime_behavior`, `docs_gap`
 
 Issue route:
 
-- Use [#394](https://github.com/noontide-co/mainbranch/issues/394) to require
+- Use [#394](https://github.com/dmthepm/mainbranch/issues/394) to require
   pre-tag release simulation, transcript review, and explicit permission
   evidence.
 - Open a focused follow-up only if a future run still denies read-only `mb`

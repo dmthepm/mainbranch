@@ -16,7 +16,7 @@ MINIMUM_SUPPORTED_VERSION = "0.2.0"
 # `mb update` first shipped in the same release as the current support floor.
 MB_UPDATE_AVAILABLE_VERSION = "0.2.0"
 PYPI_PACKAGE_URL = "https://pypi.org/pypi/mainbranch/json"
-GITHUB_RELEASE_URL_TEMPLATE = "https://github.com/noontide-co/mainbranch/releases/tag/oe-v{version}"
+GITHUB_RELEASE_URL_TEMPLATE = "https://github.com/dmthepm/mainbranch/releases/tag/oe-v{version}"
 _LATEST_AUTO = object()
 # Required-update command per install mode (#965). `mb update` reuses these, so
 # both surfaces name the same command. Use a PyPI version when known; this
