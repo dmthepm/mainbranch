@@ -403,3 +403,19 @@ Open or select your business folder in Claude Code or Codex. In Claude Code, run
 `/mb-start`; in Codex, use the global `mb-start` skill. Then tell the agent what
 you want help with. Main Branch keeps the useful work in files you own so the
 next session does not start from scratch.
+
+### Get your first useful result
+
+Ask the agent:
+
+> Read my offer, audience, and voice drafts. Show me one unclear promise and
+> propose a clearer version. Explain what supports it and what you still need
+> to ask me. Wait for my approval before writing.
+
+Review the proposal, correct any assumptions, and approve only the changes you
+want. Then ask for a checkpoint preview and approve the save separately. You
+have a useful first result when you can read an accepted offer draft and name
+one next business task. Optional account connections can wait.
+
+Continue with [a working day](working-day.md) to see how an approved decision
+becomes a lesson the next session can use.

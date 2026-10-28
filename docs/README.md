@@ -30,6 +30,7 @@ For product principles and direction, read [ethos](ethos.md) and the
 
 ### Operating the daily loop
 
+- [A working day](working-day.md): follow one question through a decision, approval, save, and the next morning.
 - [`operator-loops.md`](operator-loops.md) — how operator work moves through Sense, Decide, Ship, Reflect.
 - [`content-strategy.md`](content-strategy.md) — layered content, distribution, channel, account, person, push, and results model.
 - [`playbooks.md`](playbooks.md) — reusable operating recipes and run records.
