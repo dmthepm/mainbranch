@@ -280,6 +280,13 @@ continuously instead of in yearly versions.
   by default. On a box that is always on, that leaves an open desktop for
   anyone who walks up. Turn auto-login off and turn on the idle lock. The
   desktop is your session only; agents never run in it.
+- **Turn clipboard history off if you ever copy a credential.** If this
+  machine is one where you ever copy a password, token or key, turn
+  Omarchy's clipboard history off completely. Keep it only on a machine that
+  never handles secrets. The history keeps every copy in a plain file that,
+  by default, other users and programs on the machine can read, plus copied
+  images. A filter that looks for known secret patterns can't catch new
+  token formats or screenshots.
 - **Disk unlock.** The same trade-off as Ubuntu applies. On Arch-based
   systems, TPM unlock is often set up with Secure Boot off, which binds the key
   to less of the boot chain. If you can't set it up with Secure Boot, a
