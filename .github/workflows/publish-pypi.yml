@@ -69,11 +69,12 @@ jobs:
         working-directory: mb
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install build tooling
         run: python -m pip install --upgrade pip build
@@ -96,6 +97,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
 
       - name: Extract CHANGELOG section for this release
         id: extract
@@ -170,13 +173,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Derive Linear release metadata
         id: meta
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_NAME: ${{ needs.release-metadata.outputs.name }}
         run: |
-          echo "tag=${{ needs.release-metadata.outputs.tag }}" >> "$GITHUB_OUTPUT"
-          echo "version=${{ needs.release-metadata.outputs.version }}" >> "$GITHUB_OUTPUT"
-          echo "name=${{ needs.release-metadata.outputs.name }}" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Sync issues into Linear release
         uses: linear/linear-release-action@3858a5d7892435dc63302ac76b0cdb587435caa9 # v0.14.6

@@ -8,11 +8,10 @@ hosted Main Branch service in the open-source engine.
 
 | Version | Supported |
 |---|---|
-| 0.4.x | Yes |
-| 0.3.x | Security fixes only when practical |
-| 0.2.x | Security fixes only when practical |
-| 0.1.x | No |
-| Older versions | No |
+| 0.6.x | Yes |
+| 0.5.x | Security fixes only when practical |
+| 0.4.x | Security fixes only when practical |
+| 0.3.x and older | No |
 
 Security fixes ship in the next patch release when practical.
 
@@ -47,7 +46,7 @@ locked in
 [`decisions/2026-05-11-supply-chain-security-gates.md`](decisions/2026-05-11-supply-chain-security-gates.md).
 
 If you suspect a Main Branch release, dependency update, or workflow has been
-compromised, follow the private report path below rather than opening a public
+compromised, follow the private report path above rather than opening a public
 issue.
 
 ## Scope
