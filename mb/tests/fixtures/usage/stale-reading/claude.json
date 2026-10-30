@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "written_at": "2030-01-01T11:55:00Z",
+  "taken_at": "2030-01-01T11:50:00Z",
+  "source": "synthetic-writer",
+  "accounts": {
+    "example-a": {
+      "taken_at": "2030-01-01T08:00:00Z",
+      "used_pct": 40,
+      "session_pct": 5,
+      "window_end": "2030-01-02T12:00:00Z",
+      "session_end": "2030-01-01T14:00:00Z"
+    },
+    "example-b": {
+      "taken_at": "2030-01-01T08:00:00Z",
+      "used_pct": 20,
+      "session_pct": 5,
+      "window_end": "2030-01-02T12:00:00Z",
+      "session_end": "2030-01-01T14:00:00Z"
+    }
+  }
+}

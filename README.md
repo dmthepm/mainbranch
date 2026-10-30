@@ -447,6 +447,7 @@ build on it, here is the command list.
 | --- | --- |
 | `mb onboard` | Human setup flow: create or connect a business folder, prepare Claude/Codex setup, show next steps. |
 | `mb init` | Quiet scriptable primitive underneath `mb onboard`. |
+| `mb usage` | Read local agent usage snapshots and weekly role caps. See [usage setup](docs/usage.md). |
 | `mb status` | Local-first daily briefing with ranked next actions, MoneyPath readiness, recent activity, GitHub tasks/proposals, updates, and drift. |
 | `mb doctor` | Check environment, repo shape, frontmatter, settings, app setup, provider state, and repair paths. |
 | `mb connect` | Register connected-account metadata/credentials, test health where supported, inspect repair-safe integration status without committing secrets. `mb connect exec <provider> -- <command>` runs a command with the stored credential in its environment only, so an agent can use it without retrieving the raw value; the command itself must not print it. See [docs/connect.md](docs/connect.md). |

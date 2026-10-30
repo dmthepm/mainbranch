@@ -358,6 +358,8 @@ SCHEMAS: dict[str, dict[str, Any]] = {
 
 def _read_frontmatter(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     """Return (frontmatter dict, error). Either may be None."""
+    if path.exists() and not path.is_file():
+        return None, "unreadable: not a regular file"
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:

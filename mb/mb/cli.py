@@ -58,6 +58,7 @@ from mb import suggest as suggest_mod
 from mb import think as think_mod
 from mb import unreadable as unreadable_mod
 from mb import update as update_mod
+from mb import usage as usage_mod
 from mb import validate as validate_mod
 from mb.engine import repo_flag
 from mb.freshness import format_update_alert, looks_like_business_repo, package_update_status
@@ -2650,6 +2651,21 @@ def connect_cmd(
     else:
         connect_mod.render_connect_result(result)
     raise typer.Exit(0 if result["ok"] else 1)
+
+
+@app.command("usage")
+def usage_cmd(
+    json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
+    directory: str | None = typer.Option(None, "--dir", help="Override usage.dir locally."),
+    now: str | None = typer.Option(None, "--now", help="UTC evaluation time for fixtures."),
+) -> None:
+    """Show local agent usage and weekly role caps, without contacting providers."""
+    result = usage_mod.collect(directory=directory, now=now)
+    if json_out:
+        typer.echo(_json_payload(result, command="mb usage", schema_name="mainbranch.usage"))
+    else:
+        typer.echo(usage_mod.render(result))
+    raise typer.Exit(result["exit_code"])
 
 
 @app.command("status")

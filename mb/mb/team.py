@@ -8,6 +8,8 @@ from typing import Any
 
 import yaml
 
+from mb import usage
+
 TEAM_SCHEMA_VERSION = "1.0"
 TEAM_DIR = Path("core") / "team"
 RELATIONSHIPS = {"owner", "member", "contractor", "advisor", "external_collaborator"}
@@ -42,8 +44,8 @@ def display_name(member: dict[str, Any]) -> str:
 
 def _read_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
+        text = usage.read_bounded(path, usage.ROLE_LIMIT).decode("utf-8")
+    except (OSError, UnicodeError, usage.Refused) as exc:
         return {}, f"unreadable: {exc}"
     if not text.startswith("---"):
         return {}, "no frontmatter"
@@ -54,7 +56,7 @@ def _read_frontmatter(path: Path) -> tuple[dict[str, Any], str]:
     raw = text[3:end].lstrip("\n")
     try:
         parsed = yaml.safe_load(raw) or {}
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, RecursionError) as exc:
         return {}, f"yaml error: {exc}"
     if not isinstance(parsed, dict):
         return {}, "frontmatter not a mapping"
