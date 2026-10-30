@@ -22,9 +22,9 @@ related: "#1258 operating team (duty map, role profiles, section 6 sketch), #125
   writes. It reads one directory named in local config.
 - **Unknown is never "available".** A missing, stale, malformed or
   unknown-version snapshot is `not_verified`, shown as unknown.
-- **Never redeem.** No code path calls a redeem or consume endpoint. A static
-  test fails the build if one appears. Banked resets are shown for
-  information only.
+- **Never redeem.** No code path is written to call a redeem or consume
+  endpoint. A static test is a bounded regression check against that. Banked
+  resets are shown for information only.
 - **The one suggestion.** Only when a weekly window reads 100% used and a
   banked reset is fresh, `mb` asks the owner a question. It never acts on the
   answer.
@@ -42,7 +42,8 @@ related: "#1258 operating team (duty map, role profiles, section 6 sketch), #125
    sees which roles should pause before a window runs out.
 3. Judge snapshot age the same way the platform's own reader does, so a
    platform and `mb` never disagree about whether a number is current.
-4. Make redeeming banked resets impossible from `mb`, and test that.
+4. Ship no way to redeem banked resets from `mb`, and guard that with a bounded
+   regression check.
 
 ## Non-goals
 
@@ -150,7 +151,9 @@ Rules:
 - a required field is missing, a time isn't a UTC stamp, a percentage isn't a
   finite number in 0-100, or a count is out of bounds (`malformed`);
 - the path is a symlink, not a regular file, group- or world-writable, or over
-  16 KiB (`unsafe_file`).
+  16 KiB (`unsafe_file`);
+- the snapshot directory is group- or world-writable (`unsafe_directory`). The
+  directory need not belong to the current user, and parents are not checked.
 
 These match the platform reader's rules, so a file one accepts the other
 accepts too (except the missing-version case above).
@@ -340,21 +343,24 @@ question 5).
 
 ## 9. Never redeem: how it is enforced
 
+These checks are a bounded regression guard, not proof. Static scans can't prove
+what arbitrary Python does; for example, a name built at runtime passes.
+
 1. **No network or process in the reader.** The usage module imports nothing
    from `urllib`, `http`, `socket`, `requests`, `httpx`, `subprocess` or
    `os.system`/`os.exec*`. A test parses the module's AST and fails on any.
 2. **Static scan of the whole package.** A test walks every `.py` file under
-   `mb/mb/`, parses it, and fails when a call, attribute, function name or
-   string literal matches `redeem` or `consume` (case-insensitive), or a URL
-   literal contains `reset` together with `credit`. The only allowlisted
-   strings are the display text in the usage module ("information only",
-   the owner question), listed by exact value in the test.
+   `mb/mb/`, parses it, and fails when a name, attribute, parameter, import or
+   non-docstring string literal contains `redeem` or the word `consume`
+   (case-insensitive), or a path or URL literal contains `reset` together with
+   `credit`. Words such as `consumed` and `consumers` are not matches.
 3. **No command in the suggestion.** A test checks the owner question's
    `actions[]` entry has no `command` field and that the human text holds no
    shell-like line.
 4. **Skills too.** The same scan runs over bundled skills under
    `.claude/skills/` for instructions that tell an agent to redeem (a
-   `redeem` word outside a "never" sentence fails, with an allowlist).
+   `redeem` word, or `consume` beside `reset` or `credit`, outside a "never"
+   sentence fails).
 
 ## 10. Standalone: no platform
 

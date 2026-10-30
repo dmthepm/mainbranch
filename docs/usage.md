@@ -3,6 +3,9 @@
 Run `mb usage` to read local snapshots of your agents' weekly usage. Main Branch
 ships no collector. It reads no credentials, contacts no provider, and never
 uses or buys banked resets. The owner or a separate collector writes the files.
+A test scans the package and bundled skills for redeem and consume names,
+literals and endpoint strings. That scan is a bounded regression check, not proof
+about all code.
 
 Set `usage.dir` in `~/.config/mainbranch/config.toml`, or beneath
 `$XDG_CONFIG_HOME/mainbranch/config.toml` when that variable is set:
@@ -32,8 +35,9 @@ mb usage --dir /absolute/path/to/snapshots --now 2030-01-01T12:00:00Z --json
 
 ## Snapshot format
 
-Only `claude.json` and `codex.json` are opened. Use synthetic account keys such
-as `example-a`, never emails or private identifiers. Keys must match
+`claude.json` and `codex.json` are the only snapshot files opened. `mb usage`
+also reads your local `config.toml` and the role profiles in `core/team/*.md`.
+Use synthetic account keys such as `example-a`, never emails or private identifiers. Keys must match
 `^[a-z0-9][a-z0-9-]{0,39}$`. All timestamps use UTC with seconds and a `Z` suffix.
 
 Minimal `claude.json`:
@@ -77,6 +81,23 @@ credits and counts that disagree with the list are shown as unknown.
 Write to a temporary file, set `written_at` last, then rename the file into
 place. Keep it owner-writable only, under 16 KiB, and a regular file rather than
 a symlink. Update hand-written files when starting a batch.
+
+`config.toml` must stay under 64 KiB and each role profile under 1 MiB. Each must
+be a regular file, not a symlink or named pipe. Anything else is a configuration
+error.
+
+## Trust the collector directory
+
+Point `usage.dir` at a directory you trust. It may belong to the owner or to a
+separate collector account.
+
+- A snapshot directory or file writable by group or others is refused. Its
+  accounts show as unknown with `unsafe_directory` or `unsafe_file`.
+- These guards check the snapshot file and its own directory only. They do not
+  validate parent directories, so check that nothing above `usage.dir` lets an
+  untrusted account replace it.
+- JSON validation cannot authenticate a collector. A well-formed fresh file is
+  believed, so anyone who can write there can report any number.
 
 ## Freshness, caps, and exits
 

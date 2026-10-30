@@ -19,6 +19,9 @@ STAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ\Z")
 COMMON = {"schema_version", "written_at", "taken_at", "source"}
 READING = {"taken_at", "used_pct", "session_pct", "window_end", "session_end"}
 QUESTION = "Do you want to use one now? mb won't do it; use your runtime's own screen."
+SNAPSHOT_LIMIT = 16384
+CONFIG_LIMIT = 65536
+ROLE_LIMIT = 1048576
 
 
 class Refused(ValueError):
@@ -29,6 +32,14 @@ def timestamp(value: Any) -> datetime:
     if not isinstance(value, str) or not STAMP.fullmatch(value):
         raise ValueError("invalid UTC stamp")
     return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
+def _printable(text: str) -> str:
+    """Escape terminal controls and other nonprintable characters for display."""
+    return "".join(
+        char if char.isprintable() else char.encode("unicode_escape").decode("ascii")
+        for char in text
+    )
 
 
 def _percentage(value: Any) -> bool:
@@ -88,24 +99,33 @@ def _credit_shape(data: Any) -> None:
             raise Refused("malformed")
 
 
+def read_bounded(path: Path, limit: int, *, owner_only: bool = False) -> bytes:
+    """Read one regular file without following a final symlink or blocking on it."""
+    denied = 0o022 if owner_only else 0
+    before = path.lstat()
+    if not stat.S_ISREG(before.st_mode) or before.st_mode & denied or before.st_size > limit:
+        raise Refused("unsafe_file")
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        actual = os.fstat(stream.fileno())
+        if (
+            not stat.S_ISREG(actual.st_mode)
+            or actual.st_mode & denied
+            or (actual.st_dev, actual.st_ino) != (before.st_dev, before.st_ino)
+        ):
+            raise Refused("unsafe_file")
+        raw = stream.read(limit + 1)
+    if len(raw) > limit:
+        raise Refused("unsafe_file")
+    return raw
+
+
 def _read_file(path: Path, multi: bool) -> dict[str, Any]:
     try:
-        before = path.lstat()
-        if not stat.S_ISREG(before.st_mode) or before.st_mode & 0o022 or before.st_size > 16384:
-            raise Refused("unsafe_file")
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | os.O_NONBLOCK)
-        with os.fdopen(fd, "rb") as stream:
-            actual = os.fstat(stream.fileno())
-            if (
-                not stat.S_ISREG(actual.st_mode)
-                or actual.st_mode & 0o022
-                or (actual.st_dev, actual.st_ino) != (before.st_dev, before.st_ino)
-            ):
-                raise Refused("unsafe_file")
-            raw = stream.read(16385)
-        if len(raw) > 16384:
-            raise Refused("unsafe_file")
-        data = json.loads(raw)
+        # Follows a symlinked directory: the target's mode decides who can replace files.
+        if path.parent.stat().st_mode & 0o022:
+            raise Refused("unsafe_directory")
+        data = json.loads(read_bounded(path, SNAPSHOT_LIMIT, owner_only=True))
         if not isinstance(data, dict):
             raise Refused("malformed")
         if type(data.get("schema_version")) is not int or data["schema_version"] != 1:
@@ -136,7 +156,7 @@ def _read_file(path: Path, multi: bool) -> dict[str, Any]:
         raise
     except Refused:
         raise
-    except (OSError, ValueError, TypeError, OverflowError) as exc:
+    except (OSError, ValueError, TypeError, OverflowError, RecursionError) as exc:
         raise Refused("malformed") from exc
 
 
@@ -183,8 +203,10 @@ def _credits(raw: Any, now: datetime, fresh: bool) -> dict[str, Any] | None:
                 {"expires_at", "granted_at", "status"},
             )
             expires = timestamp(credit["expires_at"])
-            timestamp(credit["granted_at"])
+            granted = timestamp(credit["granted_at"])
             if credit["status"] not in ("available", "expired", "used"):
+                return unknown
+            if granted > read_at or granted > expires:
                 return unknown
             if credit["status"] == "available" and expires > now:
                 available.append(credit["expires_at"])
@@ -205,15 +227,15 @@ def load_config() -> dict[str, Any]:
     base = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
     path = base / "mainbranch" / "config.toml"
     try:
-        text = path.read_text(encoding="utf-8")
+        text = read_bounded(path, CONFIG_LIMIT).decode("utf-8")
     except FileNotFoundError:
         return {}
-    except (OSError, UnicodeError) as exc:
+    except (OSError, UnicodeError, Refused) as exc:
         raise ValueError("usage_config_unreadable") from exc
     try:
         tomllib = importlib.import_module("tomllib")
         data = tomllib.loads(text).get("usage", {})
-    except (ImportError, ValueError) as exc:
+    except (ImportError, ValueError, RecursionError) as exc:
         raise ValueError("usage_config_invalid_or_toml_unavailable") from exc
     if not isinstance(data, dict):
         raise ValueError("usage_config_invalid")
@@ -250,13 +272,13 @@ def _roles(
         if path.name == "README.md":
             continue
         try:
-            text = path.read_text(encoding="utf-8")
+            text = read_bounded(path, ROLE_LIMIT).decode("utf-8")
             if not text.startswith("---\n"):
                 continue
             if "\n---" not in text[4:]:
                 raise ValueError("role_profile_invalid")
             profile = yaml.safe_load(text[4:].split("\n---", 1)[0])
-        except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        except (OSError, UnicodeError, yaml.YAMLError, Refused, RecursionError) as exc:
             raise ValueError("role_profile_invalid") from exc
         if not isinstance(profile, dict) or not ({"budget", "budget_cap"} & profile.keys()):
             continue
@@ -430,7 +452,9 @@ def collect(
             if not result["accounts"]:
                 result["warnings"].append({"code": "no_snapshot"})
         known = {a["key"] for a in result["accounts"] if a.get("used_pct") is not None}
-        if any(key not in known for key in settings.get("role_accounts", {}).values()):
+        refused = any(a["used_pct"] is None for a in result["accounts"])
+        mapped = settings.get("role_accounts", {}).values()
+        if not refused and any(key not in known for key in mapped):
             raise ValueError("role_account_not_in_snapshot")
         result["roles"] = _roles(repo or Path.cwd(), settings, result["accounts"], current)
     except (ValueError, TypeError, OverflowError) as exc:
@@ -517,7 +541,7 @@ def status_line(view: dict[str, Any]) -> str:
         parts.append(text)
     line = "Usage: " + (", ".join(parts) or "unknown. Run: mb usage")
     if view.get("roles"):
-        roles = ", ".join(f"{r['id']} ({r['stop_at_pct']}%)" for r in view["roles"])
+        roles = ", ".join(f"{_printable(r['id'])} ({r['stop_at_pct']}%)" for r in view["roles"])
         line += f". Near cap: {roles}. Run: mb usage"
     return line
 
@@ -565,12 +589,14 @@ def render(result: dict[str, Any]) -> str:
     if result["roles"]:
         lines.append("Roles")
         for r in result["roles"]:
+            role = _printable(r["id"])
             if r["stop_at_pct"] is None:
-                lines.append(f"  {r['state']} {r['id']}: {r['budget_cap'] or 'cap unknown'}")
+                cap = _printable(r["budget_cap"] or "cap unknown")
+                lines.append(f"  {r['state']} {role}: {cap}")
                 continue
             lines.append(
-                f"  {r['state']} {r['id']}: cap {r['stop_at_pct']}%, "
-                f"account {r['account'] or 'unknown'}"
+                f"  {r['state']} {role}: cap {r['stop_at_pct']}%, "
+                f"account {_printable(r['account'] or 'unknown')}"
             )
     lines.extend(a["message"] for a in result["actions"])
     return "\n".join(lines)

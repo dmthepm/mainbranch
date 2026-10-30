@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import ast
 import json
+import os
+import re
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +30,51 @@ def isolated_config(tmp_path, monkeypatch):
 
 def collect(name: str = "fresh", **kwargs: Any) -> dict[str, Any]:
     return usage.collect(directory=str(FIXTURES / name), now=NOW, **kwargs)
+
+
+def _forbidden_word(text: str) -> bool:
+    words = re.findall(r"[a-z]+", re.sub(r"([a-z])([A-Z])", r"\1 \2", text).lower())
+    return "redeem" in text.lower() or "consume" in words
+
+
+def redemption_hits(source: str) -> list[str]:
+    """Bounded regression check: names and literals, not proof about arbitrary Python."""
+    tree = ast.parse(source)
+    documented = [
+        node.body[0]
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        and ast.get_docstring(node) is not None
+    ]
+    prose = {id(stmt.value) for stmt in documented if isinstance(stmt, ast.Expr)}
+    hits = []
+    for node in ast.walk(tree):
+        names = [getattr(node, field, None) for field in ("name", "attr", "id", "arg", "asname")]
+        names.append(getattr(node, "module", None))
+        hits += [name for name in names if isinstance(name, str) and _forbidden_word(name)]
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, (str, bytes))
+            and id(node) not in prose
+        ):
+            value = node.value
+            text = value.decode("utf-8", "replace") if isinstance(value, bytes) else value
+            lowered = text.lower()
+            endpoint = "/" in text and "reset" in lowered and "credit" in lowered
+            if _forbidden_word(text) or endpoint:
+                hits.append(text)
+    return hits
+
+
+def skill_hits(text: str) -> list[str]:
+    """Flag redeem wording outside a "never" sentence; a limited wording check."""
+    hits = []
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        lowered = sentence.lower()
+        consume = "consume" in lowered and ("reset" in lowered or "credit" in lowered)
+        if ("redeem" in lowered or consume) and "never" not in lowered:
+            hits.append(sentence.strip())
+    return hits
 
 
 @pytest.mark.parametrize(
@@ -244,25 +293,76 @@ def test_no_network_or_process_and_no_redemption_calls():
             and node.func.attr == "import_module"
         ):
             assert isinstance(node.args[0], ast.Constant) and node.args[0].value == "tomllib"
-    for file in package.rglob("*.py"):
-        for node in ast.walk(ast.parse(file.read_text())):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                assert not any(word in node.name.lower() for word in ("redeem", "consume"))
-            if isinstance(node, ast.Call):
-                name = (
-                    node.func.id
-                    if isinstance(node.func, ast.Name)
-                    else node.func.attr
-                    if isinstance(node.func, ast.Attribute)
-                    else ""
-                )
-                assert not any(word in name.lower() for word in ("redeem", "consume"))
-            if (
-                isinstance(node, ast.Constant)
-                and isinstance(node.value, str)
-                and "://" in node.value
-            ):
-                assert not ("reset" in node.value.lower() and "credit" in node.value.lower())
+    hits = {
+        str(file.relative_to(package)): redemption_hits(file.read_text())
+        for file in package.rglob("*.py")
+    }
+    assert {name: found for name, found in hits.items() if found} == {}
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'client.post("/redeem")',
+        'client.post(b"/redeem")',
+        'getattr(client, "redeem")()',
+        "f = client.consume; f()",
+        "client.redeem",
+        "def redeem_credit(): pass",
+        "class CreditRedeemer: pass",
+        "call(redeem=True)",
+        "from billing import consume",
+        "import provider.redeem",
+        "consumeCredit()",
+        'client.post(f"/credits/{credit}/consume")',
+        'client.post("/v1/credits/reset")',
+        'client.get("https://example.test/reset-credits")',
+        'client.get("https://example.test/redeem")',
+    ],
+)
+def test_redemption_scan_catches(source):
+    assert redemption_hits(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    ["consumed = 1", 'text = "JSON consumers"', 'key = "reset_credits"', 'word = "redemption"'],
+)
+def test_redemption_scan_allows_unrelated_words(source):
+    assert redemption_hits(source) == []
+
+
+def test_bundled_skills_never_tell_an_agent_to_redeem():
+    skills = Path(usage.__file__).parents[2] / ".claude" / "skills"
+    files = [path for path in skills.rglob("*") if path.is_file()]
+    assert any(path.name == "SKILL.md" for path in files)
+    hits = {}
+    for path in files:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        found = skill_hits(text) + (redemption_hits(text) if path.suffix == ".py" else [])
+        if found:
+            hits[str(path.relative_to(skills))] = found
+    assert hits == {}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Redeem the banked reset now.",
+        "Run this first.\nUse `client.redeem()` to restore capacity.",
+        "Consume a reset credit when blocked.",
+    ],
+)
+def test_skill_scan_catches(text):
+    assert skill_hits(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Never redeem a banked reset.", "Skills consume this file.", "The redemption arc."],
+)
+def test_skill_scan_allows_refusals_and_unrelated_words(text):
+    assert skill_hits(text) == []
 
 
 @pytest.mark.parametrize(
@@ -317,3 +417,204 @@ def test_missing_file_is_skipped_and_unknown_fields_refused(tmp_path):
     (tmp_path / "codex.json").write_text(json.dumps(data))
     result = usage.collect(directory=str(tmp_path), now=NOW)
     assert result["accounts"][0]["reason"] == "unknown_field"
+
+
+def run_with_timeout(code: str, *args: str) -> dict[str, Any]:
+    """Run a probe in a child process so a blocking read fails instead of hanging pytest."""
+    env = {**os.environ, "PYTHONPATH": str(Path(usage.__file__).parents[1])}
+    done = subprocess.run(
+        [sys.executable, "-c", code, *args],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        env=env,
+        check=True,
+    )
+    data: dict[str, Any] = json.loads(done.stdout)
+    return data
+
+
+COLLECT_PROBE = """
+import json, sys
+from pathlib import Path
+from mb import usage
+now = "2030-01-01T12:00:00Z"
+result = usage.collect(directory=sys.argv[1], now=now, repo=Path(sys.argv[2]))
+view = usage.status_view(repo=Path(sys.argv[2]), now=usage.timestamp(now))
+print(json.dumps({"collect": result, "status": view}))
+"""
+
+STATUS_PROBE = """
+import json, sys
+from mb import connect, ranker, status, usage
+status._github = lambda *a, **kw: {"available": False}
+status.package_update_status = lambda *a: {}
+status._runtime = lambda *a: {}
+connect.status_all = lambda *a, **kw: {}
+status._readiness = lambda *a: {"level": "ready", "score": 100}
+ranker.rank_status_report = lambda *a: []
+status._drift = lambda *a: {}
+report = status.run(sys.argv[1], update_marker=False, now=usage.timestamp("2030-01-01T12:00:00Z"))
+print(json.dumps({"usage": report["usage"]}))
+"""
+
+
+def _plant(path: Path, kind: str, limit: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if kind == "fifo":
+        os.mkfifo(path)
+    elif kind == "symlink-to-fifo":
+        os.mkfifo(path.with_suffix(".pipe"))
+        path.symlink_to(path.with_suffix(".pipe"))
+    elif kind == "symlink":
+        path.with_suffix(".real").write_text("---\nbudget_cap: x\n---\n")
+        path.symlink_to(path.with_suffix(".real"))
+    else:
+        with path.open("wb") as stream:
+            stream.truncate(limit + 1)
+
+
+KINDS = ["fifo", "symlink-to-fifo", "symlink", "oversize"]
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_bad_config_does_not_hang(tmp_path, kind):
+    _plant(tmp_path / "config" / "mainbranch" / "config.toml", kind, usage.CONFIG_LIMIT)
+    data = run_with_timeout(COLLECT_PROBE, str(FIXTURES / "fresh"), str(tmp_path))
+    assert data["collect"]["errors"] == [{"code": "usage_config_unreadable"}]
+    assert data["collect"]["exit_code"] == 2
+    assert data["status"]["errors"] == [{"code": "usage_config_invalid"}]
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_bad_role_file_does_not_hang(tmp_path, kind):
+    _plant(tmp_path / "core" / "team" / "blocked.md", kind, usage.ROLE_LIMIT)
+    data = run_with_timeout(COLLECT_PROBE, str(FIXTURES / "fresh"), str(tmp_path))
+    assert data["collect"]["errors"] == [{"code": "role_profile_invalid"}]
+    assert data["collect"]["exit_code"] == 2
+
+
+def test_status_survives_fifo_config_and_team_file(tmp_path):
+    _plant(tmp_path / "config" / "mainbranch" / "config.toml", "fifo", 0)
+    _plant(tmp_path / "core" / "team" / "blocked.md", "fifo", 0)
+    data = run_with_timeout(STATUS_PROBE, str(tmp_path))
+    assert data["usage"]["errors"] == [{"code": "usage_config_invalid"}]
+
+
+def test_role_text_is_escaped_for_terminals(tmp_path):
+    team = tmp_path / "core" / "team"
+    team.mkdir(parents=True)
+    (team / "evil\x1b[2J.md").write_text("---\nbudget:\n  stop_at_pct: 44\n---\n")
+    (team / "title\x1b]0;x\x07.md").write_text("---\nbudget_cap: tired\n---\n")
+    (team / "text.md").write_text('---\nbudget_cap: "stop\\e[2J \\x9b1m \\u202e\\n fake"\n---\n')
+    text = usage.render(collect(repo=tmp_path))
+    assert all(char.isprintable() or char == "\n" for char in text)
+    assert "evil\\x1b[2J: cap 44%" in text
+    assert "title\\x1b]0;x\\x07: tired" in text
+    assert "stop\\x1b[2J \\x9b1m \\u202e\\n fake" in text
+    line = usage.status_line(
+        {
+            "accounts": [],
+            "roles": [{"id": "evil\x1b[2J", "stop_at_pct": 44}],
+            "evaluated_at": NOW,
+        }
+    )
+    assert "\x1b" not in line
+    assert "evil\\x1b[2J (44%)" in line
+    cli = CliRunner().invoke(
+        app, ["usage", "--dir", str(FIXTURES / "fresh"), "--now", NOW, "--json"]
+    )
+    assert "\x1b" not in cli.stdout
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "status_value"),
+    [
+        ("granted_at", "2030-01-02T00:00:00Z", "available"),
+        ("expires_at", "2030-01-01T10:00:00Z", "available"),
+        ("granted_at", "2030-01-02T00:00:00Z", "used"),
+    ],
+)
+def test_impossible_credit_chronology_is_unknown(tmp_path, field, value, status_value):
+    data = json.loads((FIXTURES / "full-week" / "codex.json").read_text())
+    credit = data["reset_credits"]["credits"][0]
+    credit["granted_at"] = "2030-01-01T11:00:00Z"
+    credit["expires_at"] = "2030-01-03T12:00:00Z"
+    credit["status"] = status_value
+    credit[field] = value
+    data["reset_credits"]["available_count"] = 1 if status_value == "available" else 0
+    (tmp_path / "codex.json").write_text(json.dumps(data))
+    result = usage.collect(directory=str(tmp_path), now=NOW)
+    assert result["accounts"][0]["reset_credits"]["state"] == "unknown"
+    assert result["accounts"][0]["reset_credits"]["available"] is None
+    assert result["actions"] == []
+
+
+def _snapshots(folder: Path, mode: int) -> Path:
+    shutil.copytree(FIXTURES / "fresh", folder)
+    for path in folder.iterdir():
+        path.chmod(0o644)
+    folder.chmod(mode)
+    return folder
+
+
+@pytest.mark.parametrize("mode", [0o775, 0o757, 0o777, 0o1777])
+def test_writable_directory_is_not_verified(tmp_path, mode):
+    folder = _snapshots(tmp_path / "snapshots", mode)
+    config = {"role_accounts": {"near": "example-a"}}
+    team = tmp_path / "core" / "team"
+    team.mkdir(parents=True)
+    (team / "near.md").write_text("---\nbudget:\n  stop_at_pct: 44\n---\n")
+    result = usage.collect(directory=str(folder), now=NOW, repo=tmp_path, config=config)
+    assert [(a["key"], a["state"], a["reason"]) for a in result["accounts"]] == [
+        ("claude", "not_verified", "unsafe_directory"),
+        ("codex", "not_verified", "unsafe_directory"),
+    ]
+    assert result["errors"] == []
+    assert result["roles"][0]["state"] == "not_verified"
+    assert result["exit_code"] == 3
+
+
+def test_group_writable_snapshot_file_is_refused(tmp_path):
+    folder = _snapshots(tmp_path / "snapshots", 0o755)
+    (folder / "codex.json").chmod(0o664)
+    result = usage.collect(directory=str(folder), now=NOW)
+    assert [a["reason"] for a in result["accounts"]][-1] == "unsafe_file"
+
+
+def test_collector_owned_directory_stays_fresh(tmp_path, monkeypatch):
+    folder = _snapshots(tmp_path / "snapshots", 0o755)
+    monkeypatch.setattr(os, "getuid", lambda: os.stat(folder).st_uid + 1)
+    monkeypatch.setattr(os, "geteuid", lambda: os.stat(folder).st_uid + 1)
+    result = usage.collect(directory=str(folder), now=NOW)
+    assert result["exit_code"] == 0
+    assert result["summary"]["not_verified"] == 0
+
+
+@pytest.mark.parametrize(("mode", "exit_code"), [(0o755, 0), (0o777, 3)])
+def test_symlinked_directory_is_judged_by_its_target(tmp_path, mode, exit_code):
+    folder = _snapshots(tmp_path / "snapshots", mode)
+    (tmp_path / "link").symlink_to(folder)
+    assert usage.collect(directory=str(tmp_path / "link"), now=NOW)["exit_code"] == exit_code
+
+
+def test_deeply_nested_inputs_are_not_crashes(tmp_path, monkeypatch):
+    folder = tmp_path / "snapshots"
+    folder.mkdir(mode=0o755)
+    snapshot = folder / "claude.json"
+    snapshot.write_text("[" * 16000)
+    snapshot.chmod(0o644)
+    result = usage.collect(directory=str(folder), now=NOW)
+    assert [account["reason"] for account in result["accounts"]] == ["malformed"]
+
+    config = tmp_path / "config" / "mainbranch" / "config.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text(f'[usage]\ndir = "{folder}"\n')
+    config.chmod(0o600)
+    data = run_with_timeout(STATUS_PROBE, str(tmp_path))
+    assert data["usage"]["accounts"][0]["state"] == "not_verified"
+
+    config.write_text("a = " + "[" * 16000)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    with pytest.raises(ValueError):
+        usage.load_config()
