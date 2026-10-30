@@ -15,33 +15,35 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - `docs/connect.md` now explains how to replace a live provider key without an
   outage.
+- `mb usage` reads local agent usage snapshots, shows weekly role caps and
+  banked resets for information, and adds an opt-in usage line to `mb status`.
+- `/mb-seo`: check AI search access and publish `llms.txt`; review a site's public pages for SEO with no accounts, then
+  optionally set up OpenSEO, the chosen SEO tool, one copy per business. Paid
+  research asks first. Support is experimental, and Codex is not supported.
+
 ### Changed
 
 - `docs/machine-setup.md`: on Omarchy, turn clipboard history off completely
   on any machine where you ever copy a credential.
 - The README and core owner docs are shorter and start from what an owner
   does: setup, a first result, the working day and runtime limits.
+- `docs/migrating.md` now shows how to move a plugin marketplace from the old
+  `noontide-co/mainbranch` address to `dmthepm/mainbranch`.
+
 ### Fixed
 
 - Credential reads refuse recorded references that do not match the selected
   repo, provider and field, with guidance to reconnect.
-
 - Credential release audits record canonical provider IDs and refuse symlink or
   nonregular audit files. Local secret files are private before replacement.
   Connect help marks `--token` deprecated and warns about process arguments;
   connection removal is documented as planned.
-
 - `mb dashboard build` and `mb dashboard open` now refuse to write through a
   symlink inside the repo, at the output file or a parent folder, and name the
   link to replace. The output is written to a new file, so a symlink at an
   output path outside the repo is replaced, not followed.
 - Suggested `mb books doctor --repo` commands now quote the path, so a path
   with spaces or shell characters can be run as printed.
-- `mb usage` reads local agent usage snapshots, shows weekly role caps and
-  banked resets for information, and adds an opt-in usage line to `mb status`.
-- `/mb-seo`: check AI search access and publish `llms.txt`; review a site's public pages for SEO with no accounts, then
-  optionally set up OpenSEO, the chosen SEO tool, one copy per business. Paid
-  research asks first. Support is experimental, and Codex is not supported.
 
 ## [0.6.17] - 2026-10-28
 
