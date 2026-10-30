@@ -14,7 +14,7 @@ human approval over clever automation.
 
 - The PyPI publisher for `mainbranch` is configured as a **trusted
   publisher** (OIDC) bound to:
-  - `owner=noontide-co`
+  - `owner=dmthepm`
   - `repo=mainbranch`
   - `workflow=publish-pypi.yml`
   - `environment=pypi`

@@ -94,7 +94,7 @@ jobs:
           UV_MANAGED_PYTHON: "1"
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "uv==0.12.22"
+          python -m pip install "uv==0.13.5"
           uv python install 3.12
           uv venv --python 3.12 .venv-keychain
           uv pip install --python .venv-keychain/bin/python -e ".[dev]"
@@ -155,7 +155,7 @@ jobs:
       - name: Install mb at its declared minimum dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "uv==0.12.22"
+          python -m pip install "uv==0.13.5"
           uv venv --python "$(command -v python)" .venv-min
           uv pip install --python .venv-min/bin/python --resolution lowest-direct .
           uv pip list --python .venv-min/bin/python

@@ -3405,6 +3405,32 @@ def image_smoke_fal_cmd(
     raise typer.Exit(0)
 
 
+def _dashboard_result(
+    action: Callable[..., dict[str, Any]],
+    *,
+    repo: str,
+    output: str | None,
+    command: str,
+    json_out: bool,
+) -> dict[str, Any]:
+    """Run a dashboard write; an unsafe output path is named, not a traceback."""
+    try:
+        return action(repo=repo, output=output)
+    except dashboard_mod.DashboardOutputError as exc:
+        if json_out:
+            typer.echo(
+                _json_error_payload(
+                    command=command,
+                    schema_name="mainbranch.dashboard.v1",
+                    code="unsafe_output_path",
+                    message=str(exc),
+                )
+            )
+        else:
+            typer.echo(f"{command}: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+
 @dashboard_app.command("build")
 def dashboard_build_cmd(
     repo: str = typer.Option(".", "--repo", help="Business repo to visualize."),
@@ -3417,7 +3443,13 @@ def dashboard_build_cmd(
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
 ) -> None:
     """Build a local read-only dashboard HTML file."""
-    result = dashboard_mod.build(repo=repo, output=output or None)
+    result = _dashboard_result(
+        dashboard_mod.build,
+        repo=repo,
+        output=output or None,
+        command="mb dashboard build",
+        json_out=json_out,
+    )
     if json_out:
         typer.echo(
             _json_payload(
@@ -3445,7 +3477,13 @@ def dashboard_open_cmd(
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
 ) -> None:
     """Build and open the local read-only dashboard in the default browser."""
-    result = dashboard_mod.open_dashboard(repo=repo, output=output or None)
+    result = _dashboard_result(
+        dashboard_mod.open_dashboard,
+        repo=repo,
+        output=output or None,
+        command="mb dashboard open",
+        json_out=json_out,
+    )
     if json_out:
         typer.echo(
             _json_payload(

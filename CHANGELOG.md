@@ -19,6 +19,14 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - `docs/machine-setup.md`: on Omarchy, turn clipboard history off completely
   on any machine where you ever copy a credential.
+### Fixed
+
+- `mb dashboard build` and `mb dashboard open` now refuse to write through a
+  symlink inside the repo, at the output file or a parent folder, and name the
+  link to replace. The output is written to a new file, so a symlink at an
+  output path outside the repo is replaced, not followed.
+- Suggested `mb books doctor --repo` commands now quote the path, so a path
+  with spaces or shell characters can be run as printed.
 
 ## [0.6.17] - 2026-10-28
 

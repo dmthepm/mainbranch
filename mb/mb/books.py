@@ -25,6 +25,7 @@ from __future__ import annotations
 import calendar
 import json
 import re
+import shlex
 import shutil
 import subprocess
 from importlib import resources
@@ -2075,7 +2076,7 @@ def add_check_next_step(report: dict[str, Any]) -> None:
             candidate = Path(location).expanduser()
             resolved = candidate if candidate.is_absolute() else repo / candidate
             if books_repo or resolved.is_dir():
-                doctor_command = f"mb books doctor --repo {location}"
+                doctor_command = f"mb books doctor --repo {shlex.quote(location)}"
     finding = _finding(
         id="books-skill-next-step",
         title="Books next step",
