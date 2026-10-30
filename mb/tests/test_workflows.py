@@ -1375,7 +1375,10 @@ def test_codex_workflow_inventory_accounts_for_every_bundled_claude_skill() -> N
 
     assert result.exit_code == 0
     data = json.loads(result.stdout)
-    expected = {
+    # Machine skills are Claude-only and intentionally absent from business workflows.
+    # Keep this exact list so new business skills still require inventory coverage.
+    claude_only_machine_sources = {".claude/skills/mb-homelab-machine/SKILL.md"}
+    bundled = {
         str(path.relative_to(REPO_ROOT))
         for path in sorted((REPO_ROOT / ".claude" / "skills").glob("mb-*/SKILL.md"))
     }
@@ -1384,6 +1387,9 @@ def test_codex_workflow_inventory_accounts_for_every_bundled_claude_skill() -> N
         source for item in data["items"] for source in item.get("claude_skill_sources", [])
     }
 
+    assert claude_only_machine_sources <= bundled
+    assert not claude_only_machine_sources & (top_level_sources | item_sources)
+    expected = bundled - claude_only_machine_sources
     assert top_level_sources == expected
     assert item_sources == expected
 

@@ -7,6 +7,8 @@ and Claude Code there, and use your laptop and phone only to look in and steer.
 Read the concepts first. They decide most of the steps, and they stay the same
 whichever machine or operating system you pick.
 
+Agents can follow this guide with the `mb-homelab-machine` Claude Code skill.
+
 If you are brand new to Main Branch, start with
 [`beginner-setup.md`](beginner-setup.md) on your laptop. Come back here when
 you want the work to run without you.
