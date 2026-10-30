@@ -1,0 +1,22 @@
+[
+  {"query": "i've got an old thinkcentre tiny with 32gb sitting in a closet, can i turn it into the box my claude agents run on while my macbook is closed? what OS and what do i do first", "should_trigger": true},
+  {"query": "We run two businesses off one mini PC now. What should I be checking on it every week? Backups, disks, that kind of thing", "should_trigger": true},
+  {"query": "my partner is starting a candle shop and wants their agent on the same always-on box as mine. how do I add her business without it seeing my stuff", "should_trigger": true},
+  {"query": "ubuntu or omarchy for the agent machine? I like hyprland but I don't want to babysit updates", "should_trigger": true},
+  {"query": "the nightly backup says it ran fine for months but we've never restored anything. is that ok or do I need to do something", "should_trigger": true},
+  {"query": "Should we move each business on the homelab box into its own container or VM now? Nothing broke, it just feels safer", "should_trigger": true},
+  {"query": "I want a standing bookkeeping agent that keeps running on the box and picks up where it left off after a reboot. how do I set that up", "should_trigger": true},
+  {"query": "bought a WD Red 8TB in a usb enclosure for backups on the agent box, how should it be mounted and how do I know it's healthy", "should_trigger": true},
+  {"query": "we're moving the agents from the old mini pc to a new one this weekend, what usually gets missed?", "should_trigger": true},
+  {"query": "what does checkpoint 1 hardening mean for our agent machine and are we there yet", "should_trigger": true},
+  {"query": "check my tailscale settings on this laptop, is ssh or funnel turned on?", "should_trigger": false},
+  {"query": "here's our tailnet policy file, does any rule let the agent tags reach the admin boxes?", "should_trigger": false},
+  {"query": "set up a new business repo for my pottery studio with mb init", "should_trigger": false},
+  {"query": "git says I have unsaved work in the business folder, can you checkpoint and push it before I close the laptop", "should_trigger": false},
+  {"query": "Our Cloudflare Pages lander is down after the last deploy, can you look at the build log", "should_trigger": false},
+  {"query": "what's a good backup strategy for my Shopify product photos and customer list?", "should_trigger": false},
+  {"query": "reconcile last month's books and tell me what's ready for the CPA", "should_trigger": false},
+  {"query": "mb update says there's a new version, how do I upgrade main branch on my laptop", "should_trigger": false},
+  {"query": "write a carousel post about why small business owners should run AI agents on a home server", "should_trigger": false},
+  {"query": "my macbook fan is loud and the battery drains fast when claude code is running, any tips", "should_trigger": false}
+]
