@@ -324,6 +324,7 @@ Signals and routes:
 - site, landing page, lander, minisite, publish: `/mb-site`
 - ads, Google Ads, Meta Ads, make an ad from this video, compliance: `/mb-ads`
 - organic, reels, TikTok, LinkedIn, carousel, short clips or social cuts from a sales video or VSL: `/mb-organic`
+- SEO, search rankings, keyword data, competitor keywords, site audit, AI visibility, OpenSEO: `/mb-seo`
 - wiki, notes, public knowledge base, atomic notes: `/mb-wiki`
 - confused, help, explain the system: `/mb-help`
 

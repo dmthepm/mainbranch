@@ -29,6 +29,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   with spaces or shell characters can be run as printed.
 - `mb usage` reads local agent usage snapshots, shows weekly role caps and
   banked resets for information, and adds an opt-in usage line to `mb status`.
+- `/mb-seo`: check AI search access and publish `llms.txt`; review a site's public pages for SEO with no accounts, then
+  optionally set up OpenSEO, the chosen SEO tool, one copy per business. Paid
+  research asks first. Support is experimental, and Codex is not supported.
 
 ## [0.6.17] - 2026-10-28
 

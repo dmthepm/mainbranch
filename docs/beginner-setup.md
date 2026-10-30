@@ -323,6 +323,7 @@ know them. In Codex, use the matching global skill names without the slash.
 | `/mb-organic` | Drafts Reels, TikToks, carousels, static posts, and sales-video repurposing. |
 | `/mb-site` | Helps plan, write, check, and launch landing pages, minisites, websites, and Cloudflare Pages work. |
 | `/mb-books` | Reviews private books setup, monthly close, reconciliation, and CPA handoff readiness. |
+| `/mb-seo` | Reviews public pages for SEO, with optional OpenSEO research (experimental). |
 | `/mb-wiki` | Builds a personal wiki with atomic notes. |
 | `/mb-end` | Closes a session with summary, crystallization, and checkpoint options. |
 | `/mb-help` | Answers questions and helps troubleshoot. |

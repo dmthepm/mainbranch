@@ -179,7 +179,7 @@ choices; the same number must never mean two actions — ask when ambiguous.
 6. Resolve multi-offer context without reusing numbered choices or silently
    writing local state.
 7. Present one clear route set or infer intent: `/mb-think`, `/mb-bet`,
-   `/mb-ads`, `/mb-organic`, `/mb-site`, `/mb-wiki`, `/mb-help`, or
+   `/mb-ads`, `/mb-organic`, `/mb-site`, `/mb-seo`, `/mb-wiki`, `/mb-help`, or
    `/mb-end`. Conversion-script requests route through the owning workflow,
    not a standalone skill.
 

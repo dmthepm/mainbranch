@@ -44,6 +44,7 @@ for repair facts before giving prose-only advice.
 | Migrate from GPT, ChatGPT | [gpt-migration.md](references/gpt-migration.md) |
 | Reels, TikTok, organic, /mb-organic | [organic-help.md](references/organic-help.md) |
 | Skool, community | [skool-help.md](references/skool-help.md) |
+| SEO, search rankings, keyword data, site audit, AI visibility, OpenSEO | Route to `/mb-seo` |
 | Wiki, atomic notes, publish, WikiLinks | Route to `/mb-wiki` |
 | Books, bookkeeping, monthly close, reconciliation, CPA handoff | Route to `/mb-books` after `mb books check` |
 | Launch readiness, Cloudflare, Wrangler, Shopify, Resend, smoke test, form test, booking link | Route to `/mb-site`; run `mb launch check` before launch-readiness advice |
