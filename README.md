@@ -483,6 +483,7 @@ build on it, here is the command list.
 | `/mb-organic` | Organic content: Reels, TikToks, carousels, static posts, and sales-video repurpose. |
 | `/mb-site` | Lander, minisite, website, Cloudflare Pages, pitch scripts, and measurement checks. |
 | `/mb-books` | Private books setup, monthly close and reconciliation review, and CPA handoff prep. |
+| `/mb-seo` | Public-site SEO review, plus experimental optional OpenSEO research. |
 | `/mb-wiki` | Specialty personal atomic-notes wiki on Cloudflare Pages. |
 | `/mb-update` | Update Main Branch. |
 | `/mb-help` | Q&A, troubleshooting, and system help. |

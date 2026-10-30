@@ -88,6 +88,16 @@ workflow and operator.
 
 ---
 
+### /mb-seo - SEO Review and Research
+**Use when:** Asking how to be found in search, wanting keyword or competitor
+data, or setting up OpenSEO.
+
+**What it does:** Reviews public pages straight away and suggests the first useful
+changes. OpenSEO is the chosen optional tool for paid research: each business runs
+its own copy, and paid calls need the owner's yes. Support is experimental.
+
+---
+
 ### /mb-ads - Ad Generation and Review
 **Use when:** Need copy for static ads, video scripts, long-form conversion creative, or compliance review.
 
