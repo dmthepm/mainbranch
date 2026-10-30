@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "written_at": "2030-01-01T11:55:00Z",
+  "taken_at": "2030-01-01T11:50:00Z",
+  "source": "synthetic-writer",
+  "used_pct": 101,
+  "window_end": "2030-01-02T12:00:00Z",
+  "window_minutes": 10080,
+  "reset_credits": {
+    "status": "read",
+    "read_at": "2030-01-01T11:50:00Z",
+    "available_count": 1,
+    "credits": [
+      {
+        "expires_at": "2030-01-03T12:00:00Z",
+        "granted_at": "2029-12-31T12:00:00Z",
+        "status": "available"
+      }
+    ],
+    "source": "synthetic-writer",
+    "note": "fake credit"
+  }
+}

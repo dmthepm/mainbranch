@@ -607,3 +607,16 @@ The v1 envelope is present on:
 Future commands should use the same shared metadata when they add or revise
 `--json` output. Avoid moving existing payloads under a new `data` key unless a
 future schema version explicitly deprecates the top-level domain keys.
+
+## Agent usage
+
+`mb usage --json` uses `mainbranch.usage` version `1.0`. It reports `summary`,
+`accounts`, `roles`, `evaluated_at`, and `now_overridden`. `ok` is true only
+for exit 0. Precedence is configuration errors (2), a weekly window at 100%
+or a role at cap (1), unknown facts (3), healthy (0). Account labels and role
+names make `safe_to_share` false. Paths and collector `source` values are omitted.
+An `owner_question` in `actions` contains no command and performs no action.
+
+`mb status --json` includes `usage: {"configured": false}` when unset. When
+configured, it includes the same reader's summary, account facts, and roles
+near or at cap. Usage does not change the status exit code. See [usage.md](usage.md).

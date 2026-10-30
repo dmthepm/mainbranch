@@ -24,6 +24,7 @@ from mb import pushes as pushes_mod
 from mb import ranker as ranker_mod
 from mb import site as site_mod
 from mb import topology as topology_mod
+from mb import usage as usage_mod
 from mb import validate as validate_mod
 from mb.engine import install_mode, link_status, missing_bundled_links, repo_flag
 from mb.freshness import (
@@ -4962,6 +4963,7 @@ def run(
         "push_compatibility": push_report["compatibility"],
         "vocabulary": vocabulary.facts(repo_path),
         "team": team_facts,
+        "usage": usage_mod.status_view(repo=repo_path, now=current_time),
         "books": books_mod.readiness(repo_path),
         "onboarding": onboard_mod.onboarding_status(repo_path),
         "integrations": connect_mod.status_all(repo_path, github=github.get("context")),
@@ -5150,6 +5152,9 @@ def render_human(
     }
 
     console.print(f"\n[bold]mb status[/bold]  {repo['path']}")
+    usage = report.get("usage") or {}
+    if usage.get("configured") or usage.get("errors"):
+        console.print(usage_mod.status_line(usage), markup=False)
     alert = format_update_alert(report.get("update", {}))
     if alert:
         console.print(alert)

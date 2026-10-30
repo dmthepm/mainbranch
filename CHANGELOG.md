@@ -27,6 +27,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   output path outside the repo is replaced, not followed.
 - Suggested `mb books doctor --repo` commands now quote the path, so a path
   with spaces or shell characters can be run as printed.
+- `mb usage` reads local agent usage snapshots, shows weekly role caps and
+  banked resets for information, and adds an opt-in usage line to `mb status`.
 
 ## [0.6.17] - 2026-10-28
 

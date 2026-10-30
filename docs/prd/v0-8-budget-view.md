@@ -439,3 +439,13 @@ Tests:
    business on another runtime would need a generic file name
    (`usage.json`, multi-account shape). Add it in v1, or wait for a real
    user?
+
+### Decided (Devon, 29 Oct)
+
+1. Refuse files without `schema_version`. Keep the strict rule.
+2. Use weekly `budget.stop_at_pct` only. Session caps come later.
+3. Defer pace warnings to a later snapshot version. Add no `prev_*` fields now.
+4. A fresh weekly window at 100% needs attention, exit 1, even without a mapped role.
+5. Keep usage out of fleet checkin.
+6. Use `usage.dir` as the config key.
+7. Read only `claude.json` and `codex.json`.

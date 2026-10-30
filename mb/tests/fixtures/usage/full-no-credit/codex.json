@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "written_at": "2030-01-01T11:55:00Z",
+  "taken_at": "2030-01-01T11:50:00Z",
+  "source": "synthetic-writer",
+  "used_pct": 100,
+  "window_end": "2030-01-02T12:00:00Z",
+  "window_minutes": 10080
+}

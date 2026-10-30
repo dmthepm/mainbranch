@@ -150,6 +150,8 @@ or runtime support beyond the facts.
 
 ## Routing Rules
 
+Route agent usage, remaining capacity, and role-cap questions to `mb usage --json` (read-only).
+
 Hard gates win before business routing: required updates, runtime mismatch,
 broken repo wiring, repair blockers, validation blockers, private-data
 boundaries, unsafe provider operations, destructive-operation requests, and
