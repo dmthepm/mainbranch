@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -36,6 +37,34 @@ def _findings(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _check(repo: Path) -> tuple[int, dict[str, Any]]:
     result = RUNNER.invoke(app, ["books", "check", str(repo), "--json"])
     return result.exit_code, json.loads(result.output)
+
+
+def test_books_check_quotes_doctor_command_path(tmp_path: Path) -> None:
+    repo = _business(tmp_path)
+    policy = repo / "core/finance/books.md"
+    policy.write_text(
+        "---\nstorage_mode: team-private-repo\nbooks_repo: ../acme books; touch x\n---\n",
+        encoding="utf-8",
+    )
+
+    _, payload = _check(repo)
+
+    pointer = _findings(payload)["books-skill-next-step"]
+    assert pointer["doctor_command"] == "mb books doctor --repo '../acme books; touch x'"
+    assert shlex.split(pointer["doctor_command"])[-1] == "../acme books; touch x"
+    assert pointer["doctor_command"] in pointer["operator_summary"]
+
+
+def test_doctor_repo_quotes_configured_books_path(tmp_path: Path) -> None:
+    repo = _business(tmp_path)
+    policy = repo / "core/finance/books.md"
+    policy.write_text("---\nbooks_repo: ../acme books\n---\n", encoding="utf-8")
+
+    result = RUNNER.invoke(app, ["books", "doctor", "--repo", str(repo), "--json"])
+
+    assert result.exit_code == 1
+    summary = json.loads(result.output)["findings"][0]["operator_summary"]
+    assert "Run mb books doctor --repo '../acme books'." in summary
 
 
 def test_g1_books_check_names_configured_doctor_command(tmp_path: Path) -> None:

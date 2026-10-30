@@ -342,7 +342,7 @@ def inspect(repo: Path, timeout: int = 600) -> dict[str, Any]:
                             "core/finance/books.md",
                             "This is the business repo; the books repo is configured as "
                             f"{configured}. "
-                            f"Run mb books doctor --repo {configured}.",
+                            f"Run mb books doctor --repo {shlex.quote(configured)}.",
                             level="warn",
                         )
                     ],
