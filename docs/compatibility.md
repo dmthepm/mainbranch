@@ -281,7 +281,9 @@ Which install modes `mb update` upgrades for you:
 | `uv` tool install | Prints `uv tool install --refresh mainbranch==<latest>` using the version verified from PyPI, and runs it only after you answer yes at an interactive prompt. If PyPI cannot be checked, `mb update` leaves the package alone; the fallback command is `uv tool install --refresh mainbranch@latest`. Reinstalling with an explicit requirement clears an earlier exact-version pin. `--refresh` revalidates cached index data, and the tool keeps the Python it already uses. Agent surfaces are refreshed either way. |
 | Any other wheel install (for example `pip install mainbranch`) | Prints `pip install --upgrade mainbranch` for you to run in the environment that owns the install. Agent surfaces are refreshed either way. |
 
-`mb update` never replaces a uv tool install without an explicit yes. When it
+`mb update` never replaces a uv tool install without an explicit yes. An install of 0.5.2 or earlier as a uv tool predates uv
+detection and reports `unsupported install mode: wheel`; those operators run
+`uv tool install mainbranch@latest` themselves once to reach 0.5.3 or later. When it
 cannot upgrade the package automatically it still refreshes your agent
 surfaces, exits 0, and carries the upgrade command in `next_actions`, so
 `mb update --json` and `mb update --check` are safe in automation and never run
