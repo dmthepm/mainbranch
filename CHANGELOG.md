@@ -11,6 +11,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `docs/connect.md` now explains how to replace a live provider key without an
+  outage.
+
 ## [0.6.17] - 2026-10-28
 
 ### Added

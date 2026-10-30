@@ -723,6 +723,25 @@ MB_CONNECT_SECRET_BACKEND=macos-keychain \
 Rotation updates only the selected business's `repo_id`-scoped reference. A
 same-named provider in another business is not a sibling and is never rewritten.
 
+### Replace a live key without an outage
+
+`mb connect` updates the copy it stores. It can't see the other places a live key
+sits, such as a deployed Worker, a CI secret, or a provider webhook. Revoking the
+old key while one of those still holds it stops that service.
+
+1. Read what the key must be allowed to do from the code that uses it, then create
+   the new key with those scopes. A send-only key breaks anything that also reads.
+2. List every holder, including any that CI doesn't set.
+3. Install the new key in every holder. A person or the platform does this, not an
+   agent, wherever the repo forbids agents from changing secrets.
+4. Prove each holder through its own real path, such as sending a test message
+   through the deployed service. A stored key proves nothing.
+5. Revoke the old key.
+6. Repeat the proofs.
+
+Keep both keys live until step 4 passes for every holder. If a proof fails, fix it
+before revoking; the old key is still your way back.
+
 ### Storing a secret again
 
 Storing a new secret for a provider that is already connected, custom or
