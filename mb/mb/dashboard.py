@@ -17,10 +17,17 @@ import yaml
 from mb import __version__
 from mb import connect as connect_mod
 from mb import status as status_mod
+from mb.durable import atomic_write_text
 from mb.gitignore import gitignore_problem
 
 DASHBOARD_SCHEMA_VERSION = "0.1"
 DEFAULT_OUTPUT_PATH = Path(".mb") / "dashboard" / "index.html"
+
+
+class DashboardOutputError(ValueError):
+    """Raised when the dashboard output path is not safe to write."""
+
+
 SECRET_VALUE_PATTERNS = (
     re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b"),
     re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{12,}\b"),
@@ -848,10 +855,10 @@ def build(repo: str | Path = ".", output: str | Path | None = None) -> dict[str,
 
     root = Path(repo).resolve()
     output_path = _resolve_output(root, output)
+    _refuse_symlinked_output(root, output_path)
     data = collect(root)
     html_text = render_html(data)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(html_text, encoding="utf-8")
+    atomic_write_text(output_path, html_text)
     # Self-ignoring output dir: the rendered dashboard is local-only state,
     # and "committed_by_default: False" must be enforced by git, not prose.
     if _is_relative_to(output_path, root):
@@ -895,6 +902,18 @@ def _resolve_output(repo: Path, output: str | Path | None) -> Path:
         return repo / DEFAULT_OUTPUT_PATH
     path = Path(output).expanduser()
     return path if path.is_absolute() else repo / path
+
+
+def _refuse_symlinked_output(repo: Path, output_path: Path) -> None:
+    """Refuse an output path that passes through a symlink stored inside the repo."""
+    for candidate in (output_path, *output_path.parents):
+        if candidate.is_symlink() and _is_relative_to(candidate.parent, repo):
+            link = (candidate.parent.resolve() / candidate.name).relative_to(repo).as_posix()
+            raise DashboardOutputError(
+                f"{link} is a symlink; Main Branch will not write the dashboard through it. "
+                "Replace it with a regular file or folder, or pass --output outside the repo, "
+                "then rerun."
+            )
 
 
 def _is_relative_to(path: Path, parent: Path) -> bool:
