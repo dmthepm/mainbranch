@@ -7,20 +7,21 @@ coding agents.
 Public product truth lives here. Per-event narratives live in `decisions/`,
 and the changelog lives in `../CHANGELOG.md`.
 
-## Reading routes
-
-Pick the route that matches what you are doing.
-
-### Start as an owner
+## Start with your business
 
 1. [Set up your business folder](beginner-setup.md).
-2. [Run today](beginner-setup.md#after-setup) with a request about your business.
-3. [Learn the operating loops](operator-loops.md) as you work.
+2. [Follow a working day](working-day.md), from an owner question to a saved lesson the next session reads.
+3. [Use the four operating loops](operator-loops.md) to see what a task needs next.
+
+Check [runtime compatibility](compatibility.md) before choosing a production
+workflow. Codex supports the daily loop; bet, ads, organic, site, and books
+routes remain read-only planning.
 
 For product principles and direction, read [ethos](ethos.md) and the
-[roadmap](roadmap.md). Contributors can use the engine route below.
+[roadmap](roadmap.md). Use the task references below when you need them.
+Contributors should follow [the engine route](#contributing-to-the-engine).
 
-### Setting up a business repo
+## Set up or repair a folder
 
 - [`beginner-setup.md`](beginner-setup.md) — install, first run, first decision.
 - [`machine-setup.md`](machine-setup.md) — an always-on box for your agents: concepts, machine picks, Ubuntu and Omarchy, first week.
@@ -28,14 +29,13 @@ For product principles and direction, read [ethos](ethos.md) and the
 - [`compatibility.md`](compatibility.md) — supported OS, runtime, and adapter matrix.
 - [`repo-visibility-rubric.md`](repo-visibility-rubric.md) — public vs private repo guidance.
 
-### Operating the daily loop
+## Run business tasks
 
 - [A working day](working-day.md): follow one question through a decision, approval, save, and the next morning.
 - [`operator-loops.md`](operator-loops.md) — how operator work moves through Sense, Decide, Ship, Reflect.
 - [`content-strategy.md`](content-strategy.md) — layered content, distribution, channel, account, person, push, and results model.
 - [`playbooks.md`](playbooks.md) — reusable operating recipes and run records.
 - [`books.md`](books.md) — bookkeeping safety, hledger, and the private ledger vault model.
-- [`onboarding-progress.md`](onboarding-progress.md) — lifecycle skill resume surface.
 - [`business-connections.md`](business-connections.md) — when to use frontmatter links, inline links, tags, data refs, or context.
 - [`markdown-link-conventions.md`](markdown-link-conventions.md) — markdown and link rules.
 - [`source-ingestion.md`](source-ingestion.md) — manifest-first privacy rail for transcripts, authenticated sources, and provider exports.
@@ -46,7 +46,7 @@ For product principles and direction, read [ethos](ethos.md) and the
 - [`feedback.md`](feedback.md) — `mb feedback`: log mb friction and self-logged refusals locally, roll them up weekly.
 - [`session-excavation.md`](session-excavation.md) — turn transcripts, chat exports, and session logs into prioritized public-safe follow-ups.
 
-### Schemas and contracts
+## Inspect schemas and contracts
 
 - [`architecture/system-map.md`](architecture/system-map.md) — Mermaid-powered visual index of the Main Branch system, boundaries, and source docs.
 - [`system-architecture.md`](system-architecture.md) — repo shapes, business primitives, boundaries, and schemas.
@@ -62,7 +62,7 @@ For product principles and direction, read [ethos](ethos.md) and the
 - [`claude-code-invocation-contract.md`](claude-code-invocation-contract.md) — supported Claude Code path.
 - [`release-simulations.md`](release-simulations.md) — release simulation manifest contract.
 
-### Contributing to the engine
+## Contributing to the engine
 
 - [`agent-cold-start.md`](agent-cold-start.md) — public read order and progressive discovery contract for agents.
 - [`oss-operating-checklist.md`](oss-operating-checklist.md) — public release / contributor checklist.
@@ -73,19 +73,25 @@ For product principles and direction, read [ethos](ethos.md) and the
 - [`post-release-alignment.md`](post-release-alignment.md) — post-release sweep, parallel work lanes, AI review ritual.
 - [`agent-writing-style.md`](agent-writing-style.md) — writing rubric for agent-facing docs and reviews.
 - [`google-ads-gtm-conversion-rubric.md`](google-ads-gtm-conversion-rubric.md) — paid-traffic conversion rubric.
-- [`philosophy.md`](philosophy.md) — long-form product writing.
+- [`onboarding-progress.md`](onboarding-progress.md) — saved setup progress for runtime and tool authors.
 
-### Planned product shape
+## Product plans
 
 - [`prd/`](prd/) — versioned PRDs (`v0-*.md`).
 
-### Evidence
+## Evidence
 
 - [`reports/`](reports/) — dated dogfood, smoke, and review reports (`YYYY-MM-DD-*.md`).
 
-### Examples and samples
+## Examples and samples
 
 - [`examples/`](examples/) — example fixtures and samples.
+
+## Historical writing
+
+[Archived docs](archive/index.md) retain superseded guidance with a reason and
+a pointer to its replacement. They are not current operating instructions.
+Dated evidence reports and product decisions keep their historical locations.
 
 ## Naming convention
 

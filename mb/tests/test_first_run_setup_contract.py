@@ -26,19 +26,17 @@ def test_beginner_setup_uses_owner_friendly_setup_prompt() -> None:
 
     required = [
         "## Setup with an agent",
-        "Open or select the business folder in Claude Code or Codex.",
-        # The canonical paste-prompt — one prompt, two doors (README +
-        # beginner setup). Keep these in lockstep with README.md.
-        "I want Main Branch: AI business memory I own as files in one folder",
-        "interview me briefly about my business, my offer, and my audience",
-        "then run `mb doctor` inside that folder and fix anything it flags",
-        "save the first checkpoint",
-        "treat local-only as a valid",
-        "then stop and show me what you set up",
+        # The canonical paste-prompt lives only here; the README links to it.
+        "Help me set up Main Branch using the current README and setup guide",
+        "Ask briefly about my business, offer, and audience",
+        "Inside the business folder, run mb doctor and explain any findings",
+        "Preview the first checkpoint and ask before saving or syncing it",
+        "then install Main Branch and run mb onboard with my approval",
+        "Local-only setup is valid if I decline GitHub",
         # Safety rails stay documented around the prompt.
-        "writes are explained and approved first",
-        "GitHub-backed setup checks `gh auth status`",
-        "GitHub does not need to cost anything",
+        "Ask me to review assumptions before writing",
+        "gh auth status",
+        "GitHub is recommended, and it does not need to cost anything",
         "the business brain has cloud backup and readable saved history",
         "AI tools with GitHub connectors can read the business brain",
         "Do not save that prompt as a markdown document.",
@@ -51,18 +49,14 @@ def test_beginner_setup_uses_owner_friendly_setup_prompt() -> None:
     assert "mb onboard --github --push" not in normalized
 
 
-def test_beginner_setup_prompt_matches_readme_prompt() -> None:
-    """One canonical prompt: the README and beginner-setup fenced prompts
-    must stay byte-identical so the two doors never drift."""
-
-    def _fenced_prompt(text: str) -> str:
-        start = text.index("I want Main Branch: AI business memory")
-        end = text.index("```", start)
-        return " ".join(text[start:end].split())
-
-    readme_prompt = _fenced_prompt(_read("README.md"))
-    setup_prompt = _fenced_prompt(_read("docs/beginner-setup.md"))
-    assert readme_prompt == setup_prompt
+def test_setup_prompt_has_one_home() -> None:
+    """One canonical prompt: it lives in beginner setup and the README links
+    to it, so the two doors never drift."""
+    marker = "Help me set up Main Branch using the current README"
+    assert marker in _normalize(_read("docs/beginner-setup.md"))
+    readme = _read("README.md")
+    assert marker not in _normalize(readme)
+    assert "(docs/beginner-setup.md#setup-with-an-agent)" in readme
 
 
 def test_runtime_guidance_routes_pasted_setup_to_onboarding() -> None:
@@ -103,11 +97,8 @@ def test_readme_points_empty_folder_users_to_bootstrap() -> None:
     text = _read("README.md")
     normalized = _normalize(text)
 
-    assert "Start with the folder that should become your business brain" in normalized
-    assert "Tell the agent what you are setting up" in normalized
-    assert "not save your note as another document" in normalized
-    assert "GitHub backup/sync is strongly recommended" in normalized
-    assert "AI tools with GitHub connectors can read" in normalized
-    assert "gh auth status" in normalized
-    assert "gh api user --jq .login" in normalized
+    assert "paste the [setup prompt](docs/beginner-setup.md#setup-with-an-agent)" in normalized
+    assert "Local-only setup is valid" in normalized
+    assert "GitHub backup is recommended" in normalized
+    assert "Keep this business folder separate" in normalized
     assert "mb onboard --github --push" not in normalized

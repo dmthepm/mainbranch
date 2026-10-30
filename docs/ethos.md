@@ -1,181 +1,118 @@
-# Main Branch Ethos
+# Main Branch ethos
 
 Main Branch is public open-source infrastructure for running a business from
-markdown files in git.
+Markdown files in git. The owner keeps the business record. Agents read that
+record, propose work, and save accepted decisions and lessons for future sessions.
 
-The product is not another place to paste prompts. The product is a durable
-way to keep business memory usable:
+[The working-day example](working-day.md) shows the method.
+[Operator loops](operator-loops.md) names its phases.
+[The roadmap](roadmap.md) describes future direction.
 
-- the business repo is the business brain;
-- `mb` is the deterministic control plane;
-- agent-runtime skills are the judgment-heavy execution layer;
-- migration drift detection, `mb doctor repair`, `mb validate`, and `mb graph`
-  are the safety net that keeps the repo trustworthy as the engine evolves;
-- GitHub issues are durable work threads for tasks, requests, blockers, and
-  follow-ups when work needs shared visibility;
-- pull requests are proposals and review conversations;
-- git history is the evolution story;
-- `mb checkpoint` makes long agent runs durable before chat context is lost;
-- dashboards, Obsidian graphs, and future team surfaces are views over the same
-  files, not replacements for them.
+## Product principles
 
-The promise is simple: own the work, rent only the rails.
+### 1. Files first
 
-## What We Are Building
+Keep durable business context in the business repo: offers, audience, voice,
+research, decisions, bets, coordinated work, and lessons. A text editor should
+still open that record without Main Branch.
 
-Main Branch should help an operator move through four loops:
+Keep credentials, caches, raw financial or legal records, and runtime state
+outside tracked business memory. Dashboards and graphs are views over the
+files. They do not become a second source of truth.
 
-1. **Sense** - pull state in: offers, audience, voice, research, decisions,
-   `mb status`, drift, freshness, connected tools, GitHub activity.
-2. **Decide** - choose what to wager next: the bet, the priority, the override.
-   Plain English: pick what matters and make the call.
-3. **Ship** - produce and release the work: pages, ads, organic content,
-   sales videos, provider connections, fulfillment work, bookkeeping summaries, system
-   updates, and saved checkpoints. One verb covers producing the artifact and
-   putting it in the world.
-4. **Reflect** - extract the lesson, usually scheduled: bet verdicts, retros,
-   decisions superseded, core files updated from what you learned. The
-   output of Reflect feeds back into Sense.
+### 2. Deterministic facts, agent judgment
 
-Those loops are described in detail in [operator-loops.md](operator-loops.md),
-and the full reasoning lives in
-[decisions/2026-05-05-operator-loops-taxonomy.md](../decisions/2026-05-05-operator-loops-taxonomy.md).
+`mb` owns repeatable checks and operations: folder shape, validation, migration,
+status, graphing, provider readiness, updates, runtime wiring, and checkpoints.
+Its commands should be inspectable, scriptable, and clear about failure.
 
-## Product Principles
+Skills own synthesis, writing, comparison, review, and explanation. They use
+`mb` facts before making recommendations. A skill should not replace a
+repeatable health check with a prose-only guess.
 
-### 1. Files First
+### 3. The operator decides
 
-Business truth belongs in git: core files, research, decisions, bets,
-pushes, plans, public artifacts, meeting summaries, fulfillment notes, durable
-finance summaries, and proposal changes. Rebuildable indexes, local caches,
-credentials, runtime preferences, raw finance/legal sources, and live process
-state can exist outside git, but they must not replace the repo.
+Explain the evidence, uncertainty, and proposed action. Work within the owner's
+stated authority. Publishing, spending, customer contact, and account changes
+require explicit approval and a tested execution path.
 
-GitHub, Obsidian, `mb graph`, and future dashboards should all read the same
-durable memory. If two views disagree, the repo wins.
+Approval to draft does not authorize publication. A stored credential does not
+authorize account changes. Show what happened after an approved action and
+keep unresolved results visible.
 
-### 2. Thin CLI, Fat Workflows
+### 4. Business language first
 
-`mb` should stay deterministic, inspectable, scriptable, and exit-coded. It
-owns repo shape, validation, migration, status, updates, graphing, integration
-metadata, skill wiring, and runtime adapter contracts.
+Describe tasks, proposals, saved checkpoints, relationship health, provider
+readiness, and outcomes before git implementation details. Owners should not
+need to manage branches or commits to use their business history.
 
-The CLI is the fact and safety layer, not the primary product surface for most
-operators. Agent-runtime skills are the chat UX and judgment layer: synthesis,
-writing, review, routing, and explanation in plain business language. A skill
-may call `mb` for facts. It should not reimplement repo-health probes or
-structural invariants in prose.
+Keep exact commands available for inspection and support. End setup and repair
+flows with a concrete next action.
 
-This same shape should hold as the system grows: hledger can be the books
-engine while `mb books` provides privacy-bounded JSON and workflow checks;
-research-depth guidance can help the agent choose between memory, repo context,
-public research, and deeper synthesis without turning research into endless
-collection.
+### 5. Runtime honesty
 
-### 3. The Operator Decides
+Claude Code supports the bundled slash skills through its adapter. Codex CLI
+supports daily routes through generated `AGENTS.md`, global Main Branch skills,
+and deterministic `mb` facts. Its production workflows have narrower limits.
+The [compatibility reference](compatibility.md) owns the detailed support matrix.
 
-Main Branch should recommend, not seize control. The system can tell the
-operator what looks stale, risky, blocked, or important. It should cite the
-signals behind that recommendation and make override paths explicit. The agent
-recommends; the operator makes the call.
+Business repos do not need local Codex plugin or skill copies. Other runtimes
+remain compatibility targets until an adapter and smoke evidence prove the
+exact path. A shared workflow source alone does not prove runtime support.
 
-Publishing, spending money, contacting customers, mutating accounts, and
-shipping public-facing work should remain intentional operator actions unless a
-future decision explicitly changes that boundary.
+### 6. Improve through friction
 
-### 4. Beginner-Safe, Power-User-Honest
+Turn confusing steps and missing behavior into reviewable follow-ups.
+`mb feedback` records friction locally. `mb issue draft` prepares a scrubbed
+public issue; `mb issue open` submits only after review and approval.
 
-The product is for non-developers, but it should not hide the real primitives.
-GitHub issues are durable work threads that can be described as tasks,
-blockers, requests, or follow-ups when the user loop needs that translation.
-Pull requests can be described as proposals. Git history can be described as
-shipped work. The underlying terms should remain available when the user needs
-them.
+Scrubbing reduces common hazards. The owner must still review drafts for
+private business details before sharing them.
 
-Beginner flows should end with a clear next action. In chat, the agent should
-run deterministic CLI checks internally and explain the result in plain
-language. Exact commands should remain available for handoff, debugging, docs,
-and power users, but they should not be the default user experience.
+### 7. Optional specialized tools
 
-### 5. Runtime Honesty
+Use a specialized tool when it improves a task and has a clear failure and
+permission contract. Examples include bookkeeping, analytics, transcription,
+and deployment helpers. These are optional connections, not requirements for
+starting with business files.
 
-Claude Code is the first supported slash-skill runtime today. Codex CLI is
-supported for the daily Main Branch routes through generated repo guidance,
-global `mb-*` skills under the Codex skills root, deterministic `mb` facts, and
-smoke evidence. Cursor, OpenClaw, Hermes, Paperclip-adjacent orchestration, and
-local runtimes are compatibility targets only when adapter code and smoke
-evidence exist.
+Provider output is evidence to interpret. Save useful summaries in the business
+record without copying secrets or raw sensitive data into it.
 
-Main Branch should meet operators where they already work, but it should not
-claim support before support is proven.
+### 8. Curated rails beat SaaS sprawl
 
-### 6. Improve Through Friction
+Prefer official provider paths, portable files, and connections with a clear
+purpose. Connecting an account should improve a particular owner task, not
+add another system to maintain without a benefit.
 
-If a user hits an error, missing workflow, confusing step, or repeated manual
-repair, Main Branch should make it easy to turn that friction into a clean
-GitHub issue. That loop is part of the product. The public issue tracker is how
-operator usage becomes shared infrastructure.
+Keep setup, readiness, read-only access, and account mutation distinct. Do not
+claim a working integration from the presence of metadata or a starter script.
 
-Issue drafting must be privacy-safe by default. Business context, customer
-data, tokens, local paths, and account details must not be sent without an
-explicit operator decision. `mb issue draft` and `mb issue open` are the
-shipped path: drafts land under `.mb/issue-drafts/` for review, the scrubber
-redacts common hazards, and submission is an explicit operator action.
+### 9. Evidence before claims
 
-### 7. Sidecars Are Optional
+Match validation to the behavior changed. Command tests do not prove that a
+runtime discovers a skill. A starter monitor does not prove that a business
+is being monitored. A generated plan does not prove delivery.
 
-Specialized tools can make Main Branch stronger when they do one narrow job
-well and return structured output. Examples include public company context,
-ads metrics, bookkeeping, transcription, analytics, or deployment helpers.
+Use the [validation ladder](../AGENTS.md#validation-ladder) for engineering
+work. Use [release simulations](release-simulations.md) when release claims
+depend on agent behavior. Distinguish available commands from planned services.
 
-Sidecars, MCP servers, and provider rails should be optional,
-permission-aware, and behind stable contracts. They are subordinate to repo
-truth and deterministic `mb` facts, not replacements for the core engine.
+### 10. Readable saved history
 
-### 8. Curated Rails Beat SaaS Sprawl
+Use checkpoints to preserve accepted business progress at meaningful boundaries.
+Preview included files and the message before saving. A local checkpoint is a
+saved point in git history; remote backup requires a separate sync.
 
-Main Branch should not connect every tool an operator has accumulated. The team
-should make opinionated, explainable choices: prefer official provider paths,
-boring CLIs, portable files, and local-first state. Cloudflare, GitHub,
-Google/Workspace, official ads paths, Postiz, hledger, Apify, transcription,
-and future sidecars earn their place by improving a loop and by failing in
-ways `mb` can explain.
+Keep history useful enough that another session can reconstruct what changed,
+why it changed, and what remains open without the original chat.
 
-### 9. Evidence Beats Hunches
+## Product boundary
 
-Do not ship runtime claims, migration paths, packaging changes, or first-run
-flows without evidence. Use the validation ladder in [AGENTS.md](../AGENTS.md):
-static checks, CLI tests, package smoke, fixture repo smoke, and runtime smoke
-when the behavior depends on a real runtime.
+`mb` does not host a model, run a chat session, or schedule agents. A runtime
+or external caller handles conversation and ongoing execution. The local
+read-only dashboard displays repo facts; it is not a hosted service.
 
-Package-visible releases run simulations against fixture repos and review
-transcripts by hand. See [release-simulations.md](release-simulations.md).
-
-The product should feel alive; the parts underneath should stay boring.
-
-### 10. Git Is The Hidden App
-
-Main Branch should use git as the invisible save system for business work.
-Operators should not need to understand branches, diffs, or commits to benefit
-from them. Agents should checkpoint meaningful work throughout a run so future
-sessions can reconstruct what changed, what was decided, and what remains open
-from repo history.
-
-`mb checkpoint` is the shipped surface for that loop: it plans or saves
-business-readable git commits at meaningful boundaries, with privacy and
-secret-safety gates before anything is recorded. Checkpointing is not noisy
-autosave; it is durable business memory.
-
-## What We Are Not Building Yet
-
-Main Branch is not a hosted SaaS dashboard, chat client, background daemon,
-model host, vector database, scheduler, or hosted marketplace product today.
-Codex uses global Main Branch skills and generated `AGENTS.md` guidance.
-Business repos do not need repo-local Codex plugin or skill copies. Claude Code
-plugin wiring is a runtime adapter, not a hosted marketplace product.
-
-Those may become useful surfaces later. They earn their way in by preserving
-the same source of truth: the business repo, GitHub, git history, deterministic
-CLI contracts, and explicit runtime adapters. A future dashboard may include
-team communication, but chat is source material; durable operating truth lands
-in issues, proposals, decisions, pushes, logs, commits, and core updates.
+Future interfaces must preserve the same ownership and authority boundaries.
+Chat can supply evidence, but accepted business truth belongs in durable files
+and saved history.
