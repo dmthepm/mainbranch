@@ -15,6 +15,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - `docs/connect.md` now explains how to replace a live provider key without an
   outage.
+### Changed
+
+- `docs/machine-setup.md`: on Omarchy, turn clipboard history off completely
+  on any machine where you ever copy a credential.
 
 ## [0.6.17] - 2026-10-28
 
