@@ -155,6 +155,7 @@ def test_cli_envelope_and_privacy():
 
 
 def test_config_and_bad_now(tmp_path, monkeypatch):
+    pytest.importorskip("tomllib")
     assert usage.collect(now=NOW)["exit_code"] == 3
     assert usage.status_view(repo=tmp_path, now=usage.timestamp(NOW)) == {"configured": False}
     assert usage.collect(now="not-a-date")["exit_code"] == 2
@@ -599,6 +600,7 @@ def test_symlinked_directory_is_judged_by_its_target(tmp_path, mode, exit_code):
 
 
 def test_deeply_nested_inputs_are_not_crashes(tmp_path, monkeypatch):
+    pytest.importorskip("tomllib")
     folder = tmp_path / "snapshots"
     folder.mkdir(mode=0o755)
     snapshot = folder / "claude.json"
