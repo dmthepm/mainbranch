@@ -703,6 +703,7 @@ def test_keychain_simulation_recorded_fact_matches_current_status_output(
     repo = tmp_path / "biz"
     (repo / ".mb").mkdir(parents=True)
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    repo_id = connect._repo_identity(repo.resolve())["repo_id"]
     (repo / ".mb" / "connect.yaml").write_text(
         "version: 1\n"
         "providers:\n"
@@ -714,7 +715,7 @@ def test_keychain_simulation_recorded_fact_matches_current_status_output(
         "    auth: api_token\n"
         "    secrets:\n"
         "      api_token:\n"
-        "        ref: mainbranch://fixture-repo-id/cloudflare/api_token\n"
+        f"        ref: {connect._secret_ref(repo_id, 'cloudflare', 'api_token')}\n"
         "        backend: macos-keychain\n",
         encoding="utf-8",
     )

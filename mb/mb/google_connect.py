@@ -732,6 +732,8 @@ def _bootstrap(
     config = connect_mod._read_config(target)
     repo_id = connect_mod._ensure_repo_id(config, target)
     existing = _existing_entry(config, repo_id)
+    # A mismatched record can still be replaced; its recorded refs are never read.
+    refs_match = connect_mod._ref_mismatch_probes(provider, existing.entry, repo_id) is None
     # A credential-less entry recorded in user scope (`--metadata` alone); a
     # first sign-in recorded in repo scope leaves nothing in it worth keeping.
     user_metadata_only = str(existing.entry.get("scope") or "repo") == "user" and not (
@@ -745,7 +747,7 @@ def _bootstrap(
     if client_json is not None:
         client = parse_client_json(client_json)
     else:
-        stored = _stored_client(existing) if reauth else None
+        stored = _stored_client(existing) if reauth and refs_match else None
         if stored is None:
             connect_mod._refuse(
                 "oauth_client_required",
@@ -1334,6 +1336,21 @@ def read_minted_token(entry: dict[str, Any], *, source: str, target: Path) -> di
     written back to the store.
     """
 
+    try:
+        connect_mod._check_repo_entry_refs(
+            connect_mod.normalize_provider(PROVIDER_ID), entry, target
+        )
+    except connect_mod.ConnectRefusal as exc:
+        return _read_result(
+            ok=False,
+            source=source,
+            state=exc.rule,
+            backend_state=exc.rule,
+            error=str(exc),
+            repair_command=connect_mod._reconnect_command(
+                connect_mod.normalize_provider(PROVIDER_ID), entry, grant_readable=False
+            ),
+        )
     grant = _slot(entry, GRANT_SLOT)
     backend, ref = grant["backend"], grant["ref"]
     probe = connect_mod._probe_secret_ref(backend, ref)

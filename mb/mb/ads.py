@@ -212,7 +212,7 @@ def _load_meta_secret_and_metadata(repo: Path) -> tuple[str, dict[str, Any]]:
     if not isinstance(entry, dict):
         return "", {}
     provider = connect_mod.normalize_provider("meta")
-    secret = connect_mod._stored_secret(provider, entry)
+    secret = connect_mod._stored_secret(provider, entry, repo)
     raw_metadata = entry.get("metadata")
     metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
     return secret, metadata

@@ -285,6 +285,28 @@ def test_minted_token_is_reminted_near_expiry(
     assert len(endpoint.calls) == 2
 
 
+def test_reauth_with_a_client_file_replaces_a_mismatched_grant(
+    repo: Path, client_file: Path, google: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _signed_in(repo, client_file, google)
+    config = connect_mod._read_config(repo)
+    grant = config["providers"]["google"]["secrets"]["oauth_grant"]
+    expected = grant["ref"]
+    grant["ref"] = "mainbranch://example-foreign/google/oauth_grant"
+    connect_mod._write_config(repo, config)
+    assert connect_mod.status_provider("google", repo)["state"] == "credential_ref_mismatch"
+
+    refused = _oauth(repo, "--reauth")
+    assert refused.exit_code != 0
+    assert "--client-file" in refused.output
+
+    google(refresh=REFRESH_2)
+    assert _oauth(repo, "--reauth", "--client-file", str(client_file)).exit_code == 0
+    repaired = connect_mod._read_config(repo)["providers"]["google"]["secrets"]["oauth_grant"]
+    assert repaired["ref"] == expected
+    assert connect_mod.status_provider("google", repo)["state"] != "credential_ref_mismatch"
+
+
 def test_reauth_drops_a_token_minted_from_the_old_grant(
     repo: Path, client_file: Path, google: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:

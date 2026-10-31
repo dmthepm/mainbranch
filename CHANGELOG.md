@@ -23,6 +23,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   does: setup, a first result, the working day and runtime limits.
 ### Fixed
 
+- Credential reads refuse recorded references that do not match the selected
+  repo, provider and field, with guidance to reconnect.
+
 - Credential release audits record canonical provider IDs and refuse symlink or
   nonregular audit files. Local secret files are private before replacement.
   Connect help marks `--token` deprecated and warns about process arguments;
