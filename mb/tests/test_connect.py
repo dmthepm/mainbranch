@@ -4664,6 +4664,8 @@ def test_entry_written_with_a_dangling_ref_still_reads_missing_secret(
     _local_secret_env(monkeypatch, tmp_path)
     repo = tmp_path / "biz"
     (repo / ".mb").mkdir(parents=True)
+    repo_id = connect_mod._repo_identity(repo.resolve())["repo_id"]
+    ref = connect_mod._secret_ref(repo_id, "cloudflare", "api_token")
     (repo / ".mb" / "connect.yaml").write_text(
         yaml.safe_dump(
             {
@@ -4675,7 +4677,7 @@ def test_entry_written_with_a_dangling_ref_still_reads_missing_secret(
                         "scope": "repo",
                         "secrets": {
                             "api_token": {
-                                "ref": "mainbranch:connect:demo:cloudflare:api_token",
+                                "ref": ref,
                                 "backend": "local-file",
                             }
                         },

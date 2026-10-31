@@ -91,6 +91,8 @@ UNVERIFIED_STATE = "stored_unverified"
 # single-provider `mb connect status <id>` gets its own budget (#1151).
 NOT_CHECKED_STATE = "credential_not_checked"
 NOT_CHECKED_BACKEND_STATE = "not_checked"
+# A recorded ref that is not the one this repo, provider and field derive.
+REF_MISMATCH_STATE = "credential_ref_mismatch"
 
 
 # Providers with a real read-only probe in `_validate_with_provider`. Kept as
@@ -2537,7 +2539,10 @@ def _unhydrated_status(
     repo: str | Path = ".",
     deadline: float | None = None,
 ) -> dict[str, Any]:
-    secrets, missing = _secret_statuses(provider, entry, deadline=deadline)
+    target = Path(repo).resolve()
+    repo_id = str(_read_config(target).get("repo_id") or _repo_identity(target)["repo_id"])
+    probes = _ref_mismatch_probes(provider, entry, repo_id)
+    secrets, missing = _secret_statuses(provider, entry, deadline=deadline, probes=probes)
     raw_metadata = entry.get("metadata")
     metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
     backend_reason = _backend_failure_reason(secrets)
@@ -2633,6 +2638,54 @@ def status_provider(
     _credential_deadline: float | None = None,
     _secret_probes: dict[str, SecretProbe] | None = None,
 ) -> dict[str, Any]:
+    status = _provider_status(
+        provider_id,
+        repo,
+        which_func=which_func,
+        command_runner=command_runner,
+        _credential_deadline=_credential_deadline,
+        _secret_probes=_secret_probes,
+    )
+    secrets = status.get("secrets")
+    slots = secrets.values() if isinstance(secrets, dict) else ()
+    if not any(
+        isinstance(slot, dict) and slot.get("backend_state") == REF_MISMATCH_STATE for slot in slots
+    ):
+        return status
+    provider = resolve_provider(provider_id, repo)
+    command = _reconnect_command(provider, _status_entry(provider, repo), grant_readable=False)
+    status.update(
+        ok=False,
+        state=REF_MISMATCH_STATE,
+        summary=(
+            f"The recorded {provider.name} credential reference does not match this "
+            f"connection, so it was not read. Reconnect with `{command}`."
+        ),
+        repair=f"Reconnect with `{command}`.",
+        repair_command=command,
+    )
+    return status
+
+
+def _status_entry(provider: Provider, repo: str | Path) -> Any:
+    target = Path(repo).resolve()
+    config = _read_config(target)
+    entry = config["providers"].get(provider.id)
+    if isinstance(entry, dict):
+        return entry
+    repo_id = str(config.get("repo_id") or _repo_identity(target)["repo_id"])
+    return _user_scope_provider_entry(repo_id, provider.id)
+
+
+def _provider_status(
+    provider_id: str,
+    repo: str | Path = ".",
+    *,
+    which_func: Which | None = None,
+    command_runner: CommandRunner | None = None,
+    _credential_deadline: float | None = None,
+    _secret_probes: dict[str, SecretProbe] | None = None,
+) -> dict[str, Any]:
     provider = resolve_provider(provider_id, repo)
     target = Path(repo).resolve()
     config = _read_config(target)
@@ -2645,6 +2698,7 @@ def status_provider(
             return _unhydrated_status(
                 provider, user_entry, repo=target, deadline=_credential_deadline
             )
+    _secret_probes = _ref_mismatch_probes(provider, entry, repo_id) or _secret_probes
     if provider.id == "meta":
         prereq_state = _meta_prerequisite_state(
             which_func=which_func,
@@ -3013,6 +3067,8 @@ def _recorded_keychain_refs(repo: Path) -> list[tuple[str, str, str]]:
     )
     recorded: list[tuple[str, str, str]] = []
     for provider_id in sorted(entries):
+        provider = resolve_provider(provider_id, repo)
+        _check_entry_refs(provider, entries[provider_id], repo_id)
         raw_secrets = entries[provider_id].get("secrets")
         secrets = raw_secrets if isinstance(raw_secrets, dict) else {}
         for field in sorted(str(key) for key in secrets):
@@ -3324,6 +3380,47 @@ def _render_keychain_repair_all(result: dict[str, Any]) -> None:
         )
 
 
+def _ref_mismatch_probes(
+    provider: Provider, entry: Any, repo_id: str
+) -> dict[str, SecretProbe] | None:
+    """Absent probes for a mismatched entry, so status reads nothing and stays up.
+
+    Raising here would take down every status that covers all providers.
+    """
+    try:
+        _check_entry_refs(provider, entry, repo_id)
+    except ConnectRefusal:
+        return {
+            field: SecretProbe("", False, True, REF_MISMATCH_STATE)
+            for field in {*provider.required_secrets, *entry["secrets"]}
+        }
+    return None
+
+
+def _check_entry_refs(provider: Provider, entry: Any, repo_id: str) -> None:
+    """Refuse inconsistent recorded slots before any credential read."""
+    if not isinstance(entry, dict):
+        return
+    slots = entry.get("secrets")
+    if not isinstance(slots, dict):
+        return
+    for field, raw in slots.items():
+        if not isinstance(raw, dict) or not raw.get("ref"):
+            continue
+        if str(raw["ref"]) != _secret_ref(repo_id, provider.id, str(field)):
+            _refuse(
+                REF_MISMATCH_STATE,
+                "The recorded credential reference does not match this connection. "
+                f"Reconnect with `{_reconnect_command(provider, entry, grant_readable=False)}`.",
+            )
+
+
+def _check_repo_entry_refs(provider: Provider, entry: Any, target: Path) -> None:
+    config = _read_config(target)
+    repo_id = str(config.get("repo_id") or _repo_identity(target)["repo_id"])
+    _check_entry_refs(provider, entry, repo_id)
+
+
 def _entry_secret_probe(
     entry: dict[str, Any], field: str, *, deadline: float | None = None
 ) -> SecretProbe:
@@ -3348,7 +3445,8 @@ def _entry_secret_value(entry: dict[str, Any], field: str) -> str:
     return _entry_secret_probe(entry, field).value
 
 
-def _stored_secret(provider: Provider, entry: dict[str, Any]) -> str:
+def _stored_secret(provider: Provider, entry: dict[str, Any], repo: Path) -> str:
+    _check_repo_entry_refs(provider, entry, repo)
     if not provider.required_secrets:
         return ""
     return _entry_secret_value(entry, provider.required_secrets[0])
@@ -3377,6 +3475,20 @@ def read_token(provider_id: str, repo: str | Path = ".") -> dict[str, Any]:
     if not isinstance(entry, dict):
         entry = _user_scope_provider_entry(repo_id, provider.id)
         source = "user"
+    try:
+        _check_entry_refs(provider, entry, repo_id)
+    except ConnectRefusal as exc:
+        return {
+            "ok": False,
+            "provider": provider.id,
+            "field": field,
+            "source": source,
+            "token": "",
+            "state": exc.rule,
+            "backend_state": exc.rule,
+            "error": str(exc),
+            "repair_command": _reconnect_command(provider, entry, grant_readable=False),
+        }
     if _records_oauth_grant(provider, entry):
         # OAuth mode: mint a short-lived access token from the stored grant.
         from mb import google_connect
@@ -4150,6 +4262,7 @@ def rotate_provider(
     if not provider.required_secrets:
         _refuse("rotate_no_secret", f"{provider.name} stores no secret to rotate.")
     entry, _where = _connected_entry(provider, target)
+    _check_repo_entry_refs(provider, entry, target)
     # Google connects with a sign-in, which has no source to re-read; only a
     # legacy access-token entry keeps the --token-stdin and --source path.
     google_sign_in = provider.id == "google" and not (
@@ -5075,6 +5188,7 @@ def test_provider(
     target = Path(repo).resolve()
     config = _read_config(target)
     entry = config["providers"].get(provider.id)
+    _check_repo_entry_refs(provider, entry, target)
     deadline = new_credential_deadline()
     probes = (
         _entry_secret_probes(provider, entry, deadline=deadline) if isinstance(entry, dict) else {}
