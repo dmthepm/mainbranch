@@ -23,9 +23,9 @@ durable readiness contract. Explain providers as business capabilities, not
 developer config, and end with exact commands.
 
 **Pasted setup guide = setup intent.** If the user pastes this guide, the
-beginner setup guide, the README "Set up with AI" prompt ("I want Main
-Branch: AI business memory I own as files..."), or any bootstrap prompt with
-business/folder intent, treat it as setup intent, not as a document to save.
+beginner setup guide, its prompt ("Help me set up Main Branch using the current
+README and setup guide..."), the older "I want Main Branch: AI business memory
+I own as files..." prompt, or any bootstrap prompt with business/folder intent, treat it as setup intent, not as a document to save.
 Do not offer to save it as a document. Check `mb --version`; if missing, stop
 with `pipx install mainbranch`. If present, inspect `mb onboard --help`,
 explain the target folder, and ask before any write. When the pasted prompt

@@ -19,6 +19,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - `docs/machine-setup.md`: on Omarchy, turn clipboard history off completely
   on any machine where you ever copy a credential.
+- The README and core owner docs are shorter and start from what an owner
+  does: setup, a first result, the working day and runtime limits.
 ### Fixed
 
 - `mb dashboard build` and `mb dashboard open` now refuse to write through a
