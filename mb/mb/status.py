@@ -5314,6 +5314,9 @@ def render_human(
         f"Codex: {codex_mark}"
     )
 
+    for warning in skills.get("plugin", {}).get("warnings", []):
+        console.print("warning: " + warning, markup=False)
+
     integration_summary = integrations["summary"]
     if integration_summary["configured"]:
         integration_line = (

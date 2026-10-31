@@ -45,6 +45,7 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     home = tmp_path / "isolated-home"
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(home / ".claude"))
     for name in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "CODEX_HOME", "LOCALAPPDATA"):
         monkeypatch.delenv(name, raising=False)
 
