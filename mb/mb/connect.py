@@ -34,6 +34,7 @@ from mb.credential_lock import (
     credential_lock,
     forget_stored,
     note_stored,
+    save_transaction,
     still_ours,
 )
 from mb.credential_store import (
@@ -925,6 +926,13 @@ def _write_config(repo: Path, config: dict[str, Any]) -> Path:
     text = yaml.safe_dump(config, sort_keys=False)
     atomic_write_text(path, text)
     return path
+
+
+def _save_lock(repo: Path, *, create: bool = True) -> Any:
+    """The save lock for a repo: the home lock, then the repo config folder."""
+
+    config_dir = _checked_config_path(repo).parent
+    return save_transaction(_home(), config_dir, create=create)
 
 
 def config_tracked_by_git(repo: Path) -> bool:
@@ -1987,6 +1995,8 @@ def connect_provider(
     """
 
     with ExitStack() as locks:
+        # First, before the config is read: a second save re-reads what this one wrote.
+        locks.enter_context(_save_lock(Path(repo).resolve()))
         return _connect_provider(
             provider_id,
             repo,
@@ -3001,6 +3011,11 @@ def hydrate(
     """Materialize ignored repo-local provider metadata from user scope."""
 
     target = Path(repo).resolve()
+    with _save_lock(target):
+        return _hydrate_locked(target, repo, provider_id)
+
+
+def _hydrate_locked(target: Path, repo: str | Path, provider_id: str) -> dict[str, Any]:
     config = _read_config(target)
     repo_id = _ensure_repo_id(config, target)
     data = _read_user_scope()
@@ -5125,9 +5140,40 @@ def _record_validation(
     anywhere, so ``.mb/connect.yaml`` is put back as it was.
     """
 
+    try:
+        with _save_lock(target):
+            return _record_validation_locked(target, config, provider_id, entry)
+    except CredentialBusyError as exc:
+        return {
+            "recorded": False,
+            "not_recorded_reason": exc.state,
+            "not_recorded_detail": str(exc),
+        }
+
+
+def _record_validation_locked(
+    target: Path,
+    config: dict[str, Any],
+    provider_id: str,
+    entry: dict[str, Any],
+) -> dict[str, Any]:
     config_path = _checked_config_path(target)
     previous_config = config_path.read_bytes() if config_path.exists() else None
+    # The config was read before the lock: another save may have written since.
+    # Apply only this check's result to what is on disk now.
+    fresh = _read_config(target)
+    for key in ("repo_id", "repo_identity"):
+        if not fresh.get(key) and config.get(key):
+            fresh[key] = config[key]
+    current = fresh["providers"].get(provider_id)
+    if isinstance(current, dict):
+        entry = {
+            **current,
+            **{k: entry[k] for k in ("validation", "last_checked_at") if k in entry},
+        }
+    fresh["providers"][provider_id] = entry
     config["providers"][provider_id] = entry
+    config = fresh
     _write_config(target, config)
     if entry.get("scope") == "user":
         identity = {

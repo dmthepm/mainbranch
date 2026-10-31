@@ -32,6 +32,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- Two `mb connect` saves running at once, even for different providers, repos or
+  Main Branch homes, no longer lose each other's saved key or connection record.
+  The second one waits briefly, then says another connect is saving and stores
+  nothing.
 - `mb doctor`, `mb status`, `mb start` and `mb update` warn when tracked
   plugin wiring or the user marketplace registration names the old address.
   The warning preserves wiring and launch behavior and links the move guide,

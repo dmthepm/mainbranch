@@ -43,7 +43,11 @@ from typing import Any, TextIO
 
 from mb import connect as connect_mod
 from mb import google_oauth as go
-from mb.credential_lock import CredentialBusyError, credential_lock, note_stored
+from mb.credential_lock import (
+    CredentialBusyError,
+    credential_lock,
+    note_stored,
+)
 from mb.credential_store import (
     SUPPORTED_BACKENDS,
     CredentialStoreError,
@@ -814,6 +818,16 @@ def _bootstrap(
     missing = [label for label in GRANT_LABEL_NAMES if label not in granted]
     metadata[METADATA_GRANTS] = ",".join(granted)
 
+    # After the sign-in (no lock is held while a person types): take the save
+    # lock, then re-read the config another save may have rewritten meanwhile.
+    try:
+        locks.enter_context(connect_mod._save_lock(target))
+    except CredentialBusyError as exc:
+        raise GoogleConnectError(str(exc), state=exc.state) from None
+    config = connect_mod._read_config(target)
+    repo_id = connect_mod._ensure_repo_id(config, target)
+    existing = _existing_entry(config, repo_id)
+
     deadline = new_credential_deadline()
     backend = existing.grant.get("backend") or existing.token.get("backend") or secret_backend
     store = SecretStore(backend)
@@ -1252,7 +1266,10 @@ def _record_read_state(target: Path, grant_ref: str, *, reauth_required: bool) -
 
     reason = ""
     note = ""
-    with suppress(OSError, ValueError):
+    with (
+        suppress(OSError, ValueError, CredentialBusyError),
+        connect_mod._save_lock(target, create=False),
+    ):
         config = connect_mod._read_config(target)
         repo_id = str(config.get("repo_id") or connect_mod._repo_identity(target)["repo_id"])
         repo_entry = config["providers"].get(PROVIDER_ID)

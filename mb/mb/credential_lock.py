@@ -79,70 +79,73 @@ def _shown(path: Path) -> str:
         return path.name
 
 
-def _unavailable(directory: Path, provider_name: str) -> CredentialBusyError:
+def _unavailable(directory: Path, saved: str) -> CredentialBusyError:
     return CredentialBusyError(
-        f"Main Branch could not take its credential lock in {_shown(directory)}, so the "
-        f"{provider_name} credential was not saved. Nothing was stored. Make that folder "
+        f"Main Branch could not take its credential lock in {_shown(directory)}, so {saved} "
+        "was not saved. Nothing was stored. Make that folder "
         "writable, then rerun the command.",
         UNAVAILABLE_STATE,
     )
 
 
-def _no_file_locking(provider_name: str) -> CredentialBusyError:
+def _no_file_locking(saved: str) -> CredentialBusyError:
     return CredentialBusyError(
-        f"This platform has no file locking, so the {provider_name} credential was not saved. "
+        f"This platform has no file locking, so {saved} was not saved. "
         "Nothing was stored. Use WSL2 on Windows, then rerun the command.",
         UNAVAILABLE_STATE,
     )
 
 
-def _cannot_lock(directory: Path, provider_name: str, code: int) -> CredentialBusyError:
+def _cannot_lock(directory: Path, saved: str, code: int) -> CredentialBusyError:
     name = errno.errorcode.get(code, f"error {code}")
     return CredentialBusyError(
-        f"Main Branch could not lock a file in {_shown(directory)} ({name}), so the "
-        f"{provider_name} credential was not saved. Nothing was stored. That folder may be on a "
+        f"Main Branch could not lock a file in {_shown(directory)} ({name}), so {saved} "
+        "was not saved. Nothing was stored. That folder may be on a "
         "file system without file locking, such as a network home folder. Main Branch needs "
         "file locking there to save a credential safely.",
         UNAVAILABLE_STATE,
     )
 
 
-def _busy(provider_name: str) -> CredentialBusyError:
+def _busy(saving: str) -> CredentialBusyError:
     return CredentialBusyError(
-        f"Another mb connect is saving the {provider_name} credential right now. "
-        "Nothing was stored. Try again in a moment."
+        f"Another mb connect is saving {saving} right now. Nothing was stored. "
+        "Try again in a moment."
     )
 
 
 @contextmanager
-def credential_lock(home: Path, refs: list[str], provider_name: str) -> Iterator[None]:
-    """Hold the exclusive lock for every ref until the block ends.
+def _hold(
+    directory: Path, names: list[str], saved: str, saving: str, *, lock_directory: bool = False
+) -> Iterator[None]:
+    """Hold an exclusive ``flock`` on each named file in ``directory``, in the order given.
 
-    Refs are locked in sorted order so two multi-slot connects cannot deadlock.
-    Raises ``CredentialBusyError`` before the block runs if another process keeps
-    the lock past ``LOCK_WAIT_SECONDS`` (``credential_busy``), or at once if the
-    lock file cannot be opened or the file system cannot lock it
-    (``credential_lock_unavailable``). Only EWOULDBLOCK/EAGAIN mean "held": macOS
-    and Linux ``flock(2)`` document no EACCES (that comes from ``fcntl`` locks).
+    With ``lock_directory`` the lock is on ``directory`` itself (opened read-only, so
+    no file is created) and ``names`` is ignored.
     """
 
-    directory = home / LOCK_DIR_NAME
     if fcntl is None:
-        raise _no_file_locking(provider_name)
+        raise _no_file_locking(saved)
+    items = [directory] if lock_directory else [directory / name for name in names]
     taken: list[str] = []
     try:
-        for ref in sorted(set(refs)):
-            path = directory / (hashlib.sha256(ref.encode()).hexdigest()[:32] + ".lock")
-            key = str(path)
+        for path in items:
+            # Resolved, so two spellings of one folder share one entry and one inode.
+            key = os.path.realpath(path) if lock_directory else str(path)
             if key in _held:
                 _held[key][1] += 1
                 taken.append(key)
                 continue
             try:
-                directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-                fd = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o600)
+                if lock_directory:
+                    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+                    fd = os.open(path, flags | getattr(os, "O_CLOEXEC", 0))
+                else:
+                    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+                    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+                    fd = os.open(path, flags, 0o600)
             except OSError:
-                raise _unavailable(directory, provider_name) from None
+                raise _unavailable(directory, saved) from None
             deadline = time.monotonic() + LOCK_WAIT_SECONDS
             while True:
                 try:
@@ -153,10 +156,10 @@ def credential_lock(home: Path, refs: list[str], provider_name: str) -> Iterator
                         # Not a held lock (no lock support, bad descriptor): waiting
                         # cannot help, and "another connect" would be untrue.
                         os.close(fd)
-                        raise _cannot_lock(directory, provider_name, exc.errno or 0) from None
+                        raise _cannot_lock(directory, saved, exc.errno or 0) from None
                     if time.monotonic() >= deadline:
                         os.close(fd)
-                        raise _busy(provider_name) from None
+                        raise _busy(saving) from None
                     time.sleep(_POLL_SECONDS)
             _held[key] = [fd, 1]
             taken.append(key)
@@ -171,3 +174,70 @@ def credential_lock(home: Path, refs: list[str], provider_name: str) -> Iterator
                     fcntl.flock(entry[0], fcntl.LOCK_UN)
                 finally:
                     os.close(entry[0])
+
+
+def _name(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:32] + ".lock"
+
+
+@contextmanager
+def credential_lock(home: Path, refs: list[str], provider_name: str) -> Iterator[None]:
+    """Hold the exclusive lock for every ref until the block ends.
+
+    Refs are locked in sorted order so two multi-slot connects cannot deadlock.
+    Raises ``CredentialBusyError`` before the block runs if another process keeps
+    the lock past ``LOCK_WAIT_SECONDS`` (``credential_busy``), or at once if the
+    lock file cannot be opened or the file system cannot lock it
+    (``credential_lock_unavailable``). Only EWOULDBLOCK/EAGAIN mean "held": macOS
+    and Linux ``flock(2)`` document no EACCES (that comes from ``fcntl`` locks).
+    """
+
+    with _hold(
+        home / LOCK_DIR_NAME,
+        [_name(ref) for ref in sorted(set(refs))],
+        f"the {provider_name} credential",
+        f"the {provider_name} credential",
+    ):
+        yield
+
+
+TRANSACTION_LOCK_NAME = "save-transaction.lock"
+LOCAL_STORE_LOCK_NAME = "local-secrets.lock"
+
+
+@contextmanager
+def save_transaction(
+    home: Path, config_dir: Path | None = None, *, create: bool = True
+) -> Iterator[None]:
+    """Hold the save-transaction lock: one mb save at a time per Main Branch home.
+
+    Take it before reading any config a save will rewrite, and keep it through
+    the write and any rollback, so a second save re-reads what the first wrote
+    instead of replacing it. With ``config_dir`` (the folder holding the repo
+    config) it also locks that folder itself, second, for a repo shared by several
+    homes. The folder is locked, not a file in it, so nothing is created or left
+    behind in the repo, and every path to it meets at one inode. ``create`` makes
+    the folder first, as a save would; without it a missing folder is not locked.
+    Order everywhere: home, repo config folder, then ``credential_lock`` refs, then
+    the local secret file. Never hold it across a network sign-in.
+    """
+
+    with _hold(home / LOCK_DIR_NAME, [TRANSACTION_LOCK_NAME], "the connection", "a connection"):
+        if config_dir is None or not (create or config_dir.is_dir()):
+            yield
+            return
+        if create:
+            try:
+                config_dir.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                raise _unavailable(config_dir, "the connection") from None
+        with _hold(config_dir, [], "the connection", "a connection", lock_directory=True):
+            yield
+
+
+@contextmanager
+def local_store_lock(home: Path) -> Iterator[None]:
+    """Hold the lock that serializes read-modify-write of the local secret file."""
+
+    with _hold(home / LOCK_DIR_NAME, [LOCAL_STORE_LOCK_NAME], "the credential", "a credential"):
+        yield

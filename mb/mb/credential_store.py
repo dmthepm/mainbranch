@@ -15,10 +15,12 @@ import signal
 import subprocess
 import sys
 import time
-from contextlib import suppress
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from mb.credential_lock import CredentialBusyError, local_store_lock
 from mb.durable import atomic_write_text
 
 SERVICE_NAME = "mainbranch"
@@ -352,10 +354,11 @@ class SecretStore:
         """Delete an exact reference; used for bounded synthetic native smoke cleanup."""
 
         if self.backend == "local-file":
-            data = _read_local_secrets()
-            if ref in data:
-                del data[ref]
-                _write_local_secrets(data)
+            with _local_file_lock():
+                data = _read_local_secrets()
+                if ref in data:
+                    del data[ref]
+                    _write_local_secrets(data)
             return
         result = _run_helper(self.backend, "delete", ref=ref)
         state = str(result.get("state") or "unavailable")
@@ -581,7 +584,19 @@ def _write_local_secrets(data: dict[str, str]) -> None:
         raise CredentialStoreError("local_file_unavailable") from exc
 
 
+@contextmanager
+def _local_file_lock() -> Iterator[None]:
+    """Serialize read-modify-write of the shared local secret file across processes."""
+
+    try:
+        with local_store_lock(_local_secret_path().parent.parent):
+            yield
+    except CredentialBusyError:
+        raise CredentialStoreError("local_file_unavailable") from None
+
+
 def _local_set(ref: str, value: str) -> None:
-    data = _read_local_secrets()
-    data[ref] = value
-    _write_local_secrets(data)
+    with _local_file_lock():
+        data = _read_local_secrets()
+        data[ref] = value
+        _write_local_secrets(data)
