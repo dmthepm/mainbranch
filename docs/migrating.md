@@ -336,6 +336,21 @@ updating (`claude plugin marketplace add dmthepm/mainbranch`) and restart
 Claude Code. The symlink repair path remains the fallback and repair path; the
 plugin is the more durable route for fresh Claude Code worktrees.
 
+If your marketplace still points at the old `noontide-co/mainbranch` address,
+the add command above fails. Main Branch moved to `dmthepm/mainbranch` on 28 Oct
+2026. The old address only works through a GitHub redirect, which stops working
+if a new repository ever takes that name, so move to the new one:
+
+```bash
+claude plugin marketplace remove mainbranch
+claude plugin marketplace add dmthepm/mainbranch
+claude plugin install mainbranch@mainbranch --scope user
+```
+
+Removing the marketplace also uninstalls the plugin and deletes its saved
+options and data. Restart Claude Code afterwards. If your repo's tracked
+`.claude/settings.json` names the old address, change it there too.
+
 `mb skill repair --repo .` checks your personal `~/.claude/skills/` directory
 for entries that can beat the project-local Main Branch skills in Claude Code.
 It reports the resolved target for each finding. If the entry is a provably
