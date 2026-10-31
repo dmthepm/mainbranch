@@ -87,6 +87,9 @@ skills are missing. Install it once and enable it:
 claude plugin marketplace add dmthepm/mainbranch
 ```
 
+If that fails because the marketplace still points at `noontide-co/mainbranch`,
+follow the move steps in `docs/migrating.md`.
+
 The plugin works in both the Claude Desktop app and the terminal `claude` CLI,
 and it survives git worktrees. (Cloud/web Claude sessions cannot load plugins —
 use Desktop or the terminal.) `mb onboard` and `mb init` wire it for you, so a
