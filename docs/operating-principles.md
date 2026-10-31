@@ -136,6 +136,13 @@ written down:
   are isolated in their own worktrees; they never share a checkout.
 - **Liveness over silence.** Long-running agents are checked for liveness;
   a dead agent's task is reassigned, not assumed complete.
+- **Every brief has one owner.** The role that owns the work starts its lane.
+  A brief written for another role is a handoff: the writer names the receiving
+  role and sends it, and that role starts it. Thirty minutes after handoff, the
+  writer checks. If no lane has started, the writer flags it to the
+  orchestrator, who has it started, moved, or withdrawn. A brief waiting on a
+  named gate, such as an owner's answer, a budget go, or a capacity window,
+  carries a `Waiting on:` line and is not flagged until the gate clears.
 - **Read-only auditors stay read-only.** Verification agents and change
   agents are separate; an auditor never fixes what it finds, it reports.
 - **Docs first, cleanup last.** Agents read the relevant docs before
