@@ -23,6 +23,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   does: setup, a first result, the working day and runtime limits.
 ### Fixed
 
+- Credential release audits record canonical provider IDs and refuse symlink or
+  nonregular audit files. Local secret files are private before replacement.
+  Connect help marks `--token` deprecated and warns about process arguments;
+  connection removal is documented as planned.
+
 - `mb dashboard build` and `mb dashboard open` now refuse to write through a
   symlink inside the repo, at the output file or a parent folder, and name the
   link to replace. The output is written to a new file, so a symlink at an

@@ -574,7 +574,7 @@ def _write_local_secrets(data: dict[str, str]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with suppress(OSError):
             path.parent.chmod(0o700)
-        atomic_write_text(path, json.dumps(data, indent=2, sort_keys=True) + "\n")
+        atomic_write_text(path, json.dumps(data, indent=2, sort_keys=True) + "\n", mode=0o600)
         with suppress(OSError):
             path.chmod(0o600)
     except OSError as exc:

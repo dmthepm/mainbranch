@@ -139,7 +139,8 @@ def test_failed_local_replacement_preserves_previous_value(
     path = tmp_path / "home" / "secrets" / "connect.json"
     before = path.read_text(encoding="utf-8")
 
-    def fail_write(path: Path, content: str) -> None:
+    def fail_write(path: Path, content: str, *, mode: int | None = None) -> None:
+        assert mode == 0o600
         raise OSError("synthetic write failure")
 
     monkeypatch.setattr(store_mod, "atomic_write_text", fail_write)
@@ -897,3 +898,31 @@ def test_secret_probe_repr_hides_the_value() -> None:
     # The value itself, equality and tuple behaviour are unchanged.
     assert probe.value == secret and probe[0] == secret
     assert probe == store_mod.SecretProbe(secret, True, True, "", False, "security")
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_local_secret_inode_is_private_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing: bool
+) -> None:
+    import os
+    import stat
+
+    _local_env(monkeypatch, tmp_path)
+    path = store_mod._local_secret_path()
+    if existing:
+        path.parent.mkdir(parents=True)
+        path.write_text("{}")
+        path.chmod(0o644)
+    replace = os.replace
+    modes: list[int] = []
+
+    def inspect_replace(source: Any, destination: Any) -> None:
+        modes.append(stat.S_IMODE(Path(source).stat().st_mode))
+        replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", inspect_replace)
+    store_mod._write_local_secrets({"example-ref": "example-synthetic-value"})
+    store_mod._write_local_secrets({"example-ref": "example-synthetic-replacement"})
+    assert modes == [0o600, 0o600]
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert json.loads(path.read_text()) == {"example-ref": "example-synthetic-replacement"}

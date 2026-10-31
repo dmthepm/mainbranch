@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -307,3 +308,135 @@ def test_audit_does_not_restore_directory_write_permission(repo: Path) -> None:
         assert stat.S_IMODE(directory.stat().st_mode) == 0o500
     finally:
         directory.chmod(0o700)
+
+
+@pytest.mark.parametrize("verb", ["exec", "token"])
+@pytest.mark.parametrize("usage", [False, True])
+@pytest.mark.parametrize(
+    "provider",
+    [
+        "sk_test_ExampleOnly12345678901234567890",
+        "exampleQ7zN2mR9vB4xK8pL6wT3cH5jF0",
+        "example/invalid provider",
+    ],
+)
+def test_invalid_audit_provider_is_never_echoed(
+    repo: Path, verb: str, usage: bool, provider: str
+) -> None:
+    args = ["connect", verb, provider, "--repo", str(repo)]
+    if usage:
+        args.append("--json")
+    elif verb == "exec":
+        args.extend(["--", "example-command"])
+    else:
+        args.append("--print")
+    result = runner.invoke(app, args)
+    assert result.exit_code == 2
+    assert provider not in result.output
+    assert provider not in connect.audit_path().read_text()
+    assert entries()[0]["provider"] == "invalid-provider"
+
+
+def test_audit_canonical_custom_and_historical_providers(repo: Path) -> None:
+    connect.connect_provider("example-tool", repo=repo, custom=True, token=SECRET)
+    for provider in ["CLOUDFLARE_PAGES", "EXAMPLE_TOOL"]:
+        connect.write_release_audit("token", provider, repo, result="refused", flags=[])
+    assert [entry["provider"] for entry in entries()] == ["cloudflare", "example-tool"]
+    assert connect.read_release_audit(provider="example-tool")[0]["provider"] == "example-tool"
+    with connect.audit_path().open("a") as handle:
+        handle.write(json.dumps({"provider": "historical-example", "result": "refused"}) + "\n")
+    assert (
+        connect.read_release_audit(provider="historical-example")[0]["provider"]
+        == "historical-example"
+    )
+
+
+@pytest.mark.parametrize("kind", ["symlink", "fifo", "directory"])
+@pytest.mark.parametrize("verb", ["exec", "token"])
+def test_unsafe_audit_inode_blocks_release(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, kind: str, verb: str
+) -> None:
+    path = connect.audit_path()
+    path.parent.mkdir(parents=True)
+    target = repo / "example-audit-target"
+    target.write_text("example content")
+    target.chmod(0o640)
+    if kind == "symlink":
+        path.symlink_to(target)
+    elif kind == "fifo":
+        os.mkfifo(path, 0o640)
+    else:
+        path.mkdir(mode=0o750)
+    before = stat.S_IMODE(path.stat().st_mode)
+    marker = repo / "example-child-started"
+    args = (
+        ["--print"]
+        if verb == "token"
+        else [
+            "--",
+            sys.executable,
+            "-c",
+            "import pathlib,sys; pathlib.Path(sys.argv[1]).touch()",
+            str(marker),
+        ]
+    )
+    result = invoke(repo, verb, *args)
+    assert result.exit_code == 1
+    assert "audit_unavailable" in result.stderr
+    assert result.stdout == ""
+    assert not marker.exists()
+    assert target.read_text() == "example content"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o640
+    assert stat.S_IMODE(path.stat().st_mode) == before
+
+    def no_read(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("refusal must not read credentials")
+
+    monkeypatch.setattr(connect, "read_token", no_read)
+    refused = invoke(repo, "token")
+    assert refused.exit_code == 3
+    refused_exec = invoke(repo, "exec", "--", "printenv")
+    assert refused_exec.exit_code == 3
+
+
+def test_audit_refuses_fifo_with_a_reader(repo: Path) -> None:
+    path = connect.audit_path()
+    path.parent.mkdir(parents=True)
+    os.mkfifo(path)
+    path.chmod(0o640)
+    # A waiting reader lets the open succeed, so only the regular-file check can refuse.
+    reader = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        with pytest.raises(connect.ConnectRefusal, match="audit_unavailable"):
+            connect.write_release_audit(
+                "token", "cloudflare", repo, result="refused", reason="example", flags=[]
+            )
+        assert os.read(reader, 1) == b""
+    finally:
+        os.close(reader)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o640
+
+
+def test_token_help_explains_deprecated_argument() -> None:
+    result = runner.invoke(app, ["connect", "--help"], env={"COLUMNS": "200"})
+    assert result.exit_code == 0
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.stdout).split())
+    assert "Deprecated" in text
+    assert "process arguments" in text
+    assert "--token-stdin" in text
+
+
+def test_concurrent_audit_appends_are_complete_jsonl(repo: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    def append(index: int) -> None:
+        connect.write_release_audit(
+            "token", "cloudflare", repo, result="refused", reason=f"example-{index}", flags=[]
+        )
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(append, range(40)))
+    rows = entries()
+    assert len(rows) == 40
+    assert {row["reason"] for row in rows} == {f"example-{index}" for index in range(40)}
+    assert all(row["provider"] == "cloudflare" for row in rows)
