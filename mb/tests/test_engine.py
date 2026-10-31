@@ -573,7 +573,10 @@ def test_plugin_wiring_accepts_pre_move_repo_without_rewriting(tmp_path: Path) -
     }
     path.write_text(json_mod.dumps(legacy), encoding="utf-8")
 
-    assert engine_mod.plugin_wiring_status(tmp_path)["wired"] is True
+    status = engine_mod.plugin_wiring_status(tmp_path)
+    assert status["wired"] is True
+    assert status["source_classification"] == "legacy"
+    assert status["warnings"] == [engine_mod.PLUGIN_SOURCE_MOVE_WARNING]
 
     result = engine_mod.write_plugin_wiring(tmp_path)
     assert result["ok"] is True

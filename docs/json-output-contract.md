@@ -620,3 +620,24 @@ An `owner_question` in `actions` contains no command and performs no action.
 `mb status --json` includes `usage: {"configured": false}` when unset. When
 configured, it includes the same reader's summary, account facts, and roles
 near or at cap. Usage does not change the status exit code. See [usage.md](usage.md).
+
+## Plugin source warnings
+
+`runtime.skill_wiring.plugin` in `mb status` and `mb start`, and `plugin_rail`
+in `mb update`, retain the structural `wired`, `marketplace_known`,
+`plugin_enabled` and `settings_path` fields. `wired` accepts both the canonical
+and legacy GitHub addresses; it does not prove source health or runtime health.
+
+The additive `source_classification` field describes tracked settings as
+`canonical`, `legacy`, `other` or `absent`. `user_registry.source_classification`
+describes only Main Branch's entry in Claude's user marketplace registry with
+the same values, plus `unreadable` for unknown state. A missing registry is
+`absent`. The reader honors `CLAUDE_CONFIG_DIR` and returns no raw registry
+entries. These classifications do not verify remote content.
+
+`warnings` on that plugin object carries the migration warning for either
+legacy source, or an unknown-source warning for an unreadable registry.
+`mb doctor` exposes the same report in the named `plugin-source` check with
+warning severity. `mb update` also includes the messages in its top-level
+`warnings`, even when installed versions match. Source warnings do not change
+command `ok`, exit codes or launch decisions, and do not repair either source.

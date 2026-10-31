@@ -1088,12 +1088,14 @@ def _add_plugin_follow_up(result: dict[str, Any], repo: Path) -> None:
     expected_version = str(result.get("new_version") or result.get("old_version") or __version__)
     install = claude_mainbranch_plugin_status(expected_version=expected_version)
     result["plugin_rail"] = {
+        **status,
         "wired": status.get("wired", False),
         "marketplace_known": status.get("marketplace_known", False),
         "plugin_enabled": status.get("plugin_enabled", False),
         "settings_path": status.get("settings_path", ""),
         "install": install,
     }
+    result["warnings"].extend(status.get("warnings", []))
     if not status.get("wired", False):
         result["warnings"].append(
             "This repo is on symlink-only skill wiring. The Main Branch plugin is "
