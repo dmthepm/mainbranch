@@ -23,6 +23,7 @@ import logging
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -1422,6 +1423,57 @@ def _tracked_settings_path(repo: Path) -> Path:
     return repo / ".claude" / "settings.json"
 
 
+PLUGIN_SOURCE_MOVE_GUIDE = "https://github.com/dmthepm/mainbranch/blob/main/docs/migrating.md"
+PLUGIN_SOURCE_MOVE_WARNING = (
+    "Main Branch still names the old noontide-co/mainbranch plugin address. "
+    "Moving it is the owner's call: an agent must not do it without their approval. "
+    "Removing the marketplace also uninstalls the plugin and deletes its saved options "
+    "and data, so the owner should save what they need first. "
+    "Move steps: " + PLUGIN_SOURCE_MOVE_GUIDE + "."
+)
+PLUGIN_REGISTRY_MAX_BYTES = 1_048_576
+
+
+def _plugin_source_classification(source: object) -> str:
+    if source is None:
+        return "absent"
+    if isinstance(source, dict) and source.get("source") == "github":
+        if source.get("repo") == PLUGIN_REPO:
+            return "canonical"
+        if source.get("repo") == "noontide-co/mainbranch":
+            return "legacy"
+    return "other"
+
+
+def plugin_registry_status() -> dict[str, str]:
+    """Read only Main Branch's source identity from Claude's user registry.
+
+    Never return registry content or exception text, which can include other
+    marketplace entries or private paths. Missing state is ordinary absence.
+    """
+    try:
+        config = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude").expanduser()
+        # Nonblocking, so a FIFO here can't hang a command that only wants a warning.
+        fd = os.open(config / "plugins" / "known_marketplaces.json", os.O_RDONLY | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as registry:
+            info = os.fstat(registry.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > PLUGIN_REGISTRY_MAX_BYTES:
+                return {"source_classification": "unreadable"}
+            data = json.loads(registry.read(PLUGIN_REGISTRY_MAX_BYTES + 1))
+    except FileNotFoundError:
+        return {"source_classification": "absent"}
+    except (OSError, ValueError, RecursionError, RuntimeError):
+        return {"source_classification": "unreadable"}
+    if not isinstance(data, dict):
+        return {"source_classification": "unreadable"}
+    if PLUGIN_MARKETPLACE_NAME not in data:
+        return {"source_classification": "absent"}
+    entry = data[PLUGIN_MARKETPLACE_NAME]
+    if not isinstance(entry, dict):
+        return {"source_classification": "unreadable"}
+    return {"source_classification": _plugin_source_classification(entry.get("source"))}
+
+
 def plugin_wiring_status(repo: str | Path) -> dict[str, Any]:
     """Report the worktree-durable plugin wiring in tracked settings.
 
@@ -1446,7 +1498,20 @@ def plugin_wiring_status(repo: str | Path) -> dict[str, Any]:
     plugin_enabled = bool(
         isinstance(enabled_plugins, dict) and enabled_plugins.get(PLUGIN_ENABLE_KEY) is True
     )
+    source_classification = _plugin_source_classification(source)
+    registry = plugin_registry_status()
+    warnings = []
+    if "legacy" in {source_classification, registry["source_classification"]}:
+        warnings.append(PLUGIN_SOURCE_MOVE_WARNING)
+    if registry["source_classification"] == "unreadable":
+        warnings.append(
+            "Main Branch's user marketplace registration could not be read. "
+            "Its source is unknown. See " + PLUGIN_SOURCE_MOVE_GUIDE + "."
+        )
     return {
+        "source_classification": source_classification,
+        "user_registry": registry,
+        "warnings": warnings,
         "marketplace_known": marketplace_known,
         "plugin_enabled": plugin_enabled,
         "wired": marketplace_known and plugin_enabled,

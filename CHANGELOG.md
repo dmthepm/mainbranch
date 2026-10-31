@@ -23,6 +23,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   does: setup, a first result, the working day and runtime limits.
 ### Fixed
 
+- `mb doctor`, `mb status`, `mb start` and `mb update` warn when tracked
+  plugin wiring or the user marketplace registration names the old address.
+  The warning preserves wiring and launch behavior and links the move guide,
+  including the loss of plugin options and data when removing a marketplace.
+
 - Credential reads refuse recorded references that do not match the selected
   repo, provider and field, with guidance to reconnect.
 

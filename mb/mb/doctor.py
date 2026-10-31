@@ -1988,6 +1988,17 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
     )
 
     wiring = link_status(repo)
+    plugin = wiring.get("plugin", {})
+    source_warnings = plugin.get("warnings", [])
+    checks.append(
+        {
+            "name": "plugin-source",
+            "ok": not source_warnings,
+            "severity": "warn" if source_warnings else "info",
+            "detail": " ".join(source_warnings) or "No legacy Main Branch plugin source detected.",
+            "plugin": plugin,
+        }
+    )
     wiring_ok = bool(wiring["ok"])
     shadow_summary = wiring.get("shadow_report", {}).get("summary", {})
     active_shadows = int(shadow_summary.get("active_shadows", 0) or 0)

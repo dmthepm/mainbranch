@@ -587,6 +587,9 @@ def render_human(report: dict[str, Any]) -> None:
         "[bold]Skills[/bold]  /mb-start "
         + ("[green]wired[/green]" if wiring["ok"] else "[red]missing[/red]")
     )
+    for warning in wiring.get("plugin", {}).get("warnings", []):
+        console.print("warning: " + warning, markup=False)
+
     if isinstance(checkpoint, dict):
         pending = checkpoint.get("pending", {})
         recent = checkpoint.get("recent", [])
