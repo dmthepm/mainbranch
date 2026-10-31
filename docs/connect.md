@@ -1307,8 +1307,9 @@ read its previous value until the record is written or the rollback is done:
 --oauth`. They take it in repo and user scope alike, so only one `mb` process at
 a time saves a given credential through them, and they need
 `$MAINBRANCH_HOME/locks` (default `~/.mainbranch/locks`) to be writable. A
-connect that stores no token (metadata only, or a provider with no secrets) and
-disconnecting never touch the lock, so they do not need that folder.
+connect that stores no token (metadata only, or a provider with no secrets)
+never touches the lock, so it does not need that folder. Removing a connection
+is planned in [#1263](https://github.com/dmthepm/mainbranch/issues/1263).
 
 A second command waits about five seconds, then stops before it writes
 anything, says "Another mb connect is saving the <Provider> credential right

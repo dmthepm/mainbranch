@@ -2099,7 +2099,7 @@ def connect_cmd(
     token: str = typer.Option(
         "",
         "--token",
-        help="Secret token or key. Prefer --token-stdin for real credentials.",
+        help="Deprecated: token is visible in process arguments. Use --token-stdin.",
     ),
     token_stdin: bool = typer.Option(
         False,

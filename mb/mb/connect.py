@@ -3781,10 +3781,13 @@ def write_release_audit(
     repo_id = ""
     with suppress(ValueError, OSError):
         repo_id = str(_read_config(Path(repo).resolve()).get("repo_id") or "")
+    audit_provider = "invalid-provider"
+    with suppress(ValueError, OSError):
+        audit_provider = resolve_provider(provider, repo).id
     entry: dict[str, Any] = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "verb": verb,
-        "provider": provider,
+        "provider": audit_provider,
         "repo_id": repo_id,
         "scope": scope,
         "result": result,
@@ -3803,8 +3806,12 @@ def write_release_audit(
     try:
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         path.parent.chmod(stat.S_IMODE(path.parent.stat().st_mode) & 0o700)
-        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        fd = os.open(
+            path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600
+        )
         try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("audit log is not a regular file")
             os.fchmod(fd, 0o600)
             line = (json.dumps(entry, ensure_ascii=True) + "\n").encode()
             if os.write(fd, line) != len(line):
