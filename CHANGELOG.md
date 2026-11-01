@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.19] - 2026-11-01
+
 ### Added
 
 - `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
