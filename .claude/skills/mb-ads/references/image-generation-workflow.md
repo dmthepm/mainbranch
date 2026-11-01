@@ -153,51 +153,18 @@ External creative research, including Grok or ad-research synthesis, is only a
 source signal until verified against primary sources. Do not commit raw Grok
 dumps, screenshots, provider payloads, or unverified claims.
 
-Use this shape inside push-local `image-index.md`:
+Use this shape inside push-local `image-index.md` (a full worked example lives
+in the image-rail test fixtures; omit fields you have no value for):
 
 ```yaml
 schema: mainbranch.image_index.v0
 push_slug: 2026-05-ad-test
-experiment_frame: first_creative_playbook_router_experiment
 conversion_language: conversion_informed
-creative_playbook_ids:
-  - native_problem_scene
-  - specific_object_metaphor
-  - proof_artifact
-  - myth_vs_fact
-  - with_without_transformation
-  - crossed_out_problem_list
-  - founder_pov
-  - high_contrast_poster
-  - simple_chart_comparison
-  - testimonials_with_artifact
-  - us_vs_them_split
-  - simple_list_framework
-review_board_question: Which playbook produced the best actual ad candidate?
 review_rule: Beautiful but no click reason = reject.
 ad_readiness_gate:
-  state: ready
-  required_fields:
-    - offer
-    - audience
-    - campaign_goal
-    - claim_proof_boundary
+  state: ready            # hard-stop fields: offer, audience, campaign_goal, claim_proof_boundary
   hard_stop_missing: []
-  hard_stop_missing_fields: []
-  soft_warning_missing:
-    - proof
-    - customer_language
-    - brand_visual_style
-    - prior_outcomes
-    - meta_summary
-    - reference_images
-  soft_warning_missing_fields:
-    - proof
-    - customer_language
-    - brand_visual_style
-    - prior_outcomes
-    - meta_summary
-    - reference_images
+  soft_warning_missing: [proof, customer_language, brand_visual_style, prior_outcomes, meta_summary, reference_images]
 image_generation_gate:
   required_before_provider_generation:
     - selected_concept
@@ -206,256 +173,54 @@ image_generation_gate:
     - image_index_target
     - credential_state
     - operator_approval_for_live_provider_call
-selected_source_bites:
-  - concept_id: lost-thread-branch-map
-    source_file: research/customer-language.md
-    source_type: customer_language
-    extracted_phrase: I keep losing the thread
-    visual_translation: tangled red thread becoming one clean branch map
 post_processing_plan:
-  status: planned_not_implemented
   resize_target: 1440x1800
-  overlay_expected: true
-  overlay_method: future_deterministic_overlay_step
-  export_format: png_source_then_jpeg_or_png_final
-  compression_target: future_export_step
+  overlay_method: deterministic_overlay_step
   validation: Preview in Meta Ads Manager before launch.
-placement_presets:
-  facebook_feed_portrait_4x5:
-    aspect_ratio: 4:5
-    nearest_provider_size: 1024x1536
-    recommended_generation_size: 1440x1800
-    final_export_size: 1440x1800
-    safe_zone:
-      top: 10%
-      bottom: 10%
-      sides: 10%
-      notes: Keep focal point and overlay text inside conservative feed margins.
-    deterministic_overlay_expected: true
-    source_boundary: Default Meta feed format (with 9:16 for Stories/Reels); 1440x1800 minimum per ad-media-specs.md. Verify current Ads Manager specs before launch.
-    validation: Preview in Meta Ads Manager before launch.
-  facebook_feed_square_1x1:
-    aspect_ratio: 1:1
-    nearest_provider_size: 1024x1024
-    recommended_generation_size: 1440x1440
-    final_export_size: 1080x1080
-    safe_zone:
-      top: 10%
-      bottom: 10%
-      sides: 10%
-      notes: Keep the focal point centered for mobile feed crop.
-    deterministic_overlay_expected: true
-    source_boundary: Planning preset for square feed/carousel-style creative. Verify current Ads Manager specs before launch.
-    validation: Preview in Meta Ads Manager before launch.
-  facebook_story_reels_9x16:
-    aspect_ratio: 9:16
-    nearest_provider_size: 1024x1792
-    recommended_generation_size: 1440x2560
-    final_export_size: 1080x1920
-    safe_zone:
-      top: 14%
-      bottom: 35%
-      sides: 6%
-      notes: Keep critical content inside the center safe band.
-    deterministic_overlay_expected: true
-    source_boundary: 9:16 vertical guidance checked against public Meta Reels guidance; verify current Ads Manager specs before launch.
-    validation: Preview Stories/Reels placements before launch.
-reference_roles:
-  - logo
-  - product_photo
-  - style_reference
-  - screenshot_reference
-  - background
-  - mask_source
+placement_presets:       # sizes and safe zones: see ad-media-specs.md; verify current Ads Manager specs
+  facebook_feed_portrait_4x5: {aspect_ratio: "4:5", recommended_generation_size: 1440x1800, final_export_size: 1440x1800, safe_zone: {top: 10%, bottom: 10%, sides: 10%}}
+  facebook_feed_square_1x1: {aspect_ratio: "1:1", recommended_generation_size: 1440x1440, final_export_size: 1080x1080, safe_zone: {top: 10%, bottom: 10%, sides: 10%}}
+  facebook_story_reels_9x16: {aspect_ratio: "9:16", recommended_generation_size: 1440x2560, final_export_size: 1080x1920, safe_zone: {top: 14%, bottom: 35%, sides: 6%}}
+reference_roles: [logo, product_photo, style_reference, screenshot_reference, background, mask_source]
 concepts:
   - concept_id: lost-thread-branch-map
     status: planned
     prompt_key: lost-thread-branch-map.v1
     creative_playbook_id: specific_object_metaphor
-    creative_playbook:
-      id: specific_object_metaphor
-      status: candidate
-      use_when:
-        - audience speaks in systems, workflows, and operating clarity
-        - offer promise is about memory, process, or context continuity
-      default_avoid:
-        - generic SaaS gradient
-        - fake dashboard
-        - hologram UI
-        - robot assistant
-      useful_metaphors:
-        - dependency graph
-        - broken pipeline
-        - incident board
-        - branch map
-        - lost thread
-      risky_metaphors:
-        - glowing brain
-        - robot assistant
-        - generic command center
-      prompt_bias:
-        - tactile systems
-        - real artifacts
-        - visible consequence
-        - source-bite metaphor
-    router_inputs:
-      niche: founder_tool
-      offer_type: open_source_business_os
-      audience: solo founder or operator
-      source_bite_type: customer_language
-      proof_available: false
-      brand_style: tactile, technical, irreverent
-      platform: facebook_feed
-    router_reason: >
-      The source bite is emotional and abstract, so a specific object metaphor,
-      native problem scene, or bold meme/poster is more useful than chart proof.
-    playbook_fit:
-      source_bite_fit: 5
-      offer_fit: 5
-      audience_fit: 4
-      visual_distinctiveness: 5
-      conversion_pattern_fit: 4
-    external_pattern_signal:
-      source_type: grok_synthesis
-      pattern: specific_object_metaphor
-      confidence: medium
-      primary_source_verified: false
-    reference_influence_test:
-      mode: none
-      effect_on_specificity: 4
-      effect_on_native_feed_fit: 4
-      effect_on_ai_slop_risk: 2
-    reference_influence:
-      mode: none
-      influence_score: null
-      copy_risk: pass
+    router_inputs: {niche: founder_tool, offer_type: open_source_business_os, audience: solo founder or operator, source_bite_type: customer_language, proof_available: false, platform: facebook_feed}
+    router_reason: The source bite is emotional and abstract, so a specific object metaphor beats chart proof.
+    playbook_fit: {source_bite_fit: 5, offer_fit: 5, audience_fit: 4, visual_distinctiveness: 5, conversion_pattern_fit: 4}
     source_bite:
       source_file: research/customer-language.md
       source_type: customer_language
       extracted_phrase: I keep losing the thread
-      insight: The customer does not just feel disorganized; continuity breaks across tools.
+      insight: Continuity breaks across tools.
       visual_translation: tangled red thread becoming one clean branch map
-    genericness_check:
-      could_fit_notion: false
-      could_fit_asana: false
-      could_fit_quickbooks: false
-      could_fit_generic_coaching_offer: false
-      could_fit_generic_productivity_app: false
-      could_fit_any_coaching_offer: false
-      could_fit_accounting_software: false
-      specific_to_this_offer: 5
-      reason: The branch-map and durable-memory metaphor expresses the repo-backed business-memory promise.
-    avoidance_strategy:
-      avoids:
-        - stock-photo business imagery
-        - clean desk productivity cliché
-        - website hero composition
-        - fake dashboard
-        - generic SaaS gradient
-      intentionally_uses: []
-      reason: Uses a customer-language source-bite metaphor instead of generic productivity imagery.
+    genericness_check: {could_fit_generic_productivity_app: false, could_fit_any_coaching_offer: false, could_fit_accounting_software: false, specific_to_this_offer: 5, reason: "..."}
+    avoidance_strategy: {avoids: [stock-photo business imagery, fake dashboard, generic SaaS gradient], intentionally_uses: [], reason: "..."}
+    reference_influence: {mode: none, influence_score: null, copy_risk: pass}
     viewer_scroll_context: cold Facebook feed
     first_second_read: lost business thread becomes one durable branch map
-    audience_state: operator is resuming work after context switching across tools
-    visual_job: make continuity loss visible before showing the repo-backed memory fix
-    visual_metaphor: tangled red thread resolving into a clean branch map and archive
-    composition: tactile maze of red thread and scattered cards, with one clear branch path and upper-right overlay space
-    visual_hierarchy:
-      primary_focal_point: red thread becoming a branch map
-      secondary_focal_point: central archive object
-      text_zone: upper right
-    camera_language: slight top-down editorial ad composition
-    style_strength: specific metaphor, restrained production polish
+    audience_state: resuming work after context switching
+    visual_job: make continuity loss visible before showing the fix
+    visual_metaphor: tangled red thread resolving into a clean branch map
+    composition: one clear branch path, upper-right overlay space
+    visual_hierarchy: {primary_focal_point: red thread becoming a branch map, text_zone: upper right}
+    camera_language: slight top-down editorial
+    style_strength: specific metaphor, restrained polish
     emotional_tone: relief after broken continuity
     placement: facebook_feed_portrait_4x5
     text_overlay_plan: text-free base image; deterministic overlay later, max 4 words
-    source_files:
-      - core/offer.md
-      - core/audience.md
-      - core/brand/visual-style.md
-      - pushes/2026-05-ad-test/push.md
+    source_files: [core/offer.md, core/audience.md, pushes/2026-05-ad-test/push.md]
     claim_boundary: do not imply guaranteed revenue or Meta partnership
-    references:
-      - id: style-001
-        role: style_reference
-        path: mb-media://references/style-001.png
-        safe_to_share: false
-        use_for: color mood and composition
-        do_not_copy: exact subject, logos, text, or private details
-    reference_trait_extraction:
-      - reference_id: style-001
-        traits:
-          palette: muted warm neutrals with one grounded accent
-          composition: simple focal object with visible surrounding context
-          lighting: natural, tactile, not glossy studio light
-        do_not_copy: exact subject, text, logos, layout, or private details
-    prompt: >
-      Create a Facebook image ad base scene with a clear focal point, mobile-safe
-      whitespace, no rendered text, no real logos, and no private data.
-    negative_constraints:
-      - no real Meta UI
-      - no real logos
-      - no tiny text
-      - no revenue screenshots
-      - no before/after income claim
+    references: [{id: style-001, role: style_reference, path: "mb-media://references/style-001.png", safe_to_share: false, use_for: color mood, do_not_copy: exact subject, logos, text}]
+    prompt: Create a Facebook image ad base scene with a clear focal point, mobile-safe whitespace, no rendered text, no real logos, no private data.
+    negative_constraints: [no real Meta UI, no real logos, no tiny text, no revenue screenshots, no before/after income claim]
     likely_click_reason: A founder who feels context slipping away recognizes the lost-thread problem before reading the overlay.
-    review:
+    review:                # rubric: see Creative Review Rubric below
       status: accepted
-      one_second_clarity: pass
-      visual_hook_strength: pass
-      ad_usefulness: pass
-      source_bite_fit: pass
-      genericness_risk: pass
-      avoidance_strategy_fit: pass
-      avoidance_risk: pass
-      prompt_record_complete: pass
-      reference_copy_risk: pass
-      export_readiness: pass
-      readability: pass
-      placement_fit: pass
-      brand_fit: pass
-      claim_safety: pass
-      fake_ui_risk: pass
-      policy_risk: pass
-      private_data_risk: pass
-      ai_generic_risk: pass
-      click_reason_fit: pass
-      visual_quality:
-        composition: 5
-        style: 5
-        polish_control: 5
-      ad_quality:
-        thumb_stop: 5
-        problem_clarity: 5
-        desire_clarity: 5
-        curiosity_gap: 5
-        offer_relevance: 5
-        likely_click_reason: A founder who feels context slipping away recognizes the lost-thread problem before reading the overlay.
-      risk:
-        ai_slop_risk: 1
-        genericness_risk: 1
-        compliance_risk: pass
-      avoidance_check:
-        stock_photo_risk: pass
-        website_hero_risk: pass
-        clean_desk_cliche_risk: pass
-        generic_saas_risk: pass
-        ai_slop_risk: pass
-        overpolished_risk: pass
-        native_feed_fit: 5
-        too_safe_to_stop_scroll: pass
-        notes: []
-      scores:
-        one_second_clarity: 5
-        visual_hook_strength: 5
-        specificity: 5
-        brand_fit: 5
-        source_bite_fit: 5
-        specific_to_this_offer: 5
-        native_feed_fit: 5
-        ai_generic_risk: 1
+      scores: {one_second_clarity: 5, visual_hook_strength: 5, specificity: 5, brand_fit: 5, source_bite_fit: 5, specific_to_this_offer: 5, native_feed_fit: 5, ai_generic_risk: 1}
       decision: accept
-      notes: []
 assets:
   - asset_id: lost-thread-branch-map-001
     concept_id: lost-thread-branch-map
@@ -1103,6 +868,15 @@ review:
     ai_slop_risk: 3
     genericness_risk: 3
     compliance_risk: warning
+  avoidance_check:
+    stock_photo_risk: pass
+    website_hero_risk: pass
+    clean_desk_cliche_risk: warning
+    generic_saas_risk: pass
+    ai_slop_risk: pass
+    overpolished_risk: pass
+    too_safe_to_stop_scroll: warning
+    native_feed_fit: 4
   scores:
     one_second_clarity: 4
     visual_hook_strength: 4
