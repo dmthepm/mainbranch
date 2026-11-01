@@ -572,16 +572,22 @@ def test_g1_ipv6_at_every_offset(text: str, expected: str) -> None:
 )
 def test_b1_ipv4_punctuation(skill: Path, text: str, expected: str) -> None:
     module = load(skill / "scripts/redact.py")
-    output = module.render({
-        "rows": [{"check": "wildcard", "result": text, "safer": text}],
-        "notes": [text],
-    })
+    output = module.render(
+        {
+            "rows": [{"check": "wildcard", "result": text, "safer": text}],
+            "notes": [text],
+        }
+    )
     assert f"| wildcard |  | {expected} | {expected} |  |" in output
     assert f"- {expected}\n" in output
     assert module.Redactor({}).scrub(text) == expected
 
 
+def test_b2_docs_list_every_homelab_skill() -> None:
+    doc = (ROOT / "docs" / "homelab-skills.md").read_text(encoding="utf-8")
+    for path in sorted(SKILLS.glob("mb-homelab-*/SKILL.md")):
+        assert f"| `/{path.parent.name}` |" in doc
+
+
 def test_b1_redactor_copies_identical() -> None:
-    assert (AUDIT / "scripts/redact.py").read_bytes() == (
-        POLICY / "scripts/redact.py"
-    ).read_bytes()
+    assert (AUDIT / "scripts/redact.py").read_bytes() == (POLICY / "scripts/redact.py").read_bytes()

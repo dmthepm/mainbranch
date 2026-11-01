@@ -3,7 +3,8 @@
 Use these Claude Code skills to inspect the machines that run your agents.
 They work outside a business repo and do not touch business data. They are
 Claude-only, excluded from Codex global skills, workflow inventory and daily
-start routing. They remain draft pending runtime dogfood and security review.
+start routing. The two tailnet skills remain draft pending runtime dogfood and
+security review.
 
 With the Main Branch plugin enabled, invoke the skill by name in Claude Code.
 See the [invocation contract](claude-code-invocation-contract.md) for plugin
@@ -11,6 +12,7 @@ namespaces and project-local fallback. Python 3.10+ is required.
 
 | Skill | Input | Checks |
 | --- | --- | --- |
+| `/mb-homelab-machine` | An always-on agent machine you are setting up, maintaining or extending | Read-only setup, maintenance, extension and hardening checks that report NOT VERIFIED instead of guessing; the owner runs root steps |
 | `/mb-homelab-tailnet-audit` | Current machine, with Tailscale available | Version and current-track release; Tailscale SSH; Serve/Funnel forwards; tailnet lock; auto-update preference; OpenSSH listeners on Linux; macOS build metadata |
 | `/mb-homelab-tailnet-policy-review` | Policy file already on disk and lists of agent/admin tags | SSH section; accept versus check; wildcard sources/destinations; member-to-all rules; missing tag ownership; direct agent-tag reach to admin tags or all destinations |
 
