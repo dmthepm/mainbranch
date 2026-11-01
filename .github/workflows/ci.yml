@@ -30,12 +30,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+
+      - name: Plugin pin check against the real manifest
+        # A bad marketplace pin (missing commit, wrong version, not the
+        # first-party release tag, not on first-party main) must fail a required
+        # check, so this lives in this job and not a new one. Full check, not
+        # --offline; the offline form is for the manifest unit tests only.
+        if: matrix.python-version == '3.12'
+        run: python ../scripts/plugin_pin.py check
 
       - name: Install package + dev extras
         run: |
