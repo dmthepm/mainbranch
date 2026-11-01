@@ -139,8 +139,8 @@ business needs something from another, you carry it across yourself.
   encrypted). Make the off-site copy one a hacked box can't erase: a backup
   server that only accepts new snapshots (restic's rest-server has an
   `--append-only` mode), with old ones pruned from a machine you trust. Pass
-  one real restore test before any business data goes on the
-  box, then repeat it on a schedule.
+  one real restore test before any business data goes on the box, then repeat
+  it on a schedule.
 - **Updates:** on Ubuntu LTS, security updates install automatically but the
   box never reboots itself; on a rolling release such as Omarchy, nothing
   updates by itself and you run the full update about weekly (see Part 3).
@@ -164,8 +164,8 @@ business needs something from another, you carry it across yourself.
 This guide's steps are written for Linux. A Mac mini works as the box for one
 business, but plan extra time for running background services without a
 logged-in user. Tailscale's App Store and standalone apps need a logged-in
-user; only its standalone `tailscaled` build runs before login. For several businesses, Linux gives you more to work with,
-such as per-account memory caps. Choosing Linux doesn't separate the
+user; only its standalone `tailscaled` build runs before login. For several
+businesses, Linux gives you more to work with, such as per-account memory caps. Choosing Linux doesn't separate the
 businesses by itself: the limits under
 [One user account per business](#one-user-account-per-business) apply on
 both.

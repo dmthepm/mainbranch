@@ -23,7 +23,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   can't delete, Mac FileVault blocking restarts, Docker ports skipping the
   firewall, Omarchy updates turning auto-login back on, and Claude Code's
   sandbox being off by default. It also fixes the AppArmor line for Omarchy.
-
 - The Main Branch plugin is now pinned to the exact 0.6.18 release commit. New
   installs get that release, and owners move only when a new release is pinned.
 
