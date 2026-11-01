@@ -53,8 +53,8 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 
-# A pinned marketplace must name a real, not-newer release commit. Offline
-# fallback keeps shallow clones usable; a full clone runs the whole check.
+# A pinned marketplace must name a real, not-newer release commit. This needs
+# the pinned commit locally, so a shallow clone must fetch it first.
 python3 "$ROOT/scripts/plugin_pin.py" --root "$ROOT" check || {
   echo "release-preflight: plugin pin check failed." >&2
   exit 1
