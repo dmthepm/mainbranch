@@ -22,6 +22,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb machine doctor [--json]` reads a limited Ubuntu and Omarchy baseline
+  without elevation. Manifest support is deferred. Exit 3 means incomplete
+  verification; a Linux run cannot yet establish full machine health.
+
 - `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
   hardening and extending an always-on agent machine, with read-only
   done-checks that report NOT VERIFIED instead of guessing.

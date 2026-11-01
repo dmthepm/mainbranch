@@ -11,6 +11,13 @@ they name (default: today's daily rows, plus any weekly or monthly row whose
 last date is outside its window). Every row is read-only. Report in the table
 from SKILL.md. A reading without a time is NOT VERIFIED.
 
+Run `mb machine doctor` first for the current account's read-only baseline.
+Use `mb machine doctor --json` when structured results are needed. Exit 3 means
+incomplete verification, not failed verification. Exit 1 means a failed check;
+exit 2 means no verdict. Report NOT VERIFIED rows and their reasons. This first
+release has no manifest support, so a run cannot establish full machine health.
+The maintenance rows below still cover checks outside doctor's current scope.
+
 ## Principles and their checks
 
 **Updates go through one version manager.** Shared tools move through one

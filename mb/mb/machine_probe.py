@@ -20,7 +20,14 @@ Platform = Literal["ubuntu", "omarchy", "macos"]
 # Check code supplies argv; policy data must never select an executable.
 EXECUTABLES: dict[Platform, frozenset[str]] = {
     "ubuntu": frozenset(
-        {"/usr/bin/systemctl", "/usr/bin/lsblk", "/usr/bin/tailscale", "/usr/bin/gsettings"}
+        {
+            "/usr/bin/systemctl",
+            "/usr/bin/lsblk",
+            "/usr/bin/tailscale",
+            "/usr/bin/gsettings",
+            "/usr/bin/dpkg-query",
+            "/usr/bin/apt-config",
+        }
     ),
     "omarchy": frozenset(
         {"/usr/bin/systemctl", "/usr/bin/lsblk", "/usr/bin/tailscale", "/usr/bin/pacman"}

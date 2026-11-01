@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import configparser
 import getpass
+import json
+import os
 import platform
+import re
 import shlex
+import stat
 import time
 from collections import Counter
 from collections.abc import Callable, Sequence
@@ -78,6 +83,8 @@ class CheckSpec:
     tier: Literal["baseline", "advanced"] = "baseline"
     run_as: str = "any"
     severity: str = "fail"
+    platforms: tuple[str, ...] = ("ubuntu", "omarchy")
+    fix_text: str | None = None
 
 
 def check_result(spec: CheckSpec, reads: list[ReadResult]) -> dict[str, Any]:
@@ -96,7 +103,11 @@ def check_result(spec: CheckSpec, reads: list[ReadResult]) -> dict[str, Any]:
         "reads": [asdict(read) for read in reads],
         "reason": worst.reason,
         "does_not_prove": spec.does_not_prove,
-        "fix": None,
+        "fix": (
+            {"display_only": True, "run_as": "owner", "argv": None, "text": spec.fix_text}
+            if spec.fix_text
+            else None
+        ),
     }
 
 
@@ -173,7 +184,346 @@ def detect_platform(deadline: float) -> tuple[dict[str, Any], list[ReadResult]]:
     ]
 
 
-# D3 adds checks here. Platform detection is shared once per run.
+def _unknown(name: str, reason: Reason = "ambiguous_config") -> ReadResult:
+    return ReadResult(name, "not_verified", {}, reason)
+
+
+def _verdict(name: str, good: bool, **observed: bool | int | str) -> ReadResult:
+    return ReadResult(name, "pass" if good else "fail", observed)
+
+
+def _text(path: Path, prefix: Path) -> tuple[str, Reason | None]:
+    result = probe.read_file(path, prefix=prefix)
+    if result.reason:
+        return "", result.reason
+    try:
+        return result.data.decode("utf-8"), None
+    except UnicodeError:
+        return "", "ambiguous_config"
+
+
+def no_sleep(os_id: probe.Platform, deadline: float) -> list[ReadResult]:
+    reads = []
+    for target in ("sleep", "suspend", "hibernate"):
+        result = probe.run_probe(
+            os_id, ("/usr/bin/systemctl", "is-enabled", target + ".target"), deadline=deadline
+        )
+        name = target + "_masked"
+        if result.reason:
+            reads.append(_unknown(name, result.reason))
+        elif result.data.strip() in {
+            b"masked",
+            b"enabled",
+            b"disabled",
+            b"static",
+            b"indirect",
+            b"alias",
+        }:
+            reads.append(
+                _verdict(
+                    name, result.data.strip() == b"masked", masked=result.data.strip() == b"masked"
+                )
+            )
+        else:
+            reads.append(_unknown(name))
+    return reads
+
+
+def desktop_ubuntu(_: float) -> list[ReadResult]:
+    text, reason = _text(Path("/etc/gdm3/custom.conf"), Path("/etc/gdm3"))
+    if reason:
+        return [_unknown("automatic_login", reason)]
+    config = configparser.ConfigParser(interpolation=None)
+    try:
+        config.read_string(text)
+        value = config.get("daemon", "AutomaticLoginEnable").lower()
+    except (configparser.Error, KeyError):
+        return [_unknown("automatic_login")]
+    if value not in {"true", "false"}:
+        return [_unknown("automatic_login")]
+    enabled = value == "true"
+    return [_verdict("automatic_login", not enabled, enabled=enabled)]
+
+
+def _config_files(pattern: str) -> tuple[list[Path], Reason | None]:
+    try:
+        return sorted(Path("/etc").glob(pattern)), None
+    except OSError:
+        return [], "probe_error"
+
+
+def desktop_arch(_: float) -> list[ReadResult]:
+    reads = []
+    for name, pattern in (
+        ("sddm_autologin", "sddm.conf.d/*.conf"),
+        ("getty_autologin", "systemd/system/getty@*.service.d/*.conf"),
+    ):
+        paths, reason = _config_files(pattern)
+        if reason or not paths:
+            reads.append(_unknown(name, reason or "probe_missing"))
+            continue
+        enabled = False
+        for path in paths:
+            text, reason = _text(path, Path("/etc"))
+            if reason:
+                break
+            section = ""
+            for line in text.splitlines():
+                line = line.strip()
+                if line.startswith(("#", ";")):
+                    continue
+                if line.startswith("["):
+                    section = line.lower()
+                if (
+                    name == "sddm_autologin"
+                    and section == "[autologin]"
+                    and re.match(r"User\s*=\s*[^\s#;]", line)
+                ):
+                    enabled = True
+                if name == "getty_autologin" and "--autologin" in line:
+                    enabled = True
+        reads.append(
+            _unknown(name, reason) if reason else _verdict(name, not enabled, enabled=enabled)
+        )
+    return reads
+
+
+def sshd_keys(_: float) -> list[ReadResult]:
+    paths, reason = _config_files("ssh/sshd_config.d/*.conf")
+    if reason:
+        return [_unknown("sshd_authentication", reason)]
+    values: dict[str, str] = {}
+    for path in [Path("/etc/ssh/sshd_config"), *paths]:
+        text, reason = _text(path, Path("/etc/ssh"))
+        if reason:
+            return [_unknown("sshd_authentication", reason)]
+        for line in text.splitlines():
+            try:
+                tokens = shlex.split(line, comments=True)
+            except ValueError:
+                return [_unknown("sshd_authentication")]
+            if not tokens:
+                continue
+            key = tokens[0].lower()
+            if key == "match":
+                return [_unknown("sshd_authentication")]
+            if key == "include":
+                if tokens[1:] != ["/etc/ssh/sshd_config.d/*.conf"]:
+                    return [_unknown("sshd_authentication")]
+                # Included values must be evaluated at their exact position.
+                # Until that parser exists, never infer an effective value.
+                return [_unknown("sshd_authentication")]
+            if key in {
+                "passwordauthentication",
+                "kbdinteractiveauthentication",
+                "pubkeyauthentication",
+                "challengeresponseauthentication",
+            }:
+                if len(tokens) != 2 or tokens[1].lower() not in {"yes", "no"} or key in values:
+                    return [_unknown("sshd_authentication")]
+                values[key] = tokens[1].lower()
+    good = (
+        values.get("passwordauthentication") == "no"
+        and values.get(
+            "kbdinteractiveauthentication", values.get("challengeresponseauthentication")
+        )
+        == "no"
+        and values.get("pubkeyauthentication") == "yes"
+    )
+    return [
+        _verdict(
+            "sshd_authentication",
+            good,
+            password_off=values.get("passwordauthentication") == "no",
+            keyboard_interactive_off=values.get(
+                "kbdinteractiveauthentication", values.get("challengeresponseauthentication")
+            )
+            == "no",
+            pubkey_on=values.get("pubkeyauthentication") == "yes",
+        )
+    ]
+
+
+def tailscale_no_ssh(os_id: probe.Platform, deadline: float) -> list[ReadResult]:
+    result = probe.run_probe(os_id, ("/usr/bin/tailscale", "debug", "prefs"), deadline=deadline)
+    if result.reason or result.returncode != 0:
+        return [_unknown("run_ssh", result.reason or "probe_error")]
+    try:
+        value = json.loads(result.data)["RunSSH"]
+        if not isinstance(value, bool):
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        return [_unknown("run_ssh")]
+    return [_verdict("run_ssh", not value, enabled=value)]
+
+
+def reboot_pending(arch: bool) -> list[ReadResult]:
+    path = Path("/usr/lib/modules") / platform.release() if arch else Path("/run/reboot-required")
+    try:
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            return [_unknown("reboot_pending")]
+        if arch and not stat.S_ISDIR(info.st_mode):
+            return [_unknown("reboot_pending")]
+        if not arch and not stat.S_ISREG(info.st_mode):
+            return [_unknown("reboot_pending")]
+        pending = not arch
+    except FileNotFoundError:
+        pending = arch
+    except OSError:
+        return [_unknown("reboot_pending", "probe_error")]
+    return [
+        ReadResult("reboot_pending", "warn", {"pending": True}, "no_section")
+        if pending
+        else _verdict("reboot_pending", True, pending=False)
+    ]
+
+
+def unattended(deadline: float) -> list[ReadResult]:
+    reads = []
+    package = probe.run_probe(
+        "ubuntu",
+        ("/usr/bin/dpkg-query", "-W", "-f=${Status}", "unattended-upgrades"),
+        deadline=deadline,
+    )
+    reads.append(
+        _unknown("package_installed", package.reason)
+        if package.reason
+        else _verdict(
+            "package_installed",
+            package.returncode == 0 and package.data.strip() == b"install ok installed",
+            installed=package.returncode == 0 and package.data.strip() == b"install ok installed",
+        )
+    )
+    # apt-config applies all apt fragment ordering and overrides without changing it.
+    config = probe.run_probe("ubuntu", ("/usr/bin/apt-config", "dump"), deadline=deadline)
+    if config.reason or config.returncode != 0:
+        reads.append(_unknown("security_only_config", config.reason or "probe_error"))
+    else:
+        try:
+            text = config.data.decode("utf-8")
+            enabled = 'APT::Periodic::Unattended-Upgrade "1";' in text
+            reboot_off = 'Unattended-Upgrade::Automatic-Reboot "false";' in text
+            origins = re.findall(
+                r'^Unattended-Upgrade::(?:Allowed-Origins|Origins-Pattern):: "([^"\n]+)";',
+                text,
+                re.M,
+            )
+            security_only = bool(origins) and all(
+                re.fullmatch(r"\$\{distro_id\}:\$\{distro_codename\}-security", origin)
+                for origin in origins
+            )
+            reads.append(
+                _verdict(
+                    "security_only_config",
+                    enabled and reboot_off and security_only,
+                    enabled=enabled,
+                    automatic_reboot_off=reboot_off,
+                    security_only=security_only,
+                )
+            )
+        except UnicodeError:
+            reads.append(_unknown("security_only_config"))
+    timer = probe.run_probe(
+        "ubuntu", ("/usr/bin/systemctl", "is-enabled", "apt-daily-upgrade.timer"), deadline=deadline
+    )
+    reads.append(
+        _unknown("upgrade_timer", timer.reason or "probe_error")
+        if timer.reason or timer.returncode not in {0, 1}
+        else _verdict(
+            "upgrade_timer",
+            timer.data.strip() == b"enabled",
+            enabled=timer.data.strip() == b"enabled",
+        )
+    )
+    return reads
+
+
+def credential_store(deadline: float) -> list[ReadResult]:
+    from mb.credential_store import SecretStore
+
+    store = SecretStore()
+    # Local-file health reads stored values. Do not call it from doctor.
+    if store.backend == "local-file":
+        return [_unknown("store_available", "probe_missing")]
+    health = store.health(deadline=deadline)
+    ready = health.get("ok") is True
+    if ready and any(os.environ.get(key) for key in ("DISPLAY", "WAYLAND_DISPLAY")):
+        return [_unknown("store_available", "ambiguous_config")]
+    return [_verdict("store_available", ready, available=ready)]
+
+
+def registry(os_id: str) -> tuple[CheckSpec, ...]:
+    if os_id not in {"ubuntu", "omarchy"}:
+        return ()
+    linux: probe.Platform = "ubuntu" if os_id == "ubuntu" else "omarchy"
+    specs = (
+        CheckSpec(
+            "host.no-sleep",
+            "docs/machine-setup.md#the-box-works-the-laptop-is-a-remote-control",
+            lambda deadline: no_sleep(linux, deadline),
+        ),
+        CheckSpec(
+            "host.desktop-no-autologin",
+            "docs/machine-setup.md#omarchy-arch-based",
+            desktop_ubuntu,
+            platforms=("ubuntu",),
+        ),
+        CheckSpec(
+            "host.desktop-no-autologin-arch",
+            "docs/machine-setup.md#omarchy-arch-based",
+            desktop_arch,
+            platforms=("omarchy",),
+        ),
+        CheckSpec(
+            "remote_access.sshd-keys-only",
+            "docs/machine-setup.md#managing-it-from-a-mac",
+            sshd_keys,
+        ),
+        CheckSpec(
+            "remote_access.tailscale-no-ssh",
+            "docs/machine-setup.md#managing-it-from-a-mac",
+            lambda deadline: tailscale_no_ssh(linux, deadline),
+        ),
+        CheckSpec(
+            "hardening.reboot-pending",
+            "docs/machine-setup.md#backups-and-updates",
+            lambda _: reboot_pending(False),
+            platforms=("ubuntu",),
+            severity="warn",
+        ),
+        CheckSpec(
+            "hardening.reboot-pending-arch",
+            "docs/machine-setup.md#omarchy-arch-based",
+            lambda _: reboot_pending(True),
+            "A systemd or glibc update since boot.",
+            platforms=("omarchy",),
+            severity="warn",
+        ),
+        CheckSpec(
+            "hardening.unattended-security-only",
+            "docs/machine-setup.md#backups-and-updates",
+            unattended,
+            platforms=("ubuntu",),
+        ),
+        CheckSpec(
+            "credentials.store-available",
+            "docs/machine-setup.md#credentials",
+            credential_store,
+            "Availability without a desktop session unless this run is headless.",
+            source="engine",
+            run_as="each-business",
+        ),
+        CheckSpec(
+            "manifest.integrity",
+            "docs/machine-setup.md#admin-account-and-agent-accounts",
+            lambda _: [_unknown("manifest", "no_manifest")],
+            source="engine",
+        ),
+    )
+    return tuple(spec for spec in specs if os_id in spec.platforms)
+
+
 REGISTRY: tuple[CheckSpec, ...] = ()
 
 
@@ -191,7 +541,9 @@ def doctor() -> dict[str, Any]:
             reads,
         )
     ]
-    checks.extend(check_result(spec, spec.run(deadline)) for spec in REGISTRY)
+    checks.extend(
+        check_result(spec, spec.run(deadline)) for spec in (*registry(detected["id"]), *REGISTRY)
+    )
     code = exit_code(checks)
     # No manifest handling in this release. Missing policy prevents assurance.
     if code == 0:

@@ -426,3 +426,8 @@ mb doctor
 - Cursor, OpenClaw, Hermes, Paperclip-adjacent orchestration, and local
   runtimes remain roadmap surfaces until each has a documented adapter and
   smoke evidence. Codex support is limited to the skill surface above.
+
+`mb machine doctor [--json]` provides a read-only, current-account baseline on
+Ubuntu LTS and Omarchy. This initial subset has no manifest support and remains
+incomplete with exit 3 unless a check fails with exit 1. macOS only has partial
+OS detection. Fixture coverage does not establish real-host runtime support.
