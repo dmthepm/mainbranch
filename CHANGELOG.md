@@ -19,8 +19,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Changed
 
-- `docs/machine-setup.md` now covers always-on box traps: backups a hacked box
-  can't delete, Mac FileVault blocking restarts, Docker ports skipping the
+- `docs/machine-setup.md` now covers always-on box traps: append-only backups
+  pruned by age from a trusted machine, Mac FileVault blocking restarts, Docker ports skipping the
   firewall, Omarchy updates turning auto-login back on, and Claude Code's
   sandbox being off by default. It also fixes the AppArmor line for Omarchy.
 - The Main Branch plugin is now pinned to the exact 0.6.18 release commit. New

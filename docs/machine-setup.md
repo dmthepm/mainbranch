@@ -138,9 +138,12 @@ business needs something from another, you carry it across yourself.
   permissions, to a place off the box (keys and local state excluded or
   encrypted). Make the off-site copy one a hacked box can't erase: a backup
   server that only accepts new snapshots (restic's rest-server has an
-  `--append-only` mode), with old ones pruned from a machine you trust. Pass
-  one real restore test before any business data goes on the box, then repeat
-  it on a schedule.
+  `--append-only` mode), and no credential on the box that can delete. Prune
+  from a machine you trust, by age (`restic forget --keep-within`): a hacked
+  box can add fake new snapshots that push good ones out of a count-based rule.
+  See restic's [append-only notes](https://restic.readthedocs.io/en/stable/060_forget.html#security-considerations-in-append-only-mode).
+  Pass one real restore test before any business data goes on the box, then
+  repeat it on a schedule.
 - **Updates:** on Ubuntu LTS, security updates install automatically but the
   box never reboots itself; on a rolling release such as Omarchy, nothing
   updates by itself and you run the full update about weekly (see Part 3).
@@ -155,7 +158,7 @@ business needs something from another, you carry it across yourself.
 
 | | Linux (Ubuntu LTS, Omarchy) | macOS (Mac mini) |
 |---|---|---|
-| Runs with nobody logged in | Yes, with linger and user services | Needs care: user agents start at login, background work needs launchd setup. With FileVault on, macOS can't log in automatically, so after a power cut nothing starts until you log in |
+| Runs with nobody logged in | Yes, with linger and user services | Needs care: user agents start at login, background work needs launchd setup. With FileVault on, the disk stays locked after a power cut, so nothing starts until you log in |
 | Separate agent accounts | Standard | Possible; less common |
 | Remote admin | SSH | SSH or Screen Sharing |
 | Power draw | Low on mini PCs | Very low |
