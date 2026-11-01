@@ -32,6 +32,16 @@ cross-account aggregation, Windows.
 Platforms: Ubuntu LTS and Omarchy are first-class. macOS gets a small
 read-only subset with no manifest.
 
+### Release order
+
+1. **First release, no manifest.** `mb machine doctor [--json]` runs the
+   checks that need no manifest values, read-only and without sudo, on Ubuntu
+   LTS and Omarchy. Every Linux box exits `3` by design, because the baseline
+   stays incomplete without a manifest. The release note says so.
+2. **Second release, with a manifest.** Adds manifest loading, skip and
+   attest, and the remaining Linux checks.
+3. **macOS subset,** only if a Mac is available to test it.
+
 ## Standing rules
 
 From the security rulings for `mb machine`; not open for change here:
@@ -108,9 +118,12 @@ package and that folder check gives a false "no".
 
 ### Format and schema
 
-JSON, validated against the machine reference pack's schema (JSON Schema
-draft 2020-12, `manifest_version: 1`), with the engine deltas below. The pack
-names no file location, so this one is a proposal:
+JSON, validated against a committed engine schema (JSON Schema draft 2020-12,
+`manifest_version: 1`) that is the machine reference pack's schema with the
+engine deltas below. `mb` validates with a strict standard-library validator
+at runtime, so it gains no dependency. `jsonschema` is a test dependency only,
+used to prove the validator and the committed schema agree. The pack names no
+file location, so this one is a proposal:
 `/etc/mainbranch/machine.json`, owned by root, readable by all, writable only
 through the admin's `sudo`. Agent accounts read it and can't change it, so an
 agent can't weaken its own checks.
@@ -255,7 +268,7 @@ applicable on that OS. `att` means an owner attestation. `NV` means always
 | `host.disk-filevault` | engine | [mac-or-linux-for-the-box](../machine-setup.md#mac-or-linux-for-the-box) | — | — | ✓ | any | `fdesetup status` says FileVault is on. |
 | `host.desktop-no-autologin` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | ✓ | — | ✓ | any | U: `/etc/gdm3/custom.conf` `AutomaticLoginEnable`. M: `com.apple.loginwindow autoLoginUser` absent. `not_applicable` when `host.desktop.session` is `none` and no display manager is installed. |
 | `host.desktop-no-autologin-arch` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | — | ✓ | — | any | `/etc/sddm.conf.d/*.conf` `[Autologin] User=`; `getty@*.service.d/*.conf` with `--autologin`. Fails if any is present. |
-| `host.screen-lock` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | ✓ | NV | ✓ | owner | U: the owner's GNOME `lock-enabled` and `idle-delay` are within `host.desktop.screen_lock_minutes`. O: **NOT VERIFIED**: where Omarchy 4 stores its idle-lock setting is unknown. M: the owner's `askForPassword`. |
+| `host.screen-lock` | pack | [omarchy-arch-based](../machine-setup.md#omarchy-arch-based) | ✓ | NV | ✓ | owner | U: the owner's GNOME `lock-enabled` and `idle-delay` are within `host.desktop.screen_lock_minutes`. O: the `idle` block of the owner's `~/.config/omarchy/shell.json`; **NOT VERIFIED** when that block is missing or a custom plugin under `~/.config/omarchy/plugins/` handles idle. M: the owner's `askForPassword`. |
 
 ### Owner and business users
 
@@ -525,9 +538,11 @@ Omarchy boxes also have `host.screen-lock` NOT VERIFIED. macOS always exits
     `docs/machine-setup.md`;
   - every `owner-attests` check has fix text;
   - advanced checks have no reads and no fix;
-  - every pack id used appears in the pack's `generic-controls.md`.
-- Schema test: the engine schema is the pack schema with the listed deltas.
-  Both synthetic examples, with deltas applied, validate. Each delta has a
+  - every pack id used appears in a committed id list, because the pack
+    itself is private local state and public CI cannot read it.
+- Schema test: the committed engine schema and the runtime validator agree on
+  every fixture. Both synthetic examples, with deltas applied, validate. Each
+  delta has a
   rejecting case: a command field, a wrapper path, a record path outside its
   prefix, an unknown `size_class`.
 - Static test:
@@ -566,8 +581,9 @@ Omarchy boxes also have `host.screen-lock` NOT VERIFIED. macOS always exits
    evidence): applied as ruled in the security review of 28 Oct 2026.
 2. `/etc/mainbranch/machine.json` as the default location: a proposal. The
    pack names none.
-3. Where does Omarchy 4 keep its idle-lock setting? `host.screen-lock` is
-   NOT VERIFIED on Omarchy until it's confirmed.
+3. Omarchy idle lock: one host keeps it in the `idle` block of
+   `~/.config/omarchy/shell.json` and has no `hypridle.conf`. Confirm on a
+   second Omarchy install before `host.screen-lock` can pass there.
 4. The v0-7 target in this file name is tentative.
 
-Next: security re-reviews this revision; then the code batch on #1248.
+Next: the maintainer approves this design; the code batch runs on #1248.
