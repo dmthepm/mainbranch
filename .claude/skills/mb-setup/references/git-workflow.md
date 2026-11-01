@@ -59,29 +59,7 @@ mb checkpoint --validate "[added] initial business repo foundation" --json
 mb checkpoint --message "[added] initial business repo foundation" --yes
 ```
 
-After a context batch changes core files:
-
-```bash
-mb checkpoint --plan --json
-mb checkpoint --validate "[updated] core business context" --json
-mb checkpoint --message "[updated] core business context" --yes
-```
-
-After a provider becomes usable:
-
-```bash
-mb checkpoint --plan --json
-mb checkpoint --validate "[connected] GitHub" --json
-mb checkpoint --message "[connected] GitHub" --yes
-```
-
-After a multi-offer restructure:
-
-```bash
-mb checkpoint --plan --json
-mb checkpoint --validate "[updated] offer structure" --json
-mb checkpoint --message "[updated] offer structure" --yes
-```
+Other common subjects follow the same plan, validate, save sequence: `[updated] core business context` after a context batch, `[connected] GitHub` after a provider becomes usable, `[updated] offer structure` after a multi-offer restructure.
 
 If `mb checkpoint --plan` reports blockers, stop and explain the blocker in
 plain language before trying to save.

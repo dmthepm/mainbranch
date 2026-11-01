@@ -6,11 +6,7 @@ Google's Gemini-powered image generation for creating ad visuals and content ima
 
 ## What It Does
 
-Nano Banana generates images from text prompts using Google's Gemini models. In Main Branch, this means:
-
-- `/mb-ads` can generate actual image creatives (not just text prompts)
-- `/mb-organic` can create social media visuals
-- Any skill can request image generation when needed
+Nano Banana generates images from text prompts with Google's Gemini models, so `/mb-ads`, `/mb-organic` and `/mb-think` can produce actual image creatives instead of only text prompts. Without it, skills output text image prompts you paste into another image tool.
 
 ---
 
@@ -66,29 +62,9 @@ You should see `nano-banana` listed with available tools.
 
 ---
 
-## Available MCP Servers
+## MCP Servers
 
-| Server | Install | Best For |
-|--------|---------|----------|
-| `nano-banana-mcp` (ConechoAI) | `npx nano-banana-mcp` | Simple, reliable |
-| `nanobanana-mcp-server` (Python) | `uvx nanobanana-mcp-server@latest` | Python users |
-| `nanobanana-mcp` (YCSE) | Most feature-rich | Session consistency, style persistence |
-
-**Recommended:** `nano-banana-mcp` (ConechoAI) for simplicity.
-
----
-
-## How Skills Use It
-
-| Skill | How It Uses Image Gen |
-|-------|----------------------|
-| `/mb-ads` | Generate actual ad creatives from image prompts (graphic, lo-fi, interrupt styles) |
-| `/mb-organic` | Create social media visuals for reels covers, carousel images, post graphics |
-| `/mb-think` | Generate concept visuals during research/ideation |
-
-**Without Nano Banana:** Skills output text image prompts (descriptions of what the image should look like). You paste these into Midjourney, DALL-E, or another tool manually.
-
-**With Nano Banana:** Skills can generate images directly. Text prompts become actual images.
+Recommended: `nano-banana-mcp` (ConechoAI, simple and reliable). Alternatives: `nanobanana-mcp-server` (Python, `uvx nanobanana-mcp-server@latest`) and `nanobanana-mcp` (YCSE, most feature-rich, session consistency and style persistence).
 
 ---
 
