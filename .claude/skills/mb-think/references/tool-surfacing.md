@@ -31,16 +31,7 @@ How to help users discover research tools without blocking them.
 
 ## Intent-to-Tool Mapping
 
-| User Intent | Trigger Phrases | Primary Tool | Fallback |
-|-------------|-----------------|--------------|----------|
-| YouTube research | YouTube URL, "transcribe video", "what does [creator] say" | Apify | Manual transcript paste |
-| X/Twitter sentiment | "what are people saying", "sentiment on X", "Twitter discourse" | Grok | WebSearch site:x.com |
-| Deep web research | "deep research", "comprehensive analysis", "research everything" | Gemini | Multi-source WebSearch |
-| Local transcription | Local file path (.mp4, .m4a), "transcribe my recording" | whisper | External service + paste |
-| Instagram mining | Instagram handle, "mine [handle]", "competitor posts" | Apify | Manual screenshots |
-| Ad account research | "ad performance", "what's working", "CPA", "ROAS", "check my ads" | Verified Meta ad account context | Manual Ads Manager + paste |
-| Document conversion | PDF/DOCX path, "ingest this document", "convert this" | markitdown | Read tool (limited) |
-| General research | Default, "research [topic]", "what do we know" | WebSearch + codebase | Always available |
+See [research-routing-quick-ref.md](research-routing-quick-ref.md) for the intent, tool and fallback table.
 
 ---
 
@@ -163,29 +154,12 @@ After completing research with a fallback, optionally mention the upgrade:
 
 ---
 
-## Progressive Disclosure Levels
+## Progressive Disclosure
 
-### Level 1: Session Start (via /mb-start)
-
-Brief mention based on experience:
-
-| Experience | Message |
-|------------|---------|
-| `beginner` | "Research ready. I'll help with additional tools when you need them." |
-| `intermediate` | "Research: Apify ✓, Gemini ✓, Grok ✗ (web fallback available)" |
-| `advanced` | No message unless tools changed since last session |
-
-### Level 2: Intent Match (during /mb-think)
-
-Surface specific tool when user's task would benefit. See surfacing messages above.
-
-### Level 3: Post-Research Hint
-
-After using a fallback, briefly mention what the tool would provide. Once per session.
-
-### Level 4: Never Surface
-
-Don't mention tools user never tried to use. No unsolicited tool advertisements.
+1. **Session start** (via /mb-start): `beginner` "Research ready. I'll help with additional tools when you need them."; `intermediate` "Research: Apify ✓, Gemini ✓, Grok ✗ (web fallback available)"; `advanced` silent unless tools changed.
+2. **Intent match:** surface the specific tool using the messages above.
+3. **Post-research:** mention the upgrade once, after a fallback.
+4. **Never** advertise tools the user never tried to use.
 
 ---
 
@@ -201,50 +175,9 @@ Research must always proceed. If all options fail:
 
 ---
 
-## Example Flows
+## Example
 
-### User wants YouTube research, Apify missing
-
-```
-User: "Research what Alex Hormozi says about pricing"
-
-Claude: "I'd transcribe some Hormozi videos, but YouTube mining needs Apify MCP.
-
-Options:
-1. Set up Apify (5 min, one-time)
-2. Share a video URL and I'll guide you to copy the transcript manually
-3. Research pricing without YouTube"
-
-User: "2"
-
-Claude: "Got it. Share the YouTube URL and I'll tell you how to copy the transcript."
-```
-
-### User wants X research, Grok missing (first time)
-
-```
-User: "What are people saying about Skool on X?"
-
-Claude: "X sentiment research works best with Grok — you get real-time data with actual post citations.
-
-Options:
-1. Use web search instead (good for most cases)
-2. Set up Grok (5 min, requires $5 credit)
-3. Skip X research"
-
-User: "1"
-
-Claude: [proceeds with web search, notes limitation in research file]
-```
-
-### User wants X research, Grok missing (second time same session)
-
-```
-User: "Now check what people say about memberships on X"
-
-Claude: "Searching X via web..."
-[proceeds with fallback silently, no re-offer]
-```
+Missing tool, first request: state the value, give the numbered options (set up / fallback / skip), proceed with the pick and note the limitation in the research file. Second request in the same session: use the fallback silently, no re-offer.
 
 ---
 

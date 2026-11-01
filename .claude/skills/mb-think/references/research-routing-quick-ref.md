@@ -96,12 +96,7 @@ if mcp__whisper__* exists: WHISPER=true
 
 ## Setup Guide Paths
 
-| Tool | Guide |
-|------|-------|
-| Apify | `.claude/skills/mb-organic/references/apify-setup.md` |
-| Grok | `.claude/skills/mb-think/references/grok-setup.md` |
-| Gemini | `.claude/skills/mb-think/references/gemini-setup.md` |
-| whisper | `.claude/skills/mb-think/references/local-transcription.md` |
+See [tool-surfacing.md](tool-surfacing.md) (Setup Guide Locations).
 
 ---
 
