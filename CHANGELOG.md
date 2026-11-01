@@ -13,6 +13,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Changed
 
+- The tailnet skills' draft notes now record one real redaction run on one
+  machine. Both skills stay draft.
 - The Main Branch plugin is now pinned to the exact 0.6.19 release commit. New
   installs get that release, and owners move only when a new release is pinned.
 
