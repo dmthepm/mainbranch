@@ -98,6 +98,6 @@ Other limits:
   with an empty folder, it prints nothing. The command is POSIX `sh` and always exits 0.
 - With no cards at all, a set `MB_ROLE` is ignored, by design.
 - A repo-local `SessionStart` hook running `mb role hook --source <source>`
-  in `.claude/settings.json` is read by `mb doctor` as wired only when its command starts with `mb role hook`, but only the
+  in `.claude/settings.json` is read by `mb doctor` as wired only when its whole command is `mb role hook`, but only the
   plugin route was run for this release.
 - The plugin takes effect after a plugin update and a Claude Code restart.

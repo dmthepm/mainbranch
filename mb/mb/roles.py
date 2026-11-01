@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -357,24 +356,17 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
     return "\n".join(lines)
 
 
+# The whole command must be this: no quoting, redirection or other shell syntax.
+_ROLE_HOOK_COMMAND = re.compile(r"(?:[\w./-]*/)?mb role hook(?: --source [a-z]+)?")
+
+
 def _command_runs_role_hook(command: object) -> bool:
-    """True only when the command starts with ``mb role hook``.
+    """True only when the whole command is ``mb role hook``.
 
     Parsing arbitrary shell is a losing game, so any other form reads as not wired.
     That can miss a real hook. It can't report one that doesn't run.
     """
-    if not isinstance(command, str):
-        return False
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        return False
-    return (
-        len(tokens) >= 3
-        and Path(tokens[0]).name == "mb"
-        and tokens[1:3] == ["role", "hook"]
-        and not command.lstrip().startswith(("'", '"'))
-    )
+    return isinstance(command, str) and bool(_ROLE_HOOK_COMMAND.fullmatch(command.strip()))
 
 
 def _settings_has_hook(path: Path) -> bool:

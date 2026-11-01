@@ -529,7 +529,7 @@ def test_hook_command_prints_mb_output_when_mb_works(repo: Path, tmp_path: Path)
     assert result.stdout.strip() == "CARD-FROM-MB role hook --source clear"
 
 
-def _settings(command: str) -> dict:
+def _settings(command: str) -> dict[str, object]:
     return {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": command}]}]}}
 
 
@@ -542,6 +542,8 @@ def _settings(command: str) -> dict:
         (_settings('echo "mb role hook"'), False),
         (_settings('echo "hello; mb role hook "'), False),
         (_settings('echo ";" mb role hook'), False),
+        (_settings("mb role hook < /dev/null/nonexistent"), False),
+        (_settings("mb role hook; echo done"), False),
         (_settings('"mb role hook"'), False),
         (_settings("echo 'then mb role hook'"), False),
         (_settings("echo hi; mb role hook; echo done"), False),
