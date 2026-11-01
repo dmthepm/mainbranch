@@ -171,7 +171,8 @@ def test_user_runtime_environment(monkeypatch, root_owned):
     probe.run_probe(
         "ubuntu", ("/usr/bin/systemctl", "--user", "show"), deadline=time.monotonic() + 1
     )
-    assert captured["env"] == {
+    probe_environment = captured["env"]
+    assert probe_environment == {
         "LC_ALL": "C",
         "PATH": "/usr/bin:/bin",
         "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
