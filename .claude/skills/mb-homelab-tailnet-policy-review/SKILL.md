@@ -6,6 +6,9 @@ loops: [sense, decide]
 
 # Tailnet policy review
 
+Draft: tested on synthetic data and one host. Real tailnet DNS, node, login and
+peer names have not been tested. Inspect the whole response before sharing it.
+
 Say first: "This is read-only. I will read the policy file you provide and show
 a redacted report without changing your policy, tailnet or business data."
 
@@ -28,6 +31,7 @@ a redacted report without changing your policy, tailnet or business data."
    a safer shape, and official docs. Explain that static selectors do not
    resolve groups, hosts, CIDRs, posture, or application capabilities. Zero
    rows cannot prove isolation. Invalid HuJSON means the review is incomplete.
+   Tailscale's policy reference says to prefer grants; `acls` still work.
 5. Stop after a short "What to look at" list. Offer shapes for the operator to
    consider, without editing, applying or publishing a policy.
 

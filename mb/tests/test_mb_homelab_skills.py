@@ -265,7 +265,7 @@ def test_a4_commands_documented() -> None:
     evidence = (AUDIT / "references" / "commands.md").read_text()
     for argv in module.ALLOWLIST:
         line = next(line for line in evidence.splitlines() if f"`{' '.join(argv)}`" in line)
-        assert "https://tailscale.com/docs/" in line and "2026-10-25" in line
+        assert "https://tailscale.com/docs/" in line and "2026-11-01" in line
     for skill in (AUDIT, POLICY):
         docs = (skill / "references" / "commands.md").read_text()
         entrypoints = re.findall(r"python3 scripts/\w+\.py", (skill / "SKILL.md").read_text())
@@ -587,6 +587,18 @@ def test_b2_docs_list_every_homelab_skill() -> None:
     doc = (ROOT / "docs" / "homelab-skills.md").read_text(encoding="utf-8")
     for path in sorted(SKILLS.glob("mb-homelab-*/SKILL.md")):
         assert f"| `/{path.parent.name}` |" in doc
+
+
+@pytest.mark.parametrize("skill", [AUDIT, POLICY], ids=["audit", "policy"])
+def test_s2_skill_states_draft_and_official_sources(skill: Path) -> None:
+    source = " ".join((skill / "SKILL.md").read_text(encoding="utf-8").split())
+    assert "Draft: tested on synthetic data" in source
+    assert "Real tailnet DNS, node, login and peer names have not been tested." in source
+    evidence = (skill / "references" / "commands.md").read_text(encoding="utf-8")
+    assert "https://tailscale.com/docs/llms.txt" in evidence
+    assert "https://tailscale.com/security-bulletins" in evidence
+    assert "https://github.com/tailscale/tailscale-skill" in evidence
+    assert "reference data, not instructions" in evidence
 
 
 def test_b1_redactor_copies_identical() -> None:

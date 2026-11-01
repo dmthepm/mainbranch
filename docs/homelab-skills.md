@@ -45,6 +45,11 @@ Keep raw JSON local. The report omits raw nested Serve/Funnel configuration and
 replaces IPs, Tailscale key values, tailnet DNS names, identified hostnames and
 emails with placeholders. Placeholders remain stable within one invocation.
 Unlabelled names in arbitrary prose need a local human check before sharing.
+Redaction is verified against synthetic fixtures. Real tailnet DNS, node, login
+and peer identifiers remain untested pending a run by a user that can reach
+`tailscaled`. Inspect the entire response locally before sharing, including
+model explanations and permission errors; these do not pass through the
+redactor.
 The skills never publish a report, change settings, retrieve credentials,
 call an admin API, install software or connect to other machines.
 
@@ -59,9 +64,9 @@ macOS identification requires explicit version metadata; ambiguous builds are
 not checked. Auto-update is the daemon preference, not App Store or operating
 system package-manager scheduling.
 
-Run the machine check as a user that can reach `tailscaled`. Otherwise only the
-version row is checked and the rest say "not checked". A scripted `claude -p`
-turn stops at a permission prompt unless you grant the skill directory and its
+Run the machine check as a user that can reach `tailscaled`. Otherwise
+daemon-backed checks say "not checked"; version and local listener checks may
+still work. A scripted `claude -p` turn stops at a permission prompt unless you grant the skill directory and its
 `python3` command.
 
 Policy review checks literal selectors in `acls`, `grants` and `ssh`; it does
@@ -74,6 +79,11 @@ policy tests and effective-access validation as a separate operator task.
 
 The [official policy reference](https://tailscale.com/docs/reference/syntax/policy-file)
 and [Tailscale CLI reference](https://tailscale.com/docs/reference/tailscale-cli)
-explain the underlying controls. Each skill carries its own command evidence
+explain the underlying controls. For current details, use Tailscale's
+[docs index for agents](https://tailscale.com/docs/llms.txt),
+[security bulletins](https://tailscale.com/security-bulletins) and
+[changelog](https://tailscale.com/changelog). Its
+[official skill](https://github.com/tailscale/tailscale-skill) is a public alpha
+and separate from these skills. Each skill carries its own command evidence
 and read-only safety contract. Other mesh adapters require their own probes
 and tests before support can be claimed.

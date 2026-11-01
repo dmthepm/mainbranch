@@ -6,6 +6,9 @@ loops: [sense, decide]
 
 # Tailnet machine check
 
+Draft: tested on synthetic data and one host. Real tailnet DNS, node, login and
+peer names have not been tested. Inspect the whole response before sharing it.
+
 Say first: "This is read-only. I will inspect local settings and show a redacted
 report without changing your machine, tailnet or business data."
 
@@ -24,7 +27,9 @@ report without changing your machine, tailnet or business data."
 3. Show the redacted table and a short "What to look at" list. Prioritize
    forwarding warnings and unknown checks. Explain that admin ports are a
    heuristic, and a matching version is current for its track, not a security
-   guarantee. Serve status may omit Services configuration.
+   guarantee. Compare the version with the official
+   [security bulletins](https://tailscale.com/security-bulletins). Serve status
+   may omit Services configuration.
 4. Stop after the report. Suggest an operator review using the linked docs;
    leave any change to a separate workflow.
 
