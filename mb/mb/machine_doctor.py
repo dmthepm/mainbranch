@@ -39,6 +39,8 @@ Reason = Literal[
     "skipped_by_manifest",
     "advanced_pending",
     "no_section",
+    "reboot_pending",
+    "desktop_absent",
     "location_unknown",
 ]
 REASONS = frozenset(get_args(Reason))
@@ -229,14 +231,32 @@ def no_sleep(os_id: probe.Platform, deadline: float) -> list[ReadResult]:
     return reads
 
 
-def desktop_ubuntu(_: float) -> list[ReadResult]:
+def desktop_ubuntu(deadline: float) -> list[ReadResult]:
     text, reason = _text(Path("/etc/gdm3/custom.conf"), Path("/etc/gdm3"))
+    if reason == "probe_missing":
+        package = probe.run_probe(
+            "ubuntu", ("/usr/bin/dpkg-query", "-W", "-f=${Status}", "gdm3"), deadline=deadline
+        )
+        if package.reason:
+            return [_unknown("automatic_login", package.reason)]
+        absent = (package.returncode == 1 and not package.data.strip()) or (
+            package.returncode == 0
+            and package.data.strip() in {b"deinstall ok config-files", b"unknown ok not-installed"}
+        )
+        if absent:
+            return [
+                ReadResult(
+                    "automatic_login", "not_applicable", {"gdm_installed": False}, "desktop_absent"
+                )
+            ]
     if reason:
         return [_unknown("automatic_login", reason)]
     config = configparser.ConfigParser(interpolation=None)
     try:
         config.read_string(text)
-        value = config.get("daemon", "AutomaticLoginEnable").lower()
+        if not config.has_section("daemon"):
+            return [_unknown("automatic_login")]
+        value = config.get("daemon", "AutomaticLoginEnable", fallback="false").lower()
     except (configparser.Error, KeyError):
         return [_unknown("automatic_login")]
     if value not in {"true", "false"}:
@@ -289,39 +309,49 @@ def desktop_arch(_: float) -> list[ReadResult]:
 
 
 def sshd_keys(_: float) -> list[ReadResult]:
-    paths, reason = _config_files("ssh/sshd_config.d/*.conf")
-    if reason:
-        return [_unknown("sshd_authentication", reason)]
     values: dict[str, str] = {}
-    for path in [Path("/etc/ssh/sshd_config"), *paths]:
+
+    def parse(path: Path, *, included: bool = False) -> Reason | None:
         text, reason = _text(path, Path("/etc/ssh"))
         if reason:
-            return [_unknown("sshd_authentication", reason)]
+            return reason
         for line in text.splitlines():
             try:
                 tokens = shlex.split(line, comments=True)
             except ValueError:
-                return [_unknown("sshd_authentication")]
+                return "ambiguous_config"
             if not tokens:
                 continue
             key = tokens[0].lower()
             if key == "match":
-                return [_unknown("sshd_authentication")]
+                return "ambiguous_config"
             if key == "include":
-                if tokens[1:] != ["/etc/ssh/sshd_config.d/*.conf"]:
-                    return [_unknown("sshd_authentication")]
-                # Included values must be evaluated at their exact position.
-                # Until that parser exists, never infer an effective value.
-                return [_unknown("sshd_authentication")]
+                if included or tokens[1:] != ["/etc/ssh/sshd_config.d/*.conf"]:
+                    return "ambiguous_config"
+                paths, reason = _config_files("ssh/sshd_config.d/*.conf")
+                if reason:
+                    return reason
+                for child in sorted(paths):
+                    reason = parse(child, included=True)
+                    if reason:
+                        return reason
             if key in {
                 "passwordauthentication",
                 "kbdinteractiveauthentication",
                 "pubkeyauthentication",
                 "challengeresponseauthentication",
             }:
-                if len(tokens) != 2 or tokens[1].lower() not in {"yes", "no"} or key in values:
-                    return [_unknown("sshd_authentication")]
-                values[key] = tokens[1].lower()
+                if len(tokens) != 2 or tokens[1].lower() not in {"yes", "no"}:
+                    return "ambiguous_config"
+                # ChallengeResponseAuthentication is an alias for the same setting.
+                if key == "challengeresponseauthentication":
+                    key = "kbdinteractiveauthentication"
+                values.setdefault(key, tokens[1].lower())
+        return None
+
+    reason = parse(Path("/etc/ssh/sshd_config"))
+    if reason:
+        return [_unknown("sshd_authentication", reason)]
     good = (
         values.get("passwordauthentication") == "no"
         and values.get(
@@ -373,10 +403,41 @@ def reboot_pending(arch: bool) -> list[ReadResult]:
     except OSError:
         return [_unknown("reboot_pending", "probe_error")]
     return [
-        ReadResult("reboot_pending", "warn", {"pending": True}, "no_section")
+        ReadResult("reboot_pending", "warn", {"pending": True}, "reboot_pending")
         if pending
         else _verdict("reboot_pending", True, pending=False)
     ]
+
+
+def _security_origin(origin: str) -> bool:
+    # Allowed-Origins uses origin:archive. Origins-Pattern uses named selectors.
+    if "=" not in origin:
+        parts = origin.split(":")
+        return len(parts) == 2 and bool(parts[0]) and parts[1].endswith("-security")
+    selectors: dict[str, str] = {}
+    aliases = {
+        "o": "origin",
+        "a": "archive",
+        "suite": "archive",
+        "n": "codename",
+        "l": "label",
+        "c": "component",
+        "site": "site",
+    }
+    for item in origin.split(","):
+        pair = item.strip().split("=", 1)
+        if len(pair) != 2 or not pair[1]:
+            return False
+        key = aliases.get(pair[0], pair[0])
+        if (
+            key not in {"origin", "archive", "codename", "label", "component", "site"}
+            or key in selectors
+        ):
+            return False
+        selectors[key] = pair[1]
+    # A codename alone identifies a release, not its update pocket.
+    pocket = selectors.get("archive", "")
+    return pocket.endswith("-security") and not any(char in pocket for char in "*?[]")
 
 
 def unattended(deadline: float) -> list[ReadResult]:
@@ -409,10 +470,7 @@ def unattended(deadline: float) -> list[ReadResult]:
                 text,
                 re.M,
             )
-            security_only = bool(origins) and all(
-                re.fullmatch(r"\$\{distro_id\}:\$\{distro_codename\}-security", origin)
-                for origin in origins
-            )
+            security_only = bool(origins) and all(_security_origin(origin) for origin in origins)
             reads.append(
                 _verdict(
                     "security_only_config",

@@ -236,7 +236,7 @@ def test_arch_autologin(monkeypatch, enabled):
     "suffix,state,reason",
     [
         ("", "pass", None),
-        ("PasswordAuthentication yes", "not_verified", "ambiguous_config"),
+        ("PasswordAuthentication yes", "pass", None),
         ("Match User agent", "not_verified", "ambiguous_config"),
         ("Include /tmp/config", "not_verified", "ambiguous_config"),
     ],
@@ -427,3 +427,166 @@ def test_gdm_setting_in_wrong_section_is_unknown(monkeypatch):
         lambda *a, **kw: ProbeResult(data=b"[wrong]\nAutomaticLoginEnable=false"),
     )
     assert doctor.desktop_ubuntu(100)[0].state == "not_verified"
+
+
+@pytest.mark.parametrize("early,state", [(False, "fail"), (True, "pass")])
+def test_ubuntu_sshd_include_order(monkeypatch, early, state):
+    from pathlib import Path
+
+    root = "# Stock Ubuntu shape, synthetic configuration\n"
+    if early:
+        root += "PasswordAuthentication no\n"
+    root += (
+        "Include /etc/ssh/sshd_config.d/*.conf\n"
+        "PasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\n"
+    )
+    files = {
+        "/etc/ssh/sshd_config": root.encode(),
+        "/etc/ssh/sshd_config.d/10-cloud.conf": b"PasswordAuthentication yes\n",
+        "/etc/ssh/sshd_config.d/90-owner.conf": b"PasswordAuthentication no\n",
+    }
+    calls = []
+
+    def read(path, **kwargs):
+        calls.append(str(path))
+        assert kwargs["prefix"] == Path("/etc/ssh")
+        return ProbeResult(data=files[str(path)])
+
+    monkeypatch.setattr(probe, "read_file", read)
+    monkeypatch.setattr(
+        doctor, "_config_files", lambda _: ([Path(p) for p in reversed(list(files)[1:])], None)
+    )
+    assert doctor.sshd_keys(100)[0].state == state
+    assert calls == list(files)
+
+
+def test_unreferenced_ssh_dropins_are_never_read(monkeypatch):
+    monkeypatch.setattr(doctor, "_config_files", Mock(side_effect=AssertionError("unreferenced")))
+    read = Mock(
+        return_value=ProbeResult(
+            data=(
+                b"PasswordAuthentication no\nKbdInteractiveAuthentication no\n"
+                b"PubkeyAuthentication yes\n"
+            )
+        )
+    )
+    monkeypatch.setattr(probe, "read_file", read)
+    assert doctor.sshd_keys(100)[0].state == "pass"
+    assert read.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "content,reason",
+    [
+        (b"Match User synthetic\n", None),
+        (b"", "ambiguous_config"),
+        (b"Include /etc/ssh/sshd_config.d/*.conf", None),
+    ],
+)
+def test_ssh_included_ambiguity(monkeypatch, content, reason):
+    from pathlib import Path
+
+    monkeypatch.setattr(
+        doctor, "_config_files", lambda _: ([Path("/etc/ssh/sshd_config.d/10-owner.conf")], None)
+    )
+    monkeypatch.setattr(
+        probe,
+        "read_file",
+        Mock(
+            side_effect=[
+                ProbeResult(data=b"Include /etc/ssh/sshd_config.d/*.conf\n"),
+                ProbeResult(data=content, reason=reason),
+            ]
+        ),
+    )
+    assert doctor.sshd_keys(100)[0].reason == "ambiguous_config"
+
+
+@pytest.mark.parametrize(
+    "kind,origin,good",
+    [
+        ("Allowed-Origins", "${distro_id}:${distro_codename}-security", True),
+        ("Allowed-Origins", "${distro_id}ESMApps:${distro_codename}-apps-security", True),
+        ("Allowed-Origins", "${distro_id}ESM:${distro_codename}-infra-security", True),
+        ("Origins-Pattern", "origin=${distro_id},archive=${distro_codename}-security", True),
+        ("Origins-Pattern", "o=${distro_id}ESMApps,a=${distro_codename}-apps-security", True),
+        ("Origins-Pattern", "origin=${distro_id}ESM,suite=${distro_codename}-infra-security", True),
+        ("Allowed-Origins", "${distro_id}:${distro_codename}-updates", False),
+        ("Allowed-Origins", "${distro_id}:${distro_codename}-proposed", False),
+        ("Allowed-Origins", "${distro_id}:${distro_codename}-backports", False),
+        ("Origins-Pattern", "origin=${distro_id},archive=${distro_codename}-updates", False),
+        ("Origins-Pattern", "origin=${distro_id},archive=${distro_codename}-proposed", False),
+        ("Origins-Pattern", "origin=${distro_id},archive=${distro_codename}-backports", False),
+        ("Origins-Pattern", "origin=${distro_id},codename=${distro_codename}", False),
+        ("Origins-Pattern", "origin=${distro_id},archive=*", False),
+        ("Allowed-Origins", "", False),
+    ],
+)
+def test_ubuntu_pro_security_origins(monkeypatch, kind, origin, good):
+    config = (
+        'APT::Periodic::Unattended-Upgrade "1";\nUnattended-Upgrade::Automatic-Reboot "false";\n'
+    )
+    if origin:
+        config += f'Unattended-Upgrade::{kind}:: "{origin}";\n'
+    monkeypatch.setattr(
+        probe,
+        "run_probe",
+        Mock(
+            side_effect=[
+                ProbeResult(data=b"install ok installed", returncode=0),
+                ProbeResult(data=config.encode(), returncode=0),
+                ProbeResult(data=b"enabled", returncode=0),
+            ]
+        ),
+    )
+    read = doctor.unattended(100)[1]
+    assert read.state == ("pass" if good else "fail")
+    assert read.observed["security_only"] is good
+
+
+@pytest.mark.parametrize(
+    "text,state",
+    [
+        (
+            (
+                b"# GDM configuration storage\n[daemon]\n#AutomaticLoginEnable = true\n"
+                b"#AutomaticLogin = synthetic\n[security]\n"
+            ),
+            "pass",
+        ),
+        (b"[daemon]\nAutomaticLoginEnable = maybe\n", "not_verified"),
+        (b"[daemon\nAutomaticLoginEnable=false", "not_verified"),
+    ],
+)
+def test_stock_gdm_default_off(monkeypatch, text, state):
+    monkeypatch.setattr(probe, "read_file", lambda *a, **kw: ProbeResult(data=text))
+    monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("config exists")))
+    assert doctor.desktop_ubuntu(100)[0].state == state
+
+
+@pytest.mark.parametrize(
+    "code,data,state",
+    [
+        (1, b"", "not_applicable"),
+        (0, b"deinstall ok config-files", "not_applicable"),
+        (0, b"install ok installed", "not_verified"),
+        (2, b"", "not_verified"),
+    ],
+)
+def test_gdm_missing_needs_package_evidence(monkeypatch, code, data, state):
+    monkeypatch.setattr(probe, "read_file", lambda *a, **kw: ProbeResult(reason="probe_missing"))
+    run = Mock(return_value=ProbeResult(data=data, returncode=code))
+    monkeypatch.setattr(probe, "run_probe", run)
+    read = doctor.desktop_ubuntu(100)[0]
+    assert read.state == state
+    assert run.call_args.args[1] == ("/usr/bin/dpkg-query", "-W", "-f=${Status}", "gdm3")
+
+
+def test_reboot_warning_reason(monkeypatch):
+    import stat
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(Path, "lstat", lambda _: SimpleNamespace(st_mode=stat.S_IFREG))
+    read = doctor.reboot_pending(False)[0]
+    assert (read.state, read.reason) == ("warn", "reboot_pending")
