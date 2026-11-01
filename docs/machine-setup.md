@@ -124,6 +124,10 @@ business needs something from another, you carry it across yourself.
 - Keep keys in the OS keychain or a password manager and hand them to one
   command at a time (see [`connect.md`](connect.md)). Never put a key in a
   repo, a chat, a screenshot or a prompt.
+- Claude Code's shell sandbox is off by default, and if it can't start it
+  runs commands unsandboxed unless you set `sandbox.failIfUnavailable`. Turned
+  on, it can read `~/.ssh` unless you add deny rules, so separate accounts
+  stay the wall that protects keys.
 - The box holds its own credentials. Closing the laptop must not break
   anything on it.
 
@@ -132,8 +136,14 @@ business needs something from another, you carry it across yourself.
 - **Backups:** business repos push to GitHub, which is the first backup. Also
   back up every account's home folder, plus a record of users, groups and
   permissions, to a place off the box (keys and local state excluded or
-  encrypted). Pass one real restore test before any business data goes on the
-  box, then repeat it on a schedule.
+  encrypted). Make the off-site copy one a hacked box can't erase: a backup
+  server that only accepts new snapshots (restic's rest-server has an
+  `--append-only` mode), and no credential on the box that can delete. Prune
+  from a machine you trust, by age (`restic forget --keep-within`): a hacked
+  box can add fake new snapshots that push good ones out of a count-based rule.
+  See restic's [append-only notes](https://restic.readthedocs.io/en/stable/060_forget.html#security-considerations-in-append-only-mode).
+  Pass one real restore test before any business data goes on the box, then
+  repeat it on a schedule.
 - **Updates:** on Ubuntu LTS, security updates install automatically but the
   box never reboots itself; on a rolling release such as Omarchy, nothing
   updates by itself and you run the full update about weekly (see Part 3).
@@ -148,7 +158,7 @@ business needs something from another, you carry it across yourself.
 
 | | Linux (Ubuntu LTS, Omarchy) | macOS (Mac mini) |
 |---|---|---|
-| Runs with nobody logged in | Yes, with linger and user services | Needs care: user agents start at login, background work needs launchd setup |
+| Runs with nobody logged in | Yes, with linger and user services | Needs care: user agents start at login, background work needs launchd setup. With FileVault on, the disk stays locked after a power cut, so nothing starts until you log in |
 | Separate agent accounts | Standard | Possible; less common |
 | Remote admin | SSH | SSH or Screen Sharing |
 | Power draw | Low on mini PCs | Very low |
@@ -156,8 +166,9 @@ business needs something from another, you carry it across yourself.
 
 This guide's steps are written for Linux. A Mac mini works as the box for one
 business, but plan extra time for running background services without a
-logged-in user. For several businesses, Linux gives you more to work with,
-such as per-account memory caps. Choosing Linux doesn't separate the
+logged-in user. Tailscale's App Store and standalone apps need a logged-in
+user; only its standalone `tailscaled` build runs before login. For several
+businesses, Linux gives you more to work with, such as per-account memory caps. Choosing Linux doesn't separate the
 businesses by itself: the limits under
 [One user account per business](#one-user-account-per-business) apply on
 both.
@@ -245,7 +256,8 @@ October 2026. Drive prices have been moving quickly, so check before you buy.
 
 Use the server edition or a minimal desktop install, with full-disk
 encryption. You get long-term support, automatic security updates
-(`unattended-upgrades`, with automatic reboot left off) and AppArmor.
+(`unattended-upgrades`, with automatic reboot left off) and AppArmor. Its
+firewall, `ufw`, ships switched off.
 
 Disk unlock is a trade-off between coming back alone and protecting a
 stolen box:
@@ -280,8 +292,13 @@ continuously instead of in yearly versions.
   tools.
 - **Turn off auto-login and lock the screen.** Omarchy logs in automatically
   by default. On a box that is always on, that leaves an open desktop for
-  anyone who walks up. Turn auto-login off and turn on the idle lock. The
-  desktop is your session only; agents never run in it.
+  anyone who walks up. Turn auto-login off and turn on the idle lock, and
+  check both again after each update: the 4.0 upgrade turned auto-login on
+  for encrypted systems. The desktop is your session only; agents never run
+  in it.
+- **Leave Passwordless Sudo off.** Its menu offers it for agents, but while
+  it is on, anything running as your user can act as root, which breaks the
+  admin-account rule above.
 - **Turn clipboard history off if you ever copy a credential.** If this
   machine is one where you ever copy a password, token or key, turn
   Omarchy's clipboard history off completely. Keep it only on a machine that
@@ -294,8 +311,9 @@ continuously instead of in yearly versions.
   to less of the boot chain. If you can't set it up with Secure Boot, a
   passphrase is the safer choice, and the box will wait for you after a
   reboot.
-- **Security modules differ.** There is no AppArmor; Landlock is available.
-  Checks written for Ubuntu's AppArmor don't apply.
+- **Security modules differ.** Arch kernels include AppArmor but leave it off
+  until you add a kernel parameter and enable its service. Don't assume
+  Ubuntu's AppArmor profiles apply; check with `aa-enabled`.
 - Because it is rolling, check after each update that the multiplexer service
   and your agents came back.
 
@@ -317,13 +335,17 @@ Your MacBook is the remote control.
 
   The exact firewall rules depend on your system; this guide doesn't ship
   them yet. Dev servers and debug ports should listen on loopback only.
+  Ports that Docker publishes skip `ufw` rules entirely, so bind them to
+  loopback too.
 - Use SSH with keys only and turn off password logins. Keep the admin key on
   the Mac, ideally in a password manager that approves each use.
 - If you need the screen, reach a VNC server that listens only on the box's
   loopback through an SSH forward. Never open a VNC port.
 - Open the multiplexer over SSH, or use Claude Code Remote Control from the
   browser or the Claude app to steer a session that is running on the box.
-  See the Claude Code docs for its current requirements.
+  See the Claude Code docs for its current requirements. Its server mode exits
+  after about 10 minutes without network, so run it under a service that
+  restarts it.
 
 ---
 
