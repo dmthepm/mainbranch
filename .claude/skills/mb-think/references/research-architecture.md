@@ -689,5 +689,4 @@ Potential additions (not implemented yet):
 - `grok-setup.md` — Grok MCP setup guide
 - `grok-social.md` — X/Twitter research specifics
 - `local-transcription.md` — Local audio/video workflow
-- `apify-discovery.md` — Apify actors and token costs
 - `research-template.md` — File template for research output
