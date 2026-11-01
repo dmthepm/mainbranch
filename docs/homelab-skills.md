@@ -59,10 +59,17 @@ macOS identification requires explicit version metadata; ambiguous builds are
 not checked. Auto-update is the daemon preference, not App Store or operating
 system package-manager scheduling.
 
+Run the machine check as a user that can reach `tailscaled`. Otherwise only the
+version row is checked and the rest say "not checked". A scripted `claude -p`
+turn stops at a permission prompt unless you grant the skill directory and its
+`python3` command.
+
 Policy review checks literal selectors in `acls`, `grants` and `ssh`; it does
 not compute effective permissions through groups, host aliases, CIDRs, posture,
 application capabilities or other policy sections. Missing tag lists leave
-agent/admin checks incomplete. A clean table cannot prove isolation. Keep
+agent/admin checks incomplete. Agent-to-admin rows cover `acls` and `grants`; an
+`ssh` rule between those tags appears only as the general `ssh-accept` row. A
+clean table cannot prove isolation. Keep
 policy tests and effective-access validation as a separate operator task.
 
 The [official policy reference](https://tailscale.com/docs/reference/syntax/policy-file)
