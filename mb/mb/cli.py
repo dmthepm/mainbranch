@@ -43,6 +43,7 @@ from mb import issue as issue_mod
 from mb import launch as launch_mod
 from mb import leads as leads_mod
 from mb import ledger as ledger_mod
+from mb import machine_doctor as machine_doctor_mod
 from mb import migrate as migrate_mod
 from mb import onboard as onboard_mod
 from mb import production as production_mod
@@ -4433,3 +4434,38 @@ def _entry() -> None:
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"mb: error: {exc}", err=True)
         sys.exit(2)
+
+
+machine_app = typer.Typer(help="Inspect machine configuration without changing it.")
+app.add_typer(machine_app, name="machine")
+
+
+@machine_app.command("doctor")
+def machine_doctor_cmd(json_out: bool = typer.Option(False, "--json")) -> None:
+    """Check the current account's machine configuration."""
+    try:
+        report = machine_doctor_mod.doctor()
+    except Exception:
+        report = {
+            "schema": "mb.machine.doctor",
+            "schema_version": 1,
+            "safe_to_share": False,
+            "ok": False,
+            "exit_code": 2,
+            "scope": "self",
+            "checks": [],
+            "errors": [{"code": "machine.internal"}],
+        }
+    if json_out:
+        payload = envelope(
+            report, command="mb machine doctor", schema_name="mainbranch.machine.doctor.result"
+        )
+        payload["result_status"] = "error" if report["exit_code"] == 2 else "ok"
+        typer.echo(json.dumps(payload, indent=2, default=json_default))
+    else:
+        typer.echo(
+            "Machine doctor: scope self. No verdict: internal error."
+            if report["exit_code"] == 2
+            else machine_doctor_mod.human_report(report)
+        )
+    raise typer.Exit(report["exit_code"])

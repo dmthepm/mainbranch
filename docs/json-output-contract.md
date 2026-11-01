@@ -641,3 +641,19 @@ legacy source, or an unknown-source warning for an unreadable registry.
 warning severity. `mb update` also includes the messages in its top-level
 `warnings`, even when installed versions match. Source warnings do not change
 command `ok`, exit codes or launch decisions, and do not repair either source.
+
+## Machine doctor
+
+`mb machine doctor --json` uses `mainbranch.machine.doctor.result` version
+`1.0`, with domain `schema: mb.machine.doctor` and `schema_version: 1`.
+`safe_to_share` is false because `run_as` includes the account name. `scope`
+is currently `self`. `checks` keeps every parsed read and its coded reason;
+raw probe output is never included. `summary` counts each result state.
+
+Exit precedence is errors (2), failed checks (1), incomplete baseline
+verification (3), then verified baseline checks (0). `ok` is true only for
+exit 0. A completed check run has `result_status: ok`, including exits 1 and
+3; an internal error has `result_status: error`, coded `errors`, and empty
+`checks`. This first slice only checks `host.os-release`; no manifest is
+loaded, `manifest.source` is `none`, and a passing platform check still exits
+3 with `manifest.reason: no_manifest`. It does not verify machine health.
