@@ -1,0 +1,43 @@
+{
+  "description": "Main Branch role cards: print the selected agent role at session start. Silent in repos with no core/roles/ folder.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source startup 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE CHECK FAILED: this repo has role cards (core/roles) but the role could not be loaded. STOP. Do not start work and do not pick a role yourself. Tell the owner this message and ask them to fix the role setup. This session has no role.'; fi; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source resume 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE CHECK FAILED: this repo has role cards (core/roles) but the role could not be loaded. STOP. Do not start work and do not pick a role yourself. Tell the owner this message and ask them to fix the role setup. This session has no role.'; fi; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source clear 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE CHECK FAILED: this repo has role cards (core/roles) but the role could not be loaded. STOP. Do not start work and do not pick a role yourself. Tell the owner this message and ask them to fix the role setup. This session has no role.'; fi; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source compact 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE CHECK FAILED: this repo has role cards (core/roles) but the role could not be loaded. STOP. Do not start work and do not pick a role yourself. Tell the owner this message and ask them to fix the role setup. This session has no role.'; fi; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

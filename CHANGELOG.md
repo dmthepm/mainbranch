@@ -11,6 +11,18 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- Agent role cards. One committed file per agent at `core/roles/<name>.md`
+  names its role, skills, tools, protocols, first action and checkpoint file.
+  `mb role list`, `mb role show` and `mb role check` read them (`--json`
+  supported). The plugin's new `SessionStart` hook prints the card chosen with
+  `MB_ROLE` on startup, resume, clear and compact, or a loud stop-and-ask message if
+  no valid role was chosen. A business with no role cards sees no change.
+  `mb doctor` reports role wiring. Claude Code only; Codex untested. A hook
+  cannot block a session, so the refusal is text the agent is told to obey.
+  See [role cards](docs/role-cards.md).
+
 ### Changed
 
 - The tailnet skills' draft notes now record one real redaction run on one
