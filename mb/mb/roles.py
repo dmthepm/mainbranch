@@ -358,33 +358,23 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
 
 
 def _command_runs_role_hook(command: object) -> bool:
-    """True when ``mb role hook`` sits where the shell runs a command, outside quotes."""
+    """True only when the command starts with ``mb role hook``.
+
+    Parsing arbitrary shell is a losing game, so any other form reads as not wired.
+    That can miss a real hook. It can't report one that doesn't run.
+    """
     if not isinstance(command, str):
         return False
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    lexer.commenters = ""
     try:
-        tokens = list(lexer)
+        tokens = shlex.split(command)
     except ValueError:
         return False
-    for index in range(len(tokens) - 2):
-        at_start = (
-            index == 0
-            or set(tokens[index - 1]) <= set(";&|()")
-            or (tokens[index - 1] in {"then", "if", "do", "else", "elif"})
-        )
-        if (
-            at_start
-            and Path(tokens[index]).name == "mb"
-            and tokens[index + 1 : index + 3]
-            == [
-                "role",
-                "hook",
-            ]
-        ):
-            return True
-    return False
+    return (
+        len(tokens) >= 3
+        and Path(tokens[0]).name == "mb"
+        and tokens[1:3] == ["role", "hook"]
+        and not command.lstrip().startswith(("'", '"'))
+    )
 
 
 def _settings_has_hook(path: Path) -> bool:
