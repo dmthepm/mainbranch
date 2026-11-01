@@ -414,39 +414,18 @@ permission to copy the source image.
 
 ```yaml
 references:
-  - id: logo
-    role: logo
-    path: mb-media://brand/logo.png
-    safe_to_share: false
-    approval_required: true
-    privacy_level: private
-    use_for: brand mark placement only after explicit approval
-    do_not_copy: private file path or unapproved lockup variants
-  - id: product
-    role: product_photo
-    path: mb-media://pushes/2026-05-ad-test/references/product.webp
-    safe_to_share: false
-    approval_required: true
-    privacy_level: private
-    use_for: product shape and scale
-    do_not_copy: background clutter, labels, or private details
   - id: inspo-001
-    role: style_reference
+    role: style_reference          # also: logo, product_photo, screenshot_reference, background, mask_source
     path: mb-media://pushes/2026-05-ad-test/references/inspo-001.png
     safe_to_share: false
     approval_required: true
     privacy_level: private
-    use_for:
-      - composition tension
-      - gritty lighting
-      - scroll-stopping object metaphor
-    do_not_copy:
-      - exact subject
-      - exact layout
-      - text
-      - brand marks
+    use_for: [composition tension, gritty lighting, scroll-stopping object metaphor]
+    do_not_copy: [exact subject, exact layout, text, brand marks]
     operator_note: I like how specific and hard to ignore this feels.
 ```
+
+Logo references use brand-mark placement only after explicit approval and must not copy private file paths or unapproved lockup variants.
 
 ---
 
@@ -566,32 +545,7 @@ that all providers expose the same provenance, watermarking, or C2PA behavior.
 
 ## Format Pair: 4:5 + 9:16
 
-For Meta static creative, plan the default pair as **4:5** (Feeds) and
-**9:16** (Stories and Reels). Both go into one creative through placement rules.
-1:1 remains accepted on Feeds; use the `facebook_feed_square_1x1` preset only
-when a placement or reused asset needs it. Treat placement specs as
-provider-specific and check current platform requirements before launch.
-
-### Design Strategy
-
-Compose each ratio for its placement rather than cropping one from the other:
-
-- **9:16:** product, hook text and disclosures between 14% and 65% of the
-  height; the top 14% and bottom 35% sit under Meta's interface and hold the
-  scene's own background, not a flat block.
-- **4:5:** the whole product in frame with margin; words on a flat area.
-
-When one generation must serve both, generate the 9:16 with the critical
-content inside the 4:5 centre band, then crop the 4:5 from it and check both
-against the composition rules in [ad-media-specs.md](ad-media-specs.md).
-
-### Prompt Strategy for Format Pair
-
-For each concept, generate the 9:16 and the 4:5 (or the 9:16 with a 4:5 crop
-planned). Prompts should specify:
-- Critical content inside the safe band for its ratio
-- Atmospheric/contextual elements in the margins
-- Aspect ratio: `"aspect_ratio": "9:16"` / `"4:5"` or the matching resolution
+Plan the default pair as 4:5 (Feeds) and 9:16 (Stories and Reels); 1:1 only via the `facebook_feed_square_1x1` preset when a placement or reused asset needs it. Compose each ratio for its placement rather than cropping one from the other; when one generation must serve both, generate the 9:16 with critical content inside the 4:5 centre band, crop the 4:5, and check both against [ad-media-specs.md](ad-media-specs.md) (safe bands, composition, current Ads Manager specs). Each concept prompt states the aspect ratio, critical content inside its safe band, and atmospheric elements in the margins.
 
 ---
 
@@ -647,22 +601,7 @@ deterministic post-processing step such as Pillow.
 
 ### Text Positioning (Critical)
 
-On 9:16 vertical images, the bottom ~25-30% is covered by UI overlays (caption, CTA button, likes bar). Text must sit **above true center** to stay in the safe zone.
-
-```
-┌──────────────────┐
-│   TOP UI (10%)   │  ← progress bar, account icon
-│                  │
-│                  │
-│   ██ TEXT ██     │  ← Place text at 35-40% from top
-│                  │     (above geometric center)
-│                  │
-│                  │
-│  BOTTOM UI (25%) │  ← caption, CTA, likes — AVOID
-└──────────────────┘
-```
-
-**Pillow positioning:** Set text Y coordinate to `int(height * 0.38)` (38% from top), NOT `height // 2` (50%). This keeps text safely above the bottom UI zone while looking visually centered within the usable area.
+On 9:16 images the bottom ~25-30% is covered by UI (caption, CTA, likes) and the top ~10% by the progress bar and account icon. Place text at 35-40% from the top: Pillow Y = `int(height * 0.38)`, not `height // 2`.
 
 ### Prompt Pattern for Text-Free Backgrounds
 
@@ -678,30 +617,7 @@ Leave generous clean space in the center-upper area for white text.
 
 ## Batch Generation Flow
 
-**Order: Copy → Compliance Review + Image Generation (parallel)**
-
-Compliance review and image generation run in PARALLEL after copy is saved, not sequentially. The post-generation pipeline (see SKILL.md → Automatic Post-Generation Pipeline) orchestrates this.
-
-For a typical ad campaign with 5 angles (15 images):
-
-```
-1. Copy saved to output file
-2. Approved checkpoint pre-review (preserves original)
-3. Main conversation writes prompts.json to disk (keyed by target filename)
-4. PARALLEL (all agents spawned in a single message):
-   a. Compliance agents (5-6 lenses, read-only) → findings report
-   b. Image agents (1 per image, if user approved and provider configured):
-      - Each agent reads its prompt(s) from prompts.json
-      - Reads visual-style.md for brand context
-      - Generates 9:16 image via the selected provider/model
-      - Post-processes: resize, JPEG compress, and the 4:5 feed version
-      - Verifies file(s) exist on disk
-      - Returns: file path(s) + status (success/fail) + cost
-5. Synthesize: collect all image agent results, retry any failures,
-   surface P1s, show the P2/P3 proposed diff, apply copy fixes only after
-   explicit approval, write review-log.md if approved, and write image-index.md
-6. Approved checkpoint post-review (user confirms)
-```
+Order: copy saved -> approved pre-review checkpoint -> main conversation writes `prompts.json` (keyed by target filename) -> compliance agents and image agents spawn in parallel in one message -> synthesize (retry failed images, surface P1s, show the P2/P3 diff, apply copy fixes only after approval, write `review-log.md` if approved, write `image-index.md`) -> approved post-review checkpoint. The pipeline steps live in [post-generation-pipeline.md](post-generation-pipeline.md).
 
 ---
 
@@ -783,17 +699,7 @@ pushes/YYYY-MM-DD-static-ads-{campaign}/
 `image-index.md` stores logical media references that resolve to configured
 storage, not generated binaries in the push folder:
 
-```yaml
-assets:
-  - asset_id: 001_01_graphic_vertical
-    output_reference: mb-media://pushes/YYYY-MM-DD-static-ads-{campaign}/images/001_01_graphic_vertical.jpg
-    storage_backend: mb-media
-    committed_binary: false
-  - asset_id: 001_02_lofi_vertical
-    output_reference: mb-media://pushes/YYYY-MM-DD-static-ads-{campaign}/images/001_02_lofi_vertical.jpg
-    storage_backend: mb-media
-    committed_binary: false
-```
+Each asset carries `asset_id`, `output_reference: mb-media://pushes/YYYY-MM-DD-static-ads-{campaign}/images/<name>.jpg`, `storage_backend: mb-media` and `committed_binary: false`.
 
 ### Image Naming Convention
 

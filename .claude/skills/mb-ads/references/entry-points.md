@@ -33,39 +33,7 @@ Real ad workflows don't fit neat categories. Someone might have images but need 
 | "Review my ads" / "compliance check" | Review | 6-lens compliance review | No |
 | "What's working before we create?" | Pre-Gen Account Check | Account overview + creative audit | Required |
 
-### Intent Detection Logic
-
-```
-1. Parse user message for trigger phrases
-2. Check for explicit mode keywords first:
-   - "review" / "compliance" / "audit" → Review
-   - "video scripts" / "spoken word" → Video Scripts
-   - "static ads" / "full from scratch" → Full Pipeline
-3. Check for component-specific language:
-   - "just copy" / "only copy" / "have images" → Copy Only
-   - "just images" / "only images" / "have copy" → Image Only
-   - "make an ad from this video" / "repurpose for paid ads" → Video Repurpose
-   - "short clips from a sales video" / "organic cuts from a VSL" → `/mb-organic`
-   - "variations" / "hook library" / "one-liners" / "creative variations" → Hook Library
-4. Check for account-related language:
-   - "performance" / "what's working" / "check account" / "CPA" / "ROAS" → Account Check
-5. Check for ideation language:
-   - "ideas" / "brainstorm" / "concepts" / "what should I run" → Ideation
-6. If unclear → ask: "What do you have and what do you need?"
-```
-
-### Alternate Triggers
-
-These shorthand names also route correctly:
-
-| Trigger | Routes To |
-|---------|-----------|
-| "static ads" | Full Pipeline |
-| "static" | Full Pipeline |
-| "video scripts" | Video Scripts |
-| "video" | Video Scripts |
-| "one-liners" | Hook Library (creative variations) |
-| "review" | Review |
+Match explicit mode keywords first (review/compliance/audit, video scripts/spoken word, static ads/full from scratch), then component language (just copy, just images, repurpose a video, variations/hook library/one-liners), then account language (performance, what's working, CPA, ROAS), then ideation language (ideas, brainstorm, concepts). Shorthand "static", "video", "one-liners" and "review" route to Full Pipeline, Video Scripts, Hook Library and Review. If unclear, ask: "What do you have and what do you need?"
 
 ---
 
@@ -107,41 +75,13 @@ Each entry point assembles different components. Components are modular -- they 
 
 ## Quantity Flexibility
 
-Quantity is flexible -- the user says how many, the skill delivers:
-
-| User Says | Quantity |
-|-----------|---------|
-| "Give me 5 variations" | 5 |
-| "50 creative variations" | 50 |
-| "A few hooks to test" | 5-10 (suggest range, confirm) |
-| "Full batch" | Default (30 for hooks, 5-6 concepts for static) |
-| No quantity specified | Ask: "How many do you want? A few to test (5-10) or a full batch (30+)?" |
+The user says how many ("5", "50", "a few hooks to test" = suggest 5-10 and confirm). "Full batch" = 30 hooks or 5-6 static concepts. No quantity: ask "How many do you want? A few to test (5-10) or a full batch (30+)?"
 
 ---
 
 ## Routing Flow
 
-```
-User message arrives
-│
-├─ Pre-flight runs (Step 0 — always, unless pure Account Check)
-│
-├─ Detect intent (see detection logic above)
-│
-├─ If Meta ad account context is verified AND relevant intent:
-│   └─ "Want me to check what's working before we create?"
-│       ├─ Yes → Account Check component runs first
-│       └─ No → Skip, proceed to generation
-│
-├─ Assemble component pipeline for detected intent
-│
-├─ Execute pipeline:
-│   ├─ Copy/Hooks/Video generation
-│   ├─ Save output to pushes/
-│   └─ Post-Gen Pipeline (auto: commit + compliance + images)
-│
-└─ Done (write operations like Duplicate + Swap are on the roadmap)
-```
+Pre-flight (Step 0, unless pure Account Check) -> detect intent -> if Meta account context is verified and the intent is relevant, ask "Want me to check what's working before we create?" (yes: Account Check first; no: skip) -> assemble the component pipeline -> generate, save to `pushes/`, run the Post-Gen Pipeline (commit + compliance + images). Write operations such as Duplicate + Swap are roadmap.
 
 ---
 

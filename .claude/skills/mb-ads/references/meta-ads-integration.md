@@ -239,22 +239,7 @@ Preserve these constraints in setup and repair copy:
 
 ## Proactive Suggestions
 
-When account context is verified, skills can suggest it at natural moments.
-Describe the capability, not the vendor or transport.
-
-| Context | Suggestion |
-|---------|------------|
-| Before generating new creative | "Meta appears connected for read-only checks. Do you want me to pull a compact account summary before making recommendations?" |
-| After generating a batch | "Want to compare this against what's currently live before you upload it?" |
-| In `/mb-think` with an ad-related topic | "Should we use live ad account data for this research, or stay with reference files?" |
-| Monday review cadence | "Want to check this week's Meta ad performance?" |
-
-Rules:
-
-- suggest once per context;
-- user can decline;
-- frame as optional account context;
-- fall back to reference files or manual Ads Manager notes.
+When account context is verified, suggest it once per context at natural moments: before generating new creative (the pull question above), after a batch ("Want to compare this against what's currently live before you upload it?"), in `/mb-think` with an ad topic, and on Monday reviews. The user can decline; frame it as optional account context and fall back to reference files or manual Ads Manager notes.
 
 ---
 

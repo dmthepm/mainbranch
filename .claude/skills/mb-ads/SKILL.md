@@ -97,47 +97,9 @@ Codex support is read-only planning until runtime smoke proves more.
 
 ## Output destinations and operator vocabulary
 
-This skill writes new coordinated work to `pushes/<YYYY-MM-DD-slug>/` (the
-engine primitive). Examples below say "push" for the wrapping
-record; this is the engine's word. If `core/vocabulary.md` defines a
-display word — for example `terms.push.singular: drop` — speak the
-operator's word ("drop") in conversation while still writing current
-files (`pushes/...`, `type: push`, `linked_pushes`). Never rename folders,
-frontmatter, link fields, JSON keys, or commands based on vocabulary.
+New coordinated work goes to `pushes/<YYYY-MM-DD-slug>/` (the engine primitive; speak the operator's word from `core/vocabulary.md` such as "drop" in conversation, but never rename folders, frontmatter, link fields, JSON keys or commands). "Campaign" elsewhere in this skill means the Meta Ads provider object, not a Main Branch primitive. Legacy `campaigns/` records: run `mb doctor` and `mb migrate campaigns --plan` (read-only) before creating new push work.
 
-If the repo still has legacy `campaigns/` records, preview the migration
-**before** creating new push work:
-
-```text
-mb doctor                       # confirms legacy campaigns/ drift
-mb migrate campaigns --plan     # read-only preview of moves
-```
-
-The word "campaign" elsewhere in this skill refers to Meta Ads campaigns
-(the provider's term for its object) — not the Main Branch primitive.
-
-When creating `push.md`, include the validator-required frontmatter and fill
-the values from repo truth or operator answers. When finished creative
-already exists outside git (a Drive folder, an export), ask "where do the
-finished files live?" and record `media_location` plus a `media_backend`
-hint (google-drive, r2, local, mb-media):
-
-```yaml
----
-type: push
-slug: YYYY-MM-DD-slug
-kind: launch
-status: planned
-health: unknown
-goal: { metric: "", target: "", by: YYYY-MM-DD }
-owner: ""
-audience: ""
-offer: core/offers/<offer>/offer.md
-promise: ""
-media_location: ""   # optional — where binary creative lives
-media_backend: ""    # optional hint; requires media_location
----
-```
+When creating `push.md`, load [references/push-records.md](references/push-records.md) for the validator-required frontmatter, media location hints and plan-only playbooks.
 
 When creating or first writing a push, ask once:
 "Which bet does this push serve, and which existing decision or research supports it?"
@@ -154,13 +116,7 @@ Use docs/business-connections.md; never infer links from body-only references.
 Also link named playbooks and outcomes through `linked_playbooks` and
 `linked_outcomes`.
 
-When an ad-adjacent workflow needs a resource-delivery plan, provider setup
-recipe, launch checklist, or external automation approval record, draft it
-as `pushes/<YYYY-MM-DD-slug>/playbooks/<playbook>.md` with `type: playbook`
-— plans and approval records only. Do not publish, schedule, DM, reply,
-mutate ad accounts, or claim a provider is supported unless `mb` and a
-shipped provider adapter prove that path with docs, tests, approval gates,
-and smoke evidence.
+Playbook rule: ad-adjacent resource-delivery plans, provider setup recipes, launch checklists and automation approval records are drafted as `pushes/<YYYY-MM-DD-slug>/playbooks/<playbook>.md` (`type: playbook`) as plans and approval records only: do not publish, schedule, DM, reply, mutate ad accounts, or claim a provider is supported unless `mb` and a shipped adapter prove it with docs, tests, approval gates and smoke evidence.
 
 ## Step 0: Pre-Flight Readiness
 
@@ -275,31 +231,11 @@ Never ask the operator to paste Google Ads/GTM tokens, OAuth secrets, conversion
 
 ## Meta Ad Account Readiness (Lazy)
 
-Check Meta ad account access only when the user's request needs live ad account
-context. Do not duplicate provider setup or health checks in prose.
+Check Meta ad account access only when the request needs live ad account context, and never block generation on it. Read `mb status --json --peek`; run `mb connect plan` for setup choices and `mb connect doctor --json` when something looks broken. If `mb` reports Meta Ads account context `ready`, ask before pulling a compact read-only summary:
 
-### Readiness Flow
+> "Meta appears connected for read-only checks. Do you want me to pull a compact account summary before making recommendations?"
 
-```
-1. Read `mb status --json --peek` → integrations/providers/measurement facts.
-2. If the operator needs setup choices, run `mb connect plan`.
-3. If something looks broken, run `mb connect doctor --json`.
-4. If `mb` says Meta Ads account context is `ready`, ask whether to pull a
-   compact read-only account summary before generating.
-5. Never block generation on missing ad account access.
-```
-
-**Graceful degradation:** If Meta Ads account context is not `ready`, mention
-the optional account context once, quote the `mb` repair command when useful,
-then continue from repo reference files, exported screenshots, or manual Ads
-Manager notes.
-
-### User-Facing Display
-
-Describe the capability: connecting a Meta ad account, pulling a compact
-read-only account summary, or auditing active campaigns. Keep status
-capability-first and do not name connector vendor details. If the user asks,
-offer `mb connect plan` or continuing from reference files.
+If yes, say "I'll pull a read-only summary and avoid saving raw account data", pull only the compact summary the runtime supports, and use safe readiness, activity and naming-pattern context only (see [references/meta-ads-integration.md](references/meta-ads-integration.md)). If no, or context is not `ready`, mention the optional account context once, quote the `mb` repair command when useful, and continue from reference files, screenshots or manual Ads Manager notes. Describe the capability (connect an ad account, pull a read-only summary, audit active campaigns), not connector vendor details. After generating, an approved summary frames next steps without exposing raw account data or implying account mutation. Account awareness is read-only; write operations are roadmap and need explicit approval gates.
 
 ---
 
@@ -350,30 +286,6 @@ or update a push playbook as a plan only; do not execute provider mutation.
 [references/launch-plan-check.md](references/launch-plan-check.md). Prepare
 campaign materials, policy findings, measurement readiness, manual provider
 steps, and approval records; do not mutate ad accounts or start spend.
-
-### Proactive Account Awareness
-
-If `mb status --json --peek` / `mb connect doctor --json` reports Meta Ads
-ready and the current runtime exposes the read-only ad account tools:
-
-**Before generating:** Ask before pulling live account context:
-> "Meta appears connected for read-only checks. Do you want me to pull a compact account summary before making recommendations?"
-
-If user says yes, run Account Check component (see [references/meta-ads-integration.md](references/meta-ads-integration.md)):
-- Say: "I'll pull a read-only summary and avoid saving raw account data."
-- Pull only the compact account summary the current runtime supports
-- Use safe readiness, activity, and naming-pattern context only
-
-If user says no, proceed to generation with reference files only.
-
-**After generating:** If the operator approved a read-only summary, use it to
-frame next steps without exposing raw account data or implying account mutation.
-
-Account awareness is currently read-only. Write operations are on the roadmap
-and require explicit operator approval gates -- see
-[references/meta-ads-integration.md](references/meta-ads-integration.md).
-
----
 
 ## Pre-Flight: Special Ad Categories
 
