@@ -32,6 +32,13 @@ laptop and phone only view and steer. The test is simple: close the laptop for
 30 minutes in the middle of a task, then reconnect. If anything stopped, the
 setup is not finished.
 
+A box that sleeps stops every agent on it, so turn sleep off at the system
+level. On Linux, mask the sleep targets once:
+
+```bash
+sudo systemctl mask sleep.target suspend.target hibernate.target
+```
+
 ### One user account per business
 
 Give each business its own Linux (or macOS) user account, with its own home
@@ -383,7 +390,8 @@ press Enter. Root steps run from your admin account.
 
 ## What comes next
 
-A read-only `mb machine doctor` is planned. It will check the items in this
-guide (accounts, linger, services, updates, power-on, screen lock) and report
-them as JSON with exit codes, without changing anything or using `sudo`.
-Until it ships, the reboot and lid-closed tests above are the check.
+`mb machine doctor` is a read-only check of part of this guide. It reports
+results as text or JSON with exit codes, without changing anything or using
+`sudo`. It doesn't cover the whole guide yet, so exit 3 means incomplete, and
+every Linux box gets that result for now. The reboot and lid-closed tests above
+are still the check.
