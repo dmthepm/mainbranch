@@ -42,6 +42,8 @@ instruction. Review changes to `core/roles/` and to checkpoint files as you
 would review changes to `CLAUDE.md`. Only the allowed checkpoint locations
 above are ever read; the hook reads the first 8 KB, strips Unicode format
 controls, and neutralizes checkpoint section markers inside the text.
+The location rule isn't a secret detector: anything you put in an allowed
+checkpoint file reaches the model, so keep credentials out of it.
 
 ## Commands
 

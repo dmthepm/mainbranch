@@ -527,3 +527,26 @@ def test_hook_command_prints_mb_output_when_mb_works(repo: Path, tmp_path: Path)
     result = _run_hook("clear", repo, shim)
     assert result.returncode == 0
     assert result.stdout.strip() == "CARD-FROM-MB role hook --source clear"
+
+
+def _settings(command: str) -> dict:
+    return {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": command}]}]}}
+
+
+@pytest.mark.parametrize(
+    ("doc", "expected"),
+    [
+        (_settings("mb role hook --source startup"), True),
+        (_settings("/usr/local/bin/mb role hook"), True),
+        (_settings("if command -v mb; then mb role hook; fi"), True),
+        (_settings('echo "mb role hook"'), False),
+        (_settings("printf mb role hook"), False),
+        ({"hooks": []}, False),
+        ({"hooks": {"SessionStart": {}}}, False),
+        ([], False),
+    ],
+)
+def test_settings_hook_needs_a_real_invocation(tmp_path, doc, expected) -> None:
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    assert roles._settings_has_hook(path) is expected

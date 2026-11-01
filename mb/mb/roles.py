@@ -356,8 +356,14 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
     return "\n".join(lines)
 
 
+# ``mb`` must sit where the shell runs a command, so `echo "mb role hook"` doesn't count.
+_ROLE_HOOK_COMMAND = re.compile(
+    r"""(?:^|[;&|(\n]|\bthen\b|\bif\b)\s*(?:[\w./-]*/)?mb\s+role\s+hook(?=[\s;&|)]|$)"""
+)
+
+
 def _command_runs_role_hook(command: object) -> bool:
-    return isinstance(command, str) and "mb role hook" in command
+    return isinstance(command, str) and bool(_ROLE_HOOK_COMMAND.search(command))
 
 
 def _settings_has_hook(path: Path) -> bool:
@@ -366,8 +372,9 @@ def _settings_has_hook(path: Path) -> bool:
         doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, ValueError):
         return False
-    groups = doc.get("hooks", {}).get("SessionStart") if isinstance(doc, dict) else None
-    if not isinstance(groups, list) or not isinstance(doc["hooks"], dict):
+    hooks_by_event = doc.get("hooks") if isinstance(doc, dict) else None
+    groups = hooks_by_event.get("SessionStart") if isinstance(hooks_by_event, dict) else None
+    if not isinstance(groups, list):
         return False
     for group in groups:
         hooks = group.get("hooks") if isinstance(group, dict) else None
