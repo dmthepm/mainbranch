@@ -393,5 +393,6 @@ press Enter. Root steps run from your admin account.
 `mb machine doctor` is a read-only check of part of this guide. It reports
 results as text or JSON with exit codes, without changing anything or using
 `sudo`. It doesn't cover the whole guide yet, so exit 3 means incomplete, and
-every Linux box gets that result for now. The reboot and lid-closed tests above
+every otherwise-passing Linux run gets that result for now. Real failures still
+exit 1. The reboot and lid-closed tests above
 are still the check.

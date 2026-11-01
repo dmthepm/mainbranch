@@ -285,21 +285,20 @@ def test_tailscale_prefs(monkeypatch, data, code, state):
     assert "private" not in str(read.observed)
 
 
-@pytest.mark.parametrize("ready", [True, False])
-def test_store_health_never_reads_secret(monkeypatch, ready):
-    monkeypatch.delenv("DISPLAY", raising=False)
-    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+def test_store_health_never_starts_child_or_reads_secret(monkeypatch):
+    import subprocess
+
     from mb.credential_store import SecretStore
 
-    monkeypatch.setattr(
-        SecretStore, "__init__", lambda self: setattr(self, "backend", "secret-service")
-    )
-    health = Mock(return_value={"ok": ready})
-    monkeypatch.setattr(SecretStore, "health", health)
-    monkeypatch.setattr(SecretStore, "get", Mock(side_effect=AssertionError("secret read")))
-    monkeypatch.setattr(SecretStore, "probe", Mock(side_effect=AssertionError("secret read")))
-    assert doctor.credential_store(100)[0].state == ("pass" if ready else "fail")
-    health.assert_called_once_with(deadline=100)
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "secret-service")
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    forbidden = Mock(side_effect=AssertionError("child process or secret read"))
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    monkeypatch.setattr(SecretStore, "get", forbidden)
+    monkeypatch.setattr(SecretStore, "probe", forbidden)
+    assert doctor.credential_store(100)[0].state == "not_verified"
+    forbidden.assert_not_called()
 
 
 def test_local_store_never_calls_health(monkeypatch):
@@ -519,6 +518,12 @@ def test_ssh_included_ambiguity(monkeypatch, content, reason):
         ("Origins-Pattern", "origin=${distro_id},archive=${distro_codename}-backports", False),
         ("Origins-Pattern", "origin=${distro_id},codename=${distro_codename}", False),
         ("Origins-Pattern", "origin=${distro_id},archive=*", False),
+        ("Allowed-Origins", "ThirdParty:unrelated-security", False),
+        ("Origins-Pattern", "archive=unrelated-security", False),
+        ("Origins-Pattern", "origin=ThirdParty,archive=unrelated-security", False),
+        ("Allowed-Origins", "Ubuntu:jammy-security", True),
+        ("Allowed-Origins", "UbuntuESM:jammy-infra-security", True),
+        ("Allowed-Origins", "UbuntuESMApps:jammy-apps-security", True),
         ("Allowed-Origins", "", False),
     ],
 )
@@ -540,8 +545,9 @@ def test_ubuntu_pro_security_origins(monkeypatch, kind, origin, good):
         ),
     )
     read = doctor.unattended(100)[1]
-    assert read.state == ("pass" if good else "fail")
-    assert read.observed["security_only"] is good
+    assert read.state == ("pass" if good else "not_verified" if origin else "fail")
+    if read.state != "not_verified":
+        assert read.observed["security_only"] is good
 
 
 @pytest.mark.parametrize(
@@ -590,3 +596,43 @@ def test_reboot_warning_reason(monkeypatch):
     monkeypatch.setattr(Path, "lstat", lambda _: SimpleNamespace(st_mode=stat.S_IFREG))
     read = doctor.reboot_pending(False)[0]
     assert (read.state, read.reason) == ("warn", "reboot_pending")
+
+
+def test_sshd_unenumerable_include_never_passes(monkeypatch, tmp_path):
+    import os
+    from pathlib import Path
+
+    directory = tmp_path / "sshd_config.d"
+    directory.mkdir()
+    (directory / "00.conf").write_text("PasswordAuthentication yes\n")
+    directory.chmod(0)
+    monkeypatch.setattr(
+        doctor,
+        "_text",
+        lambda *a: (
+            "Include /etc/ssh/sshd_config.d/*.conf\nPasswordAuthentication no\n"
+            "KbdInteractiveAuthentication no\nPubkeyAuthentication yes\n",
+            None,
+        ),
+    )
+    # Simulate EACCES even on runners whose uid bypasses mode bits.
+    monkeypatch.setattr(Path, "lstat", lambda self: directory.stat())
+    monkeypatch.setattr(os, "scandir", Mock(side_effect=PermissionError()))
+    try:
+        read = doctor.sshd_keys(100)[0]
+        assert (read.state, read.reason) == ("not_verified", "probe_error")
+    finally:
+        directory.chmod(0o700)
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "ThirdParty:unrelated-security",
+        "archive=unrelated-security",
+        "origin=ThirdParty,archive=unrelated-security",
+        "UbuntuESM:jammy-security",
+    ],
+)
+def test_unrecognized_security_origin(origin):
+    assert doctor._security_origin(origin) is False

@@ -267,6 +267,14 @@ def desktop_ubuntu(deadline: float) -> list[ReadResult]:
 
 def _config_files(pattern: str) -> tuple[list[Path], Reason | None]:
     try:
+        if pattern == "ssh/sshd_config.d/*.conf":
+            directory = Path("/etc/ssh/sshd_config.d")
+            if not stat.S_ISDIR(directory.lstat().st_mode):
+                return [], "ambiguous_config"
+            with os.scandir(directory) as entries:
+                return sorted(
+                    directory / entry.name for entry in entries if entry.name.endswith(".conf")
+                ), None
         return sorted(Path("/etc").glob(pattern)), None
     except OSError:
         return [], "probe_error"
@@ -410,10 +418,27 @@ def reboot_pending(arch: bool) -> list[ReadResult]:
 
 
 def _security_origin(origin: str) -> bool:
+    def supported(identity: str, pocket: str) -> bool:
+        suffixes = {
+            "Ubuntu": "-security",
+            "UbuntuESM": "-infra-security",
+            "UbuntuESMApps": "-apps-security",
+            "${distro_id}": "-security",
+            "${distro_id}ESM": "-infra-security",
+            "${distro_id}ESMApps": "-apps-security",
+        }
+        suffix = suffixes.get(identity)
+        if suffix is None:
+            return False
+        release = pocket.removesuffix(suffix)
+        return pocket.endswith(suffix) and (
+            release == "${distro_codename}" or bool(re.fullmatch(r"[a-z]+", release))
+        )
+
     # Allowed-Origins uses origin:archive. Origins-Pattern uses named selectors.
     if "=" not in origin:
         parts = origin.split(":")
-        return len(parts) == 2 and bool(parts[0]) and parts[1].endswith("-security")
+        return len(parts) == 2 and supported(parts[0], parts[1])
     selectors: dict[str, str] = {}
     aliases = {
         "o": "origin",
@@ -437,7 +462,7 @@ def _security_origin(origin: str) -> bool:
         selectors[key] = pair[1]
     # A codename alone identifies a release, not its update pocket.
     pocket = selectors.get("archive", "")
-    return pocket.endswith("-security") and not any(char in pocket for char in "*?[]")
+    return supported(selectors.get("origin", ""), pocket)
 
 
 def unattended(deadline: float) -> list[ReadResult]:
@@ -472,7 +497,9 @@ def unattended(deadline: float) -> list[ReadResult]:
             )
             security_only = bool(origins) and all(_security_origin(origin) for origin in origins)
             reads.append(
-                _verdict(
+                _unknown("security_only_config", "ambiguous_config")
+                if origins and not security_only
+                else _verdict(
                     "security_only_config",
                     enabled and reboot_off and security_only,
                     enabled=enabled,
@@ -497,18 +524,10 @@ def unattended(deadline: float) -> list[ReadResult]:
     return reads
 
 
-def credential_store(deadline: float) -> list[ReadResult]:
-    from mb.credential_store import SecretStore
-
-    store = SecretStore()
-    # Local-file health reads stored values. Do not call it from doctor.
-    if store.backend == "local-file":
-        return [_unknown("store_available", "probe_missing")]
-    health = store.health(deadline=deadline)
-    ready = health.get("ok") is True
-    if ready and any(os.environ.get(key) for key in ("DISPLAY", "WAYLAND_DISPLAY")):
-        return [_unknown("store_available", "ambiguous_config")]
-    return [_verdict("store_available", ready, available=ready)]
+def credential_store(_: float) -> list[ReadResult]:
+    # Existing backend health adapters require a child process or read stored
+    # values. Neither is a bounded, in-process metadata read for doctor.
+    return [_unknown("store_available", "probe_missing")]
 
 
 def registry(os_id: str) -> tuple[CheckSpec, ...]:
