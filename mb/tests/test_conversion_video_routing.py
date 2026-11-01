@@ -68,7 +68,7 @@ def test_operator_help_avoids_retired_data_repo_and_public_conductor_framing() -
         ".claude/skills/mb-help/references/system-model.md",
         ".claude/skills/mb-help/references/workspace-setup.md",
         ".claude/skills/mb-help/references/troubleshooting.md",
-        ".claude/reference/engine-path-resolution.md",
+        ".claude/skills/mb-setup/references/engine-path-resolution.md",
         ".claude/reference/conversion/vsl-routing.md",
         ".claude/reference/business-primitives/setup-patterns.md",
         ".claude/skills/mb-start/SKILL.md",

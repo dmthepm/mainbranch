@@ -29,7 +29,7 @@ decisions/2026-04-27-credential-provisioning.md):
      create call to survive transient retries within the search-API's
      eventual-consistency window (~minutes-to-hours).
 
-Spec: see `.claude/reference/minisite.md` ("Stripe payment-link
+Spec: see `references/minisite.md` ("Stripe payment-link
 defaults" table) for the canonical defaults this atom encodes.
 
 Test mode vs live mode: the atom is mode-agnostic — it uses whatever key
