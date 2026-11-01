@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -356,14 +357,34 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
     return "\n".join(lines)
 
 
-# ``mb`` must sit where the shell runs a command, so `echo "mb role hook"` doesn't count.
-_ROLE_HOOK_COMMAND = re.compile(
-    r"""(?:^|[;&|(\n]|\bthen\b|\bif\b)\s*(?:[\w./-]*/)?mb\s+role\s+hook(?=[\s;&|)]|$)"""
-)
-
-
 def _command_runs_role_hook(command: object) -> bool:
-    return isinstance(command, str) and bool(_ROLE_HOOK_COMMAND.search(command))
+    """True when ``mb role hook`` sits where the shell runs a command, outside quotes."""
+    if not isinstance(command, str):
+        return False
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return False
+    for index in range(len(tokens) - 2):
+        at_start = (
+            index == 0
+            or set(tokens[index - 1]) <= set(";&|()")
+            or (tokens[index - 1] in {"then", "if", "do", "else", "elif"})
+        )
+        if (
+            at_start
+            and Path(tokens[index]).name == "mb"
+            and tokens[index + 1 : index + 3]
+            == [
+                "role",
+                "hook",
+            ]
+        ):
+            return True
+    return False
 
 
 def _settings_has_hook(path: Path) -> bool:
