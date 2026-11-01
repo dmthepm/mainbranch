@@ -16,6 +16,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
   hardening and extending an always-on agent machine, with read-only
   done-checks that report NOT VERIFIED instead of guessing.
+- Read-only Claude Code tailnet machine and policy review skills with redacted reports; see [homelab skills](docs/homelab-skills.md).
 
 ### Changed
 

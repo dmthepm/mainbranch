@@ -1377,7 +1377,11 @@ def test_codex_workflow_inventory_accounts_for_every_bundled_claude_skill() -> N
     data = json.loads(result.stdout)
     # Machine skills are Claude-only and intentionally absent from business workflows.
     # Keep this exact list so new business skills still require inventory coverage.
-    claude_only_machine_sources = {".claude/skills/mb-homelab-machine/SKILL.md"}
+    claude_only_machine_sources = {
+        ".claude/skills/mb-homelab-machine/SKILL.md",
+        ".claude/skills/mb-homelab-tailnet-audit/SKILL.md",
+        ".claude/skills/mb-homelab-tailnet-policy-review/SKILL.md",
+    }
     bundled = {
         str(path.relative_to(REPO_ROOT))
         for path in sorted((REPO_ROOT / ".claude" / "skills").glob("mb-*/SKILL.md"))

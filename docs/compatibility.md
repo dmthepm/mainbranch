@@ -1,5 +1,7 @@
 # Compatibility
 
+Main Branch also carries read-only `mb-homelab-*` skills for securing the machines that run your agents; they do not touch business data. See [homelab skills](homelab-skills.md).
+
 Main Branch is intentionally narrow today: `mb`, bundled Claude Code skills,
 and global Codex `mb-*` skills. This page is the public compatibility contract
 for those surfaces.
