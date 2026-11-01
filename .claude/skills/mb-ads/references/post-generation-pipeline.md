@@ -4,15 +4,7 @@
 
 ## Step 1: Checkpoint Pre-Review
 
-```bash
-mb checkpoint --plan --json
-mb checkpoint --validate "[drafted] {type} ad batch" --json
-mb checkpoint --message "[drafted] {type} ad batch" --yes
-```
-
-Run the plan first, show the proposed files/message and any blockers, then save
-only after operator approval. This preserves the original before any fixes. The
-user can always `git diff HEAD~1` to see what changed.
+Phase 0 of [review-workflow.md](review-workflow.md): plan, show, save only after operator approval.
 
 ## Step 2: Select Lens Tier
 
@@ -43,32 +35,7 @@ images (Static or One-Liner):
 
 Spawn ALL agents in a single message for parallel execution. Use `subagent_type: "general-purpose"` for all agents.
 
-**Compliance agents (read-only pattern -- zero persistence risk):**
-
-Each compliance agent receives:
-- **Ad content inline** (pass the full batch file content in the prompt -- do NOT just give a file path)
-- **Lens file path** (agent reads its assigned lens from this skill's bundled `references/lenses/` directory, never cwd-relative)
-- **Business context** (only what that lens needs):
-  - FTC: offer.md, testimonials.md, typicality.md
-  - Meta Policy: offer.md
-  - Copy Quality: offer.md, audience.md, skool-surfaces.md (if exists)
-  - Voice Auth: voice.md
-  - Substantiation: offer.md, testimonials.md, typicality.md
-  - Visual Standards: (no extra context needed -- evaluates image prompts)
-
-Each agent prompt must include:
-```
-Evaluate every ad/variation/script against the lens checklist.
-For each issue, return:
-  - severity: P1 | P2 | P3
-  - item_ref: which ad/line
-  - issue: what's wrong
-  - evidence: exact text that violates
-  - rule: which check this violates
-  - fix: specific rewrite
-Return "NO ISSUES" explicitly if everything passes.
-Do NOT write any files. Do NOT fix anything. Report only.
-```
+**Compliance agents:** brief and context per lens as in Phase 2 of [review-workflow.md](review-workflow.md) (ad content inline, read-only, lens files from this skill's `references/lenses/`).
 
 **Image generation agents (write-with-fallback pattern -- if user approved):**
 
@@ -84,25 +51,7 @@ See [image-generation-workflow.md](image-generation-workflow.md) -> "Parallel Ag
 
 When all agents return:
 
-1. **Compliance synthesis:**
-   - Collect all lens findings
-   - Deduplicate (FTC and Substantiation may flag same issue)
-   - Build unified P1/P2/P3 report
-   - **P1 issues:** Surface to user for decision. Do NOT auto-fix. Mark status as BLOCKED.
-   - **P2/P3 issues:** Convert findings to a proposed-change JSON file with `severity`, `item_ref`, `issue`, `evidence`, `rule`, and `fix` fields.
-   - Run the compliance gate in dry-run mode before any source copy edit:
-
-     ```bash
-     python -m mb.ads_compliance_gate pushes/YYYY-MM-DD-{type}-{campaign}/{batch-file}.md pushes/YYYY-MM-DD-{type}-{campaign}/proposed-compliance-fixes.json
-     ```
-
-   - Show the full proposed diff to the user and ask: "Apply these compliance copy changes? (y/n)"
-   - If the user says no, leave the batch file unchanged and keep `proposed-compliance-fixes.json` for review.
-   - If the user says yes, apply through the same gate with explicit approval:
-
-     ```bash
-     python -m mb.ads_compliance_gate pushes/YYYY-MM-DD-{type}-{campaign}/{batch-file}.md pushes/YYYY-MM-DD-{type}-{campaign}/proposed-compliance-fixes.json --approve --review-log pushes/YYYY-MM-DD-{type}-{campaign}/review-log.md
-     ```
+1. **Compliance synthesis:** deduplicate lens findings into a unified P1/P2/P3 report. P1 goes to the user for decision (never auto-fixed; status BLOCKED). P2/P3 go through the dry-run compliance gate, diff and explicit approval in Phase 4 of [review-workflow.md](review-workflow.md). If the user declines, leave the batch file unchanged, keep `proposed-compliance-fixes.json`, and summarize the declined changes in chat. `review-log.md` is written only when the user approves source copy changes.
 
 2. **Image synthesis (if applicable):**
    - Collect results from all image agents, retry any failures, write a local
@@ -111,10 +60,6 @@ When all agents return:
      candidate?" It is visual-comparison scratch, not committed proof.
    - Commit only safe `image-index.md` records and distilled findings, not raw
      images, private paths, provider payloads, or screenshots.
-
-3. **Review log:**
-   - `review-log.md` is written only when the user approves source copy changes.
-   - If the user declines, do not rewrite the source copy; summarize the declined proposed changes in chat.
 
 ## Step 6: Present Unified Report
 
@@ -143,16 +88,7 @@ Pipeline complete:
 
 ## Step 7: Checkpoint Post-Review
 
-If user approves:
-
-```bash
-mb checkpoint --plan --json
-mb checkpoint --validate "[updated] {type} ad batch after review" --json
-mb checkpoint --message "[updated] {type} ad batch after review" --yes
-```
-
-Do not run raw `git add` or `git commit`; the checkpoint command stages only
-after its safety plan passes and the operator approves.
+If the user approves, run Phase 5 of [review-workflow.md](review-workflow.md) (`[updated] {type} ad batch after review`). Do not run raw `git add` or `git commit`.
 
 ## Pipeline Timing
 

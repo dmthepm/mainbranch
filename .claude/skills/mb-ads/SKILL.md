@@ -445,7 +445,7 @@ VSL-style paid creative, load
 
 Review ads through 6 compliance and quality lenses before shipping (FTC, Meta Policy, Copy Quality, Visual Standards, Voice Authenticity, Substantiation). Spawns 6 parallel Task agents (read-only), synthesizes a unified P1/P2/P3 report, presents proposed P2/P3 copy changes as a diff, and applies them only after explicit approval.
 
-See **[references/mode-review.md](references/mode-review.md)** for the full lens table, review process, severity levels, and status determination.
+See **[references/review-workflow.md](references/review-workflow.md)** for the lens table, review process, severity levels, and status determination.
 
 ---
 

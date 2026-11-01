@@ -491,7 +491,6 @@ def test_mb_ads_review_references_are_skill_local() -> None:
     text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in [
-            skill_root / "references" / "mode-review.md",
             skill_root / "references" / "review-workflow.md",
             skill_root / "references" / "mode-static-ads.md",
             skill_root / "references" / "post-generation-pipeline.md",
