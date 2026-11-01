@@ -155,26 +155,9 @@ When the request depends on a new, thin, or underperforming offer, load
 launch-plan claims. Route to `/mb-think` when audience, outcome, mechanism,
 proof, risk reversal, objections, reason to act, or next step is unclear.
 
-### 0b. Score Reference Files (fast — direct Read only, NO agents)
+### 0b. Score Reference Files (fast: direct Read only, NO agents)
 
-**NEVER spawn Explore or Task agents for pre-flight.** Read files directly at the known repo path. Pre-flight should complete in under 10 seconds.
-
-At the repo path, resolve offer context first with
-`.claude/reference/business-primitives/offer-bet-push-proof.md`, then check
-these files and count lines:
-
-```
-[resolved offer.md]          → 0 (missing), 1 (<20 lines), 2 (20-80), 3 (80+)
-[resolved audience.md]       → same scoring
-core/voice.md                → same scoring
-core/proof/testimonials.md → same scoring
-core/proof/angles/*.md  → count .md files EXCLUDING README.md: 0=0, 1=1, 2-3=2, 4+=3
-core/brand/visual-style.md → same scoring (optional)
-```
-
-In multi-offer mode, score the offer-specific `offer.md` and `audience.md` (resolved via path resolution), not the brand-level `core/offer.md`.
-
-Composite = sum of all 6 scores (max 18).
+**NEVER spawn Explore or Task agents for pre-flight.** Read files directly at the known repo path; it should finish in under 10 seconds. Resolve offer context first with `.claude/reference/business-primitives/offer-bet-push-proof.md` (multi-offer mode scores the offer-specific `offer.md` and `audience.md`, not brand-level `core/offer.md`). Score the resolved `offer.md`, resolved `audience.md`, `core/voice.md`, `core/proof/testimonials.md`, `core/proof/angles/*.md` (count excluding README.md) and optional `core/brand/visual-style.md` as 0 (missing), 1 (<20 lines), 2 (20-80), 3 (80+); angles are 0 / 1 / 2-3 files = 2 / 4+ = 3. Composite = sum of 6 (max 18).
 
 ### 0c. Route on Score
 

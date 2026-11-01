@@ -373,23 +373,7 @@ checked against current primary docs and pinned per run.
 
 ## Detection
 
-At triage, check whether an approved image provider is available. Use
-`mb status --json --peek` / `mb connect doctor --json` first for provider
-readiness when available. Those commands may not prove a media API key exists;
-only check environment variables when the selected mode actually needs image
-generation.
-
-```bash
-python3 -c "from openai import OpenAI; print('openai OK')" 2>/dev/null
-python3 -c "from google import genai; print('google-genai OK')" 2>/dev/null
-```
-
-If a provider is available, show the provider/model, estimated cost, output
-path, and required approval before generating. If unavailable, output text
-prompts only:
-
-> "Image prompts saved. Paste them into your chosen image tool, or configure an
-> approved provider before asking Main Branch to generate files directly."
+At triage use `mb status --json --peek` / `mb connect doctor --json` for provider readiness; those may not prove a media API key exists, so check environment variables only when the selected mode needs generation. If a provider is available, show provider/model, estimated cost, output path and required approval before generating. If not, output text prompts only: "Image prompts saved. Paste them into your chosen image tool, or configure an approved provider before asking Main Branch to generate files directly."
 
 ---
 
@@ -627,19 +611,7 @@ Image generation uses **one subagent per image** (or per 2-3 images for large ba
 
 ### How It Works
 
-1. **Main conversation prepares `prompts.json`** before spawning any agents. Each key is the target filename, each value contains the prompt text, style (on-brand/freestyle), and brand context.
-
-2. **All agents spawn in a single message** — compliance agents AND image agents together. Use `subagent_type: "general-purpose"` for all.
-
-3. **Each image agent:**
-   - Reads its assigned prompt(s) from `prompts.json` (by filename key)
-   - Uses the already-configured provider environment for this run
-   - Calls the selected provider/model (single image per API call)
-   - Post-processes immediately (resize, PNG to JPEG, compress under 300KB)
-   - Verifies the final JPEG exists in configured media storage
-   - Returns: `{ output_reference: "mb-media://pushes/2026-05-ad-test/images/001_01_graphic_vertical.jpg", status: "success", provider: "openai", model: "gpt-image-2", cost_estimate: "$X from current provider pricing" }` (or `status: "fail"` with error message)
-
-4. **Main conversation collects results** from all image agents, retries any failures with fresh single-image agents.
+Main conversation writes `prompts.json` (key = target filename; value = prompt text, style on-brand/freestyle, brand context) before spawning anything. All agents, compliance and image, spawn in one message as `general-purpose`. Each image agent reads its prompt(s), uses the already-configured provider environment, makes one API call per image, post-processes immediately, verifies the final JPEG in configured media storage, and returns `{output_reference: "mb-media://pushes/2026-05-ad-test/images/001_01_graphic_vertical.jpg", status, provider, model, cost_estimate}` (or `status: "fail"` with the error). Main collects results and retries failures with fresh single-image agents.
 
 ### Batching Strategy
 
@@ -718,100 +690,4 @@ Examples:
 
 ## Image Index Metadata
 
-Every generated image batch gets an `image-index.md` with:
-
-- 3 to 6 planned/reviewed concepts when the task is image creative direction;
-- creative playbook IDs, router inputs/reasons, and fit scores for each
-  candidate;
-- concept-to-asset links through `concept_id`;
-- provider and model, or `manual`;
-- docs-checked date;
-- source files read;
-- prompt text or prompt file key;
-- placement preset and safe-zone notes;
-- reference image roles, safe logical paths, `use_for`, and `do_not_copy`;
-- structured review status and checks;
-- output dimensions and format;
-- post-processing settings;
-- cost estimate and actual cost when known;
-- failure/retry count;
-- safe logical media references;
-- storage backend label;
-- approval state.
-
-### Creative Review Rubric
-
-Review generated or manually produced images before treating them as campaign
-assets. Record structured checks:
-
-```yaml
-review:
-  status: needs_revision
-  one_second_clarity: pass
-  visual_hook_strength: pass
-  ad_usefulness: pass
-  readability: warning
-  placement_fit: pass
-  brand_fit: warning
-  claim_safety: pass
-  fake_ui_risk: fail
-  policy_risk: warning
-  private_data_risk: pass
-  ai_generic_risk: warning
-  click_reason_fit: pass
-  visual_quality:
-    composition: 4
-    style: 4
-    polish_control: 3
-  ad_quality:
-    thumb_stop: 4
-    problem_clarity: 4
-    desire_clarity: 3
-    curiosity_gap: 4
-    offer_relevance: 3
-    likely_click_reason: The audience recognizes the source-bite problem fast.
-  risk:
-    ai_slop_risk: 3
-    genericness_risk: 3
-    compliance_risk: warning
-  avoidance_check:
-    stock_photo_risk: pass
-    website_hero_risk: pass
-    clean_desk_cliche_risk: warning
-    generic_saas_risk: pass
-    ai_slop_risk: pass
-    overpolished_risk: pass
-    too_safe_to_stop_scroll: warning
-    native_feed_fit: 4
-  scores:
-    one_second_clarity: 4
-    visual_hook_strength: 4
-    specificity: 3
-    brand_fit: 3
-    ai_generic_risk: 3
-  decision: revise
-  notes:
-    - Avoid fake Meta dashboard elements.
-    - Leave more upper-right whitespace for overlay.
-```
-
-The review should answer: what the image is supposed to do, who it is for,
-what pain or desire it visualizes, why the composition and placement fit, what
-claim boundary it respects, and whether to accept, revise, regenerate, or
-reject it.
-
-Beautiful but no click reason = reject. Separate image quality from ad quality:
-a polished composition with no audience-specific reason to click is not a
-usable ad candidate.
-
-## Fallback (No Provider)
-
-If no image provider is configured:
-
-1. Generate text prompts only (structured JSON format)
-2. Save prompts and the intended logical media references to `image-index.md`
-3. Note: "Image prompts saved as text. To generate images, paste these into your chosen image tool or configure an approved provider for a future run."
-
----
-
-*See also: image-prompt-templates.md for template library, preflight-algorithm.md for readiness scoring.*
+Every generated image batch gets an `image-index.md` carrying the schema above: concepts with playbook IDs, router inputs and fit scores; `concept_id` links to assets; provider and model (or `manual`); docs-checked date; source files read; prompt text or key; placement preset and safe zones; reference roles, safe logical paths, `use_for` and `do_not_copy`; structured review; output dimensions, format and post-processing; estimated and actual cost; failure/retry count; storage backend label; approval state.

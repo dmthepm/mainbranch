@@ -112,7 +112,7 @@ VERDICT: PASS | PASS WITH EDITS | FAIL
 
 - The editor checks every line against the live page, the business's
   never-list, the lengths above, the pairing rule, and the lenses in
-  [lenses/](lenses/README.md).
+  [review-workflow.md](review-workflow.md).
 - The writer applies each EDIT or declines it with a reason, and records the
   verdict and every edit in the slots file's "Copy pass record".
 - FAIL means a rewrite and a new fresh edit, never a patch-and-ship.

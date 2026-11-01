@@ -74,7 +74,7 @@ Some offers genuinely need outcome proof:
 - Competitive markets where everyone uses them
 
 If you must use them:
-1. Collect real typicality data (see `typicality/README.md`)
+1. Collect real typicality data (in `core/proof/typicality.md`)
 2. Lead with honest disclosure
 3. Consider landing page disclosure vs in-ad disclosure
 4. Document everything for FTC defense
