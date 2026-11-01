@@ -13,7 +13,7 @@ table. You prepare the steps; the owner runs root steps and sign-ins.
 ## Add a business
 
 A new business gets its own Unix user. Never add it to an existing account,
-even for a trial: one business or trust domain per Unix user, and a same-user
+even for a trial: one business per Unix user, and a same-user
 hook is advisory, not a boundary. Several standing roles can share one business's
 account, because they share its trust.
 

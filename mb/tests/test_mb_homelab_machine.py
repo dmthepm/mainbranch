@@ -144,7 +144,6 @@ def test_homelab_maintenance_inputs_are_covered() -> None:
     for phrase in (
         "minimum release age",
         "audited override",
-        "<version manager>",
         "`<tool> --help` exits 0",
         "Stale means unknown, never available",
         "restart table",
@@ -188,3 +187,30 @@ def test_claude_only_like_other_machine_skills() -> None:
     ]
     paths.extend((ROOT / "workflows").rglob("*.md"))
     assert all(SKILL.name not in text(path) for path in paths)
+
+
+def test_account_rule_uses_the_guides_business_language() -> None:
+    for path in MARKDOWN:
+        assert "trust domain" not in text(path).lower(), path.name
+    assert "One business per Unix user" in text(SKILL / "SKILL.md")
+    assert "no two businesses\nsharing an account" in text(SKILL / "references/maintenance.md")
+
+
+def test_version_manager_rule_has_no_placeholder() -> None:
+    maintenance = text(SKILL / "references/maintenance.md")
+    assert "<version manager>" not in maintenance
+    assert "minimum release age" in maintenance
+    assert "audited override" in maintenance
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        ".claude/skills/mb-help/references/skills-guide.md",
+        "docs/compatibility.md",
+    ],
+)
+def test_machine_skill_is_discoverable(relative: str) -> None:
+    source = text(ROOT / relative)
+    assert "/mb-homelab-machine" in source
+    assert "Claude Code only" in source

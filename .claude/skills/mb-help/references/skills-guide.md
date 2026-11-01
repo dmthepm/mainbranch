@@ -230,6 +230,17 @@ its own copy, and paid calls need the owner's yes. Support is experimental.
 
 ---
 
+### /mb-homelab-machine - Always-on agent machine
+
+**Use when:** Picking, setting up, maintaining, extending or hardening the machine
+that runs your agents. Claude Code only; no business repo is needed.
+
+**What it does:** Reads the machine guide, runs read-only checks and reports
+PASS, FAIL or NOT VERIFIED. The owner runs root steps and changes settings.
+Each business keeps its own user account.
+
+---
+
 ## Decision Tree
 
 ```

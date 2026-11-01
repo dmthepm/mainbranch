@@ -14,7 +14,7 @@ from SKILL.md. A reading without a time is NOT VERIFIED.
 ## Principles and their checks
 
 **Updates go through one version manager.** Shared tools move through one
-`<version manager>` with a minimum release age by default, so a new release
+version manager with a minimum release age by default, so a new release
 waits before it lands. A confirmed security advisory may skip the wait through
 one audited override, which records the advisory, the tool, the version and
 who approved it. The exact command and rules are pending the owner's security
@@ -36,7 +36,7 @@ the window's reset time, and when the reading was taken.
 the owner (for example two hours). Stale means unknown, never available:
 report a stale or missing reading as NOT VERIFIED, not as headroom. Banked
 resets and credits are shown for information only; never redeem or spend one,
-and raise a redeem question to the owner only when the window shows 100% used.
+and bring them up with the owner only when the window shows 100% used.
 
 **Every agent can restart from its checkpoint.** The machine record has a
 restart table: agent, Unix user, session, checkpoint file, last checkpoint
@@ -49,9 +49,9 @@ as the agent's account; you can't read another account's files.
 *Done-check:* see the backup rows below. A backup job that "succeeded" with no
 drill inside its window is NOT VERIFIED.
 
-**One business or trust domain per Unix user.**
+**One business per Unix user.**
 A same-user hook is advisory, not a boundary.
-*Done-check (weekly):* the restart table shows no two businesses or trust domains
+*Done-check (weekly):* the restart table shows no two businesses
 sharing an account.
 
 ## Daily
@@ -74,7 +74,7 @@ sharing an account.
 | Services after update | after any update or reboot, every `<unit>` is `active` again |
 | Off-site backup | the off-site tool's last snapshot is under 7 days old (read its snapshot list or log, never its password) |
 | Disk health | SMART overall health is PASSED for the system disk and the backup drive. `smartctl` usually needs root: prepare `smartctl -H <device>` for the owner and report NOT VERIFIED until they share the result |
-| Accounts | one business or trust domain per Unix user; no agent account in an admin group |
+| Accounts | one business per Unix user; no agent account in an admin group |
 | Listeners | `ss -Htln` lists no dev server or debug port on a non-loopback address |
 
 ## Monthly

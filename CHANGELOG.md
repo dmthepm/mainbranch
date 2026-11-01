@@ -11,6 +11,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
+  hardening and extending an always-on agent machine, with read-only
+  done-checks that report NOT VERIFIED instead of guessing.
+
 ### Changed
 
 - The Main Branch plugin is now pinned to the exact 0.6.18 release commit. New
@@ -64,11 +70,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   output path outside the repo is replaced, not followed.
 - Suggested `mb books doctor --repo` commands now quote the path, so a path
   with spaces or shell characters can be run as printed.
-### Added
-
-- `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
-  hardening and extending an always-on agent machine, with read-only
-  done-checks that report NOT VERIFIED instead of guessing.
 
 ## [0.6.17] - 2026-10-28
 

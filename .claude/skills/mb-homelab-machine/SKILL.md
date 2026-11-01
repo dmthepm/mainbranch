@@ -35,7 +35,7 @@ and its done-checks before starting the next.
 2. **One box for the agents.** Agent sessions start on the always-on box. The
    laptop and phone only view and steer. If closing the laptop stops work, the
    setup isn't finished.
-3. **Isolation by Unix user.** One business or trust domain per Unix user. Several
+3. **Isolation by Unix user.** One business per Unix user. Several
    roles may share one business's account. A hook or rule inside the same user is advisory, not a security
    boundary. Accounts reach each other only through the owner until a
    reviewed gate exists.
