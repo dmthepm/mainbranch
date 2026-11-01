@@ -11,6 +11,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Changed
+
+- The Main Branch plugin is now pinned to the exact 0.6.18 release commit. New
+  installs get that release, and owners move only when a new release is pinned.
+
 ## [0.6.18] - 2026-11-01
 
 ### Added

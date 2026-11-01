@@ -10,7 +10,11 @@
   "plugins": [
     {
       "name": "mainbranch",
-      "source": "./",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/dmthepm/mainbranch.git",
+        "sha": "9d5e75f98fd7cf4b04c9c07ce9ffcf820e6d8cbe"
+      },
       "description": "Main Branch Claude Code skills for running a business from markdown files in git."
     }
   ]
