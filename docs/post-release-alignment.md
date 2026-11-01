@@ -27,25 +27,28 @@ next parallel batch:
 
 1. Merge / release ships (tag, GitHub Release, PyPI publish, Linear release
    sync — see `docs/release-simulations.md`).
-2. Align Linear and GitHub issue state: close the release-prep issue, comment
+2. Pin the plugin to the release commit with its own PR and read back an
+   install at that commit (`docs/release-agent-contract.md` Rule 8). Owners
+   keep the previous release until this lands.
+3. Align Linear and GitHub issue state: close the release-prep issue, comment
    release evidence on GitHub by default so the public thread and Linear mirror
    agree, mark Linear issues shipped via Linear release completion (not on
    merge).
-3. Audit release simulation transcripts when the release touched package,
+4. Audit release simulation transcripts when the release touched package,
    runtime, first-run, generated guidance, or operator workflow behavior. Use
    the transcript audit below.
-4. If a pre-release security sidecar such as DeepSec ran, review the sanitized
+5. If a pre-release security sidecar such as DeepSec ran, review the sanitized
    result alongside the release evidence. Route confirmed product gaps to
    GitHub issues or a public-safe report; keep raw logs, local paths, model
    traces, and private security details out of public docs.
-5. Align repo docs and decisions if anything shipped changed the product
+6. Align repo docs and decisions if anything shipped changed the product
    stance. Use the alignment sweep below.
-6. Audit agent cold-start guidance when the release taught a new protocol,
+7. Audit agent cold-start guidance when the release taught a new protocol,
    review habit, validation rule, or task-triggered read path. Use
    `docs/agent-cold-start.md` as the public source of truth.
-7. Align local agent preferences only when a private local workflow reminder
+8. Align local agent preferences only when a private local workflow reminder
    changed. Use the local-preferences policy below.
-8. Start the next parallel batch.
+9. Start the next parallel batch.
 
 ## 2. Alignment sweep
 

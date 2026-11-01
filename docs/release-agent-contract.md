@@ -220,8 +220,12 @@ diff touches plugin wiring, the marketplace/plugin manifests, or the runtime
 guidance that routes operators to the plugin, the release driver must run a
 manual plugin-load smoke before publishing and record it as a validation line:
 
-- `claude plugin marketplace add dmthepm/mainbranch`, enable the plugin,
-  then confirm the plugin-native `/mainbranch:mb-start` (and one other
+- add the **candidate**, not the published marketplace. Once a release is
+  pinned (Rule 8), `claude plugin marketplace add dmthepm/mainbranch` installs
+  the previous release's commit. Export the candidate with
+  `scripts/release-pin-plugin.sh --candidate <empty dir>` (it resets the
+  source to `./`), run `claude plugin marketplace add <that dir>`, enable the
+  plugin, then confirm the plugin-native `/mainbranch:mb-start` (and one other
   `/mainbranch:mb-*` skill) resolves in **both** the Claude Desktop app
   **and** the terminal `claude` CLI;
 - separately record whether the legacy project-local bridge also exposes
@@ -236,6 +240,33 @@ manual plugin-load smoke before publishing and record it as a validation line:
 This is the one true pre-publish gate that lives only here: a green CI run does
 not cover it. "Skipped because no Claude Code build was available" is a valid
 recorded reason only for a diff that does not touch the plugin rail.
+
+### 8. Pin the plugin to the release commit after the release exists.
+
+Each release pins the plugin marketplace to one exact commit: an HTTPS `url`
+source plus the full 40-character `sha` (decision
+`decisions/2026-10-31-plugin-source-and-release-pinning.md`). The pin names a
+commit, so it can only be written after that commit exists. The order is:
+
+1. Release commit: versions bumped, CHANGELOG dated, marketplace source
+   unchanged (`./` or the previous release's pin).
+2. Tag the release commit.
+3. Publish (PyPI, GitHub Release).
+4. Pin PR, on its own branch:
+   `scripts/release-pin-plugin.sh oe-vX.Y.Z`. It refuses unless the tag's
+   commit declares `X.Y.Z` in both `plugin.json` and the marketplace metadata.
+5. Read back an install at the exact commit: in a throwaway profile
+   (`CLAUDE_CONFIG_DIR` set for that one command only), add the pinned
+   marketplace, install, and record the installed commit and version from
+   `plugins/installed_plugins.json` and `claude plugin list`. They must match
+   the tag's commit. Claude Desktop is a separate check.
+
+`scripts/plugin_pin.py check` (run by `scripts/release-preflight.sh` and, in
+offline form, by the manifest tests) fails on a short sha, a non-HTTPS url, a
+repo other than `dmthepm/mainbranch`, or a pinned commit whose plugin and
+marketplace versions disagree. Because the release commit bumps versions
+before the pin PR exists, the pinned commit may declare the same version as
+the tree or an older one; it may never declare a newer one.
 
 ## Where this lives
 

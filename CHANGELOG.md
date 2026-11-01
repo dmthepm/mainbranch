@@ -23,6 +23,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Changed
 
+- Each release can now pin the Main Branch plugin to the exact release it
+  shipped, so an owner's plugin no longer follows whatever is on the main
+  branch between releases. The release steps now pin after the release exists
+  and check the pin before it ships. Nothing changes for owners yet: the pin
+  starts with a later release.
 - `docs/machine-setup.md`: on Omarchy, turn clipboard history off completely
   on any machine where you ever copy a credential.
 - The README and core owner docs are shorter and start from what an owner

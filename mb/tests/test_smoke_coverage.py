@@ -8,9 +8,11 @@ behaviour tests on the affected modules.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from pathlib import Path
+from types import ModuleType
 
 from typer.testing import CliRunner
 
@@ -18,6 +20,19 @@ from mb import __version__
 from mb.cli import app
 
 runner = CliRunner()
+
+
+def _load_plugin_pin() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "plugin_pin", Path(__file__).resolve().parents[2] / "scripts" / "plugin_pin.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+plugin_pin = _load_plugin_pin()
 
 
 # ------------------------------------------------------------------ educational
@@ -228,6 +243,8 @@ def test_claude_plugin_manifest_points_at_prefixed_skills() -> None:
     assert manifest["version"] == pyproject_version.group(1)
     assert manifest["skills"] == "./.claude/skills/"
     assert (manifest_path.parents[1] / ".claude" / "skills" / "mb-start" / "SKILL.md").is_file()
+    # Both `./` and a valid url + sha pin are acceptable marketplace sources.
+    assert plugin_pin.check(manifest_path.parents[1], offline=True) == []
 
 
 def test_claude_code_invocation_contract_documents_supported_skill_surface() -> None:
@@ -269,7 +286,11 @@ def test_marketplace_manifest_makes_plugin_installable() -> None:
     plugins = manifest["plugins"]
     assert len(plugins) == 1
     assert plugins[0]["name"] == "mainbranch"
-    assert plugins[0]["source"] == "./"
+    # "./" until a release pins it; a pin must pass the same check the release
+    # driver runs (scripts/plugin_pin.py check).
+    source = plugins[0]["source"]
+    assert source == "./" or (isinstance(source, dict) and source["source"] == "url")
+    assert plugin_pin.check(repo_root, offline=True) == []
 
     plugin = json.loads((repo_root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
     # Versions travel together; the release preflight checks plugin.json —
