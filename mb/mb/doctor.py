@@ -2009,6 +2009,12 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
                 + ", ".join(role_wiring["invalid"])
                 + ". Run `mb role check`."
             )
+        elif not role_wiring["hook_wired"] and role_wiring["plugin_wired"]:
+            role_detail = (
+                "Role hook not verified: the Main Branch plugin is enabled, but doctor cannot "
+                "see whether its version has the role hook. Update the plugin, or add "
+                "`mb role hook` as a SessionStart hook in .claude/settings.json."
+            )
         elif not role_wiring["hook_wired"]:
             role_detail = (
                 "Role cards exist but no SessionStart hook is wired, so sessions are "

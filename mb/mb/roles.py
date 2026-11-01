@@ -7,8 +7,11 @@ the SessionStart hook, an argument for ``mb role show``/``check``).
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import subprocess
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +36,26 @@ MAX_CARD_BYTES = 65_536
 MAX_CHECKPOINT_BYTES = 8_192
 _CONTROL_RE = re.compile("[\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]")
 _NOT_TEXT_RE = re.compile("[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f\\u2028\\u2029]")
+CHECKPOINT_DIRS = ("state", "core/roles")
+CHECKPOINT_RULE = (
+    "checkpoint must be a regular .md file under state/ or core/roles/, with no hidden "
+    "path segment, and not git-ignored unless under state/"
+)
+_MARKER_RE = re.compile(r"-{3}\s*(end\s+)?checkpoint(\s+contents)?\s*-{3}", re.IGNORECASE)
+
+
+def strip_format(value: str) -> str:
+    """Drop Unicode format controls (bidi overrides, zero-width, BOM) and line/paragraph breaks."""
+    return "".join(ch for ch in value if unicodedata.category(ch) not in ("Cf", "Zl", "Zp"))
+
+
+def emit(value: str) -> str:
+    """Make a field or checkpoint text safe to put in model context.
+
+    Format controls go first so they cannot split a marker; section markers
+    inside the text are neutralized so it cannot forge the end of a section.
+    """
+    return _MARKER_RE.sub("[marker removed]", strip_format(value))
 
 
 def has_control(value: str, *, multiline: bool = False) -> bool:
@@ -42,7 +65,7 @@ def has_control(value: str, *, multiline: bool = False) -> bool:
 
 def printable(value: str, limit: int = 60) -> str:
     """Make untrusted text safe to echo: no control characters, bounded length."""
-    cleaned = _CONTROL_RE.sub("?", value.replace("\n", "?").replace("\r", "?"))
+    cleaned = _CONTROL_RE.sub("?", strip_format(value).replace("\n", "?").replace("\r", "?"))
     return cleaned if len(cleaned) <= limit else cleaned[:limit] + "..."
 
 
@@ -58,7 +81,9 @@ def card_paths(repo: str | Path) -> list[Path]:
     """Every ``*.md`` directly inside ``core/roles/``; empty when the folder is absent."""
     folder = _root(repo) / ROLES_DIR
     try:
-        return sorted(p for p in folder.iterdir() if p.suffix == ".md")
+        return sorted(
+            p for p in folder.iterdir() if p.suffix == ".md" and not p.name.startswith(".")
+        )
     except OSError:
         return []
 
@@ -75,6 +100,47 @@ def _safe_relative(value: str) -> bool:
     return ".." not in Path(value.replace("\\", "/")).parts
 
 
+def _git_ignored(root: Path, relative: str) -> bool:
+    """True if git ignores the path. Fails closed: an unanswered question counts as ignored."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-q", "--", relative],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True
+    return result.returncode != 1
+
+
+def checkpoint_problem(root: Path, relative: str) -> str | None:
+    """Why a checkpoint may not be read automatically, or None when it may.
+
+    The rule applies to the written path and to where it really points, so a
+    link from an allowed name to ``.env`` fails.
+    """
+    if not _safe_relative(relative):
+        return "checkpoint must be a relative path inside the repo"
+    try:
+        resolved = (root / relative).resolve().relative_to(root)
+    except (OSError, ValueError):
+        return "checkpoint must be a relative path inside the repo"
+    for rel in (Path(relative.replace("\\", "/")), resolved):
+        parts = rel.parts
+        top = "core/roles" if parts[:2] == ("core", "roles") else (parts[:1] or ("",))[0]
+        if (
+            rel.suffix != ".md"
+            or top not in CHECKPOINT_DIRS
+            or len(parts) <= len(top.split("/"))
+            or any(part.startswith(".") for part in parts)
+        ):
+            return CHECKPOINT_RULE
+        if top != "state" and _git_ignored(root, rel.as_posix()):
+            return CHECKPOINT_RULE
+    return None
+
+
 def _read_card(path: Path, root: Path) -> tuple[dict[str, Any] | None, str, list[str]]:
     """Return ``(frontmatter, body, errors)``. Never raises on bad content."""
     try:
@@ -87,7 +153,11 @@ def _read_card(path: Path, root: Path) -> tuple[dict[str, Any] | None, str, list
             return None, "", ["card is not a regular file"]
         if resolved.stat().st_size > MAX_CARD_BYTES:
             return None, "", [f"card is larger than {MAX_CARD_BYTES} bytes"]
-        text = resolved.read_text(encoding="utf-8")
+        with resolved.open("rb") as handle:
+            raw = handle.read(MAX_CARD_BYTES + 1)
+        if len(raw) > MAX_CARD_BYTES:
+            return None, "", [f"card is larger than {MAX_CARD_BYTES} bytes"]
+        text = raw.decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return None, "", ["card could not be read as UTF-8 text"]
     if not text.startswith("---\n"):
@@ -104,7 +174,7 @@ def _read_card(path: Path, root: Path) -> tuple[dict[str, Any] | None, str, list
     return parsed, text[end + 4 :].lstrip("\n"), []
 
 
-def _validate(fm: dict[str, Any], stem: str) -> tuple[list[str], list[str]]:
+def _validate(fm: dict[str, Any], stem: str, root: Path) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
     for field in REQUIRED_FIELDS:
@@ -133,8 +203,10 @@ def _validate(fm: dict[str, Any], stem: str) -> tuple[list[str], list[str]]:
     if isinstance(role, str) and len(role) > 200:
         errors.append("role must be at most 200 characters")
     checkpoint = fm.get("checkpoint")
-    if isinstance(checkpoint, str) and checkpoint.strip() and not _safe_relative(checkpoint):
-        errors.append("checkpoint must be a relative path inside the repo")
+    if isinstance(checkpoint, str) and checkpoint.strip():
+        problem = checkpoint_problem(root, checkpoint)
+        if problem:
+            errors.append(problem)
     for extra in sorted(set(fm) - set(REQUIRED_FIELDS), key=str):
         warnings.append(f"unknown field ignored: {printable(str(extra), 40)}")
     return errors, warnings
@@ -163,7 +235,7 @@ def load_card(repo: str | Path, name: str) -> dict[str, Any]:
     fm, body, errors = _read_card(path, root)
     warnings: list[str] = []
     if fm is not None:
-        errors, warnings = _validate(fm, name)
+        errors, warnings = _validate(fm, name, root)
     card: dict[str, Any] = {
         "name": name,
         "path": f"{ROLES_DIR}/{name}.md",
@@ -214,6 +286,8 @@ def check(repo: str | Path, name: str | None = None) -> dict[str, Any]:
 
 
 def _checkpoint_text(repo: Path, relative: str) -> str:
+    if checkpoint_problem(repo, relative):
+        return f"(Checkpoint {printable(relative)} was not read: {CHECKPOINT_RULE}.)"
     path = repo / relative
     try:
         resolved = path.resolve()
@@ -225,7 +299,7 @@ def _checkpoint_text(repo: Path, relative: str) -> str:
     except (OSError, ValueError):
         return f"(No checkpoint file at {relative} yet. State this and ask what to do next.)"
     text = raw[:MAX_CHECKPOINT_BYTES].decode("utf-8", errors="replace")
-    cleaned = "".join(ch for ch in text if ch in "\n\t" or not _CONTROL_RE.match(ch))
+    cleaned = emit("".join(ch for ch in text if ch in "\n\t" or not _CONTROL_RE.match(ch)))
     if len(raw) > MAX_CHECKPOINT_BYTES:
         cleaned += "\n(checkpoint truncated)"
     return cleaned
@@ -269,12 +343,12 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
     lines = [
         f"MAIN BRANCH ROLE CARD (session {source}). You are running as role: {card['name']}.",
         "State this role in your first reply. Do not take another role.",
-        f"Role: {card['role']}",
-        "Skills: " + (", ".join(card["skills"]) or "none"),
-        "Tools: " + (", ".join(card["tools"]) or "none"),
-        "Protocols: " + (", ".join(card["protocols"]) or "none"),
-        f"First action: {card['first_action'].strip()}",
-        f"Checkpoint file: {card['checkpoint']}",
+        f"Role: {emit(card['role'])}",
+        "Skills: " + (emit(", ".join(card["skills"])) or "none"),
+        "Tools: " + (emit(", ".join(card["tools"])) or "none"),
+        "Protocols: " + (emit(", ".join(card["protocols"])) or "none"),
+        f"First action: {emit(card['first_action'].strip())}",
+        f"Checkpoint file: {emit(card['checkpoint'])}",
         "--- checkpoint contents ---",
         _checkpoint_text(root, card["checkpoint"]).rstrip(),
         "--- end checkpoint ---",
@@ -282,16 +356,33 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
     return "\n".join(lines)
 
 
+def _command_runs_role_hook(command: object) -> bool:
+    return isinstance(command, str) and "mb role hook" in command
+
+
 def _settings_has_hook(path: Path) -> bool:
+    """True when the settings JSON has a SessionStart hook whose command runs ``mb role hook``."""
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError):
         return False
-    return "SessionStart" in text and "mb role hook" in text
+    groups = doc.get("hooks", {}).get("SessionStart") if isinstance(doc, dict) else None
+    if not isinstance(groups, list) or not isinstance(doc["hooks"], dict):
+        return False
+    for group in groups:
+        hooks = group.get("hooks") if isinstance(group, dict) else None
+        for hook in hooks if isinstance(hooks, list) else []:
+            if isinstance(hook, dict) and _command_runs_role_hook(hook.get("command")):
+                return True
+    return False
 
 
 def wiring(repo: str | Path, plugin_wired: bool) -> dict[str, Any]:
-    """Facts for ``mb doctor``. Only meaningful when the repo has role cards."""
+    """Facts for ``mb doctor``. Only meaningful when the repo has role cards.
+
+    ``hook_wired`` means a real hook command was found in project settings. An
+    enabled plugin is reported separately: its version is not visible here.
+    """
     root = _root(repo)
     cards = list_cards(root)
     project_hook = any(
@@ -301,7 +392,7 @@ def wiring(repo: str | Path, plugin_wired: bool) -> dict[str, Any]:
     return {
         "cards": len(cards),
         "invalid": [c["name"] for c in cards if not c["valid"]],
-        "hook_wired": plugin_wired or project_hook,
+        "hook_wired": project_hook,
         "plugin_wired": plugin_wired,
         "project_hook": project_hook,
         "role_selected": bool(os.environ.get(ROLE_ENV, "").strip()),
