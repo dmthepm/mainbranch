@@ -261,12 +261,28 @@ commit, so it can only be written after that commit exists. The order is:
    `plugins/installed_plugins.json` and `claude plugin list`. They must match
    the tag's commit. Claude Desktop is a separate check.
 
-`scripts/plugin_pin.py check` (run by `scripts/release-preflight.sh` and, in
-offline form, by the manifest tests) fails on a short sha, a non-HTTPS url, a
-repo other than `dmthepm/mainbranch`, or a pinned commit whose plugin and
-marketplace versions disagree. Because the release commit bumps versions
-before the pin PR exists, the pinned commit may declare the same version as
-the tree or an older one; it may never declare a newer one.
+Until the first pin lands (0.6.18's, right after it publishes), the
+marketplace source stays `./` and installs follow `main`. Only after that do
+owners stay on the previous release between releases.
+
+Provenance: the pinned commit must be the commit of the first-party tag
+`oe-vX.Y.Z`, read from `https://github.com/dmthepm/mainbranch.git` (never a
+local tag), and an ancestor of first-party `main`. Annotated and lightweight
+tags both work; the check follows the tag to its commit. The remote cannot be
+overridden from the command line. Versions are exactly three numeric parts.
+
+`scripts/plugin_pin.py check` (run by `scripts/release-preflight.sh`, and by
+the required `Python (mb umbrella)` CI job against the real manifest with full
+history) fails on a short sha, a non-HTTPS url, a repo other than
+`dmthepm/mainbranch`, a pinned commit whose plugin and marketplace versions
+disagree, a commit that fails the provenance rule, or an unreachable remote.
+`--offline` skips the network and is for the manifest unit tests only. Because
+the release commit bumps versions before the pin PR exists, the pinned commit
+may declare the same version as the tree or an older one; it may never declare
+a newer one.
+
+The candidate export (`--candidate`) refuses a dirty tree and prints the
+exported HEAD sha; record that sha in the smoke evidence.
 
 ## Where this lives
 

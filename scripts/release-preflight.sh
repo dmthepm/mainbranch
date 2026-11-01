@@ -53,8 +53,9 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 
-# A pinned marketplace must name a real, not-newer release commit. This needs
-# the pinned commit locally, so a shallow clone must fetch it first.
+# A pinned marketplace must name the first-party release tag's commit, on
+# first-party main, and not newer than this tree. This needs the network; the
+# check fetches first-party main itself.
 python3 "$ROOT/scripts/plugin_pin.py" --root "$ROOT" check || {
   echo "release-preflight: plugin pin check failed." >&2
   exit 1

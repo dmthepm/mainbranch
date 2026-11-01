@@ -28,8 +28,10 @@ next parallel batch:
 1. Merge / release ships (tag, GitHub Release, PyPI publish, Linear release
    sync — see `docs/release-simulations.md`).
 2. Pin the plugin to the release commit with its own PR and read back an
-   install at that commit (`docs/release-agent-contract.md` Rule 8). Owners
-   keep the previous release until this lands.
+   install at that commit (`docs/release-agent-contract.md` Rule 8). Until
+   the first pin lands (0.6.18's, right after it publishes), installs still
+   follow `main`. After that, owners stay on the previous release between
+   releases, until each release's pin PR lands.
 3. Align Linear and GitHub issue state: close the release-prep issue, comment
    release evidence on GitHub by default so the public thread and Linear mirror
    agree, mark Linear issues shipped via Linear release completion (not on
