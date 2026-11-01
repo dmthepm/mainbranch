@@ -11,6 +11,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
+  hardening and extending an always-on agent machine, with read-only
+  done-checks that report NOT VERIFIED instead of guessing.
+
 ### Changed
 
 - The Main Branch plugin is now pinned to the exact 0.6.18 release commit. New
