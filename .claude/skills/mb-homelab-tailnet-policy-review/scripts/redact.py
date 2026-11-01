@@ -15,7 +15,7 @@ KEY = re.compile(
 EMAIL = re.compile(r"[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}")
 DNS = re.compile(r"(?:[\w-]+\.)*ts\.net\.?", re.IGNORECASE)
 URL = re.compile(r"https?://[^\s\"'<>|]+", re.IGNORECASE)
-IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
+IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?!\d)(?!\.\d)")
 IPV6 = re.compile(r"[0-9a-fA-F:.]+(?:%[\w.-]+)?")
 IDENTITY_CLASSES = {
     "displayname": "user",

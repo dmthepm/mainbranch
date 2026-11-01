@@ -552,3 +552,36 @@ def test_g1_ipv6_at_every_offset(text: str, expected: str) -> None:
     assert f"| wildcard |  | {expected} | {expected} |  |" in output
     assert f"- {expected}\n" in output
     assert module.Redactor({}).scrub(text) == expected
+
+
+@pytest.mark.parametrize("skill", [AUDIT, POLICY], ids=["audit", "policy"])
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Endpoint 192.0.2.81.", "Endpoint node-1."),
+        ("192.0.2.81. Again 192.0.2.81.", "node-1. Again node-1."),
+        ("192.0.2.81...", "node-1..."),
+        ("192.0.2.81,", "node-1,"),
+        ("(192.0.2.81)", "(node-1)"),
+        ("192.0.2.81:443", "node-1:443"),
+        ("[192.0.2.81]:443", "[node-1]:443"),
+        ("999.0.2.81.", "999.0.2.81."),
+        ("192.0.2.999.", "192.0.2.999."),
+        ("1.2.3.4.5", "1.2.3.4.5"),
+    ],
+)
+def test_b1_ipv4_punctuation(skill: Path, text: str, expected: str) -> None:
+    module = load(skill / "scripts/redact.py")
+    output = module.render({
+        "rows": [{"check": "wildcard", "result": text, "safer": text}],
+        "notes": [text],
+    })
+    assert f"| wildcard |  | {expected} | {expected} |  |" in output
+    assert f"- {expected}\n" in output
+    assert module.Redactor({}).scrub(text) == expected
+
+
+def test_b1_redactor_copies_identical() -> None:
+    assert (AUDIT / "scripts/redact.py").read_bytes() == (
+        POLICY / "scripts/redact.py"
+    ).read_bytes()
