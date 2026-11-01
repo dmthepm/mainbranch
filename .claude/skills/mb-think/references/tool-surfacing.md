@@ -250,7 +250,7 @@ Claude: "Searching X via web..."
 
 ## See Also
 
-- [research-architecture.md](research-architecture.md) — Full research routing system
+- [research-routing-quick-ref.md](research-routing-quick-ref.md) — Research routing
 - [grok-setup.md](grok-setup.md) — Grok setup guide
 - [gemini-setup.md](gemini-setup.md) — Gemini setup guide
 - [local-transcription.md](local-transcription.md) — whisper setup and usage

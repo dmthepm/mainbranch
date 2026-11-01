@@ -170,6 +170,6 @@ Gemini Deep Research is now available in /mb-think.
 ## See Also
 
 - [gemini-deep-research.md](gemini-deep-research.md) — How to use Gemini for research
-- [research-architecture.md](research-architecture.md) — Full routing logic
+- [research-routing-quick-ref.md](research-routing-quick-ref.md) — Routing logic
 - `mb-start/references/config-system.md` — Full config file layout (local.yaml, env.sh, config.yaml)
 - `mb-setup/SKILL.md` Step 4a — How env.sh is created during initial setup

@@ -2,7 +2,7 @@
 
 Detailed workflow for research mode in `/mb-think`.
 
-**See also:** [research-architecture.md](research-architecture.md) for full routing and tool selection logic.
+**See also:** [research-routing-quick-ref.md](research-routing-quick-ref.md) for full routing and tool selection logic.
 
 ---
 
@@ -549,3 +549,20 @@ Research is complete when:
 ## Template
 
 See [templates/research-template.md](templates/research-template.md) for full file structure.
+
+---
+
+## Parallel Research Agents
+
+When research needs 2+ sources (YouTube + web, X + codebase, competitor mining + deep research), spawn one Task agent per source in a single message with `subagent_type: "general-purpose"` (has Write, Edit, Bash, MCP access). Do not use `run_in_background: true`: background agents cannot access MCP tools (Apify, etc.) or prompt for permissions.
+
+Each agent:
+- gets a focused prompt: one source, one research question, no full business context;
+- writes its own dated file (for example `research/YYYY-MM-DD-topic-yt-mining.md`);
+- verifies the write (Read or `ls`) after writing;
+- returns the file path, write status and a 5-bullet summary;
+- on write failure, returns the full research content so the main conversation can write it (works around a known Claude Code subagent write persistence bug).
+
+After all agents return, check the files landed, write any that failed from the returned content, then synthesize across summaries. Heavy raw content stays in subagent contexts. For authenticated or private sources, run the source-ingestion rail first and keep raw transcripts and provider payloads out of committed files by default.
+
+Multi-source output example: `research/2026-01-26-guarantee-x-social.md`, `-competitors.md`, `-psychology-gemini-deep.md`, plus `-synthesis.md` that references the individual files.

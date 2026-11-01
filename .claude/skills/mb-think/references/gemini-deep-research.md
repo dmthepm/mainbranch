@@ -487,7 +487,7 @@ The Interactions API is the new unified interface. It supports both models and a
 ## See Also
 
 - [gemini-setup.md](gemini-setup.md) — Setup guide
-- [research-architecture.md](research-architecture.md) — Full routing logic
+- [research-routing-quick-ref.md](research-routing-quick-ref.md) — Routing logic
 - [research-routing-quick-ref.md](research-routing-quick-ref.md) — Quick decision tree
 
 ---
