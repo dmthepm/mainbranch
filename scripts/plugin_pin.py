@@ -17,7 +17,9 @@ versions while the pin still names the previous release, so "older" must pass.
 
 Provenance rule, in `pin` and in a full `check`: the pinned commit must be the
 commit of the first-party tag oe-v<version>, read from the first-party remote
-(never a local ref), and an ancestor of first-party main. Versions are exactly
+(never a local ref), and an ancestor of first-party main. Git's environment and
+user config are dropped for these reads, and a repo whose own config rewrites
+URLs is refused, so nothing redirects the remote. Versions are exactly
 three numeric components. `--offline` skips the network and the pinned-commit
 reads; it exists for the manifest unit tests only.
 """
@@ -26,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,9 +43,20 @@ SHA_RE = re.compile(r"[0-9a-f]{40}")
 VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
 
 
+def _git_env() -> dict[str, str]:
+    """Drop Git's environment and user config, which could redirect the first-party URL."""
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+    return env
+
+
 def _git(root: Path, *args: str) -> str:
     result = subprocess.run(
-        ["git", "-C", str(root), *args], capture_output=True, text=True, check=False
+        ["git", "-C", str(root), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_git_env(),
     )
     if result.returncode != 0:
         raise ValueError(result.stderr.strip() or f"git {' '.join(args)} failed")
@@ -93,8 +107,22 @@ def _plugin_entry(manifest: Any) -> dict[str, Any]:
     return plugins[0]
 
 
+def _refuse_url_rewrites(root: Path) -> None:
+    """Refuse a repo whose own config rewrites URLs; _git_env can't drop that config."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "config", "--get-regexp", r"^url\..*\.insteadof$"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_git_env(),
+    )
+    if result.returncode == 0:
+        raise ValueError("this repo's git config rewrites URLs (url.*.insteadOf); remove that")
+
+
 def _remote_tag_commit(root: Path, tag: str, remote: str) -> str:
     """Return the commit the first-party remote's tag names (peeling annotated tags)."""
+    _refuse_url_rewrites(root)
     ref = f"refs/tags/{tag}"
     try:
         out = _git(root, "ls-remote", remote, ref, f"{ref}^{{}}")
@@ -190,6 +218,7 @@ def check(root: Path, *, offline: bool = False, remote: str = PIN_URL) -> list[s
     if problems or offline:
         return problems
     assert isinstance(sha, str)
+    _refuse_url_rewrites(root)
     try:
         # Fetch first so a shallow checkout has the pinned commit to read.
         _git(root, "fetch", "--quiet", "--no-tags", remote, "refs/heads/main")

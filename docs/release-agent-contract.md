@@ -269,7 +269,9 @@ Provenance: the pinned commit must be the commit of the first-party tag
 `oe-vX.Y.Z`, read from `https://github.com/dmthepm/mainbranch.git` (never a
 local tag), and an ancestor of first-party `main`. Annotated and lightweight
 tags both work; the check follows the tag to its commit. The remote cannot be
-overridden from the command line. Versions are exactly three numeric parts.
+overridden from the command line or by Git's environment or user config, and a
+repo whose own config rewrites URLs is refused. Versions are exactly three
+numeric parts.
 
 `scripts/plugin_pin.py check` (run by `scripts/release-preflight.sh`, and by
 the required `Python (mb umbrella)` CI job against the real manifest with full

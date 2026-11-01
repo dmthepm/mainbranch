@@ -229,6 +229,53 @@ def test_pin_refuses_tagged_commit_outside_main(repo: Path, remote: str) -> None
         pp.pin(repo, "oe-v0.6.17", remote=remote)
 
 
+def _forged_remote(root: Path, sha: str) -> str:
+    """A second remote that claims a forged commit is the release on main."""
+    forged = root.parent / "forged.git"
+    _git(root.parent, "init", "-q", "--bare", "forged.git")
+    _git(root, "tag", "oe-v0.6.17", sha)
+    _git(root, "push", "-q", str(forged), f"{sha}:refs/heads/main", "refs/tags/oe-v0.6.17")
+    return str(forged)
+
+
+def test_git_environment_cannot_redirect_the_remote(
+    repo: Path, remote: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = _release(repo, "0.6.17")
+    _git(repo, "tag", "-d", "oe-v0.6.17")
+    (repo / "forged.txt").write_text("not the release", encoding="utf-8")
+    forged = _commit(repo, "0.6.17")
+    target = _forged_remote(repo, forged)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", f"url.{target}.insteadOf")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", remote)
+    assert pp.pin(repo, "oe-v0.6.17", remote=remote) == real != forged
+
+
+def test_user_git_config_cannot_redirect_the_remote(
+    repo: Path, remote: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = _release(repo, "0.6.17")
+    _git(repo, "tag", "-d", "oe-v0.6.17")
+    (repo / "forged.txt").write_text("not the release", encoding="utf-8")
+    forged = _commit(repo, "0.6.17")
+    target = _forged_remote(repo, forged)
+    config = tmp_path / "gitconfig"
+    config.write_text(f'[url "{target}"]\n\tinsteadOf = {remote}\n', encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
+    assert pp.pin(repo, "oe-v0.6.17", remote=remote) == real != forged
+
+
+def test_repo_git_config_that_rewrites_urls_is_refused(repo: Path, remote: str) -> None:
+    sha = _release(repo, "0.6.17")
+    _set_source(repo, _pin_source(sha))
+    _git(repo, "config", "url.file:///nowhere.insteadOf", remote)
+    with pytest.raises(ValueError, match="rewrites URLs"):
+        pp.check(repo, remote=remote)
+    with pytest.raises(ValueError, match="rewrites URLs"):
+        pp.pin(repo, "oe-v0.6.17", remote=remote)
+
+
 def test_pin_and_check_fail_when_remote_is_unreachable(repo: Path, tmp_path: Path) -> None:
     sha = _release(repo, "0.6.17")
     gone = str(tmp_path / "nowhere.git")
