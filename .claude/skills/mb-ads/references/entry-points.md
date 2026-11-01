@@ -33,7 +33,7 @@ Real ad workflows don't fit neat categories. Someone might have images but need 
 | "Review my ads" / "compliance check" | Review | 6-lens compliance review | No |
 | "What's working before we create?" | Pre-Gen Account Check | Account overview + creative audit | Required |
 
-Match explicit mode keywords first (review/compliance/audit, video scripts/spoken word, static ads/full from scratch), then component language (just copy, just images, repurpose a video, variations/hook library/one-liners), then account language (performance, what's working, CPA, ROAS), then ideation language (ideas, brainstorm, concepts). Shorthand "static", "video", "one-liners" and "review" route to Full Pipeline, Video Scripts, Hook Library and Review. If unclear, ask: "What do you have and what do you need?"
+Match explicit mode keywords first (review/compliance/audit, "video scripts", "spoken word", static ads/full from scratch), then component language (just copy, just images, repurpose a video, variations/hook library/one-liners), then account language (performance, what's working, CPA, ROAS), then ideation language (ideas, brainstorm, concepts). Shorthand "static", "video", "one-liners" and "review" route to Full Pipeline, Video Scripts, Hook Library and Review. If unclear, ask: "What do you have and what do you need?"
 
 ---
 
