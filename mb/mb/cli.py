@@ -2366,6 +2366,8 @@ def connect_cmd(
             result = connect_mod.hydrate(repo, provider_id=provider)
         except ValueError as exc:
             _connect_error_exit("mb connect hydrate", exc, json_out=json_out)
+        except connect_mod.CredentialBusyError as exc:
+            _connect_runtime_exit("mb connect hydrate", exc, json_out=json_out)
         if json_out:
             typer.echo(json.dumps(result, indent=2))
         else:

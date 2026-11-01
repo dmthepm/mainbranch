@@ -140,7 +140,7 @@ def test_a_second_process_is_refused_while_the_first_holds_the_credential(
                 input=LATER + "\n",
             )
             assert result.exit_code == 1
-            assert "Another mb connect is saving the Stripe credential" in result.output
+            assert "Another mb connect is saving" in result.output
             assert "Nothing was stored" in result.output
             assert "Traceback" not in result.output
             assert LATER not in result.output
@@ -305,7 +305,7 @@ def test_a_held_lock_still_waits_then_reports_busy(
     assert result.exit_code == 1
     payload = json.loads(result.output[result.output.index("{") :])
     assert payload["state"] == "credential_busy"
-    assert "Another mb connect is saving the Stripe credential" in result.output
+    assert "Another mb connect is saving" in result.output
     assert len(fake.calls) > 1
     assert _fd_is_closed(fake.calls[-1])
     assert LATER not in _items()

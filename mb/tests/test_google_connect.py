@@ -725,6 +725,27 @@ def test_oauth_refuses_to_replace_access_token_without_flag(
     assert connect_mod.read_token("google", repo)["token"] == LEGACY_TOKEN
 
 
+def test_oauth_refuses_when_access_token_connected_during_sign_in(
+    repo: Path, client_file: Path, google: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    browser, _ = google()
+
+    def connect_while_signing_in(*args: Any, **kwargs: Any) -> Any:
+        _connect_legacy_token(repo)
+        return browser(*args, **kwargs)
+
+    monkeypatch.setattr(gc, "open_browser", connect_while_signing_in)
+
+    result = _oauth(repo, *_signin_args(client_file), "--json")
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["rule"] == "oauth_replaces_access_token"
+    assert "--replace-access-token" in payload["summary"]
+    assert connect_mod.status_provider("google", repo)["credential_mode"] != "oauth"
+    assert connect_mod.read_token("google", repo)["token"] == LEGACY_TOKEN
+
+
 def test_oauth_replace_access_token_upgrades_to_oauth(
     repo: Path, client_file: Path, google: Any
 ) -> None:

@@ -43,7 +43,11 @@ from typing import Any, TextIO
 
 from mb import connect as connect_mod
 from mb import google_oauth as go
-from mb.credential_lock import CredentialBusyError, credential_lock, note_stored
+from mb.credential_lock import (
+    CredentialBusyError,
+    credential_lock,
+    note_stored,
+)
 from mb.credential_store import (
     SUPPORTED_BACKENDS,
     CredentialStoreError,
@@ -694,6 +698,53 @@ def bootstrap(*args: Any, **kwargs: Any) -> dict[str, Any]:
         return _bootstrap(*args, locks=locks, **kwargs)
 
 
+def _decide(
+    existing: _Existing,
+    *,
+    scope: str,
+    requested_scope: str,
+    metadata_pairs: list[str] | None,
+    reauth: bool,
+    replace_access_token: bool,
+    secret_backend: str | None,
+) -> tuple[str, dict[str, str], bool]:
+    """Decide what this sign-in may replace, from one read of the stored entry.
+
+    Run before the sign-in and again once the save lock is held, so a connect
+    that finished meanwhile is judged, not overwritten. Returns the scope, the
+    merged metadata and whether a credential-less user-scope record is dropped.
+    """
+
+    # A credential-less entry recorded in user scope (`--metadata` alone); a
+    # first sign-in recorded in repo scope leaves nothing in it worth keeping.
+    user_metadata_only = str(existing.entry.get("scope") or "repo") == "user" and not (
+        existing.oauth or existing.has_access_token
+    )
+    _refuse_by_mode(existing, reauth=reauth, replace_access_token=replace_access_token)
+    raw_metadata = existing.entry.get("metadata")
+    metadata = _oauth_metadata(
+        list(metadata_pairs or []), raw_metadata if isinstance(raw_metadata, dict) else {}
+    )
+    normalized_scope = requested_scope
+    if existing.oauth or existing.has_access_token:
+        # Renewing (or replacing) a stored credential keeps its scope and
+        # store. An entry with no credential yet (`--metadata` alone) is a
+        # first sign-in, so --scope is honoured there.
+        recorded_scope = str(existing.entry.get("scope") or "repo")
+        if scope.strip() and normalized_scope != recorded_scope:
+            connect_mod._refuse(
+                "oauth_scope_kept",
+                f"this repo's Google connection is recorded in {recorded_scope} scope, and "
+                f"renewing it keeps that scope, so --scope {normalized_scope} would be ignored. "
+                "Re-run without --scope. Nothing was changed.",
+            )
+        normalized_scope = recorded_scope
+        _refuse_other_backend(existing, secret_backend)
+    elif existing.entry and not scope.strip():
+        normalized_scope = str(existing.entry.get("scope") or "repo")
+    return normalized_scope, metadata, user_metadata_only
+
+
 def _bootstrap(
     repo: str | Path = ".",
     *,
@@ -725,8 +776,8 @@ def _bootstrap(
 
     say = emit or (lambda line: print(line, file=sys.stderr))
     provider = connect_mod.normalize_provider(PROVIDER_ID)
-    normalized_scope = scope.strip().lower().replace("_", "-") or "repo"
-    if normalized_scope not in connect_mod.CONNECT_SCOPES:
+    requested_scope = scope.strip().lower().replace("_", "-") or "repo"
+    if requested_scope not in connect_mod.CONNECT_SCOPES:
         connect_mod._refuse("connect_scope", "--scope must be repo or user. Nothing was changed.")
     target = Path(repo).resolve()
     config = connect_mod._read_config(target)
@@ -734,15 +785,14 @@ def _bootstrap(
     existing = _existing_entry(config, repo_id)
     # A mismatched record can still be replaced; its recorded refs are never read.
     refs_match = connect_mod._ref_mismatch_probes(provider, existing.entry, repo_id) is None
-    # A credential-less entry recorded in user scope (`--metadata` alone); a
-    # first sign-in recorded in repo scope leaves nothing in it worth keeping.
-    user_metadata_only = str(existing.entry.get("scope") or "repo") == "user" and not (
-        existing.oauth or existing.has_access_token
-    )
-    _refuse_by_mode(existing, reauth=reauth, replace_access_token=replace_access_token)
-    raw_metadata = existing.entry.get("metadata")
-    metadata = _oauth_metadata(
-        list(metadata_pairs or []), raw_metadata if isinstance(raw_metadata, dict) else {}
+    normalized_scope, metadata, user_metadata_only = _decide(
+        existing,
+        scope=scope,
+        requested_scope=requested_scope,
+        metadata_pairs=metadata_pairs,
+        reauth=reauth,
+        replace_access_token=replace_access_token,
+        secret_backend=secret_backend,
     )
     if client_json is not None:
         client = parse_client_json(client_json)
@@ -762,23 +812,6 @@ def _bootstrap(
         client = stored
     if paste and not _stdin_is_tty(stdin):
         raise go.GoogleOAuthError("paste_needs_tty")
-    if existing.oauth or existing.has_access_token:
-        # Renewing (or replacing) a stored credential keeps its scope and
-        # store. An entry with no credential yet (`--metadata` alone) is a
-        # first sign-in, so --scope is honoured there.
-        recorded_scope = str(existing.entry.get("scope") or "repo")
-        if scope.strip() and normalized_scope != recorded_scope:
-            connect_mod._refuse(
-                "oauth_scope_kept",
-                f"this repo's Google connection is recorded in {recorded_scope} scope, and "
-                f"renewing it keeps that scope, so --scope {normalized_scope} would be ignored. "
-                "Re-run without --scope. Nothing was changed.",
-            )
-        normalized_scope = recorded_scope
-        _refuse_other_backend(existing, secret_backend)
-    elif existing.entry and not scope.strip():
-        normalized_scope = str(existing.entry.get("scope") or "repo")
-
     if normalized_scope == "user":
         # Before the sign-in and the grant write: nothing is stored if refused.
         connect_mod._ensure_user_scope_writable()
@@ -813,6 +846,28 @@ def _bootstrap(
         )
     missing = [label for label in GRANT_LABEL_NAMES if label not in granted]
     metadata[METADATA_GRANTS] = ",".join(granted)
+
+    # After the sign-in (no lock is held while a person types): take the save
+    # lock, then re-read the config another save may have rewritten meanwhile.
+    try:
+        locks.enter_context(connect_mod._save_lock(target))
+    except CredentialBusyError as exc:
+        raise GoogleConnectError(str(exc), state=exc.state) from None
+    config = connect_mod._read_config(target)
+    repo_id = connect_mod._ensure_repo_id(config, target)
+    existing = _existing_entry(config, repo_id)
+    normalized_scope, metadata, user_metadata_only = _decide(
+        existing,
+        scope=scope,
+        requested_scope=requested_scope,
+        metadata_pairs=metadata_pairs,
+        reauth=reauth,
+        replace_access_token=replace_access_token,
+        secret_backend=secret_backend,
+    )
+    metadata[METADATA_GRANTS] = ",".join(granted)
+    if normalized_scope == "user":
+        connect_mod._ensure_user_scope_writable()
 
     deadline = new_credential_deadline()
     backend = existing.grant.get("backend") or existing.token.get("backend") or secret_backend
@@ -1252,7 +1307,10 @@ def _record_read_state(target: Path, grant_ref: str, *, reauth_required: bool) -
 
     reason = ""
     note = ""
-    with suppress(OSError, ValueError):
+    with (
+        suppress(OSError, ValueError, CredentialBusyError),
+        connect_mod._save_lock(target, create=False),
+    ):
         config = connect_mod._read_config(target)
         repo_id = str(config.get("repo_id") or connect_mod._repo_identity(target)["repo_id"])
         repo_entry = config["providers"].get(PROVIDER_ID)
