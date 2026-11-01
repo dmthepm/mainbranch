@@ -188,10 +188,7 @@ def test_check_fails_when_pin_is_a_forged_local_tag_commit(repo: Path, remote: s
     forged = _git(repo, "rev-parse", "HEAD")
     _git(repo, "tag", "-f", "oe-v0.6.18")
     _set_source(repo, _pin_source(forged))
-    assert any(
-        "is not the commit of first-party tag oe-v0.6.18" in p
-        for p in pp.check(repo, remote=remote)
-    )
+    assert any("cannot read the pinned commit" in p for p in pp.check(repo, remote=remote))
 
 
 def test_check_fails_on_untagged_commit_repeating_the_released_version(
@@ -216,7 +213,7 @@ def test_check_fails_on_tagged_commit_outside_main(repo: Path, remote: str) -> N
     _git(repo, "tag", "oe-v0.6.18")
     _git(repo, "push", "-q", remote, "refs/tags/oe-v0.6.18")  # tag only, never merged to main
     _set_source(repo, _pin_source(outside))
-    assert any("is not an ancestor of first-party main" in p for p in pp.check(repo, remote=remote))
+    assert any("cannot read the pinned commit" in p for p in pp.check(repo, remote=remote))
 
 
 def test_pin_refuses_tagged_commit_outside_main(repo: Path, remote: str) -> None:
@@ -266,20 +263,26 @@ def test_user_git_config_cannot_redirect_the_remote(
     assert pp.pin(repo, "oe-v0.6.17", remote=remote) == real != forged
 
 
-def test_repo_git_config_that_rewrites_urls_is_refused(repo: Path, remote: str) -> None:
-    sha = _release(repo, "0.6.17")
-    _set_source(repo, _pin_source(sha))
-    _git(repo, "config", "url.file:///nowhere.insteadOf", remote)
-    with pytest.raises(ValueError, match="rewrites URLs"):
-        pp.check(repo, remote=remote)
-    with pytest.raises(ValueError, match="rewrites URLs"):
-        pp.pin(repo, "oe-v0.6.17", remote=remote)
+@pytest.mark.parametrize("key", ["url.{target}.insteadOf", "remote.{remote}.url"])
+def test_repo_git_config_cannot_redirect_the_remote(repo: Path, remote: str, key: str) -> None:
+    real = _release(repo, "0.6.17")
+    _git(repo, "tag", "-d", "oe-v0.6.17")
+    (repo / "forged.txt").write_text("not the release", encoding="utf-8")
+    forged = _commit(repo, "0.6.17")
+    target = _forged_remote(repo, forged)
+    value = remote if "insteadOf" in key else target
+    _git(repo, "config", key.format(target=target, remote=remote), value)
+    assert pp.pin(repo, "oe-v0.6.17", remote=remote) == real != forged
+    _set_source(repo, _pin_source(real))
+    assert pp.check(repo, remote=remote) == []
+    _set_source(repo, _pin_source(forged))
+    assert any("cannot read the pinned commit" in p for p in pp.check(repo, remote=remote))
 
 
 def test_pin_and_check_fail_when_remote_is_unreachable(repo: Path, tmp_path: Path) -> None:
     sha = _release(repo, "0.6.17")
     gone = str(tmp_path / "nowhere.git")
-    with pytest.raises(ValueError, match="cannot reach the first-party remote"):
+    with pytest.raises(ValueError, match="cannot fetch first-party main"):
         pp.pin(repo, "oe-v0.6.17", remote=gone)
     _set_source(repo, _pin_source(sha))
     problems = pp.check(repo, remote=gone)

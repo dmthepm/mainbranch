@@ -17,9 +17,9 @@ versions while the pin still names the previous release, so "older" must pass.
 
 Provenance rule, in `pin` and in a full `check`: the pinned commit must be the
 commit of the first-party tag oe-v<version>, read from the first-party remote
-(never a local ref), and an ancestor of first-party main. Git's environment and
-user config are dropped for these reads, and a repo whose own config rewrites
-URLs is refused, so nothing redirects the remote. Versions are exactly
+(never a local ref), and an ancestor of first-party main. These reads run in an
+empty temporary repo with Git's environment and user config dropped, so nothing
+in the working repo or on this machine's Git setup changes them. Versions are exactly
 three numeric components. `--offline` skips the network and the pinned-commit
 reads; it exists for the manifest unit tests only.
 """
@@ -33,6 +33,8 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -107,25 +109,28 @@ def _plugin_entry(manifest: Any) -> dict[str, Any]:
     return plugins[0]
 
 
-def _refuse_url_rewrites(root: Path) -> None:
-    """Refuse a repo whose own config rewrites URLs; _git_env can't drop that config."""
-    result = subprocess.run(
-        ["git", "-C", str(root), "config", "--get-regexp", r"^url\..*\.insteadof$"],
-        capture_output=True,
-        text=True,
-        check=False,
-        env=_git_env(),
-    )
-    if result.returncode == 0:
-        raise ValueError("this repo's git config rewrites URLs (url.*.insteadOf); remove that")
+@contextmanager
+def _first_party(remote: str) -> Iterator[Path]:
+    """Yield an empty temp repo holding only first-party main.
+
+    Nothing in the working repo is consulted, so its config, refs and tags
+    can't change the answer.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp)
+        _git(repo, "init", "--quiet", "--bare")
+        try:
+            _git(repo, "fetch", "--quiet", "--no-tags", remote, "refs/heads/main")
+        except ValueError as exc:
+            raise ValueError(f"cannot fetch first-party main: {exc}") from exc
+        yield repo
 
 
-def _remote_tag_commit(root: Path, tag: str, remote: str) -> str:
+def _remote_tag_commit(repo: Path, tag: str, remote: str) -> str:
     """Return the commit the first-party remote's tag names (peeling annotated tags)."""
-    _refuse_url_rewrites(root)
     ref = f"refs/tags/{tag}"
     try:
-        out = _git(root, "ls-remote", remote, ref, f"{ref}^{{}}")
+        out = _git(repo, "ls-remote", remote, ref, f"{ref}^{{}}")
     except ValueError as exc:
         raise ValueError(
             f"cannot reach the first-party remote to verify tag {tag}: {exc}"
@@ -140,26 +145,20 @@ def _remote_tag_commit(root: Path, tag: str, remote: str) -> str:
     return commit
 
 
-def _verify_provenance(root: Path, commit: str, version: str, remote: str) -> None:
+def _verify_provenance(repo: Path, commit: str, version: str, remote: str) -> None:
     """Require COMMIT to be the first-party tag oe-v<version>'s commit and on main."""
     tag = f"oe-v{version}"
-    tagged = _remote_tag_commit(root, tag, remote)
+    tagged = _remote_tag_commit(repo, tag, remote)
     if tagged != commit:
         raise ValueError(
             f"commit {commit[:12]} is not the commit of first-party tag {tag} ({tagged[:12]})"
         )
-    try:
-        # FETCH_HEAD only: no local ref changes. Also brings the commit's objects.
-        _git(root, "fetch", "--quiet", "--no-tags", remote, "refs/heads/main")
-    except ValueError as exc:
-        raise ValueError(
-            f"cannot fetch first-party main to verify {tag}: {exc}"
-        ) from exc
     result = subprocess.run(
-        ["git", "-C", str(root), "merge-base", "--is-ancestor", commit, "FETCH_HEAD"],
+        ["git", "-C", str(repo), "merge-base", "--is-ancestor", commit, "FETCH_HEAD"],
         capture_output=True,
         text=True,
         check=False,
+        env=_git_env(),
     )
     if result.returncode != 0:
         raise ValueError(
@@ -172,10 +171,11 @@ def pin(root: Path, tag: str, *, remote: str = PIN_URL) -> str:
     version = tag.removeprefix("oe-v").removeprefix("v")
     if not VERSION_RE.fullmatch(version):
         raise ValueError(f"cannot read a three-part version from tag {tag!r}")
-    # Provenance first: the first-party remote names the commit, not a local ref.
-    commit = _remote_tag_commit(root, f"oe-v{version}", remote)
-    _verify_provenance(root, commit, version, remote)
-    plugin_version, marketplace_version = _declared_versions(root, commit)
+    with _first_party(remote) as repo:
+        # Provenance first: the first-party remote names the commit, not a local ref.
+        commit = _remote_tag_commit(repo, f"oe-v{version}", remote)
+        _verify_provenance(repo, commit, version, remote)
+        plugin_version, marketplace_version = _declared_versions(repo, commit)
     if plugin_version != version or marketplace_version != version:
         raise ValueError(
             f"commit {commit[:12]} declares plugin.json {plugin_version} and marketplace "
@@ -218,26 +218,26 @@ def check(root: Path, *, offline: bool = False, remote: str = PIN_URL) -> list[s
     if problems or offline:
         return problems
     assert isinstance(sha, str)
-    _refuse_url_rewrites(root)
     try:
-        # Fetch first so a shallow checkout has the pinned commit to read.
-        _git(root, "fetch", "--quiet", "--no-tags", remote, "refs/heads/main")
+        with _first_party(remote) as repo:
+            return _check_pinned(repo, sha, here, remote)
     except ValueError as exc:
-        return [f"cannot fetch first-party main to verify the pin: {exc}"]
+        return [str(exc)]
+
+
+def _check_pinned(repo: Path, sha: str, here: str, remote: str) -> list[str]:
+    """Check a pinned commit against first-party history and this tree's version."""
     try:
-        pinned = _declared_versions(root, sha)
+        pinned = _declared_versions(repo, sha)
     except ValueError as exc:
-        return [f"cannot read the pinned commit {sha[:12]} here: {exc}"]
+        return [f"cannot read the pinned commit {sha[:12]} from first-party main: {exc}"]
     if pinned[0] != pinned[1]:
-        return [
-            f"pinned commit declares plugin.json {pinned[0]} but marketplace {pinned[1]}"
-        ]
+        return [f"pinned commit declares plugin.json {pinned[0]} but marketplace {pinned[1]}"]
+    problems = []
     if _version_key(pinned[0]) > _version_key(here):
-        problems.append(
-            f"pinned commit declares {pinned[0]}, newer than this tree's {here}"
-        )
+        problems.append(f"pinned commit declares {pinned[0]}, newer than this tree's {here}")
     try:
-        _verify_provenance(root, sha, pinned[0], remote)
+        _verify_provenance(repo, sha, pinned[0], remote)
     except ValueError as exc:
         problems.append(str(exc))
     return problems

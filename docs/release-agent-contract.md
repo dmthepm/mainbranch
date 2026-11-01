@@ -268,14 +268,13 @@ owners stay on the previous release between releases.
 Provenance: the pinned commit must be the commit of the first-party tag
 `oe-vX.Y.Z`, read from `https://github.com/dmthepm/mainbranch.git` (never a
 local tag), and an ancestor of first-party `main`. Annotated and lightweight
-tags both work; the check follows the tag to its commit. The remote cannot be
-overridden from the command line or by Git's environment or user config, and a
-repo whose own config rewrites URLs is refused. Versions are exactly three
-numeric parts.
+tags both work; the check follows the tag to its commit. These reads run in an
+empty temporary repo with Git's environment and user config dropped, so no local
+tag, ref or Git setting can change them, and the remote can't be set from the
+command line. Versions are exactly three numeric parts.
 
 `scripts/plugin_pin.py check` (run by `scripts/release-preflight.sh`, and by
-the required `Python (mb umbrella)` CI job against the real manifest with full
-history) fails on a short sha, a non-HTTPS url, a repo other than
+the required `Python (mb umbrella)` CI job against the real manifest) fails on a short sha, a non-HTTPS url, a repo other than
 `dmthepm/mainbranch`, a pinned commit whose plugin and marketplace versions
 disagree, a commit that fails the provenance rule, or an unreachable remote.
 `--offline` skips the network and is for the manifest unit tests only. Because
