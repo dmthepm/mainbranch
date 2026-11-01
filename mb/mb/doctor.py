@@ -33,6 +33,7 @@ from mb import migrate as migrate_mod
 from mb import migration_lint
 from mb import onboard as onboard_mod
 from mb import related_links as related_links_mod
+from mb import roles as roles_mod
 from mb import spine as spine_mod
 from mb import topology as topology_mod
 from mb import validate as validate_mod
@@ -1999,6 +2000,39 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
             "plugin": plugin,
         }
     )
+    if roles_mod.has_cards(repo):
+        role_wiring = roles_mod.wiring(repo, bool(plugin.get("wired")))
+        role_problem = bool(role_wiring["invalid"]) or not role_wiring["hook_wired"]
+        if role_wiring["invalid"]:
+            role_detail = (
+                "Invalid role card(s): "
+                + ", ".join(role_wiring["invalid"])
+                + ". Run `mb role check`."
+            )
+        elif not role_wiring["hook_wired"]:
+            role_detail = (
+                "Role cards exist but no SessionStart hook is wired, so sessions are "
+                "not told their role. Enable the Main Branch plugin (version with role "
+                "cards) or add `mb role hook` as a SessionStart hook."
+            )
+        else:
+            role_detail = (
+                f"{role_wiring['cards']} role card(s) valid; SessionStart hook wired. "
+                + (
+                    "A role is selected in this shell."
+                    if role_wiring["role_selected"]
+                    else "Launch agents with MB_ROLE=<name>; none is selected in this shell."
+                )
+            )
+        checks.append(
+            {
+                "name": "role-cards",
+                "ok": not role_problem,
+                "severity": "warn" if role_problem else "info",
+                "detail": role_detail,
+                "roles": role_wiring,
+            }
+        )
     wiring_ok = bool(wiring["ok"])
     shadow_summary = wiring.get("shadow_report", {}).get("summary", {})
     active_shadows = int(shadow_summary.get("active_shadows", 0) or 0)

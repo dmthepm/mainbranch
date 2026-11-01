@@ -19,6 +19,7 @@ for those surfaces.
 | Developer mode | Git clone | For contributors who want to edit the engine or skills. |
 | Agent runtime | Claude Code | Supported through the Main Branch plugin (`claude plugin marketplace add dmthepm/mainbranch`, then enable). The plugin is the primary rail and works in both the Claude Desktop app and the terminal `claude` CLI; it survives git worktrees. Project-local slash-skill wiring remains a fallback. Cloud/web Claude sessions cannot load plugins. |
 | Codex CLI | Supported | Fresh business repos include `AGENTS.md`; global Main Branch `mb-*` skills install once per user under `~/.codex/skills` and route through deterministic `mb` facts. `mb workflow list --runtime codex` exposes supported, pending, and unsupported workflow surfaces. |
+| Agent role cards | Claude Code only; Codex untested | `core/roles/<name>.md` cards, selected with `MB_ROLE` at launch, printed by a plugin `SessionStart` hook on startup, resume and compact. A hook cannot block a session, so a missing role is a loud refusal text, not a stop. See [role cards](role-cards.md). |
 | Cursor, OpenClaw, Hermes, Paperclip-adjacent orchestration, local LLMs | Roadmap | `mb` is runtime-agnostic by design, but these adapters are not supported yet. |
 
 **Windows tip — try WSL2.** If you're on Windows and want a working setup today, use [Windows Subsystem for Linux 2 (WSL2)](https://learn.microsoft.com/en-us/windows/wsl/install). Inside WSL2, follow the supported Linux flow. The pipx install path works there.

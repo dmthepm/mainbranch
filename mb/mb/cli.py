@@ -49,6 +49,7 @@ from mb import onboard as onboard_mod
 from mb import production as production_mod
 from mb import pulse as pulse_mod
 from mb import resolve as resolve_mod
+from mb import roles as roles_mod
 from mb import similar_bets as similar_bets_mod
 from mb import site as site_mod
 from mb import skill_validate as skill_validate_mod
@@ -4469,3 +4470,102 @@ def machine_doctor_cmd(json_out: bool = typer.Option(False, "--json")) -> None:
             else machine_doctor_mod.human_report(report)
         )
     raise typer.Exit(report["exit_code"])
+
+
+role_app = typer.Typer(help="Agent role cards: list, show, check, and the session hook.")
+app.add_typer(role_app, name="role")
+
+
+@role_app.command("list")
+def role_list_cmd(
+    repo: str = typer.Option(".", "--repo", help="Business repo."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """List the role cards in core/roles/."""
+    cards = roles_mod.list_cards(repo)
+    if json_out:
+        typer.echo(
+            _json_payload(
+                {"ok": all(c["valid"] for c in cards), "roles": cards},
+                command="mb role list",
+                schema_name="mainbranch.role.list",
+            )
+        )
+        return
+    if not cards:
+        typer.echo("No role cards. Add one at core/roles/<name>.md (see docs/role-cards.md).")
+        return
+    for card in cards:
+        mark = "ok     " if card["valid"] else "INVALID"
+        typer.echo(f"{mark} {card['name']}  {card['role'] or '; '.join(card['errors'])}")
+
+
+@role_app.command("show")
+def role_show_cmd(
+    name: str = typer.Argument(..., help="Role name, exactly as the card file is named."),
+    repo: str = typer.Option(".", "--repo", help="Business repo."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Show one role card. Exits 1 if it is missing or invalid."""
+    card = roles_mod.load_card(repo, name)
+    if json_out:
+        typer.echo(
+            _json_payload(
+                {"ok": card["valid"], "role": card, "errors": card["errors"]},
+                command="mb role show",
+                schema_name="mainbranch.role.show",
+            )
+        )
+    elif card["valid"]:
+        typer.echo(f"{card['name']}: {card['role']}")
+        for field in roles_mod.LIST_FIELDS:
+            typer.echo(f"{field}: {', '.join(card[field]) or 'none'}")
+        typer.echo(f"first_action: {card['first_action'].strip()}")
+        typer.echo(f"checkpoint: {card['checkpoint']}")
+    else:
+        for error in card["errors"]:
+            typer.echo(f"mb role show: {error}", err=True)
+    raise typer.Exit(0 if card["valid"] else 1)
+
+
+@role_app.command("check")
+def role_check_cmd(
+    name: str = typer.Argument(None, help="One role to check; default is every card."),
+    repo: str = typer.Option(".", "--repo", help="Business repo."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Validate role cards. Exits 1 if any checked card is invalid."""
+    report = roles_mod.check(repo, name)
+    if json_out:
+        typer.echo(
+            _json_payload(report, command="mb role check", schema_name="mainbranch.role.check")
+        )
+    else:
+        for result in report["cards"]:
+            typer.echo(f"{'ok     ' if result['valid'] else 'INVALID'} {result['name']}")
+            for error in result["errors"]:
+                typer.echo(f"  - {error}")
+        if not report["cards"]:
+            typer.echo("No role cards.")
+    raise typer.Exit(0 if report["ok"] else 1)
+
+
+@role_app.command("hook")
+def role_hook_cmd(
+    source: str = typer.Option("startup", "--source", help="startup, resume, clear, or compact."),
+) -> None:
+    """SessionStart hook entry: print the selected role card, or a refusal.
+
+    Prints nothing when the repo has no role cards. Always exits 0: a hook
+    cannot block a session, so the refusal is text the agent must obey.
+    """
+    repo = os.environ.get("CLAUDE_PROJECT_DIR") or "."
+    safe_source = source if source in roles_mod.HOOK_SOURCES else "unknown"
+    try:
+        text = roles_mod.hook_text(repo, safe_source)
+    except Exception:
+        text = roles_mod.refusal(
+            "The role check hit an internal error and could not read the role card."
+        )
+    if text:
+        typer.echo(text)

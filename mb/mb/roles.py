@@ -1,0 +1,308 @@
+"""Agent role cards: one committed file per agent, selected by name at launch.
+
+A card lives at ``core/roles/<name>.md`` in the business repo. Everything here
+is read-only. The role is never guessed: the caller names it (``MB_ROLE`` for
+the SessionStart hook, an argument for ``mb role show``/``check``).
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+ROLES_DIR = "core/roles"
+ROLE_ENV = "MB_ROLE"
+NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+# The card schema. A test pins this tuple: change it on purpose, not by accident.
+REQUIRED_FIELDS: tuple[str, ...] = (
+    "name",
+    "role",
+    "skills",
+    "tools",
+    "protocols",
+    "first_action",
+    "checkpoint",
+)
+LIST_FIELDS = ("skills", "tools", "protocols")
+HOOK_SOURCES = ("startup", "resume", "clear", "compact")
+MAX_CARD_BYTES = 65_536
+MAX_CHECKPOINT_BYTES = 8_192
+_CONTROL_RE = re.compile("[\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]")
+_NOT_TEXT_RE = re.compile("[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f\\u2028\\u2029]")
+
+
+def has_control(value: str, *, multiline: bool = False) -> bool:
+    """True when ``value`` has control characters; newline and tab pass if ``multiline``."""
+    return bool((_NOT_TEXT_RE if multiline else _CONTROL_RE).search(value))
+
+
+def printable(value: str, limit: int = 60) -> str:
+    """Make untrusted text safe to echo: no control characters, bounded length."""
+    cleaned = _CONTROL_RE.sub("?", value.replace("\n", "?").replace("\r", "?"))
+    return cleaned if len(cleaned) <= limit else cleaned[:limit] + "..."
+
+
+def valid_name(name: object) -> bool:
+    return isinstance(name, str) and NAME_RE.fullmatch(name) is not None
+
+
+def _root(repo: str | Path) -> Path:
+    return Path(repo).expanduser().resolve()
+
+
+def card_paths(repo: str | Path) -> list[Path]:
+    """Every ``*.md`` directly inside ``core/roles/``; empty when the folder is absent."""
+    folder = _root(repo) / ROLES_DIR
+    try:
+        return sorted(p for p in folder.iterdir() if p.suffix == ".md")
+    except OSError:
+        return []
+
+
+def has_cards(repo: str | Path) -> bool:
+    return bool(card_paths(repo))
+
+
+def _safe_relative(value: str) -> bool:
+    if not value or has_control(value) or value.startswith(("/", "~", "\\")):
+        return False
+    if re.match(r"^[A-Za-z]:", value):
+        return False
+    return ".." not in Path(value.replace("\\", "/")).parts
+
+
+def _read_card(path: Path, root: Path) -> tuple[dict[str, Any] | None, str, list[str]]:
+    """Return ``(frontmatter, body, errors)``. Never raises on bad content."""
+    try:
+        resolved = path.resolve()
+        resolved.relative_to(root)
+    except (OSError, ValueError):
+        return None, "", ["card resolves outside the repo"]
+    try:
+        if not resolved.is_file():
+            return None, "", ["card is not a regular file"]
+        if resolved.stat().st_size > MAX_CARD_BYTES:
+            return None, "", [f"card is larger than {MAX_CARD_BYTES} bytes"]
+        text = resolved.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None, "", ["card could not be read as UTF-8 text"]
+    if not text.startswith("---\n"):
+        return None, text, ["card has no frontmatter"]
+    end = text.find("\n---", 4)
+    if end == -1:
+        return None, text, ["card frontmatter is not closed"]
+    try:
+        parsed = yaml.safe_load(text[4:end])
+    except yaml.YAMLError:
+        return None, text, ["card frontmatter is not valid YAML"]
+    if not isinstance(parsed, dict):
+        return None, text, ["card frontmatter must be a mapping"]
+    return parsed, text[end + 4 :].lstrip("\n"), []
+
+
+def _validate(fm: dict[str, Any], stem: str) -> tuple[list[str], list[str]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    for field in REQUIRED_FIELDS:
+        if field not in fm:
+            errors.append(f"missing field: {field}")
+    for field in REQUIRED_FIELDS:
+        if field not in fm:
+            continue
+        value = fm[field]
+        if field in LIST_FIELDS:
+            if not isinstance(value, list) or not all(
+                isinstance(v, str) and v.strip() and not has_control(v) for v in value
+            ):
+                errors.append(f"{field} must be a list of plain text items")
+        elif not isinstance(value, str) or not value.strip():
+            errors.append(f"{field} must be non-empty text")
+        elif has_control(value, multiline=field == "first_action"):
+            errors.append(f"{field} must not contain control characters")
+    name = fm.get("name")
+    if isinstance(name, str):
+        if not valid_name(name):
+            errors.append("name must be lowercase letters, digits, and hyphens (max 40)")
+        elif name != stem:
+            errors.append("name must match the file name")
+    role = fm.get("role")
+    if isinstance(role, str) and len(role) > 200:
+        errors.append("role must be at most 200 characters")
+    checkpoint = fm.get("checkpoint")
+    if isinstance(checkpoint, str) and checkpoint.strip() and not _safe_relative(checkpoint):
+        errors.append("checkpoint must be a relative path inside the repo")
+    for extra in sorted(set(fm) - set(REQUIRED_FIELDS), key=str):
+        warnings.append(f"unknown field ignored: {printable(str(extra), 40)}")
+    return errors, warnings
+
+
+def load_card(repo: str | Path, name: str) -> dict[str, Any]:
+    """Load one card by exact name. The name is checked before any path is built."""
+    if not valid_name(name):
+        return {
+            "name": printable(str(name)),
+            "valid": False,
+            "found": False,
+            "errors": ["role name must be lowercase letters, digits, and hyphens (max 40)"],
+            "warnings": [],
+        }
+    root = _root(repo)
+    path = root / ROLES_DIR / f"{name}.md"
+    if not path.exists() and not path.is_symlink():
+        return {
+            "name": name,
+            "valid": False,
+            "found": False,
+            "errors": [f"no role card at {ROLES_DIR}/{name}.md"],
+            "warnings": [],
+        }
+    fm, body, errors = _read_card(path, root)
+    warnings: list[str] = []
+    if fm is not None:
+        errors, warnings = _validate(fm, name)
+    card: dict[str, Any] = {
+        "name": name,
+        "path": f"{ROLES_DIR}/{name}.md",
+        "found": True,
+        "valid": not errors,
+        "errors": errors,
+        "warnings": warnings,
+    }
+    if not errors and fm is not None:
+        card.update({field: fm[field] for field in REQUIRED_FIELDS})
+        card["body"] = body
+    return card
+
+
+def list_cards(repo: str | Path) -> list[dict[str, Any]]:
+    cards = []
+    for path in card_paths(repo):
+        card = load_card(repo, path.stem)
+        cards.append(
+            {
+                "name": card["name"],
+                "path": f"{ROLES_DIR}/{path.name}",
+                "valid": card["valid"],
+                "role": card.get("role"),
+                "errors": card["errors"],
+            }
+        )
+    return cards
+
+
+def check(repo: str | Path, name: str | None = None) -> dict[str, Any]:
+    """Validate every card, or one named card. ``ok`` is false on any invalid card."""
+    if name is not None:
+        card = load_card(repo, name)
+        results = [{k: card[k] for k in ("name", "valid", "errors", "warnings")}]
+    else:
+        results = []
+        for path in card_paths(repo):
+            card = load_card(repo, path.stem)
+            results.append({k: card[k] for k in ("name", "valid", "errors", "warnings")})
+    errors = [f"{r['name']}: {e}" for r in results for e in r["errors"]]
+    return {
+        "ok": all(r["valid"] for r in results),
+        "cards": results,
+        "errors": errors,
+        "warnings": [f"{r['name']}: {w}" for r in results for w in r["warnings"]],
+    }
+
+
+def _checkpoint_text(repo: Path, relative: str) -> str:
+    path = repo / relative
+    try:
+        resolved = path.resolve()
+        resolved.relative_to(repo)
+        if not resolved.is_file():
+            raise OSError
+        with resolved.open("rb") as handle:
+            raw = handle.read(MAX_CHECKPOINT_BYTES + 1)
+    except (OSError, ValueError):
+        return f"(No checkpoint file at {relative} yet. State this and ask what to do next.)"
+    text = raw[:MAX_CHECKPOINT_BYTES].decode("utf-8", errors="replace")
+    cleaned = "".join(ch for ch in text if ch in "\n\t" or not _CONTROL_RE.match(ch))
+    if len(raw) > MAX_CHECKPOINT_BYTES:
+        cleaned += "\n(checkpoint truncated)"
+    return cleaned
+
+
+def refusal(reason: str) -> str:
+    """Loud, plain text for a session that has no usable role."""
+    return (
+        "!!! MAIN BRANCH ROLE CHECK FAILED !!!\n"
+        f"{reason}\n"
+        "STOP. Do not start work and do not pick a role yourself. "
+        "Tell the owner exactly this message and ask which role to run as. "
+        f"(Launch with {ROLE_ENV}=<role-name>; see `mb role list`.)\n"
+        "!!! END ROLE CHECK !!!"
+    )
+
+
+def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) -> str:
+    """Text the SessionStart hook prints. Empty string means print nothing.
+
+    No cards in the repo means nothing changes for that business, so the hook
+    is silent there. With cards, the role must be named explicitly.
+    """
+    if not has_cards(repo):
+        return ""
+    selected = (env if env is not None else os.environ).get(ROLE_ENV, "")
+    if not selected.strip():
+        names = ", ".join(c["name"] for c in list_cards(repo))
+        return refusal(f"No role was selected ({ROLE_ENV} is not set). Role cards here: {names}.")
+    if not valid_name(selected):
+        return refusal(f"The selected role name {printable(selected)!r} is not a valid role name.")
+    card = load_card(repo, selected)
+    if not card["found"]:
+        return refusal(f"Selected role {selected!r} has no card at {ROLES_DIR}/{selected}.md.")
+    if not card["valid"]:
+        return refusal(
+            f"Role card {selected!r} is invalid: "
+            + "; ".join(printable(e, 120) for e in card["errors"])
+        )
+    root = _root(repo)
+    lines = [
+        f"MAIN BRANCH ROLE CARD (session {source}). You are running as role: {card['name']}.",
+        "State this role in your first reply. Do not take another role.",
+        f"Role: {card['role']}",
+        "Skills: " + (", ".join(card["skills"]) or "none"),
+        "Tools: " + (", ".join(card["tools"]) or "none"),
+        "Protocols: " + (", ".join(card["protocols"]) or "none"),
+        f"First action: {card['first_action'].strip()}",
+        f"Checkpoint file: {card['checkpoint']}",
+        "--- checkpoint contents ---",
+        _checkpoint_text(root, card["checkpoint"]).rstrip(),
+        "--- end checkpoint ---",
+    ]
+    return "\n".join(lines)
+
+
+def _settings_has_hook(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    return "SessionStart" in text and "mb role hook" in text
+
+
+def wiring(repo: str | Path, plugin_wired: bool) -> dict[str, Any]:
+    """Facts for ``mb doctor``. Only meaningful when the repo has role cards."""
+    root = _root(repo)
+    cards = list_cards(root)
+    project_hook = any(
+        _settings_has_hook(root / ".claude" / name)
+        for name in ("settings.json", "settings.local.json")
+    )
+    return {
+        "cards": len(cards),
+        "invalid": [c["name"] for c in cards if not c["valid"]],
+        "hook_wired": plugin_wired or project_hook,
+        "plugin_wired": plugin_wired,
+        "project_hook": project_hook,
+        "role_selected": bool(os.environ.get(ROLE_ENV, "").strip()),
+    }
