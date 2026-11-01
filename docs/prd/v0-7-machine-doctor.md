@@ -477,7 +477,7 @@ Field rules:
   `probe_timeout`, `probe_error`, `untrusted_executable`, `owner_attested`,
   `attestation_missing`, `attestation_stale`, `other_account`, `no_manifest`,
   `caller_selected_policy`, `skipped_by_manifest`, `advanced_pending`,
-  `no_section`, `location_unknown`. Reasons are never free text, so no stray paths or
+  `no_section`, `location_unknown`, `reboot_pending`. Reasons are never free text, so no stray paths or
   output leak.
 - `observed` holds only the parsed fields that a read selects: booleans,
   numbers, enums, modes. Never raw output, file contents, environment values
