@@ -118,18 +118,7 @@ and the site record is typically `pushes/<YYYY-MM-DD-slug>/site.md`. Site
 files themselves live in the linked site repo (Cloudflare Pages, etc.) and
 are not duplicated in the business repo.
 
-Reverse references from the site repo should use the role-neutral
-`.mainbranch/repo.json` descriptor with engine push paths
-(`linked.pushes: ["pushes/<...>/push.md"]`). Existing site repos may still use
-`.mainbranch/source.json`; its historical `campaign_path` key should point
-at the current push record when possible. Treat old `campaigns/` records as
-migration input and run `mb migrate campaigns --plan` before relying on them.
-
-If `core/vocabulary.md` defines display words (e.g. `terms.push.singular:
-launch`), speak the operator's word in conversation while still writing
-engine files. If the repo still has legacy `campaigns/` records,
-recommend `mb doctor` and `mb migrate campaigns --plan` before creating
-new push work.
+Reverse references from the site repo use the role-neutral `.mainbranch/repo.json` descriptor with engine push paths (`linked.pushes: ["pushes/<...>/push.md"]`); older site repos may still use `.mainbranch/source.json` (its `campaign_path` should point at the current push record). If `core/vocabulary.md` defines display words (e.g. `terms.push.singular: launch`), speak the operator's word while still writing engine files. Legacy `campaigns/` records are migration input: run `mb doctor` and `mb migrate campaigns --plan` before relying on them or creating new push work.
 
 When creating `push.md`, include the validator-required frontmatter and fill
 the values from repo truth or operator answers:
@@ -288,16 +277,7 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 - [`references/website-build.md`](references/website-build.md) - legacy Next.js website flow.
 - [`references/graduation.md`](references/graduation.md) - paths between shapes and CMS bolt-on.
 
-**Minisite step detail**
-
-- [`references/minisite-research.md`](references/minisite-research.md) - research subagents and persisted findings.
-- [`references/minisite-brief.md`](references/minisite-brief.md) - brief draft, dial, archetype, schema, review, and lock.
-- [`references/minisite-setup.md`](references/minisite-setup.md) - domain, repo, DNS, and Cloudflare Pages setup.
-- [`references/minisite-conversion.md`](references/minisite-conversion.md) - conversion endpoint selection and `.mainbranch/conversion.json`.
-- [`references/concept-variations.md`](references/concept-variations.md) - parallel home-page concepts.
-- [`references/minisite-buildout.md`](references/minisite-buildout.md) - remaining pages and build validation.
-- [`references/minisite-publish.md`](references/minisite-publish.md) - raw publish, pre-publish review, final push.
-- [`references/minisite-iterate.md`](references/minisite-iterate.md) - post-build edits, regeneration, and graduation signals.
+**Minisite step detail:** [`references/minisite-build.md`](references/minisite-build.md) routes each step (research, brief, setup, conversion, concept variations, build-out, publish, iterate) to its own reference; load only the current step.
 
 **Generation + design**
 

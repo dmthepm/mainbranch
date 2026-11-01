@@ -4,7 +4,7 @@ The minisite shape is ~4-6 pages of static HTML, no build step, deployed to Clou
 
 V1 target. This is the default for paid-ad lander tests, single-offer first deploys, lead-form funnels, and conversion-gateway flows.
 
-The source-of-truth contract for what a minisite is (page list, per-page content, conversion endpoint, tracking, walkthrough UX) lives at `.claude/reference/minisite.md`. This file is the `/mb-site` minisite router. Load the step reference needed for the current step instead of loading the whole flow at once.
+The source-of-truth contract for what a minisite is (page list, per-page content, conversion endpoint, tracking, walkthrough UX) lives at [`minisite.md`](minisite.md). This file is the `/mb-site` minisite router. Load the step reference needed for the current step instead of loading the whole flow at once.
 
 ## Progressive Loading Map
 

@@ -409,255 +409,93 @@ Return:
 
 ## Spawning Pattern
 
-**Spawn all three agents in a single message using the Task tool.** This sends them to parallel context windows. Each agent's prompt includes the pre-gathered metadata PLUS instructions to read specific files themselves using the absolute repo path.
+Spawn all three agents in a single message with the Task tool (`subagent_type: "general-purpose"`, `max_turns: 20` each to cap runaway cost). Each prompt = pre-gathered metadata + that agent's template + the absolute repo path; each agent reads files itself in its own context and is read-only. Agent 1 (Reference Health Analyst): section-level quality, cross-file consistency, setup-pattern fit, staleness; returns a ranked gap list with effort estimates. Agent 2 (Pipeline & Momentum Analyst): git patterns, active decisions, unlinked research, pipeline state, velocity; returns bottleneck ranking. Agent 3 (Soul & Strategy Connector): soul alignment with recent work, past crystallize/triage outputs; returns soul-grounded recommendations.
 
-```
-Task(
-  subagent_type: "general-purpose",
-  description: "Reference Health Analyst: read all reference files at [repo-path],
-    analyze section-level quality, cross-file consistency, business setup pattern fit,
-    staleness detection. Return ranked gap list with effort estimates.",
-  prompt: "[Pre-gathered metadata + Agent 1 prompt template + absolute repo path]"
-)
-
-Task(
-  subagent_type: "general-purpose",
-  description: "Pipeline & Momentum Analyst: analyze git patterns, active decisions,
-    unlinked research, content pipeline state, velocity. Return bottleneck ranking
-    and momentum assessment.",
-  prompt: "[Pre-gathered metadata + Agent 2 prompt template + absolute repo path]"
-)
-
-Task(
-  subagent_type: "general-purpose",
-  description: "Soul & Strategy Connector: read soul.md at [repo-path], check
-    alignment with recent work, review past crystallize/triage outputs. Return
-    soul-grounded recommendations.",
-  prompt: "[Pre-gathered metadata + Agent 3 prompt template + absolute repo path]"
-)
-```
-
-Each agent is **read-only**. Each reads files in its own context window. Main conversation stays lean.
-
-**Set `max_turns: 20` on each Task call** to prevent runaway agents. 20 turns is enough for full file reads + analysis but caps cost if something loops.
-
-### After Spawning: Wait for Agents
-
-**The user already chose triage. They're waiting for results.** Show a brief message: "Analyzing your business state..." while agents work.
-
-### When Agents Return: Present the Synthesis
-
-When all agents complete, synthesize their findings (see Synthesis Format below) and present to the user. Then ask: "Want to go with [primary recommendation]? Or does something else feel right?"
-
-The user can pick the recommendation, ask follow-up questions, or choose a different path entirely. Triage is guidance, not enforcement.
+While they work, show "Analyzing your business state...". When all return, synthesize (below), then ask: "Want to go with [primary recommendation]? Or does something else feel right?" Triage is guidance, not enforcement: route to the skill if they accept, respect any other choice.
 
 ---
 
 ## Synthesis Format
 
-After all three agents return, synthesize into this format:
-
 ```
 === TRIAGE ANALYSIS ===
 
-[2-3 sentences of context -- what the agents found, what patterns emerged.
-This shows the user you read their whole business state, not just surface scores.]
+[2-3 sentences: what the agents found, what patterns emerged -- shows you read the whole business state]
 
 ## Recommended Focus
 
-**Primary:** [The one thing that would have the highest compound impact]
+**Primary:** [the one thing with the highest compound impact]
 [1-2 sentences: why this, what it unlocks, how it connects to their purpose]
 
-**Also ready:** [1-2 other high-value options]
-[Brief reasoning for each]
+**Also ready:** [1-2 other high-value options, brief reasoning]
 
 ## Quick Fixes Available
 
-- [Specific gap]: [What question to ask to fill it] -- ~5 min
-- [Specific gap]: [What question to ask to fill it] -- ~5 min
+- [Specific gap]: [question to ask to fill it] -- ~5 min
 
 ## What I'd Skip Today
 
-[1 thing the user might instinctively do that the analysis suggests isn't
-the highest value right now. This is the highest-leverage part of the
-recommendation -- telling someone what NOT to do.]
-[Brief reasoning]
+[1 thing the user might instinctively do that the analysis suggests is not the highest value right now, with brief reasoning -- the highest-leverage part of the recommendation]
 ```
-
-**After presenting:** Ask "Want to go with [primary recommendation]? Or does something else feel right?"
-
-If user picks the primary recommendation, route to the appropriate skill. If they pick something else, respect it -- triage is guidance, not enforcement.
 
 ---
 
 ## Thin Repo Mode (THIN 8-11 or GOOD 12-14 with gaps)
 
-**When reference is still building, triage becomes the most valuable thing in the system.** This is where users most need direction. The synthesis should inspire, not audit.
+When reference is still building, the synthesis should inspire, not audit. Lead with the unlock, show what already works first, make it feel like leveling up. Don't say "You're missing voice.md, testimonials, and 3 angles"; say "Your offer and audience are solid. Adding a Never Say section to voice.md would immediately sharpen every ad hook. I can ask you 3 questions right now and we'll have it in 5 minutes." Always offer to do it right now.
 
-### Shift the Energy
+Every gap connects to a downstream outcome the user cares about:
 
-- **Don't say:** "You're missing voice.md, testimonials, and 3 angles."
-- **Do say:** "Your offer and audience are solid. Adding a Never Say section to voice.md would immediately sharpen every ad hook. I can ask you 3 questions right now and we'll have it in 5 minutes."
+| Gap | What unlocks | How to say it |
+|-----|--------------|---------------|
+| No voice.md | Ads stop sounding generic | "Once voice.md has a Never Say section, /mb-ads stops using phrases that don't sound like you" |
+| Thin audience.md | Hooks land | "3-5 pain points in audience.md means /mb-ads writes hooks your audience recognizes" |
+| No angles | Less ad fatigue | "Three angles = three different emotional entry points before fatigue" |
+| No testimonials | Proof-based ads | "Even 2-3 testimonials unlock proof ads. Got screenshots of wins, DMs or reviews?" |
+| No content-strategy | A distribution plan | "Status says content strategy is missing. 15 min with /mb-think can build the simple file first." |
+| Disconnected content layers | Trustworthy channel and account health | "A strategy layer is disconnected. Repair the link/index before planning from it." |
 
-### Show What Unlocks
-
-Every gap recommendation must connect to a specific downstream outcome the user cares about:
-
-| Gap | What Unlocks | How to Say It |
-|-----|-------------|---------------|
-| No voice.md | Ads sound generic | "Once voice.md has a Never Say section, /mb-ads stops using phrases that don't sound like you" |
-| Thin audience.md | Hooks don't land | "Adding 3-5 pain points to audience.md means /mb-ads writes hooks your audience actually recognizes" |
-| No angles | Ad fatigue | "One angle = one ad direction. Three angles = three completely different emotional entry points. More angles = more creative variety before fatigue" |
-| No testimonials | Can't use social proof | "Even 2-3 testimonials unlock proof-based ads. Got any screenshots of wins, DMs, or reviews?" |
-| No content-strategy | No distribution plan | "Your reference is ready to generate content, but status says content strategy is missing. 15 min with /mb-think can build the simple file first." |
-| Disconnected content layers | Dashboard/status cannot trust channel or account health | "Your strategy layers exist, but status says one is disconnected. Repair the link/index before using it for planning." |
-
-### Make It Easy
-
-**Always offer to do it right now.** The #1 reason thin repos stay thin is the user doesn't know it's a 5-minute fix:
-
-> "Want me to ask you the 3 questions that would build your voice.md right now? Takes about 5 minutes and immediately improves every output."
-
-### Synthesis Format for Thin Repos
-
-```
-=== TRIAGE ANALYSIS ===
-
-[Acknowledge what they HAVE built — celebrate progress, not just gaps]
-
-## Your Biggest Unlock Right Now
-
-**[One thing]:** [What adding it unlocks, in terms the user cares about]
-[Offer to do it right now with specific questions — make it feel like 5 minutes, not a project]
-
-## What's Already Working
-
-- [File] is [specific strength] — this means [downstream benefit]
-- [File] has [good section] — [what it enables]
-
-## After That
-
-[1-2 next-level items for when they're ready — don't overwhelm, just show the path]
-```
-
-**Key difference from full synthesis:** Lead with the unlock, not the gaps. Show what's working first. Make the recommendation feel like leveling up, not fixing problems.
+Thin-repo format: `=== TRIAGE ANALYSIS ===`, acknowledge what they have built, then `## Your Biggest Unlock Right Now` (one thing, offered as a 5-minute action with specific questions), `## What's Already Working` (file, strength, downstream benefit), `## After That` (1-2 next-level items).
 
 ---
 
 ## Anti-Patterns
 
-Include these in each agent's prompt (adapted from /mb-end's crystallize anti-patterns).
+Include in each agent's prompt (adapted from /mb-end's crystallize anti-patterns):
 
-### 1. Don't List Everything That's Wrong
-
-"You're missing 12 things" is debt collection, not guidance. Pick the highest-leverage gaps. The user should feel oriented, not overwhelmed.
-
-### 2. Don't Prescribe Without Reasoning
-
-"Update voice.md" is a command. "Your ads will sound generic until voice.md has a Never Say section -- want me to ask you 3 questions to build it?" is guidance. Every recommendation needs a WHY connected to downstream impact.
-
-### 3. Don't Ignore Soul
-
-If the user's recent work is all execution with no enrichment, the recommendation should notice that -- not just suggest more execution. If the soul health check indicated "push," the triage must honor that.
-
-### 4. Don't Be Generic
-
-"You should work on your reference files" could be said to anyone. Name the specific file, section, and what filling it would unlock. Reference actual content from the files you read.
-
-### 5. Don't Overwhelm
-
-Three parallel agents produce a LOT of findings. Synthesis must ruthlessly prioritize. One primary recommendation. One or two secondary options. Quick fixes. What to skip. Done. Not a 20-item action plan.
-
-### 6. Don't Ignore What the User Just Told You
-
-If the soul health check revealed "this feels like push," the triage recommendation must honor that. If the user mentioned a specific concern during /mb-start, incorporate it.
-
-### 7. Don't Make Thin Repos Feel Broken
-
-"You're missing 5 files" makes the user feel behind. "Your offer is clear and your audience is developing -- adding a Never Say section to voice.md would immediately sharpen your ads. Want me to ask you 3 questions?" makes them feel like they're building something. Thin repos are not broken. They're early. The triage should feel like unlocking the next level, not auditing what's missing.
-
-### 8. Don't Repeat Past Triage
-
-If a previous triage recommended voice.md work and it still hasn't happened, don't just repeat the recommendation. Ask whether the gap is actually blocking anything, or whether the user has implicitly decided it's low priority.
+1. **Don't list everything that's wrong.** Pick the highest-leverage gaps; the user should feel oriented, not billed.
+2. **Don't prescribe without reasoning.** "Update voice.md" is a command; "Your ads will sound generic until voice.md has a Never Say section -- want me to ask 3 questions?" is guidance.
+3. **Don't ignore soul.** If recent work is all execution, say so; honor the soul health check's push/pull answer.
+4. **Don't be generic.** Name the file, section and what filling it unlocks, citing actual content.
+5. **Don't overwhelm.** One primary, one or two secondary, quick fixes, what to skip; not a 20-item plan.
+6. **Don't ignore what the user just told you** (soul check answer, a concern raised during /mb-start).
+7. **Don't make thin repos feel broken.** They are early, not behind.
+8. **Don't repeat past triage.** If a past recommendation never happened, ask whether the gap actually blocks anything.
 
 ---
 
 ## Saving Triage Output
 
-Like crystallize, triage output is saved for future temporal awareness.
-
-**Save to:** `research/YYYY-MM-DD-start-triage.md`
-
-```markdown
----
-type: research
-date: YYYY-MM-DD
-source: triage
-status: complete
----
-# Start-of-Session Triage
-
-## Recommendation Given
-[The primary recommendation as presented]
-
-## Secondary Options
-[The also-ready options]
-
-## Quick Fixes Identified
-[Gaps that could be filled in ~5 min]
-
-## What Was Skipped
-[The "what I'd skip today" item]
-
-## User Choice
-[What the user actually chose to do]
-
-## Follow-Up
-[Whether the recommendation was followed -- updated at /mb-end if possible]
-```
-
-**Why save:** Future triage agents read these to spot what keeps happening over time. "Last time we recommended voice.md work and you chose /mb-ads instead -- did that work out?" This prevents repeated recommendations and helps the system learn user preferences.
+Save to `research/YYYY-MM-DD-start-triage.md` so future triage can spot patterns over time ("Last time we recommended voice.md work and you chose /mb-ads instead -- did that work out?"). Frontmatter `type: research`, `date`, `source: triage`, `status: complete`; sections: Recommendation Given, Secondary Options, Quick Fixes Identified, What Was Skipped, User Choice, Follow-Up (updated at /mb-end if possible).
 
 ---
 
 ## Token Budget
 
-### By Tier
+| Tier | Agents | Total (main 5-10K + agents) |
+|------|--------|-----------------------------|
+| Light | Reference Health only (30-50K) | 35-60K |
+| Standard | Health + Pipeline (20-40K) | 55-100K |
+| Full | All three (Soul 20-30K) | 75-130K |
 
-| Tier | Agents | Main Cost | Agent Cost | Total |
-|------|--------|-----------|------------|-------|
-| Light (1 agent) | Reference Health only | 5-10K | 30-50K | 35-60K |
-| Standard (2 agents) | Health + Pipeline | 5-10K | 50-90K | 55-100K |
-| Full (3 agents) | All three | 5-10K | 70-120K | 75-130K |
+Only pre-gathering (~5-10K) and synthesis (~5-10K) hit main, so triage costs main ~10-20K regardless of tier.
 
-### Per Agent
-
-| Component | Estimated Tokens |
-|-----------|-----------------|
-| Pre-gathering (main conversation) | 5-10K |
-| Agent 1: Reference Health | 30-50K |
-| Agent 2: Pipeline & Momentum | 20-40K |
-| Agent 3: Soul & Strategy | 20-30K |
-| Synthesis (main conversation) | 5-10K |
-
-**Main context impact:** Only pre-gathering (~5-10K) and synthesis (~5-10K) hit main. Agent tokens are in their own windows. This means triage costs main ~10-20K total, regardless of tier.
-
----
-
-## What the Triage Agent Is NOT
-
-1. **Not a task list.** It produces a recommendation with reasoning, not a numbered list of everything that needs doing.
-
-2. **Not an audit.** The readiness assessment already scored files. Triage interprets scores in context and recommends action.
-
-3. **Not a summary.** The session state check already surfaced recent activity. Triage looks forward.
-
-4. **Not /mb-think.** It does not execute research or decisions. It recommends where to start. Then the appropriate skill does the work.
+Triage is not a task list, an audit (readiness already scored files), a summary (session state already covered recent activity), or `/mb-think` (it recommends where to start; the appropriate skill does the work).
 
 ---
 
 ## See Also
 
-- [../SKILL.md](../SKILL.md) -- The /mb-start flow where triage is an explicit route
-- [readiness-assessment.md](readiness-assessment.md) -- Scoring rubric and display format (runs before triage, provides scores to agents)
-- `/mb-end` crystallize-agent pattern -- The model for this agent's gating, tiering, and token budget
+- [../SKILL.md](../SKILL.md) -- the /mb-start flow where triage is an explicit route
+- [readiness-assessment.md](readiness-assessment.md) -- scoring rubric and display format (runs before triage)
+- `/mb-end` crystallize-agent pattern -- the model for gating, tiering and token budget

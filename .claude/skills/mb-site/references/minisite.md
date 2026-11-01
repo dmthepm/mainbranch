@@ -329,56 +329,9 @@ Failed gate = halt with a specific message and routing suggestion. No silent ski
 
 ---
 
-## Candidate launch walkthrough
+## Launch walkthrough
 
-Current shipped site work routes through `/mb-site`. Guided
-`/mb-start launch <offer>` orchestration walks the operator through the same
-phases by selecting the current skill step. Each phase has explicit Y/N gates on
-money-spending steps, resumability between phases, and clear exit criteria.
-
-### Phase 1 — Pre-flight
-
-- Verify offer locked (offer.md + audience.md present)
-- Verify creds (CF + gh; conversion-endpoint creds checked in phase 4 only if needed)
-- Surface what's missing with specific next-step commands
-
-### Phase 2 — Domain
-
-- Operator picks: own-existing or buy-new
-- If buy-new: route through `references/naming-heuristic.md`
-- `domain.py buy` is not live in this build; route new purchases through https://dash.cloudflare.com/registrar with confirmation
-
-### Phase 3 — Infrastructure (tool chain)
-
-- `dns.py ensure <domain>` (idempotent)
-- Create project repo (`gh repo create`)
-- `pages.py create-project <name> --repo-owner <owner> --repo-name <repo> --source github`
-- `pages.py set-domain <name> <domain>` (attach + CNAME + SSL active)
-
-### Phase 4 — Conversion endpoint
-
-Operator picks the kind (Stripe / lead form / appointment / custom). Then per-kind:
-
-- **Stripe payment page:** `stripe.py create-payment-link <offer-slug> --amount <cents>` → write returned URL to `<repo>/.mainbranch/conversion.json`
-- **Lead form:** ask for the form URL (or pick a provider, get walked through setup), write to `<repo>/.mainbranch/conversion.json`
-- **Appointment booking:** ask for the booking URL, write to `<repo>/.mainbranch/conversion.json`
-- **Custom webhook:** ask for the URL, write to `<repo>/.mainbranch/conversion.json`
-
-The conversion.json file is the single source the generation subagent reads to wire CTAs.
-
-### Phase 5 — Generation
-
-- Resolve offer context
-- Spawn generation subagent with `minisite-generation-system.md` + offer/audience/reference URLs + conversion-endpoint info from phase 4
-- Validate output (file presence, footer, og_render, optional Lighthouse)
-
-### Phase 6 — Ship
-
-- Operator commits + pushes through the current checkpoint/git guidance; a
-  future launch orchestration may do this only after explicit approval.
-- Cloudflare auto-deploys
-- Verify `https://<domain>/` returns 200
-- Print summary: live URL, repo URL, total spend, time-to-ship
+The walkthrough is the 11-step flow in [`minisite-build.md`](minisite-build.md), with explicit Y/N gates on money-spending steps, resumability between steps, and clear exit criteria. Before money or state changes, pre-flight verifies the offer is locked and credentials exist. `domain.py buy` is not live in this build: route new purchases through https://dash.cloudflare.com/registrar with confirmation, and use [`naming-heuristic.md`](naming-heuristic.md) for names. Infrastructure uses `dns.py ensure <domain>`, `gh repo create`, `pages.py create-project ...` and `pages.py set-domain <name> <domain>`; the conversion endpoint is written to `<repo>/.mainbranch/conversion.json`, the single source the generation subagent reads to wire CTAs. After validation (file presence, footer, og_render, optional Lighthouse) the operator commits and pushes through checkpoint guidance, Cloudflare auto-deploys, and `https://<domain>/` must return 200.
 
 ---
 
@@ -410,26 +363,8 @@ This is the quality bar: an LLM that produces the same minisite twice on the sam
 - [`og_render.py`](../scripts/og_render.py) — SVG → PNG (1200x630)
 - [`stripe.py`](../scripts/stripe.py) — Stripe payment link creation (one of several conversion-endpoint backends)
 
-**Decisions (durable architecture):**
-- `noontide-co/noontide-ops` `decisions/2026-04-27-lander-launch-skills.md`
-- `noontide-co/noontide-ops` `decisions/2026-04-27-lander-chassis-as-stacked-skill.md`
-- `noontide-co/noontide-ops` `decisions/2026-04-27-git-auto-deploy-non-negotiable.md`
-- `noontide-co/noontide-ops` `decisions/2026-04-27-credential-provisioning.md`
-
-**Onboarding:**
-- Main Branch issue [#94](https://github.com/dmthepm/mainbranch/issues/94) — V1 onboarding pinned current-state
-
 ---
 
-## Future direction (not V1, but planned)
+## Future direction (not V1)
 
-- **Edit-via-talk:** ongoing minisite editing via talk-and-update, not just one-time generation
-- **Stripe webhook handling:** payment-success → CRM sync, email triggers, fulfillment automation
-- **Subscription billing:** for offers that recur monthly/annually
-- **Server-side tracking:** for attribution accuracy when browser-side gaps surface
-- **Multi-currency:** non-USD pricing
-- **A/B testing:** same offer, two minisite variants, route paid traffic to compare
-- **Multi-endpoint sites:** lead-form + deposit on the same site (currently a graduation signal to website shape)
-- **Graduation tooling:** `/mb-site graduate <new-shape>` automates minisite → website transitions
-
-These exist as known-future work. They influence design decisions today (don't paint into corners) but aren't load-bearing for the V1 ship.
+Edit-via-talk, Stripe webhooks, subscription billing, server-side tracking, multi-currency, A/B variants, multi-endpoint sites (currently a graduation signal to the website shape), and `/mb-site graduate <new-shape>` tooling. These shape design today but are not load-bearing for V1.

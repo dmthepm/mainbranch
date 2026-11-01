@@ -309,123 +309,30 @@ mb onboard plan --repo "$REPO_PATH" --team-size solo --success-stage working
 
 ## Step 4: Provider And Tool Pre-Flight (Not Full Research Detection)
 
-Check provider and MCP readiness only for skills the user might invoke. See
-[mcp-preflight.md](references/mcp-preflight.md).
-
-Start from CLI facts:
-
-```bash
-mb status --json --peek
-mb connect plan
-mb connect doctor --json
-```
-
-Use the status and connect JSON before checking runtime tool presence. The
-operator-facing pattern is:
+Check provider and MCP readiness only for skills the user might invoke ([mcp-preflight.md](references/mcp-preflight.md)). Start from `mb status --json --peek`, `mb connect plan` and `mb connect doctor --json` (run doctor when a provider section is degraded, missing or selected by the operator), and use that JSON before checking runtime tool presence. Quote the CLI's `next_command` / `repair_command`; do not re-probe provider credentials from prose or mutate `.vip/config.yaml`. Operator-facing pattern:
 
 > "This action needs [business capability].
 >
 > 1. Set up [provider] now — `[exact command]`
 > 2. Skip for this session — [specific limitation]"
 
-**Full research tool detection still happens in /mb-think** — deferred to when user actually needs research. This keeps /mb-start fast and avoids checking tools user might not use this session.
-
-**What /mb-start checks:** provider readiness from `mb status --json --peek`
-and `mb connect plan`, selected-skill MCPs when provider status says runtime
-tools are unknown, and critical blockers such as missing config or broken paths.
-Leave full research/document tool scans to `/mb-think`; most sessions do not
-need every tool checked upfront.
-
-If user's stated intent involves research, route to /mb-think. It will use
-`mb` provider facts first, then detect only the runtime tools needed for the
-selected research path.
-
----
-
-## Step 5: Tool Status Audit (Deterministic Facts First)
-
-Run a lightweight provider/readiness audit:
-
-- Use `mb status --json --peek` facts already gathered.
-- Run `mb connect doctor --json` when a provider section is degraded, missing,
-  or selected by the operator.
-- Quote the CLI's `next_command` / `repair_command`.
-- Do not re-probe provider credentials from prose or mutate `.vip/config.yaml`.
-
-See [tool-status-audit.md](references/tool-status-audit.md) for the full procedure and messaging rules.
+Full research and document tool detection happens in `/mb-think` when the user needs research, not here; most sessions do not need every tool checked upfront. See [tool-status-audit.md](references/tool-status-audit.md) for the audit procedure and messaging rules.
 
 ---
 
 ## Step 6: Readiness Assessment
 
-Use `readiness`, `money_path`, and `ranked_actions` from
-`mb status --json --peek` before routing. The reference below is fallback detail
-for gaps that status does not expose yet.
+Use `readiness`, `money_path`, `ranked_actions`, `onboarding`, `drift.items` and `validation.file_contracts` from `mb status --json --peek` before routing; prefer `money_path.ranked_actions` for path gaps unless the top-level ranked action already incorporates it. [readiness-assessment.md](references/readiness-assessment.md) is fallback detail for gaps status does not expose (scoring rubric, session state, soul health check, skill-specific requirements, display format, exact fallback thresholds). Adapt display to `user.experience` without making the repo feel audited or behind.
 
-See [readiness-assessment.md](references/readiness-assessment.md) for complete scoring rubric, session state checks, soul health check, skill-specific requirements, and display format.
-
-Quick summary: status readiness gates setup, repair, and output skills; fallback
-scoring only fills missing detail. Adapt display to `user.experience` level
-without making the repo feel audited or behind.
-
----
+Fallback: check `core/*.md`. If CWD looks like an old Main Branch repo, run `mb status --json --peek` and/or `mb doctor repair --plan` before routing. No folder -> `/mb-setup`. Two or more core files missing/thin -> `/mb-think codify`; otherwise route by intent. In multi-offer repos, a thin/missing active-offer `offer.md` routes to `/mb-think`.
 
 ## Step 7: Defer Full Context Loading
 
-Do not read full reference files into main. Status readiness already names the
-scores, files, and gaps needed for routing. The selected skill or triage agent
-loads deep context. Exception: read `[repo]/CLAUDE.md` when present because it
-is small and helps with routing tone.
-
-**Onboarding exception:** When onboarding is incomplete and current `core/`
-files already exist, read enough of those files to avoid asking for facts the
-repo already contains. Keep this bounded: summarize the existing facts and ask
-only for confirmation or missing profile fields.
-
-**Multi-offer context:** If CLI facts or the current session identify an
-active offer, note it for routing; the selected skill loads the offer file.
-
----
+Do not read full reference files into main; status readiness already names the scores, files and gaps. The selected skill or triage agent loads deep context. Exceptions: read `[repo]/CLAUDE.md` when present (small, helps routing tone), and when onboarding is incomplete but current `core/` files exist, read enough of them to avoid asking for facts the repo already contains (summarize, then ask only for confirmation or missing profile fields). If CLI facts or the session identify an active offer, note it for routing.
 
 ## Step 8: Offer Detection (Multi-Offer Only)
 
-Use the active-offer resolution contract in
-`.claude/reference/business-primitives/offer-bet-push-proof.md`; load
-`setup-patterns.md` and `slug-conventions.md` from that same directory when
-setup shape or naming is unclear.
-
-```bash
-find "$REPO_PATH/core/offers" -mindepth 2 -maxdepth 2 -name "offer.md" 2>/dev/null
-```
-
-If `core/offers` is absent and `core/` is also absent, do not infer the offer
-from old paths; treat old shape as migration input after `mb status --json
---peek` or `mb doctor repair --plan`.
-
-No `core/offers/` means single-offer mode. If offers exist, use current CLI
-status facts first, never silently route from `.vip/local.yaml`, present choices
-by slug/name when route numbers are already visible, and keep selection
-session-scoped unless the operator approves a current `mb` persistence command.
-`/mb-start [offer-name]` can select a validated offer for this session. `all`
-means brand-level `core/` context.
-
----
-
-## Step 9: Detect State and Assess Completeness
-
-Use `readiness`, `onboarding`, `drift.items`, `money_path`, and `ranked_actions`
-from status first. Prefer `money_path.ranked_actions` for path gaps unless the
-top-level ranked action already incorporates it.
-
-Fallback: check `core/*.md`. If CWD looks like an old Main Branch repo, run
-`mb status --json --peek` and/or `mb doctor repair --plan` before routing. No folder → `/mb-setup`. If two or more
-core files are missing/thin, route to `/mb-think codify`; otherwise route by
-intent. Use [readiness-assessment.md](references/readiness-assessment.md) for
-the exact fallback thresholds.
-
-**Multi-offer completeness:** When status does not expose offer readiness, check
-the active offer's `offer.md`; a thin/missing offer-specific file should route
-to `/mb-think`.
+Use the active-offer resolution contract in `.claude/reference/business-primitives/offer-bet-push-proof.md` (load `setup-patterns.md` and `slug-conventions.md` from that directory when setup shape or naming is unclear). `find "$REPO_PATH/core/offers" -mindepth 2 -maxdepth 2 -name "offer.md"` lists offers. No `core/offers/` means single-offer mode; if `core/` is also absent, treat old shape as migration input after `mb status --json --peek` or `mb doctor repair --plan`, and do not infer the offer from old paths. If offers exist, use current CLI status facts first, never silently route from `.vip/local.yaml`, present choices by slug/name when route numbers are already visible, and keep selection session-scoped unless the operator approves a current `mb` persistence command. `/mb-start [offer-name]` selects a validated offer for this session; `all` means brand-level `core/` context.
 
 ---
 
