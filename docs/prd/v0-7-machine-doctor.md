@@ -1,6 +1,6 @@
 ---
 title: "PRD: mb machine doctor (manifest, check registry, JSON and exit codes)"
-status: draft
+status: approved
 date: 2026-10-28
 release: planned (target v0.7.x, tentative)
 linked_issue: https://github.com/dmthepm/mainbranch/issues/1248
@@ -8,9 +8,10 @@ linked_issue: https://github.com/dmthepm/mainbranch/issues/1248
 
 # PRD: `mb machine doctor`
 
-## Decision asked of reviewers
+## Decision
 
-Approve this shape before any code lands:
+Approved by the maintainer on 1 November 2026, including the check registry
+below as the full machine checklist. The shape:
 
 1. a **machine manifest** that holds desired-state values only. It follows
    the machine reference pack's schema, minus the parts that would carry
@@ -22,7 +23,7 @@ Approve this shape before any code lands:
    > `0`, where `3` means incomplete, and `attested` is owner evidence that
    never counts as a pass.
 
-Design only. No code ships with this PRD.
+This file is the design. Code ships in the releases listed below.
 
 Out of scope: `mb machine setup` (only after a first real machine passes
 doctor, and only with the maintainer's yes), any fix that runs, isolation
@@ -586,4 +587,4 @@ Omarchy boxes also have `host.screen-lock` NOT VERIFIED. macOS always exits
    second Omarchy install before `host.screen-lock` can pass there.
 4. The v0-7 target in this file name is tentative.
 
-Next: the maintainer approves this design; the code batch runs on #1248.
+Next: the code batch runs on #1248.
