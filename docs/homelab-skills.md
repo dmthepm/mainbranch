@@ -45,11 +45,12 @@ Keep raw JSON local. The report omits raw nested Serve/Funnel configuration and
 replaces IPs, Tailscale key values, tailnet DNS names, identified hostnames and
 emails with placeholders. Placeholders remain stable within one invocation.
 Unlabelled names in arbitrary prose need a local human check before sharing.
-Redaction is verified against synthetic fixtures. Real tailnet DNS, node, login
-and peer identifiers remain untested pending a run by a user that can reach
-`tailscaled`. Inspect the entire response locally before sharing, including
-model explanations and permission errors; these do not pass through the
-redactor.
+Redaction is verified against synthetic fixtures and one real machine check run
+by a user that can reach `tailscaled`: the report held none of that machine's
+tailnet DNS names, node names, logins, peer names, IPs or hostname. One machine
+proves no other setup, and no real policy has been reviewed. Inspect the entire
+response locally before sharing, including model explanations and permission
+errors; these do not pass through the redactor.
 The skills never publish a report, change settings, retrieve credentials,
 call an admin API, install software or connect to other machines.
 

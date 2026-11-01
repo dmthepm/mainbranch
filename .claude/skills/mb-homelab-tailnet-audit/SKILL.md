@@ -6,8 +6,8 @@ loops: [sense, decide]
 
 # Tailnet machine check
 
-Draft: tested on synthetic data and one host. Real tailnet DNS, node, login and
-peer names have not been tested. Inspect the whole response before sharing it.
+Draft: redaction passed one real run on one machine, plus synthetic tests. One
+machine proves no other setup. Inspect the whole response before sharing it.
 
 Say first: "This is read-only. I will inspect local settings and show a redacted
 report without changing your machine, tailnet or business data."

@@ -6,8 +6,8 @@ loops: [sense, decide]
 
 # Tailnet policy review
 
-Draft: tested on synthetic data and one host. Real tailnet DNS, node, login and
-peer names have not been tested. Inspect the whole response before sharing it.
+Draft: tested on synthetic policies only, never a real one. The redactor passed
+one real machine run. Inspect the whole response before sharing it.
 
 Say first: "This is read-only. I will read the policy file you provide and show
 a redacted report without changing your policy, tailnet or business data."
