@@ -66,7 +66,7 @@ def test_schema_fields_are_pinned() -> None:
     )
     assert roles.ROLES_DIR == "core/roles"
     assert roles.ROLE_ENV == "MB_ROLE"
-    assert roles.HOOK_SOURCES == ("startup", "resume", "clear", "compact")
+    assert roles.HOOK_SOURCES == ("startup", "resume", "clear", "compact", "fork")
 
 
 @pytest.mark.parametrize(
@@ -178,7 +178,7 @@ def test_role_commands_are_read_only(repo: Path) -> None:
 # --- hook -----------------------------------------------------------------
 
 
-@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact"])
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
 def test_hook_prints_card_and_checkpoint_for_each_source(repo: Path, source: str) -> None:
     _card(repo)
     (repo / "state" / "scout-checkpoint.md").write_text("Next: QUOKKA-99\n", encoding="utf-8")
@@ -363,10 +363,16 @@ def test_hook_command_silent_in_repo_without_cards(
 # --- plugin hook file -----------------------------------------------------
 
 
-def test_plugin_hooks_json_wires_exactly_startup_resume_clear_compact() -> None:
+def test_plugin_hooks_json_wires_exactly_startup_resume_clear_compact_fork() -> None:
     doc = json.loads((REPO_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
     groups = doc["hooks"]["SessionStart"]
-    assert [g["matcher"] for g in groups] == ["startup", "resume", "clear", "compact"]
+    assert [g["matcher"] for g in groups] == [
+        "startup",
+        "resume",
+        "clear",
+        "compact",
+        "fork",
+    ]
     for group in groups:
         (hook,) = group["hooks"]
         assert hook["type"] == "command"
@@ -476,7 +482,7 @@ def _old_mb(directory: Path) -> Path:
     return directory
 
 
-@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact"])
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
 def test_hook_command_refuses_when_mb_is_missing_and_cards_dir_exists(
     repo: Path, tmp_path: Path, source: str
 ) -> None:
@@ -489,7 +495,7 @@ def test_hook_command_refuses_when_mb_is_missing_and_cards_dir_exists(
     assert "could not be loaded" in result.stdout and "too old" not in result.stdout
 
 
-@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact"])
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
 def test_hook_command_refuses_when_mb_is_too_old_for_role(
     repo: Path, tmp_path: Path, source: str
 ) -> None:

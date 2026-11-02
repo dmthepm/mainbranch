@@ -328,6 +328,8 @@ Fallback: check `core/*.md`. If CWD looks like an old Main Branch repo, run `mb 
 
 ## Step 7: Defer Full Context Loading
 
+If a role card was loaded at session start, say which role you are running as in your first line; never choose or guess a role yourself.
+
 Do not read full reference files into main; status readiness already names the scores, files and gaps. The selected skill or triage agent loads deep context. Exceptions: read `[repo]/CLAUDE.md` when present (small, helps routing tone), and when onboarding is incomplete but current `core/` files exist, read enough of them to avoid asking for facts the repo already contains (summarize, then ask only for confirmation or missing profile fields). If CLI facts or the session identify an active offer, note it for routing.
 
 ## Step 8: Offer Detection (Multi-Offer Only)

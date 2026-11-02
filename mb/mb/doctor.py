@@ -29,6 +29,7 @@ from mb import migration_lint
 from mb import onboard as onboard_mod
 from mb import related_links as related_links_mod
 from mb import roles as roles_mod
+from mb import roles_codex as roles_codex_mod
 from mb import spine as spine_mod
 from mb import topology as topology_mod
 from mb import validate as _validate_mod  # noqa: F401
@@ -954,6 +955,32 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
                 "severity": "warn" if role_problem else "info",
                 "detail": role_detail,
                 "roles": role_wiring,
+            }
+        )
+        codex_found = bool(codex_mod.executable_status()["found"])
+        codex_role = roles_codex_mod.wiring()
+        if not codex_found:
+            codex_detail = "Codex is not on PATH, so its role hook was not checked."
+        elif codex_role["wired"]:
+            codex_detail = (
+                f"Codex role hook found in {codex_role['path']}. Trust not verified: Codex skips "
+                "a new or changed hook until you review it in /hooks. Restart Codex after "
+                "installing."
+            )
+        elif codex_role["problem"]:
+            codex_detail = f"Codex role hook not wired: {codex_role['problem']}."
+        else:
+            codex_detail = (
+                "Codex role hook not wired, so Codex sessions are not told their role. "
+                "Preview with `mb role codex-hook`, then add `--apply`."
+            )
+        checks.append(
+            {
+                "name": "role-cards-codex",
+                "ok": not codex_found or bool(codex_role["wired"]),
+                "severity": "warn" if codex_found and not codex_role["wired"] else "info",
+                "detail": codex_detail,
+                "codex": {**codex_role, "installed": codex_found},
             }
         )
     wiring_ok = bool(wiring["ok"])
