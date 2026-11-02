@@ -76,7 +76,7 @@ What goes on each page by default. The generation subagent has aesthetic freedom
 - **Brief proof:** 1–3 testimonials or stat callouts (full proof lives at `/proof/` if picked)
 - **Founder/brand glimpse:** 1–2 sentences from `soul.md` or `offer.md` if relevant
 - **Secondary CTA:** repeat of primary, often with different copy ("ready when you are"), same conversion URL
-- **Footer:** Noontide footer (see below)
+- **Footer:** parent-entity footer (see below)
 
 The conversion URL is the same one used everywhere on the site. Until the URL
 is wired, placeholder `https://CONVERSION-PLACEHOLDER` ships and the `/mb-site`
@@ -129,22 +129,22 @@ The post-conversion landing page. Wherever the conversion endpoint allows a redi
 
 ## Footer (every page)
 
-The last visible element on every `.html` page. Default content:
+The last visible element on every `.html` page. Template (replace the placeholders from `offer.md`):
 
 ```html
 <footer class="site-footer">
   <p>
-    A product of <strong>Noontide Collective LLC</strong> ·
+    A product of <strong>&lt;legal entity from offer.md&gt;</strong> ·
     <a href="/privacy/">Privacy</a> ·
     <a href="/terms/">Terms</a> ·
-    <a href="mailto:hello@noontide.co">Contact</a>
+    <a href="mailto:&lt;contact email from offer.md&gt;">Contact</a>
   </p>
 </footer>
 ```
 
-**Override:** if `offer.md` declares a different parent entity (e.g., `entity: DM-LLC`, `contact: dm@example.com`), substitute. Otherwise use the default verbatim.
+**Entity:** take the parent entity and contact email from `offer.md` (e.g., `entity: Example LLC`, `contact: hello@example.com`). Never default to our own entity. If `offer.md` has none, ask the owner.
 
-The skill's validation step greps every page for "Noontide Collective LLC" or the declared replacement. Missing footer = generation failure, fix request to subagent.
+The skill's validation step greps every page for the entity value declared in `offer.md`. Missing footer = generation failure, fix request to subagent.
 
 ---
 

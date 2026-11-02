@@ -53,10 +53,10 @@ Each missing file is a fix request to the subagent.
 Footer presence:
 
 ```bash
-grep -L "Noontide Collective LLC" *.html **/*.html
+grep -L "$ENTITY" *.html **/*.html   # ENTITY = the legal entity from offer.md
 ```
 
-That command should return nothing, or only files where `offer.md` declared a different parent entity.
+That command should return nothing, or only files where `offer.md` declared no entity (ask the owner first).
 
 OG render:
 

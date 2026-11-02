@@ -17,8 +17,7 @@ Invocation: `python3 stripe.py <subcommand> [args]`
 Output: companyctx-shape envelope JSON on stdout, logs on stderr.
 Exit code: 0 on ok|partial, 1 on degraded.
 
-Idempotency model (per `noontide-co/noontide-ops`
-decisions/2026-04-27-credential-provisioning.md):
+Idempotency model (per the credential-provisioning decision):
 
   1. Search products by metadata `mb_offer:<slug>` AND `mb_kind:deposit`.
      If found AND product has stashed `mb_payment_link_url` in metadata
