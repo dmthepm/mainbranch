@@ -11,8 +11,13 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.20] - 2026-11-02
+
 ### Added
 
+- `mb machine doctor [--json]` reads a limited Ubuntu and Omarchy baseline
+  without elevation. Manifest support is deferred. Exit 3 means incomplete
+  verification; a Linux run cannot yet establish full machine health.
 - Agent role cards. One committed file per agent at `core/roles/<name>.md`
   names its role, skills, tools, protocols, first action and checkpoint file.
   `mb role list`, `mb role show` and `mb role check` read them (`--json`
@@ -30,11 +35,28 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `init-site.sh`). The website shape now builds static-first on Cloudflare
   Pages, with an optional generator build step, and `website-build.md` keeps
   the brand, copy and publish guidance.
-- Bundled skills lose about a fifth of their duplicated text (Round 1-3 of the
-  skills cleanup): the shipped `.claude/reference/` copies of compliance,
-  minisite, engine-path and pull-engine-updates are gone (the skill copy is
-  the home), site footers take the parent entity from the owner's `offer.md`,
+- Bundled skills are about 7,300 lines shorter (roughly one line in six),
+  cut from duplicated and stale text. Safety, approval, spend, publishing and
+  customer-contact rules stay. The shipped `.claude/reference/` copies of
+  compliance, minisite, engine-path and pull-engine-updates are gone (the
+  skill copy is the home), site footers and the Stripe card statement
+  descriptor come from the owner's `offer.md` (there is no built-in default,
+  and the Stripe payment-link script now refuses to run without a descriptor),
   and `/mb-think` and `/mb-organic` share the `*-competitor-mine.md` name.
+  `/mb-organic` no longer ships `mining-template.md`.
+- The generated `CLAUDE.md` and `AGENTS.md` for a business repo are shorter
+  (351 to 267 and 585 to 475 lines), so they cost less every session. Safety,
+  approval, spend, publishing and customer-contact rules stay; detail moved to
+  skills, docs and `mb --help`. `mb update` refreshes only the `CLAUDE.md`
+  entry-rules block, so an older repo keeps its copy until you refresh it;
+  `mb doctor repair --only codex` replaces the `AGENTS.md` managed block.
+- The README and the start of `docs/beginner-setup.md` are rewritten for a
+  business owner: what Main Branch is, what you get, and what to do first.
+- Stale reports moved to `docs/archive/` with an index, and every doc is now
+  routed from `docs/README.md`.
+- Internal: the largest engine files (`cli`, `status`, `connect`, `codex`,
+  `doctor`) are split by concern. Functions moved unchanged and every name
+  stays importable from its old module; nothing an owner runs changes.
 - The tailnet skills' draft notes now record one real redaction run on one
   machine. Both skills stay draft.
 - The Main Branch plugin is now pinned to the exact 0.6.19 release commit. New
@@ -43,10 +65,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ## [0.6.19] - 2026-11-01
 
 ### Added
-
-- `mb machine doctor [--json]` reads a limited Ubuntu and Omarchy baseline
-  without elevation. Manifest support is deferred. Exit 3 means incomplete
-  verification; a Linux run cannot yet establish full machine health.
 
 - `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
   hardening and extending an always-on agent machine, with read-only
