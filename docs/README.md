@@ -38,7 +38,7 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 - [`offer-sharpening.md`](offer-sharpening.md) — the loop for making an offer clearer, more believable, and truer to the operator's voice.
 - [`scheduled-data-sync.md`](scheduled-data-sync.md) — how to keep business data fresh on a schedule.
 - [`usage.md`](usage.md) — `mb usage`: read local snapshots of your agents' weekly usage.
-- [`role-cards.md`](role-cards.md) — role cards: tell each restarted agent what it is for (Claude Code; Codex pending real-run verification).
+- [`role-cards.md`](role-cards.md) — role cards: tell each restarted agent what it is for (Claude Code and Codex).
 - [`homelab-skills.md`](homelab-skills.md) — read-only Claude Code skills that inspect the machines running your agents.
 - [`books.md`](books.md) — bookkeeping safety, hledger, and the private ledger vault model.
 - [`books-workflow.md`](books-workflow.md) — the statement-anchored books protocol inside a private hledger books repo.

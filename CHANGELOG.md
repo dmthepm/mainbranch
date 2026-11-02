@@ -19,8 +19,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   one user-level Codex `SessionStart` hook that prints the same role card and
   checkpoint on startup, resume, clear, compact and fork. It merges into an existing
   `hooks.json`, keeps other hooks, and `--remove` takes it out. `mb doctor` reports
-  `role-cards-codex` and never calls the hook trusted. Codex: pending real-run
-  verification. Needs a Codex restart and your review of the hook in `/hooks`;
+  `role-cards-codex` and never calls the hook trusted. Tested in a real run on Codex
+  0.164. Needs a Codex restart and your review of the hook in `/hooks`;
   subagents are not covered. `/mb-start`, `/mb-end` and `/mb-help` name the loaded
   role, save to its checkpoint file, and say to start a new lane with `MB_ROLE`.
   See [role cards](docs/role-cards.md).

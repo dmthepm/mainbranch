@@ -3,9 +3,8 @@
 A role card tells one agent what it is for. A restarted agent reads its card
 instead of a generic prompt, so it does not take another agent's role.
 
-Works in Claude Code. Codex: pending real-run verification. The Codex hook is
-implemented and tested against its documented behavior, but not yet confirmed in a
-real Codex run. See [Codex](#codex).
+Works in Claude Code and Codex. Codex needs one setup step and one review. See
+[Codex](#codex).
 
 ## The card
 
@@ -109,7 +108,10 @@ Other limits:
 
 ## Codex
 
-Codex: pending real-run verification.
+Tested in a real run on Codex 0.164: startup from a subfolder, resume, clear, compact,
+fork, a git worktree, the refusal when no role is set, and silence in a repo with no
+cards. Not tested: a bare `codex` that auto-restores a session, subagents, later Codex
+versions, a full-length card and checkpoint near the size limit.
 
 The card and `mb role hook` are the same as in Claude Code. Codex only needs a thin
 trigger, a user-level `SessionStart` hook in `hooks.json` under `$CODEX_HOME`
@@ -139,14 +141,17 @@ always says trust is "not verified": doctor cannot see Codex's trust store.
 
 Limits:
 
+- **Runs outside the sandbox.** Codex warns that trusted hooks can run outside its
+  sandbox. This one runs `mb role hook` and prints text.
 - **Trust review.** Codex records a hash of each hook and skips a new or changed
   one until you approve it. It prints a startup warning telling you to open `/hooks`;
   review and trust the Main Branch hook there. Until you do, no card is loaded. A
   Main Branch update that changes the hook command asks for review again.
 - **Restart needed.** Install, then restart Codex.
 - **Subagents are not covered.** Only the session itself is told its role.
-- **User-level only.** Codex ignores repo-level hooks in git worktrees and in
-  untrusted projects, so the repo's `.codex/hooks.json` is not used.
+- **User-level only.** A user-level hook works in git worktrees (tested). Repo-level
+  hooks need a trusted project and have been reported ignored in worktrees, so the
+  repo's `.codex/hooks.json` is not used.
 - **A bare `codex` that auto-restores a session** may fire no source on some
   versions. Use `codex resume` to be sure. Not proven on 0.164.
 - **Size.** Codex shortens long hook output. The hook sets a 4,000-token limit, enough
