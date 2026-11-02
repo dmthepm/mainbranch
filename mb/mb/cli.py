@@ -27,6 +27,7 @@ from mb import init as init_mod
 from mb import issue as issue_mod
 from mb import machine_doctor as machine_doctor_mod
 from mb import roles as roles_mod
+from mb import roles_codex as roles_codex_mod
 from mb import start as start_mod
 from mb import status as status_mod
 from mb import usage as usage_mod
@@ -2362,18 +2363,49 @@ def role_check_cmd(
     raise typer.Exit(0 if report["ok"] else 1)
 
 
+def _codex_hook_input() -> dict[str, Any]:
+    """The JSON payload Codex sends a hook on stdin; {} when absent, a terminal, or not JSON."""
+    try:
+        if sys.stdin is None or sys.stdin.isatty():
+            return {}
+        payload = json.loads(sys.stdin.read(65_536))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _codex_hook_target(payload: dict[str, Any], source: str) -> tuple[str, str]:
+    """The repo folder and source for a Codex session, from the payload and its cwd.
+
+    Codex sets no project variable, so the session ``cwd`` is the only place to start;
+    a subfolder of the business repo resolves up to the repo that has ``core/roles``.
+    """
+    cwd = payload.get("cwd")
+    start = Path(cwd) if isinstance(cwd, str) and Path(cwd).is_absolute() else Path.cwd()
+    repo = roles_mod.find_repo(start) if start.is_dir() else None
+    payload_source = payload.get("source")
+    chosen = payload_source if payload_source in roles_mod.HOOK_SOURCES else source
+    return str(repo or start), chosen if chosen in roles_mod.HOOK_SOURCES else "unknown"
+
+
 @role_app.command("hook")
 def role_hook_cmd(
-    source: str = typer.Option("startup", "--source", help="startup, resume, clear, or compact."),
+    source: str = typer.Option("", "--source", help="startup, resume, clear, compact, or fork."),
+    runtime: str = typer.Option("claude", "--runtime", help="claude (default) or codex."),
 ) -> None:
     """SessionStart hook entry: print the selected role card, or a refusal.
 
     Prints nothing when the repo has no role cards. Always exits 0: a hook
     cannot block a session, so the refusal is text the agent must obey.
+    With --runtime codex the repo and source come from Codex's stdin payload.
     """
-    repo = os.environ.get("CLAUDE_PROJECT_DIR") or "."
-    safe_source = source if source in roles_mod.HOOK_SOURCES else "unknown"
     try:
+        if runtime == "codex":
+            repo, safe_source = _codex_hook_target(_codex_hook_input(), source)
+        else:
+            repo = os.environ.get("CLAUDE_PROJECT_DIR") or "."
+            source = source or "startup"
+            safe_source = source if source in roles_mod.HOOK_SOURCES else "unknown"
         text = roles_mod.hook_text(repo, safe_source)
     except Exception:
         text = roles_mod.refusal(
@@ -2381,3 +2413,46 @@ def role_hook_cmd(
         )
     if text:
         typer.echo(text)
+
+
+@role_app.command("codex-hook")
+def role_codex_hook_cmd(
+    apply_changes: bool = typer.Option(
+        False, "--apply", help="Write the change. Default: preview."
+    ),
+    remove: bool = typer.Option(False, "--remove", help="Remove the Main Branch Codex hook."),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Preview or install the Codex SessionStart hook that loads role cards.
+
+    Edits only the user-level hooks.json in CODEX_HOME (default ~/.codex). Other hooks
+    are kept, a changed file is written atomically, and a file that cannot be read as
+    expected is left untouched. Codex asks you to review the hook before it runs.
+    """
+    report = (
+        roles_codex_mod.apply(remove=remove)
+        if apply_changes
+        else roles_codex_mod.plan(remove=remove)
+    )
+    report.pop("after", None)
+    report["ok"] = report["action"] != "refused"
+    if json_out:
+        typer.echo(
+            _json_payload(
+                report, command="mb role codex-hook", schema_name="mainbranch.role.codex_hook"
+            )
+        )
+    else:
+        verb = "remove" if remove else "install"
+        if report["action"] == "refused":
+            typer.echo(f"Refused: {report['problem']}")
+        elif report["action"] == "unchanged":
+            typer.echo(f"Nothing to {verb}: {report['path']} is already as wanted.")
+        else:
+            typer.echo(report["diff"].rstrip() or f"(would {verb} {report['path']})")
+            typer.echo("")
+            if report.get("written"):
+                typer.echo("Done. Restart Codex, then open /hooks and trust the hook.")
+            else:
+                typer.echo(f"Preview only. Run again with --apply to {verb}.")
+    raise typer.Exit(1 if report["action"] == "refused" else 0)

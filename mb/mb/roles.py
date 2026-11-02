@@ -31,7 +31,7 @@ REQUIRED_FIELDS: tuple[str, ...] = (
     "checkpoint",
 )
 LIST_FIELDS = ("skills", "tools", "protocols")
-HOOK_SOURCES = ("startup", "resume", "clear", "compact")
+HOOK_SOURCES = ("startup", "resume", "clear", "compact", "fork")
 MAX_CARD_BYTES = 65_536
 MAX_CHECKPOINT_BYTES = 8_192
 _CONTROL_RE = re.compile("[\\x00-\\x1f\\x7f-\\x9f\\u2028\\u2029]")
@@ -90,6 +90,21 @@ def card_paths(repo: str | Path) -> list[Path]:
 
 def has_cards(repo: str | Path) -> bool:
     return bool(card_paths(repo))
+
+
+def find_repo(start: str | Path) -> Path | None:
+    """The nearest folder at or above ``start`` that has ``core/roles/``, or None.
+
+    The walk stops at the first git root, so a session started in a subfolder of
+    a business repo finds its cards and never reaches into a parent repo.
+    """
+    current = Path(start).expanduser().resolve()
+    for folder in (current, *current.parents):
+        if (folder / ROLES_DIR).is_dir():
+            return folder
+        if (folder / ".git").exists():
+            return None
+    return None
 
 
 def _safe_relative(value: str) -> bool:

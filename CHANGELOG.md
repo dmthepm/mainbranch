@@ -11,6 +11,18 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- Role cards in Codex. `mb role codex-hook` previews, and with `--apply` installs,
+  one user-level Codex `SessionStart` hook that prints the same role card and
+  checkpoint on startup, resume, clear, compact and fork. It merges into an existing
+  `hooks.json`, keeps other hooks, and `--remove` takes it out. `mb doctor` reports
+  `role-cards-codex` and never calls the hook trusted. Codex: pending real-run
+  verification. Needs a Codex restart and your review of the hook in `/hooks`;
+  subagents are not covered. `/mb-start`, `/mb-end` and `/mb-help` name the loaded
+  role, save to its checkpoint file, and say to start a new lane with `MB_ROLE`.
+  See [role cards](docs/role-cards.md).
+
 ### Changed
 
 - The Main Branch plugin is now pinned to the exact 0.6.20 release commit. New

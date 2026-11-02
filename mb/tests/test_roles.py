@@ -66,7 +66,7 @@ def test_schema_fields_are_pinned() -> None:
     )
     assert roles.ROLES_DIR == "core/roles"
     assert roles.ROLE_ENV == "MB_ROLE"
-    assert roles.HOOK_SOURCES == ("startup", "resume", "clear", "compact")
+    assert roles.HOOK_SOURCES == ("startup", "resume", "clear", "compact", "fork")
 
 
 @pytest.mark.parametrize(

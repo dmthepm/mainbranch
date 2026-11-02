@@ -363,6 +363,8 @@ editing. If approved, note the updated file in the crystallize file.
 
 ## Step 6: Checkpoint & Close
 
+If a role card is loaded, save progress notes to that role's checkpoint file, the path its card names, and do not repeat the card.
+
 Run `mb checkpoint --plan --json` from the business repo. Summarize the changed
 surfaces/files, proposed message, and any blockers.
 
