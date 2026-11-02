@@ -99,14 +99,16 @@ def _validate_meta_with_cli(
     which_func: Which | None = None,
     command_runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
-    checked_at = _now()
+    from mb import connect
+
+    checked_at = connect._now()
     checks: list[dict[str, Any]] = []
-    prereq_state = _meta_prerequisite_state(
+    prereq_state = connect._meta_prerequisite_state(
         which_func=which_func,
         command_runner=command_runner,
     )
     if prereq_state:
-        repair = _meta_repair(prereq_state)
+        repair = connect._meta_repair(prereq_state)
         checks.append(
             {
                 "name": "local_prerequisites",
@@ -115,7 +117,7 @@ def _validate_meta_with_cli(
                 "safe_to_share": True,
             }
         )
-        return _meta_validation_result(
+        return connect._meta_validation_result(
             ok=False,
             state=prereq_state,
             checked_at=checked_at,
@@ -125,8 +127,8 @@ def _validate_meta_with_cli(
             repair_command=repair["repair_command"],
         )
     if not secret:
-        repair = _meta_repair("missing_secret", ["access_token"])
-        return _meta_validation_result(
+        repair = connect._meta_repair("missing_secret", ["access_token"])
+        return connect._meta_validation_result(
             ok=False,
             state="missing_secret",
             checked_at=checked_at,
@@ -137,8 +139,8 @@ def _validate_meta_with_cli(
         )
     ad_account_id = str(metadata.get("ad_account_id") or "").strip()
     if not ad_account_id:
-        repair = _meta_repair("missing_metadata")
-        return _meta_validation_result(
+        repair = connect._meta_repair("missing_metadata")
+        return connect._meta_validation_result(
             ok=False,
             state="missing_metadata",
             checked_at=checked_at,
@@ -149,14 +151,18 @@ def _validate_meta_with_cli(
         )
 
     run = command_runner or _run_command
-    env = _meta_env(secret, metadata)
+    env = connect._meta_env(secret, metadata)
     auth_args = ["meta", "auth", "status"]
-    auth = _run_meta_command(run, auth_args, repo, env)
-    checks.append(_safe_command_check("auth_status", auth_args, auth))
+    auth = connect._run_meta_command(run, auth_args, repo, env)
+    checks.append(connect._safe_command_check("auth_status", auth_args, auth))
     if not auth.get("ok"):
-        state = "waiting_for_admin_approval" if _looks_like_admin_approval(auth) else "auth_failed"
-        repair = _meta_repair(state)
-        return _meta_validation_result(
+        state = (
+            "waiting_for_admin_approval"
+            if connect._looks_like_admin_approval(auth)
+            else "auth_failed"
+        )
+        repair = connect._meta_repair(state)
+        return connect._meta_validation_result(
             ok=False,
             state=state,
             checked_at=checked_at,
@@ -179,16 +185,16 @@ def _validate_meta_with_cli(
                 }
             )
             continue
-        result = _run_meta_command(run, args, repo, env)
-        checks.append(_safe_command_check(name, args, result))
+        result = connect._run_meta_command(run, args, repo, env)
+        checks.append(connect._safe_command_check(name, args, result))
         if not result.get("ok"):
             state = (
                 "waiting_for_admin_approval"
-                if _looks_like_admin_approval(result)
+                if connect._looks_like_admin_approval(result)
                 else "read_smoke_failed"
             )
-            repair = _meta_repair(state)
-            return _meta_validation_result(
+            repair = connect._meta_repair(state)
+            return connect._meta_validation_result(
                 ok=False,
                 state=state,
                 checked_at=checked_at,
@@ -198,7 +204,7 @@ def _validate_meta_with_cli(
                 repair_command=repair["repair_command"],
             )
 
-    return _meta_validation_result(
+    return connect._meta_validation_result(
         ok=True,
         state="ready",
         checked_at=checked_at,
@@ -245,10 +251,12 @@ def _probe_stripe(provider: Provider, secret: str) -> dict[str, Any]:
     A 2xx means allowed and a 403 means the key is valid but restricted from
     that resource. A 401 anywhere means Stripe rejected the key itself.
     """
+    from mb import connect
+
     scopes: dict[str, str] = {}
     first_upstream: dict[str, Any] = {}
     for resource, url in STRIPE_SCOPE_PROBES:
-        result = _http_get_json(
+        result = connect._http_get_json(
             url,
             {"Authorization": f"Bearer {secret}"},
             provider_name=provider.name,
@@ -304,14 +312,16 @@ GITHUB_SCOPE_RE = re.compile(r"[a-z][a-z_]{0,31}(?::[a-z][a-z_]{0,31})?")
 
 def _probe_github(provider: Provider, secret: str) -> dict[str, Any]:
     """Authenticated-user read, plus the scopes GitHub reports for the token."""
-    result = _http_get_json(
+    from mb import connect
+
+    result = connect._http_get_json(
         "https://api.github.com/user",
         {"Authorization": f"Bearer {secret}", **GITHUB_API_HEADERS},
         provider_name=provider.name,
         endpoint_family="github_authenticated_user",
         response_headers=("X-OAuth-Scopes",),
     )
-    kind = _github_token_kind(secret)
+    kind = connect._github_token_kind(secret)
     raw_headers = result.get("headers")
     headers: dict[str, Any] = raw_headers if isinstance(raw_headers, dict) else {}
     raw_scopes = headers.get("X-OAuth-Scopes")
@@ -342,6 +352,8 @@ def _probe_github(provider: Provider, secret: str) -> dict[str, Any]:
 
 def _probe_ga4(provider: Provider, secret: str, metadata: dict[str, Any]) -> dict[str, Any]:
     """Read one property's metadata from the GA4 Admin API."""
+    from mb import connect
+
     raw_property = str(metadata.get("property_id") or "").strip()
     match = GA4_PROPERTY_RE.fullmatch(raw_property)
     if not match:
@@ -365,7 +377,7 @@ def _probe_ga4(provider: Provider, secret: str, metadata: dict[str, Any]) -> dic
                 "safe_to_share": True,
             },
         }
-    return _http_get_json(
+    return connect._http_get_json(
         f"https://analyticsadmin.googleapis.com/v1beta/properties/{match.group(1)}",
         {"Authorization": f"Bearer {secret}"},
         provider_name=provider.name,
@@ -384,10 +396,10 @@ def _validate_with_provider(
 ) -> dict[str, Any]:
     from mb import connect
 
-    checked_at = _now()
+    checked_at = connect._now()
     metadata = metadata or {}
     if provider.id == "cloudflare":
-        token_type = _cloudflare_token_type(metadata, secret)
+        token_type = connect._cloudflare_token_type(metadata, secret)
         if token_type == "account":
             account_id = str(metadata.get("account_id") or "").strip()
             if not account_id:
@@ -423,7 +435,7 @@ def _validate_with_provider(
         else:
             url = "https://api.cloudflare.com/client/v4/user/tokens/verify"
             endpoint_family = "cloudflare_user_token_verify"
-        result = _http_get_json(
+        result = connect._http_get_json(
             url,
             {"Authorization": f"Bearer {secret}"},
             provider_name=provider.name,
@@ -432,7 +444,7 @@ def _validate_with_provider(
         raw_upstream = result.get("upstream")
         upstream: dict[str, Any] = raw_upstream if isinstance(raw_upstream, dict) else {}
         if token_type == "account" and upstream.get("http_status") == 404:
-            fallback = _http_get_json(
+            fallback = connect._http_get_json(
                 f"https://api.cloudflare.com/client/v4/accounts/{account_id}",
                 {"Authorization": f"Bearer {secret}"},
                 provider_name=provider.name,
@@ -450,7 +462,7 @@ def _validate_with_provider(
                 )
             result = fallback
     elif provider.id == "apify":
-        result = _http_get_json(
+        result = connect._http_get_json(
             "https://api.apify.com/v2/users/me",
             {"Authorization": f"Bearer {secret}"},
             provider_name=provider.name,
@@ -484,7 +496,7 @@ def _validate_with_provider(
                 f"{provider.name} has a stored credential, but Main Branch has no "
                 "automated way to confirm it works with the provider."
             ),
-            "repair": _unverified_repair(provider)["repair"],
+            "repair": connect._unverified_repair(provider)["repair"],
             "safe_to_share": True,
         }
     return {

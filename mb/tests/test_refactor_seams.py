@@ -1,5 +1,8 @@
 """Compatibility checks for the original module bindings."""
 
+import ast
+import inspect
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -56,3 +59,30 @@ def test_original_imports_remain_available() -> None:
     assert schema_write_blocker is migrate.schema_write_blocker
     assert validate_mod is validate
     assert json_default is original_json_default
+
+
+@pytest.mark.parametrize("module_name", ["connect_probes", "connect_render"])
+def test_extracted_calls_use_connect_bindings(module_name: str) -> None:
+    function_names = {name for name, value in vars(connect).items() if inspect.isfunction(value)}
+    source_path = Path(connect.__file__).with_name(f"{module_name}.py")
+    tree = ast.parse(source_path.read_text())
+    direct_calls = [
+        f"{module_name}:{call.lineno}: {call.func.id}"
+        for function in ast.walk(tree)
+        if isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef))
+        for call in ast.walk(function)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id in function_names
+    ]
+    assert direct_calls == [], "Calls bypass mb.connect bindings: " + ", ".join(direct_calls)
+
+
+def test_provider_status_uses_connect_state_label(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(connect, "state_label", lambda state: "patched label")
+    connect.render_provider_status(
+        {"ok": True, "provider": "github", "account_label": "", "state": "ready"}
+    )
+    assert capsys.readouterr().out == "mb connect status github: ok (patched label)\n"

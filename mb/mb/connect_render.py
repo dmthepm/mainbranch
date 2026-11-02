@@ -52,6 +52,8 @@ def state_label(state: str) -> str:
 
 
 def render_status(result: dict[str, Any]) -> None:
+    from mb import connect
+
     summary = result["summary"]
     print(f"mb connect status  {result['repo']}")
     line = (
@@ -75,21 +77,24 @@ def render_status(result: dict[str, Any]) -> None:
     for item in result["providers"]:
         state = "ok" if item["ok"] else "warn"
         label = f" ({item['account_label']})" if item["account_label"] else ""
-        print(f"  {state}  {item['provider']}{label}: {state_label(item['state'])}")
+        print(f"  {state}  {item['provider']}{label}: {connect.state_label(item['state'])}")
         if item["repair_command"]:
             print(f"       next: {item['repair_command']}")
 
 
 def render_provider_status(result: dict[str, Any]) -> None:
+    from mb import connect
+
     state = "ok" if result["ok"] else "warn"
     label = f" ({result['account_label']})" if result["account_label"] else ""
     print(
-        f"mb connect status {result['provider']}{label}: {state} ({state_label(result['state'])})"
+        f"mb connect status {result['provider']}{label}: {state} "
+        f"({connect.state_label(result['state'])})"
     )
     if result.get("summary"):
         print(f"summary: {result['summary']}")
     if result.get("credential_mode") == "oauth":
-        _render_google_products(result)
+        connect._render_google_products(result)
     if result.get("repair_command"):
         print(f"next: {result['repair_command']}")
 
@@ -126,10 +131,12 @@ def _render_google_products(result: dict[str, Any]) -> None:
 
 
 def render_doctor(result: dict[str, Any]) -> None:
+    from mb import connect
+
     print(f"mb connect doctor  {result['repo']}")
     for check in result["checks"]:
         state = "ok" if check["ok"] else "warn"
-        print(f"  {state}  {check['name']}: {state_label(check['state'])}")
+        print(f"  {state}  {check['name']}: {connect.state_label(check['state'])}")
         if check["repair_command"]:
             print(f"       next: {check['repair_command']}")
     probe_gap = result.get("probe_gap") or {}
@@ -139,6 +146,8 @@ def render_doctor(result: dict[str, Any]) -> None:
 
 
 def render_test_result(result: dict[str, Any]) -> None:
+    from mb import connect
+
     if result.get("provider") == "google" and "products" in result:
         from mb import google_probe
 
@@ -153,7 +162,7 @@ def render_test_result(result: dict[str, Any]) -> None:
         if result.get("not_recorded_reason")
         else status["state"]
     )
-    print(f"mb connect test {result['provider']}: {state} ({state_label(shown)})")
+    print(f"mb connect test {result['provider']}: {state} ({connect.state_label(shown)})")
     summary = validation.get("summary")
     if summary:
         print(f"summary: {summary}")
@@ -179,9 +188,9 @@ def render_test_result(result: dict[str, Any]) -> None:
     else:
         next_command = str(status.get("repair_command") or "")
     if result.get("not_recorded_reason") == "user_scope_read_only":
-        render_user_scope_not_recorded()
+        connect.render_user_scope_not_recorded()
     elif result.get("not_recorded_reason") == "user_scope_write_failed":
-        render_user_scope_write_failed(result)
+        connect.render_user_scope_write_failed(result)
     if next_command:
         print(f"next: {next_command}")
 
@@ -193,14 +202,18 @@ def not_recorded_line(detail: str) -> str:
 
 
 def render_user_scope_write_failed(result: dict[str, Any]) -> None:
+    from mb import connect
+
     detail = result.get("not_recorded_detail") or "the user-scope file was not written"
-    print(not_recorded_line(str(detail)))
+    print(connect.not_recorded_line(str(detail)))
 
 
 def render_rotate_result(result: dict[str, Any]) -> None:
+    from mb import connect
+
     stored = "stored" if result["stored"] else "not stored"
     print(f"mb connect rotate {result['provider']}: re-read from 1Password, {stored}")
-    render_test_result(result)
+    connect.render_test_result(result)
 
 
 def render_hydrate_result(result: dict[str, Any]) -> None:
