@@ -38,9 +38,8 @@ the operator to fix the runtime/login-shell PATH and rerun read-only checks
 before Main Branch advice, repair planning, or writes.
 
 Use `mb status --json --peek` as the default daily briefing before routing the
-operator. It names readiness, drift, onboarding progress, update state, GitHub
-activity, provider signals, recent work, content strategy health, MoneyPath,
-ranked actions, bets, pushes, and checkpoint state.
+operator (readiness, drift, update state, provider signals, recent work, MoneyPath,
+ranked actions, bets, pushes, checkpoint state).
 Do not replace those facts with ad hoc shell inspection unless `mb` says a section is unavailable.
 
 Read-only commands can be run without asking first. Commands that write files,
@@ -109,8 +108,7 @@ business-owner language. Speak first in terms of bets, goals, offers, pushes,
 playbooks, outcomes, decisions, next actions, and saved checkpoints. Treat git,
 branches, pull requests, provider refs, and local wiring as the hidden memory
 layer unless the operator asks for the plumbing.
-
-Default translations for normal owner answers:
+Default translations:
 - `git is clean`, `repo is clean`, `working tree clean`, or `working tree: clean`
   -> nothing unsaved locally;
 - `branch main`, `branch: main`, or `current branch: main` -> current business
@@ -130,12 +128,9 @@ Use the `vocabulary` block from `mb status --json --peek` when present. If
 `core/vocabulary.md` says this business calls pushes drops, launches,
 challenges, or promos, use that word in operator-facing prose while preserving
 current paths, frontmatter, JSON keys, validator rules, and command names.
-
-Use the `team` block from `mb status --json --peek` when present. Map known
-GitHub handles to the business names in `core/team/<slug>.md`; keep unknown
-handles as handles and suggest adding a public-safe team file when the person is
-part of the business context. Do not invent identities from commit authors,
-emails, or usernames alone.
+Use the `team` block when present: map known GitHub handles to the names in
+`core/team/<slug>.md`, keep unknown handles as handles, and never invent
+identities from commit authors, emails, or usernames alone.
 
 ## Codex Lifecycle Workflow Index
 
@@ -144,7 +139,7 @@ Branch Codex skill bundle is installed globally once per user and routes `mb-*`
 workflow names over deterministic `mb` facts. Business repos keep this
 lightweight `AGENTS.md` guidance instead of tracked repo-local plugin or skill
 copies. `mb doctor repair --only codex` refreshes this file and installs or
-repairs the global skills.
+repairs the global skills (`mb doctor repair --plan --only codex` inspects them).
 
 Use the global Main Branch skills for Main Branch daily routes only. Do not
 create repo-local Codex plugin manifests, copied Claude skill trees, or
@@ -154,16 +149,10 @@ The global `main-branch` skill is an index; named global skills such as
 `mb-start`, `mb-status`, `mb-think`, `mb-bet`, `mb-ads`, `mb-organic`, and
 `mb-site` carry the workflow routes.
 
-Use this index to map natural Codex requests:
-
 - **Start the day / what next / get oriented:** use the Codex Start Workflow
-  below. Run `mb status --json --peek` first, then `mb start --json` when
-  runtime handoff or adapter-readiness facts matter.
+  below.
 - **Inspect status / what changed / what is stale:** use the Codex Status
   Workflow below.
-  Answer from `ranked_actions`, `since_last_check`, `journal`, `money_path`,
-  `validation.file_contracts`, `content_strategy`, `integrations`,
-  `readiness`, and `drift.items`.
 - **Think / research / decide / codify:** use the Codex Think Route below. Start
   from `mb` facts, choose a research depth, and ask before writing durable
   business files.
@@ -177,38 +166,26 @@ Use this index to map natural Codex requests:
   Read workflow inventory from canonical `items`; `workflows` is a
   compatibility alias and `counts.items` is the top-level count.
 
-Use `mb doctor repair --plan --only codex` to inspect global skill wiring.
-
 ## Codex Start Workflow
 
 This is the Codex-native start workflow.
 
-1. Run `mb status --json --peek` from the current working directory. Use the
-   repo markers in that JSON to confirm this is the business repo. If the
-   status report says this is not a Main Branch repo or the command is missing,
-   ask for the business repo path instead of guessing.
-2. Use the status JSON as the source of truth for
-   readiness, drift, onboarding, update severity, GitHub facts, provider
-   readiness, recent work, MoneyPath, ranked actions, bets, pushes,
-   vocabulary, and checkpoint state.
-3. Run `mb start --json` when you need runtime handoff, repo-boundary, or
-   adapter-readiness facts.
-4. Stop before more checks if either status or start reports
-   `runtime.codex_cli.status` as `runtime_mismatch`, or if `drift.items`
-   includes `codex_runtime_mb_mismatch`. Tell the operator to fix the
-   runtime/login-shell PATH first.
-5. Run `mb doctor repair --plan` before recommending setup or repair. Quote the
+1. Run `mb status --json --peek` from the current working directory and confirm
+   the repo markers. If it is not a Main Branch repo or `mb` is missing, ask
+   for the business repo path instead of guessing.
+2. Run `mb start --json` when you need runtime handoff, repo-boundary, or
+   adapter-readiness facts. Apply the runtime-mismatch stop above.
+3. Run `mb doctor repair --plan` before recommending setup or repair. Quote the
    exact repair command from the plan. Ask before any write/apply command.
-6. If status says an update is required, route to the cited `mb update` command
-   and ask before running it. If status says an update is recommended, make that
-   the only recommendation before business routing: name installed/latest
-   versions, use `update.release_notes_url` or `update.update_check_command`
-   when present, and ask whether to update now. Do not show ranked actions
-   until after the operator updates or explicitly chooses to continue. After an
-   approved update, rerun `mb status --json --peek`.
-7. Resume onboarding from status facts. In rich repos, read existing `core/`
+4. If status says an update is required, route to the cited `mb update` command
+   and ask before running it. If an update is recommended, make it the only
+   recommendation before business routing: name installed/latest versions, use
+   `update.release_notes_url` or `update.update_check_command` when present, and
+   ask whether to update now. Show no ranked actions until the operator updates
+   or chooses to continue; rerun `mb status --json --peek` after an update.
+5. Resume onboarding from status facts. In rich repos, read existing `core/`
    files before asking bounded missing-profile questions.
-8. Present one clear business route: frame a bet, think through a decision,
+6. Present one clear business route: frame a bet, think through a decision,
    advance a push, draft a playbook, repair the repo, review provider
    readiness, save a checkpoint, or inspect a specific offer.
 
@@ -220,31 +197,21 @@ before acting.
 
 This is the Codex-native status workflow.
 
-1. Run `mb status --json --peek`.
-2. Treat the JSON as the source of truth for setup, update, drift, GitHub,
-   onboarding, integrations, bets, recent work, since-last-check,
-   `content_strategy`, `money_path`, `validation.file_contracts`, vocabulary,
-   checkpoint state, and `ranked_actions`.
-3. Stop before business routing if `runtime.codex_cli.status` is
-   `runtime_mismatch` or `drift.items` includes `codex_runtime_mb_mismatch`.
-   Tell the operator to fix the runtime/login-shell PATH and rerun the
-   read-only checks first.
-4. Lead with the top `ranked_actions` entry when the operator asks what to do
-   next. Include the reason and cited signal summaries. After it, name the
-   first warn-level `relationship_health.gaps` item once with its repair.
-5. For "what changed?" answer from `since_last_check.journal` first, then
-   top-level `journal` for recent context.
-6. For provider questions, read `integrations` first. Run `mb connect plan` or
-   `mb connect doctor --json` only when the operator needs choices or repair
-   commands.
-7. Use `money_path` for customer progress, offer, proof, CTA, channel, push,
-   playbook, page readiness, and outcome feedback questions. Keep language
+1. Run `mb status --json --peek`; treat the JSON as the source of truth and
+   apply the runtime-mismatch stop above.
+2. For "what to do next", lead with the top `ranked_actions` entry, its reason,
+   and cited signal summaries, then name the first warn-level
+   `relationship_health.gaps` item once with its repair.
+3. For "what changed?", answer from `since_last_check.journal` first, then
+   top-level `journal`.
+4. Provider questions: read `integrations` first; run `mb connect plan` or
+   `mb connect doctor --json` only when the operator needs choices or repair.
+5. Use `money_path` for customer progress, offer, proof, CTA, channel, push,
+   playbook, page readiness, and outcome feedback; keep language
    evidence-based: legible, supported, connected, instrumented.
-8. Use `validation.file_contracts` when a business file exists but is missing
-   the shape needed for the next workflow. Route offer-shape gaps to
-   `mb-think`; ask before editing files.
-9. Use `content_strategy` for content strategy health, layered channel/account
-   files, stale platform rules, or disconnected content layers.
+6. Use `validation.file_contracts` when a file lacks the shape the next workflow
+   needs (route offer-shape gaps to `mb-think`; ask before editing), and
+   `content_strategy` for strategy health or stale channel/account rules.
 
 Do not mutate the last-check marker unless the operator explicitly says this is
 the daily check-in and wants it recorded.
@@ -408,6 +375,7 @@ The checkpoint plan also lists older uncommitted work, so do not treat it as
 this session's files. If a gap names one, offer one link fix with the field and
 file; ask at most one question. Otherwise, or when unsure, skip.
 
+
 ## Routing Rules
 
 - If `ranked_actions` has entries, lead with the first action, its reason, and
@@ -421,156 +389,78 @@ file; ask at most one question. Otherwise, or when unsure, skip.
   editing durable files.
 - Use `content_strategy` when routing content strategy repair, stale
   channel/account platform-rule review, or disconnected layered files.
-- Route agent usage, remaining capacity, and role-cap questions to `mb usage --json` (read-only).
-- Data/ops surface routing: whose-data questions -> `mb spine declare` and
-  `mb spine show` (the declaration is a committed repo fact that doctor
-  grades; `mb spine init --owned` is the triggered build path only, never a
-  default migration). Money-path-overnight worries, once real money or real
-  leads flow unattended -> `mb canary init`. A recurring daily read on the
-  business -> `mb pulse init` (deterministic collectors + a judgment skill:
-  scorecard, anomalies, exactly ONE recommended action, read-only).
-  A question that spans several repos or sites (what is deployed, is CI red,
-  what is behind) -> `mb fleet status` (read-only; `mb fleet refresh` first;
-  needs Python 3.11+).
-  Real Search Console or GA4 numbers (queries, indexing, sitemaps, sessions,
-  conversions) -> `mb google sc query|inspect|sitemaps list` or
-  `mb google ga4 report` with `--json` (`--out <private file>` for big pulls;
-  read-only, recorded site and property only; not connected -> the person runs
-  `mb connect google --oauth`).
-  "Show me the business" ->
-  `mb dashboard open` (local, read-only, never committed). Commands that
-  need a credential -> `mb connect exec <provider> -- <command>` (the secret
-  goes into that command's environment only, never into output;
-  `mb connect token` refuses terminals and pipes). Plaintext credentials
-  sitting in agent configs -> `mb connect hygiene` (read-only scan; never prints the value). Reading the
-  recorded business identity (ad account, pixel, page, sender domain) instead
-  of inferring it from live state -> `mb connect identity`. Tools missing from
-  the provider list -> `mb connect <id> --custom`. Writing to an external
-  provider (CRM, email
-  send, ads, account metadata) -> the provider-mutation contract: read-only
-  discovery first, a sanitized plan (provider + object count + risk, no
-  private rows), explicit approval, minimal-scope apply, verify + a
-  private-safe record (docs/provider-mutation-contract.md); reads and writes
-  are separate surfaces. Taking real money / an offer going live ->
-  `mb production plan` (read-only: the branch-protection gap — PR required,
-  CI + canary as status checks, force-push/deletion blocked — and the exact
-  gh apply commands the operator runs; `--solo` records a deliberate skip).
-  Comparing lead sources or before a CPL-driven budget call ->
-  `mb leads grade --file <leads.json> [--spend N]` (deterministic eligibility
-  per lead — plausible email, valid URL, owner answer — and ELIGIBLE-lead CPL
-  beside raw CPL so the honest metric is the default; no lead data stored).
-  Tracking which creatives work (keep/kill) -> `mb ledger init` (scaffolds
-  the what's-working creative ledger: per-asset spend, raw vs ELIGIBLE CPL,
-  downstream event, KEEP/KILL/WATCH — an asset is not working until it makes
-  an eligible lead; graduate to the owned spine past ~50 assets). Running an
-  unattended or steered agent loop with inspectable state ->
-  `mb automation init` (scaffolds the steered-loop contract loop-state.md the
-  loop reads first and updates each run; handoffs render from it; unattended
-  deterministic jobs pair with `mb pulse install`). Agents
-  validating their own work in repos with
-  legacy debt -> `mb validate --paths <prefix>`. Filing work upstream or in
-  the business repo without leaking private detail -> `mb issue` (privacy-safe
-  GitHub issue drafting). An `mb` command refused, confused you or lacked a
-  probe -> `mb feedback "<what happened>" --command "<mb command name>"`
-  before you work around it: a credential-free summary in your own words and
-  the command name only, never copied arguments, tokens, keys or paths (local
-  log only, nothing sent; `mb feedback rollup` drafts the week for a
-  maintainer). "What should we
-  improve in this repo?" ->
-  `mb suggest` (read-only improvement suggestions). An old repo shape that
-  needs the current structure -> `mb migrate` via the doctor-recommended
-  plan, never hand-moved files. Lead with the business answer, command
-  second; triggered surfaces stay triggered.
-- If readiness is blocked or drift has errors, handle repair before output
-  work.
-- Explain two named drift items instead of re-deriving them. A
-  `core_propagation` drift item means offer/audience/voice identity files
-  changed after the active push records were last updated — derived copy such
-  as ads, pages, and emails may still carry the old identity; re-check active
-  pushes against the updated core files. An `uncodified_decisions` drift item
-  means decisions accepted more than seven days ago were never codified into
-  reference files — decided, but reality unchanged; route repair through the
-  global `mb-think` skill's codify mode.
-- If onboarding is incomplete, use the `onboarding.summary` and checklist from
-  status instead of inventing a setup interview.
-- Use current Main Branch paths for new work. If status or doctor facts report
-  old structural paths, treat them as migration input and follow the repair
-  plan before creating new coordinated work.
-- If the operator asks for publishing, spend, provider mutation, customer
-  contact, migration, checkpoint creation, or file writes, plan first and ask
-  for explicit approval.
-- If the operator brings a live idea and it is unclear where it belongs, route
-  by business meaning: offers are what the business may keep selling; bets are
-  time-boxed wagers; pushes are coordinated execution; proof is evidence; and
-  decisions explain durable changes.
+- If readiness is blocked or drift has errors, handle repair before output work.
+- A `core_propagation` drift item means identity files changed after active
+  push records were updated: re-check active pushes against the core files. An
+  `uncodified_decisions` drift item means old accepted decisions never reached
+  the reference files: route repair through `mb-think` codify mode.
+- If onboarding is incomplete, use `onboarding.summary` and its checklist
+  instead of inventing a setup interview.
+- Use current Main Branch paths. If facts report old structural paths, follow
+  the repair plan before creating new coordinated work.
+- Publishing, spend, provider mutation, customer contact, migration, checkpoint
+  creation, or file writes: plan first and ask for explicit approval.
+- A live idea of unclear home: offers are what the business may keep selling;
+  bets are time-boxed wagers; pushes are coordinated execution; proof is
+  evidence; decisions explain durable changes.
+- Writing to an external provider (CRM, email send, ads, account metadata) ->
+  the provider-mutation contract: read-only discovery first, a sanitized plan
+  (provider + object count + risk, no private rows), explicit approval,
+  minimal-scope apply, verify + a private-safe record
+  (docs/provider-mutation-contract.md). Reads and writes are separate surfaces.
+- Commands that need a credential -> `mb connect exec <provider> -- <command>`
+  (the secret stays in that command's environment; `mb connect token` refuses
+  terminals and pipes). Scan agent configs for plaintext credentials with
+  `mb connect hygiene`; read the recorded business identity with
+  `mb connect identity`; missing providers -> `mb connect <id> --custom`.
+- Surfaces below are triggered, not defaults. Lead with the business answer,
+  command second; run `mb <command> --help` for flags:
+  agent usage and role caps -> `mb usage --json`; whose data lives where ->
+  `mb spine declare` / `mb spine show`; money flowing unattended -> `mb canary init`;
+  daily read on the business -> `mb pulse init`; many repos or sites ->
+  `mb fleet status` (`mb fleet refresh` first; Python 3.11+); Search Console or
+  GA4 numbers -> `mb google sc query|inspect|sitemaps list` or
+  `mb google ga4 report` with `--json` (not connected -> `mb connect google --oauth`);
+  "show me the business" -> `mb dashboard open`; taking real money ->
+  `mb production plan` (read-only); comparing lead sources ->
+  `mb leads grade --file <leads.json> [--spend N]`; which creatives work ->
+  `mb ledger init`; unattended or steered agent loops -> `mb automation init`;
+  validating in repos with legacy debt -> `mb validate --paths <prefix>`; filing
+  work without leaking private detail -> `mb issue`; an `mb` command refused or
+  confused you -> `mb feedback "<what happened>" --command "<mb command name>"`
+  before working around it (credential-free summary and command name only; local
+  log, nothing sent); improvement ideas -> `mb suggest`; an old repo shape ->
+  `mb migrate` via the doctor-recommended plan, never hand-moved files.
 
 ## Business Folders
 
-- `core/` - the business brain: offer, audience, voice, soul, proof, brand,
-  team, strategy, operations, finance.
-- `core/offers/` - per-offer specifics when this is a multi-offer repo.
-- `core/team/` - public-safe team member names, roles, GitHub handles, and
-  ownership context.
-- `core/proof/` - testimonials, typicality, and reusable proof. Use
-  structured permission and offer-link fields when proof should be detectable
-  by `mb status`. If specific proof is not approved for public marketing, use
-  `permissioned_public: false` and collect permission before public ads, pages,
-  or claims use it.
-- `core/operations/` - operating context.
-  `core/operations/spine.md` records where customer and lead data lives:
-  `mb spine declare` writes it, `mb spine show` reads it back, and doctor
-  grades it. `core/operations/agent-access-dossier.md` maps what agents can
-  access; doctor runs only the mb-owned `mb connect test` rows of its verify
-  column and surfaces any other verify command for the operator to run.
-- `core/content-strategy.md` - business-level content strategy and index.
-- `core/marketing/` - optional distribution, channel, and account strategy.
-- `core/people/` - optional founder/person voice source material, beliefs,
-  stories, and proof.
-- `research/` - dated notes from when you went looking.
-- `decisions/` - dated choices, with rationale.
-- `bets/` - operating bets with appetite, metric, target, and outcome.
-- `pushes/` - coordinated pushes such as launches, drops, challenges, promos.
-- `log/` - running activity log.
-- `documents/` - anything that does not belong above.
-
-Use `core/content-strategy.md` as the default solo-operator content strategy.
-When the business needs more layers, read or write
-`core/marketing/distribution-strategy.md`,
-`core/marketing/channels/<channel>.md`,
-`core/marketing/accounts/<platform>-<account>.md`, and
-`core/people/<person>.md`. Weekly content planning should reference those files,
-then put specific execution in `pushes/` and results in `log/`.
-`mb validate` checks their frontmatter shape and relationships;
-`mb status --json --peek` exposes normalized `content_strategy` health for
-agents and future read-only dashboard views.
+`core/` is the business brain (offer, audience, voice, soul, proof, brand, team,
+strategy, operations, finance; `core/offers/` for multi-offer repos).
+`core/content-strategy.md` is the business-level content strategy; layers live in
+`core/marketing/` and `core/people/`. `core/proof/` holds testimonials,
+typicality, and reusable proof; use structured permission and offer-link fields,
+and for proof not approved for public marketing set `permissioned_public: false`
+and collect permission before public ads, pages, or claims use it.
+`core/operations/spine.md` records where customer and lead data lives (`mb spine
+declare` writes it, `mb spine show` reads it, doctor grades it);
+`core/operations/agent-access-dossier.md` maps what agents can access, and doctor
+runs only its mb-owned `mb connect test` rows. Other folders: `research/` (dated
+notes), `decisions/` (dated choices), `bets/`, `pushes/` (launches, drops,
+challenges, promos), `log/`, `documents/`. Weekly content planning references the
+strategy files, then puts execution in `pushes/` and results in `log/`.
+`mb validate` checks their frontmatter shape.
 
 ## Linking
 
 Typed relationships live in frontmatter as repo-relative `.md` paths
-(`linked_decisions:`, `linked_research:`, `linked_pushes:`, etc.). Those
-are the official relationships `mb graph` and `mb validate --cross-refs` read.
-Author them only from evidence in the repo or from explicit operator
-instruction; do not invent relationships to make the graph look fuller.
-Use the connection decision matrix before editing relationships:
-https://github.com/dmthepm/mainbranch/blob/main/docs/business-connections.md
-
-When a file declares typed edges in frontmatter, mirror them in a body
-`## Related links` section using **Markdown relative links** so the same
-edges show up in Obsidian's Graph view and Backlinks pane for operators
-who open the repo as a vault. The body mirror is a viewer aid, not a
-second source of truth — if frontmatter and the mirror disagree,
-frontmatter wins. Keep mirror links note-level; do not link to section
-anchors, since GitHub and Obsidian disagree on heading-fragment syntax.
-If the mirror is missing or stale, preview `mb doctor repair --plan`
-and ask before applying `mb doctor repair --apply`; repair adds missing
-body links from frontmatter and does not update frontmatter
-from body-only links.
-See the engine doc
-[`docs/markdown-link-conventions.md`](https://github.com/dmthepm/mainbranch/blob/main/docs/markdown-link-conventions.md)
-for the full rules.
-
-Obsidian is an optional viewer over the same files `mb` validates. Do
-not depend on any Obsidian plugin for repo correctness.
+(`linked_decisions:`, `linked_research:`, `linked_pushes:`, etc.); `mb graph` and
+`mb validate --cross-refs` read them. Author them only from evidence in the repo
+or explicit operator instruction; never invent relationships. Mirror them in a
+body `## Related links` section using note-level Markdown relative links;
+frontmatter wins if they disagree. If the mirror is missing or stale, preview
+`mb doctor repair --plan` and ask before `mb doctor repair --apply`. Rules:
+https://github.com/dmthepm/mainbranch/blob/main/docs/business-connections.md and
+https://github.com/dmthepm/mainbranch/blob/main/docs/markdown-link-conventions.md.
 
 ## Connected Accounts
 
