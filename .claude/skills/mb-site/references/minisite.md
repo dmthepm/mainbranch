@@ -142,9 +142,9 @@ The last visible element on every `.html` page. Template (replace the placeholde
 </footer>
 ```
 
-**Entity:** take the parent entity and contact email from `offer.md` (e.g., `entity: Example LLC`, `contact: hello@example.com`). Never default to our own entity. If `offer.md` has none, ask the owner.
+**Entity:** take the parent entity and contact email from `offer.md` (e.g., `entity: Example LLC`, `contact: hello@example.com`). Never default to our own entity. If `offer.md` has none, ask the owner and, with their OK, record the answer in `offer.md`.
 
-The skill's validation step greps every page for the entity value declared in `offer.md`. Missing footer = generation failure, fix request to subagent.
+The validation step fails on an empty entity, the literal `&lt;legal entity` placeholder, or any page (nested included) missing the entity value, using the check in `minisite-buildout.md`. Missing footer = generation failure, fix request to subagent.
 
 ---
 

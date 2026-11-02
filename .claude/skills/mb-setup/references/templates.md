@@ -10,11 +10,16 @@ Copy and customize these templates when creating reference files.
 ---
 type: context
 status: active
+entity: [Legal entity name, e.g. Example LLC]
+contact: [Public contact email, e.g. hello@example.com]
 ---
 
 # The Offer
 
 ## What We Sell
+
+`entity` and `contact` are the legal business name and public contact email.
+Site skills put them in every page footer, so fill them in before a site ships.
 
 [One paragraph: What is this product/service?]
 

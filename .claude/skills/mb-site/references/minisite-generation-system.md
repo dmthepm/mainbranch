@@ -79,7 +79,7 @@ Last visible element on every `.html` page. Template (replace the placeholders f
 </footer>
 ```
 
-Take the parent entity and contact email from the owner's `offer.md` (e.g., `entity: Example LLC`, `contact: hello@example.com`). Never default to Main Branch's or Noontide's entity. If `offer.md` has no entity, ask the owner before generating. The skill will grep every page for the entity value from `offer.md` — missing footers fail validation.
+Take the parent entity and contact email from the owner's `offer.md` (e.g., `entity: Example LLC`, `contact: hello@example.com`). Never default to Main Branch's or Noontide's entity. If `offer.md` has no `entity` (or `contact`), ask the owner before generating and, with their OK, record the answer in `offer.md` so it is not asked again. Validation fails on an empty entity, on the literal `&lt;legal entity` placeholder, and on any page (nested ones included) missing the entity value; see `minisite-buildout.md`.
 
 ### What NOT to ship
 

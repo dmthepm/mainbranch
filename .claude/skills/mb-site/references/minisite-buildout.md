@@ -53,10 +53,13 @@ Each missing file is a fix request to the subagent.
 Footer presence:
 
 ```bash
-grep -L "$ENTITY" *.html **/*.html   # ENTITY = the legal entity from offer.md
+# ENTITY = `entity:` from offer.md frontmatter
+[ -n "$ENTITY" ] && [ "$ENTITY" != "<legal entity from offer.md>" ] || { echo "no entity: ask the owner"; exit 1; }
+find . -name '*.html' -exec grep -L -F "$ENTITY" {} +
+find . -name '*.html' -exec grep -l -F "&lt;legal entity" {} +
 ```
 
-That command should return nothing, or only files where `offer.md` declared no entity (ask the owner first).
+Stop if `ENTITY` is empty or still the placeholder. Both `find` commands must print nothing; any file listed is a fix request to the subagent.
 
 OG render:
 

@@ -125,6 +125,8 @@ repair language. Apify research remains MCP-first for now: treat it as an
 agent-side research tool surface unless a later CLI contract exposes stable
 provider-readiness facts. Runtime-local tool checks happen only after a
 selected research path needs them and `mb` cannot inspect the tool directly.
+Before any large Apify mining run, the owner sees an estimated cost and says OK first
+([research-phase.md](references/research-phase.md)).
 
 **Quick gist:** On first `/mb-think` invocation, read status/connect facts. When
 the user's intent needs a runtime-local tool, check only that tool, cache

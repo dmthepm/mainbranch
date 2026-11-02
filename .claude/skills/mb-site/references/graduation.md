@@ -30,7 +30,7 @@ Don't graduate prematurely. Each tier costs operational complexity. Graduate whe
 **Mechanics:**
 1. Run `/mb-site` against the existing project. The minisite generation subagent reads the same offer.md / audience.md and produces a ~4–6 page version. The home page stays focused (linking directly to the conversion endpoint); supporting pages get the proof, mechanism, and faq content.
 2. Confirm `/start/thanks/` is present (minisite shape requires it as the post-conversion landing).
-3. Update `~/.mainbranch/sites.json` `shape` field: `lander` → `minisite`.
+3. Update the `shape` field in the repo-local `.mainbranch/repo.json` (or legacy `~/.mainbranch/sites.json`): `lander` → `minisite`.
 4. `git push` — Cloudflare auto-deploys.
 5. (Optional) Re-run `og_render.py` if the og.svg changed.
 

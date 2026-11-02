@@ -265,6 +265,8 @@ Then fetch results with `mcp__apify__get-actor-output` using the returned datase
 3. Synthesize immediately — extract frameworks, quotes, patterns
 4. Save synthesis, not raw transcript
 
+**Before a large Apify mining run** (many posts, several competitors, or a hashtag sweep): show the owner an estimated cost (posts × the actor's per-post price) and get their OK first. Offer a quick scan as the cheaper option.
+
 **If MCP fails:**
 1. Check Apify account has credits
 2. Verify video has captions (some don't)

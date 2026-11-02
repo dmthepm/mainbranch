@@ -49,7 +49,7 @@ Read `voice.md`, `offer.md`, `audience.md`, `soul.md` and `core/proof/testimonia
 
 Preview locally (static server, or the generator's dev command). Iterate until the owner is happy.
 
-Publish: run the local build if there is one, `git status && git diff --stat`, commit, `git push origin main`. Cloudflare Pages auto-deploys in about 1-2 minutes. Ask before the first push to a public site, and follow the visibility and approval rules in [`SKILL.md`](../SKILL.md). Then run `mb site check` per [`site-measurement.md`](site-measurement.md).
+Publish: run the local build if there is one, `git status && git diff --stat`, commit, `git push origin main`. Cloudflare Pages auto-deploys in about 1-2 minutes. Ask before every publish (each push to the site repo, not only the first), and follow the visibility and approval rules in [`SKILL.md`](../SKILL.md). Then run `mb site check` per [`site-measurement.md`](site-measurement.md).
 
 ---
 

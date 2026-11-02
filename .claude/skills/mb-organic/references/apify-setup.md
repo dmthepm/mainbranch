@@ -92,6 +92,8 @@ Apify is now saved to your global Claude Code settings (`~/.claude/settings.json
 
 Every time you mine Instagram content through `/mb-think`, Apify will be used automatically. No re-setup needed.
 
+**Cost before a large run:** before any large mining run (many posts, several competitors, or a hashtag sweep), show the owner an estimated Apify cost (roughly posts × per-post rate, from the actor's listed price) and get their OK first. Offer a quick scan (top 5 posts, 2-3 competitors) as the cheaper choice.
+
 ---
 
 ## Verify It's Working

@@ -235,7 +235,7 @@ Ask the operator. Do not assume.
 >
 > **B. Iterating on an existing site.**
 > - Editing pages, adding sections, updating copy: load the current shape build reference.
-> - Publishing existing work: load the shape publish section .
+> - Publishing existing work: load the current shape build reference and follow its publish step; publishing asks for approval every time (see the approval gates above).
 >
 > **C. Graduating to a different shape.**
 > - Lander -> minisite, minisite -> website, website -> website + CMS. Load [`references/graduation.md`](references/graduation.md).

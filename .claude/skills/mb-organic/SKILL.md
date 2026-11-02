@@ -238,7 +238,7 @@ If no mining exists, prompt: "No mined concepts found. Want to mine competitors 
 
 ### `/mb-organic mine` (Routes to /mb-think)
 
-Redirect: "Mining is research work now. Routing you to `/mb-think` for mining — it'll save to `research/` and you can come back here to generate scripts from those concepts." Then invoke `/mb-think`.
+Redirect: "Mining is research work now. Routing you to `/mb-think` for mining — it'll save to `research/` and you can come back here to generate scripts from those concepts." Then invoke `/mb-think`. Before any large Apify mining run, the owner sees an estimated cost and says OK first ([apify-setup.md](references/apify-setup.md)).
 
 ### `/mb-organic video "concept"`
 
