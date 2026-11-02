@@ -35,7 +35,13 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 - [`operator-loops.md`](operator-loops.md) — how operator work moves through Sense, Decide, Ship, Reflect.
 - [`content-strategy.md`](content-strategy.md) — layered content, distribution, channel, account, person, push, and results model.
 - [`playbooks.md`](playbooks.md) — reusable operating recipes and run records.
+- [`offer-sharpening.md`](offer-sharpening.md) — the loop for making an offer clearer, more believable, and truer to the operator's voice.
+- [`scheduled-data-sync.md`](scheduled-data-sync.md) — how to keep business data fresh on a schedule.
+- [`usage.md`](usage.md) — `mb usage`: read local snapshots of your agents' weekly usage.
+- [`role-cards.md`](role-cards.md) — role cards: tell each restarted agent what it is for (Claude Code only).
+- [`homelab-skills.md`](homelab-skills.md) — read-only Claude Code skills that inspect the machines running your agents.
 - [`books.md`](books.md) — bookkeeping safety, hledger, and the private ledger vault model.
+- [`books-workflow.md`](books-workflow.md) — the statement-anchored books protocol inside a private hledger books repo.
 - [`business-connections.md`](business-connections.md) — when to use frontmatter links, inline links, tags, data refs, or context.
 - [`markdown-link-conventions.md`](markdown-link-conventions.md) — markdown and link rules.
 - [`source-ingestion.md`](source-ingestion.md) — manifest-first privacy rail for transcripts, authenticated sources, and provider exports.
@@ -50,6 +56,7 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 
 - [`architecture/system-map.md`](architecture/system-map.md) — Mermaid-powered visual index of the Main Branch system, boundaries, and source docs.
 - [`system-architecture.md`](system-architecture.md) — repo shapes, business primitives, boundaries, and schemas.
+- [`business-file-contracts.md`](business-file-contracts.md) — what a useful business record must contain before an agent routes work from it.
 - [`json-output-contract.md`](json-output-contract.md) — `mb --json` envelope.
 - [`data-source-registry.md`](data-source-registry.md) — `type: data_source` records.
 - [`child-repo-descriptors.md`](child-repo-descriptors.md) — `.mainbranch/repo.json`.
@@ -78,11 +85,13 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 ## Product plans
 
 - [`prd/`](prd/) — versioned PRDs (`v0-*.md`).
-- [`prd/v0-7-machine-doctor.md`](prd/v0-7-machine-doctor.md) — draft design for `mb machine doctor`: manifest, check registry, JSON and exit codes.
+- [`prd/v0-7-machine-doctor.md`](prd/v0-7-machine-doctor.md) — design for `mb machine doctor`: manifest, check registry, JSON and exit codes. The first release (no manifest yet) is on main, unreleased.
+- [`prd/v0-8-budget-view.md`](prd/v0-8-budget-view.md) — design for the read-only agent usage view; `mb usage` now ships it.
+- Earlier PRDs: [`v0-2-agent-workflow-and-evals`](prd/v0-2-agent-workflow-and-evals.md) and [`v0-2-first-run-daily-briefing`](prd/v0-2-first-run-daily-briefing.md).
 
 ## Evidence
 
-- [`reports/`](reports/) — dated dogfood, smoke, and review reports (`YYYY-MM-DD-*.md`).
+- [`reports/`](reports/) — dated dogfood, smoke, and review reports (`YYYY-MM-DD-*.md`) still linked from current docs; completed ones are in the archive.
 
 ## Examples and samples
 
@@ -92,7 +101,9 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 
 [Archived docs](archive/index.md) retain superseded guidance with a reason and
 a pointer to its replacement. They are not current operating instructions.
-Dated evidence reports and product decisions keep their historical locations.
+Completed evidence reports are archived there. Reports still linked from
+decisions or current docs, and product decisions, keep their historical
+locations.
 
 ## Naming convention
 

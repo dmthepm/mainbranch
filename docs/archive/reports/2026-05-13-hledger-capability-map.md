@@ -32,11 +32,11 @@ JSON contracts, and plain-language summaries.
 - The official hledger manual: <https://hledger.org/hledger.html>.
 - The hledger error guide: <https://hledger.org/ERRORS.html>.
 - Existing Main Branch books docs and decisions:
-  - [docs/books.md](../books.md)
-  - [decisions/2026-05-11-mb-books-foundation.md](../../decisions/2026-05-11-mb-books-foundation.md)
-  - [docs/reports/2026-05-11-hledger-vs-beancount-fit.md](2026-05-11-hledger-vs-beancount-fit.md)
+  - [docs/books.md](../../books.md)
+  - [decisions/2026-05-11-mb-books-foundation.md](../../../decisions/2026-05-11-mb-books-foundation.md)
+  - [docs/reports/2026-05-11-hledger-vs-beancount-fit.md](../../reports/2026-05-11-hledger-vs-beancount-fit.md)
 - Current fake fixture:
-  [docs/examples/books/acme-fixture.journal](../examples/books/acme-fixture.journal).
+  [docs/examples/books/acme-fixture.journal](../../examples/books/acme-fixture.journal).
 
 ## First Command Families To Wrap
 
