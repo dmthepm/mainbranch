@@ -228,7 +228,7 @@ def test_uninstall_splits_a_group_it_shares_with_another_hook(codex_home: Path) 
         "matcher": "startup",
         "hooks": [
             OTHER_GROUP["hooks"][0],
-            {"type": "command", "command": "mb role hook --runtime codex"},
+            {"type": "command", "command": roles_codex.CODEX_HOOK_COMMAND},
         ],
     }
     _write(codex_home, {"hooks": {"SessionStart": [shared]}})
