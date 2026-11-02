@@ -68,33 +68,13 @@ Recommended: `nano-banana-mcp` (ConechoAI, simple and reliable). Alternatives: `
 
 ---
 
-## Pricing
+## Model and Pricing
 
-Uses Google AI Studio credits (same as Gemini research):
+Nano Banana is an optional image provider. `/mb-ads` defaults to the provider in its image workflow (OpenAI GPT Image 2 is the first readiness target); use Nano Banana when the operator prefers Google or wants a comparison rail.
 
-**The ONLY model to use (copy-paste exactly):**
+Uses Google AI Studio credits (same as Gemini research). Do not pin an image model ID from memory: read the current Nano Banana model name and price at [ai.google.dev/gemini-api/docs/image-generation](https://ai.google.dev/gemini-api/docs/image-generation) or from the MCP server's tool list, and use the current image-generation model, not a text or "flash" research model. A test with the wrong model tells you nothing useful.
 
-```
-gemini-3-pro-image-preview
-```
-
-| Model | SDK String | Cost | Quality |
-|-------|-----------|------|---------|
-| Nano Banana Pro | `gemini-3-pro-image-preview` | ~$0.13/image | **Use this for everything.** 4K, accurate text rendering |
-
-**NEVER use Flash models for image generation.** Quality is not ad-grade. Not even for testing — a test with the wrong model tells you nothing useful.
-
-**NEVER use:** `gemini-2.0-flash-preview-image-generation`, `gemini-2.5-flash-image`, or any other model name. They will either 404 or produce unusable output.
-
-**Imagen 4** (standalone text-to-image, no conversational editing):
-
-| Model | Cost | Quality |
-|-------|------|---------|
-| Imagen 4 Fast | ~$0.02/image | Quick generation |
-| Imagen 4 Standard | ~$0.04/image | Balanced |
-| Imagen 4 Ultra | ~$0.06/image | Highest fidelity |
-
-Free tier includes limited image generation. Paid credits scale to hundreds of images.
+Free tier includes limited image generation; paid credits scale up.
 
 ---
 
