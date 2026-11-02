@@ -168,7 +168,7 @@ its own copy, and paid calls need the owner's yes. Support is experimental.
 **Site shapes:**
 - `/mb-site` lander — 1 page (V1 stub; use minisite for now)
 - `/mb-site` minisite — ~4–6 pages (V1 default; static HTML, no build step)
-- `/mb-site` website — full multi-section (Next.js / Astro)
+- `/mb-site` website — full multi-section (static-first, optional Astro-style build)
 - Plus graduation paths up the ladder, including bolt-on CMS
 
 **Key difference from /mb-think:** /mb-think builds reference files. /mb-site uses them to produce a live site. The brief and the site happen inside /mb-site as one flow — no need to run /mb-think first to "build the brief," though you should have offer.md and audience.md filled in.

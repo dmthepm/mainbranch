@@ -25,6 +25,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Changed
 
+- `/mb-site` retires its legacy Next.js and Netlify build shapes
+  (`frontend-design`, `section-patterns`, `deployment` references and
+  `init-site.sh`). The website shape now builds static-first on Cloudflare
+  Pages, with an optional generator build step, and `website-build.md` keeps
+  the brand, copy and publish guidance.
+- Bundled skills lose about a fifth of their duplicated text (Round 1-3 of the
+  skills cleanup): the shipped `.claude/reference/` copies of compliance,
+  minisite, engine-path and pull-engine-updates are gone (the skill copy is
+  the home), site footers take the parent entity from the owner's `offer.md`,
+  and `/mb-think` and `/mb-organic` share the `*-competitor-mine.md` name.
 - The tailnet skills' draft notes now record one real redaction run on one
   machine. Both skills stay draft.
 - The Main Branch plugin is now pinned to the exact 0.6.19 release commit. New

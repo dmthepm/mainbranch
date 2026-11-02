@@ -83,7 +83,7 @@ If two full runs produce identical output, the brief was over-specified or the c
 
 - No `pnpm install`, no `pnpm build`. Static HTML only.
 - No `site-config.ts` pattern. Each minisite generates its own one-off structure.
-- No section-types menu; the Next.js section catalog from [`website-build.md`](website-build.md) does not apply.
+- No section-types menu; each minisite picks its own sections.
 - No Anthropic API key. Generation runs inside the operator's Claude Code session through the `Agent` tool.
 - No multi-endpoint conversion. One minisite has one conversion endpoint; graduate to website shape if you need both.
 

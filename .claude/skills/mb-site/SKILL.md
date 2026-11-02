@@ -231,11 +231,11 @@ Ask the operator. Do not assume.
 > **A. New site from scratch.** Pick a shape.
 > - **Lander** (1 page, all-in-one). Use for focused one-off offer tests, retargeting, or paid-traffic landers. Load [`references/lander-build.md`](references/lander-build.md).
 > - **Minisite** (~4-6 pages, static HTML). V1 default for paid-ad lander tests, single-offer first deploys, payment, lead-form, and booking funnels. Load [`references/minisite-build.md`](references/minisite-build.md).
-> - **Website** (full site, usually with build step). Legacy Next.js templates work today. Load [`references/website-build.md`](references/website-build.md).
+> - **Website** (full site, usually with build step). Static-first on Cloudflare Pages, with an optional build step. Load [`references/website-build.md`](references/website-build.md).
 >
 > **B. Iterating on an existing site.**
 > - Editing pages, adding sections, updating copy: load the current shape build reference.
-> - Publishing existing work: load the shape publish section or [`references/deployment.md`](references/deployment.md) for legacy Netlify.
+> - Publishing existing work: load the shape publish section .
 >
 > **C. Graduating to a different shape.**
 > - Lander -> minisite, minisite -> website, website -> website + CMS. Load [`references/graduation.md`](references/graduation.md).
@@ -274,7 +274,7 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 
 - [`references/lander-build.md`](references/lander-build.md) - 1-page shape stub.
 - [`references/minisite-build.md`](references/minisite-build.md) - minisite step router.
-- [`references/website-build.md`](references/website-build.md) - legacy Next.js website flow.
+- [`references/website-build.md`](references/website-build.md) - website flow (static-first, optional build step).
 - [`references/graduation.md`](references/graduation.md) - paths between shapes and CMS bolt-on.
 
 **Minisite step detail:** [`references/minisite-build.md`](references/minisite-build.md) routes each step (research, brief, setup, conversion, concept variations, build-out, publish, iterate) to its own reference; load only the current step.
@@ -287,8 +287,6 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 - [`references/anti-patterns.md`](references/anti-patterns.md) - AI tells and generation anti-patterns.
 - [`references/archetypes.md`](references/archetypes.md) - 9-archetype picker. Load picked detail lazily.
 - [`references/headline-formulas.md`](references/headline-formulas.md) - formulas grouped by frame.
-- [`references/frontend-design.md`](references/frontend-design.md) - website typography, color, motion.
-- [`references/section-patterns.md`](references/section-patterns.md) - website section catalog.
 
 **Visibility, hosting, and checks**
 
@@ -305,6 +303,5 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 
 - [`references/naming-heuristic.md`](references/naming-heuristic.md) - domain naming playbook.
 - [`references/cloudflare-pages-link.md`](references/cloudflare-pages-link.md) - Cloudflare Pages GitHub App handshake.
-- [`references/deployment.md`](references/deployment.md) - legacy Netlify fallback.
 - [`references/examples.md`](references/examples.md) - usage examples.
 - [`references/troubleshooting.md`](references/troubleshooting.md) - common fixes.
