@@ -1,6 +1,6 @@
 ---
 title: "PRD: v0.3 Agent Checkpoints + Git Memory"
-status: draft
+status: shipped
 date: 2026-05-04
 release: v0.3.x
 linked_issue: https://github.com/dmthepm/mainbranch/issues/288

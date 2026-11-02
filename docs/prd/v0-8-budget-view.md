@@ -32,7 +32,9 @@ related: "#1258 operating team (duty map, role profiles, section 6 sketch), #125
   is close to its cap. It doesn't change the status exit code.
 - **Standalone businesses.** The snapshot format is documented. The owner's
   own script, or the owner by hand, writes it. `mb` ships no collector.
-- **Status today:** designed, not built. Nothing in this PRD is shipped.
+- **Status today:** `mb usage` now ships a read-only usage view (#1260; see
+  [agent usage](../usage.md)). This PRD is the design it came from; where the
+  two differ, `usage.md` describes what ships.
 
 ## Goals
 
