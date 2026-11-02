@@ -293,7 +293,7 @@ Before saving: show file paths.
 
 ## Full Flow Walkthrough
 
-1. Check for concepts in `research/*-competitor-mine.md` or `research/*-mining.md`; if none, ask whether to mine first (route to `/mb-think`) or take a topic directly.
+1. Check for concepts in `research/*-competitor-mine.md`; if none, ask whether to mine first (route to `/mb-think`) or take a topic directly.
 2. User picks a concept or provides their own; map it to their offer, audience and voice.
 3. Generate with the matching framework (video, carousel, static).
 4. Save to `pushes/YYYY-MM-DD-organic-{slug}/`, never `campaigns/` (legacy compatibility only).

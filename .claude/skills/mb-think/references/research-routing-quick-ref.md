@@ -64,7 +64,7 @@ if mcp__whisper__* exists: WHISPER=true
 | `-x-public-mining.md` | Apify public X scrape | `2026-01-26-launch-post-x-public-mining.md` |
 | `-flash.md` | Gemini Flash (Tier 1) | `2026-01-26-quick-research-flash.md` |
 | `-gemini-deep.md` | Gemini Deep (Tier 2) | `2026-01-26-guarantee-psychology-gemini-deep.md` |
-| `-ig-mining.md` | Apify Instagram | `2026-01-26-competitor-content-ig-mining.md` |
+| `-competitor-mine.md` | Apify Instagram, competitor sites and videos | `2026-01-26-competitor-content-competitor-mine.md` |
 | `-keyword-gate.md` | Keyword gate | `2026-01-26-workshop-keyword-gate.md` |
 | `-voice-mining.md` | whisper-mcp (voice memos) | `2026-01-26-ideas-voice-mining.md` |
 | `-local-mining.md` | whisper-mcp | `2026-01-26-sales-call-local-mining.md` |

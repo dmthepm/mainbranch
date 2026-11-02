@@ -66,14 +66,13 @@ the output with `brief_format: grok-8` and include all eight categories.
 | `-claude-web.md` | Claude.ai web interface |
 | `-x-social.md` | X/Twitter social research (Grok MCP) |
 | `-yt-mining.md` | YouTube transcript mining (Apify) |
-| `-ig-mining.md` | Instagram mining (Apify or manual) |
+| `-competitor-mine.md` | Competitor content mining (Instagram, sites, videos; Apify or manual). `/mb-organic` reads this name |
 | `-customer-mining.md` | Customer calls, surveys, support, onboarding, cancellation language |
 | `-review-mining.md` | Public reviews and rating-backed customer language |
 | `-winning-ad-research.md` | Competitor gap maps, ad/script teardown, winning blueprint research |
 | `-content-comment-mining.md` | TikTok, YouTube, Instagram, or X comment language mining |
 | `-local-mining.md` | Local video/audio transcription |
 | `-voice-mining.md` | Voice memo transcription |
-| `-competitor-mining.md` | Competitor site mining |
 | `-internal-mining.md` | Internal data (emails, DMs, reviews) |
 | `-source-mining.md` | Authenticated/private source synthesis after manifest-first review |
 | `-audit.md` | Site or system audit |
@@ -287,7 +286,7 @@ Then fetch results with `mcp__apify__get-actor-output` using the returned datase
 1. Synthesize key findings (don't dump raw transcript)
 2. Extract quotable moments
 3. Note messaging patterns
-4. Save to `research/YYYY-MM-DD-[topic]-mining.md`
+4. Save competitor content to `research/YYYY-MM-DD-[topic]-competitor-mine.md` (other sources: the suffix table above)
 5. For private or authenticated sources, keep raw output in ignored scratch and
    record proof candidates with permission fields before public use
 
