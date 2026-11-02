@@ -18,7 +18,6 @@ import urllib.parse
 from collections import deque
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager, suppress
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, NoReturn
@@ -27,6 +26,174 @@ import yaml
 
 from mb import http_safe
 from mb._credential_helper import STAGE_SUFFIX
+from mb.connect_probes import (
+    GA4_PROPERTY_RE as GA4_PROPERTY_RE,
+)
+from mb.connect_probes import (
+    GITHUB_API_HEADERS as GITHUB_API_HEADERS,
+)
+from mb.connect_probes import (
+    GITHUB_SCOPE_RE as GITHUB_SCOPE_RE,
+)
+from mb.connect_probes import (
+    GITHUB_TOKEN_KIND_NAMES as GITHUB_TOKEN_KIND_NAMES,
+)
+from mb.connect_probes import (
+    GITHUB_TOKEN_KINDS as GITHUB_TOKEN_KINDS,
+)
+from mb.connect_probes import (
+    PROBE_DETAIL_KEYS as PROBE_DETAIL_KEYS,
+)
+from mb.connect_probes import (
+    STRIPE_SCOPE_PROBES as STRIPE_SCOPE_PROBES,
+)
+from mb.connect_probes import (
+    _github_token_kind as _github_token_kind,
+)
+from mb.connect_probes import (
+    _looks_like_admin_approval as _looks_like_admin_approval,
+)
+from mb.connect_probes import (
+    _meta_env as _meta_env,
+)
+from mb.connect_probes import (
+    _meta_validation_result as _meta_validation_result,
+)
+from mb.connect_probes import (
+    _probe_ga4 as _probe_ga4,
+)
+from mb.connect_probes import (
+    _probe_github as _probe_github,
+)
+from mb.connect_probes import (
+    _probe_stripe as _probe_stripe,
+)
+from mb.connect_probes import (
+    _run_meta_command as _run_meta_command,
+)
+from mb.connect_probes import (
+    _safe_command_check as _safe_command_check,
+)
+from mb.connect_probes import (
+    _validate_meta_with_cli as _validate_meta_with_cli,
+)
+from mb.connect_probes import (
+    _validate_with_provider as _validate_with_provider,
+)
+from mb.connect_registry import (
+    _GOOGLE_PRODUCT_RULE_RE as _GOOGLE_PRODUCT_RULE_RE,
+)
+from mb.connect_registry import (
+    BACKEND_FAILURE_STATE as BACKEND_FAILURE_STATE,
+)
+from mb.connect_registry import (
+    BEARER_SECRET_RE as BEARER_SECRET_RE,
+)
+from mb.connect_registry import (
+    CONDITIONAL_PROBE_PROVIDERS as CONDITIONAL_PROBE_PROVIDERS,
+)
+from mb.connect_registry import (
+    GOOGLE_OAUTH_GRANT_SLOT as GOOGLE_OAUTH_GRANT_SLOT,
+)
+from mb.connect_registry import (
+    GOOGLE_OAUTH_GRANTS_METADATA as GOOGLE_OAUTH_GRANTS_METADATA,
+)
+from mb.connect_registry import (
+    GOOGLE_OAUTH_PRODUCTS as GOOGLE_OAUTH_PRODUCTS,
+)
+from mb.connect_registry import (
+    GOOGLE_PRODUCT_STATES as GOOGLE_PRODUCT_STATES,
+)
+from mb.connect_registry import (
+    GOOGLE_REAUTH_REQUIRED_STATE as GOOGLE_REAUTH_REQUIRED_STATE,
+)
+from mb.connect_registry import (
+    META_READ_SMOKE_COMMANDS as META_READ_SMOKE_COMMANDS,
+)
+from mb.connect_registry import (
+    META_SETUP_REQUIREMENTS as META_SETUP_REQUIREMENTS,
+)
+from mb.connect_registry import (
+    META_TOKEN_SCOPES as META_TOKEN_SCOPES,
+)
+from mb.connect_registry import (
+    NOT_CHECKED_BACKEND_STATE as NOT_CHECKED_BACKEND_STATE,
+)
+from mb.connect_registry import (
+    NOT_CHECKED_STATE as NOT_CHECKED_STATE,
+)
+from mb.connect_registry import (
+    PROBE_PROVIDERS as PROBE_PROVIDERS,
+)
+from mb.connect_registry import (
+    PROVIDER_GUIDANCE as PROVIDER_GUIDANCE,
+)
+from mb.connect_registry import (
+    PROVIDERS as PROVIDERS,
+)
+from mb.connect_registry import (
+    REF_MISMATCH_STATE as REF_MISMATCH_STATE,
+)
+from mb.connect_registry import (
+    TOKEN_REFUSED_EXIT_CODE as TOKEN_REFUSED_EXIT_CODE,
+)
+from mb.connect_registry import (
+    UNVERIFIED_STATE as UNVERIFIED_STATE,
+)
+from mb.connect_registry import (
+    VALIDATION_TIMEOUT_SECONDS as VALIDATION_TIMEOUT_SECONDS,
+)
+from mb.connect_registry import (
+    CommandRunner as CommandRunner,
+)
+from mb.connect_registry import (
+    Provider as Provider,
+)
+from mb.connect_registry import (
+    Which as Which,
+)
+from mb.connect_render import (
+    _render_google_products as _render_google_products,
+)
+from mb.connect_render import (
+    not_recorded_line as not_recorded_line,
+)
+from mb.connect_render import (
+    render_connect_result as render_connect_result,
+)
+from mb.connect_render import (
+    render_doctor as render_doctor,
+)
+from mb.connect_render import (
+    render_hydrate_result as render_hydrate_result,
+)
+from mb.connect_render import (
+    render_identity as render_identity,
+)
+from mb.connect_render import (
+    render_list as render_list,
+)
+from mb.connect_render import (
+    render_plan as render_plan,
+)
+from mb.connect_render import (
+    render_provider_status as render_provider_status,
+)
+from mb.connect_render import (
+    render_rotate_result as render_rotate_result,
+)
+from mb.connect_render import (
+    render_status as render_status,
+)
+from mb.connect_render import (
+    render_test_result as render_test_result,
+)
+from mb.connect_render import (
+    render_user_scope_write_failed as render_user_scope_write_failed,
+)
+from mb.connect_render import (
+    state_label as state_label,
+)
 from mb.credential_lock import (
     CredentialBusyError as CredentialBusyError,
 )
@@ -63,10 +230,7 @@ SAFE_METADATA_KEYS = {
     "source",
 }
 CONNECT_SCOPES = {"repo", "user"}
-VALIDATION_TIMEOUT_SECONDS = 8
 SECRET_REPLACEMENT = "<redacted>"
-CommandRunner = Callable[..., dict[str, Any]]
-Which = Callable[[str], str | None]
 
 SECRET_ASSIGNMENT_RE = re.compile(
     r"(?i)\b"
@@ -79,43 +243,6 @@ SECRET_PHRASE_RE = re.compile(
     r"((?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|authorization)[ \t]+)"
     r"(bearer[ \t]+)?([A-Za-z0-9._~+/=-]{12,})"
 )
-BEARER_SECRET_RE = re.compile(r"(?i)\bbearer[ \t]+[^\s,;]+")
-
-BACKEND_FAILURE_STATE = "backend_unavailable"
-# A credential is stored and readable, but no provider call has ever confirmed
-# it works. Distinct from `unvalidated` ("`mb connect test` has not been run"):
-# running the test again cannot clear this state when the provider has no probe.
-UNVERIFIED_STATE = "stored_unverified"
-# An aggregate command (`mb connect status`/`list`, `mb doctor`) ran out of its
-# shared credential budget before it could read this credential. Nothing is
-# known, so nothing is reported broken and nothing is suggested for repair; a
-# single-provider `mb connect status <id>` gets its own budget (#1151).
-NOT_CHECKED_STATE = "credential_not_checked"
-NOT_CHECKED_BACKEND_STATE = "not_checked"
-# A recorded ref that is not the one this repo, provider and field derive.
-REF_MISMATCH_STATE = "credential_ref_mismatch"
-
-
-# Providers with a real read-only probe in `_validate_with_provider`. Kept as
-# one named set because the exit-code contract turns on it: a provider with a
-# probe can be verified by running `mb connect test`, and one without cannot be
-# verified by anything the operator runs.
-# `test_probe_provider_set_matches_validate_with_provider` guards the drift.
-PROBE_PROVIDERS: frozenset[str] = frozenset(
-    {"cloudflare", "apify", "meta", "stripe", "github", "ga4"}
-)
-# Providers whose probe depends on how the connection was made. `google` is
-# probed only in OAuth mode (its entry records an `oauth_grant`; see
-# `mb/google_probe.py`); an access-token `google` connection stays probe-less,
-# so it keeps exiting 0 as it always has. Disjoint from `PROBE_PROVIDERS`.
-CONDITIONAL_PROBE_PROVIDERS: frozenset[str] = frozenset({"google"})
-
-
-# `mb connect token` without `--print`, caller policy and env-dump refusals.
-# Distinct from 1 (credential missing or unreadable, store failure) and 2
-# (usage error or other refusals), so a script can tell "refused by design"
-# from "no credential". Stable: documented in docs/connect.md.
-TOKEN_REFUSED_EXIT_CODE = 3
 
 
 class ConnectRefusal(ValueError):
@@ -284,296 +411,6 @@ class ConfigCorruptError(ValueError):
         super().__init__(message)
         self.file_path = file_path
         self.problem = problem
-
-
-# Optional `google` slot holding one OAuth grant (client and refresh token) as
-# a single credential-store item. Its presence makes the connection OAuth mode.
-GOOGLE_OAUTH_GRANT_SLOT = "oauth_grant"
-# Repo metadata key the sign-in writes: the Google products it granted.
-GOOGLE_OAUTH_GRANTS_METADATA = "oauth_grants"
-# The products a Google sign-in can grant, and the per-product outcomes a
-# check records (`google_probe`); status shows only these.
-GOOGLE_OAUTH_PRODUCTS: tuple[str, ...] = ("search_console", "ga4")
-GOOGLE_PRODUCT_STATES = frozenset({"ok", "grant_missing", "unvalidated", "invalid", "not_checked"})
-_GOOGLE_PRODUCT_RULE_RE = re.compile(r"[a-z][a-z0-9_]{0,63}")
-# State a read records when Google refuses the stored grant (`invalid_grant`).
-GOOGLE_REAUTH_REQUIRED_STATE = "reauth_required"
-
-
-@dataclass(frozen=True)
-class Provider:
-    """Provider registry entry.
-
-    ``required_secrets`` names are local credential slots, not values. They are
-    safe to write into repo metadata because actual secret material is stored
-    through ``SecretStore``. ``optional_secrets`` are slots a connection may
-    record; status reports one only when the entry records it, and a missing
-    optional slot never makes a connection ``missing_secret``.
-    """
-
-    id: str
-    name: str
-    category: str
-    auth: str
-    required_secrets: tuple[str, ...]
-    metadata_fields: tuple[str, ...]
-    description: str
-    env_vars: tuple[str, ...] = ()
-    # Expected prefixes for the primary secret. Empty = no shape check.
-    # Used to refuse malformed credentials at intake without ever echoing
-    # the value itself.
-    key_prefixes: tuple[str, ...] = ()
-    optional_secrets: tuple[str, ...] = ()
-
-
-PROVIDERS: tuple[Provider, ...] = (
-    Provider(
-        id="google",
-        name="Google",
-        category="workspace",
-        auth="oauth_or_service_account",
-        required_secrets=("access_token",),
-        metadata_fields=("account_email", "workspace"),
-        description="Google Workspace, Drive, Docs, Sheets, Slides, and future analytics sync.",
-        env_vars=("GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_OAUTH_TOKEN"),
-        optional_secrets=(GOOGLE_OAUTH_GRANT_SLOT,),
-    ),
-    Provider(
-        id="meta",
-        name="Meta",
-        category="ads",
-        auth="meta_ads_cli_read_only",
-        required_secrets=("access_token",),
-        metadata_fields=("ad_account_id", "business_id", "page_id", "pixel_id"),
-        description=(
-            "Meta Ads account access through Meta's official Ads CLI, with local "
-            "credential storage and read-only account smoke before skills use live facts."
-        ),
-        env_vars=("ACCESS_TOKEN", "META_ACCESS_TOKEN"),
-    ),
-    Provider(
-        id="cloudflare",
-        name="Cloudflare",
-        category="site",
-        auth="api_token",
-        required_secrets=("api_token",),
-        metadata_fields=("account_id", "zone_id"),
-        description="Cloudflare Pages, DNS, Workers, and deployment metadata.",
-        env_vars=("CLOUDFLARE_API_TOKEN",),
-    ),
-    Provider(
-        id="stripe",
-        name="Stripe",
-        category="payments",
-        auth="api_key",
-        required_secrets=("api_key",),
-        metadata_fields=("account_id", "mode"),
-        description=(
-            "Stripe payments: checkout, products, customers, and webhook "
-            "configuration. Store the secret or restricted key locally; keys "
-            "never enter chat or committed repo files. Record `mode` metadata "
-            "(test or live) so agents can verify the key matches the intent."
-        ),
-        env_vars=("STRIPE_SECRET_KEY", "STRIPE_API_KEY"),
-        key_prefixes=("sk_", "rk_"),
-    ),
-    Provider(
-        id="resend",
-        name="Resend",
-        category="email",
-        auth="api_key",
-        required_secrets=("api_key",),
-        metadata_fields=("sender_domain", "audience_id"),
-        description=(
-            "Resend transactional and lifecycle email: sending, domains, and "
-            "audiences. The sender domain lives in metadata so agents read "
-            "identity from recorded facts instead of live provider state."
-        ),
-        env_vars=("RESEND_API_KEY",),
-        key_prefixes=("re_",),
-    ),
-    Provider(
-        id="postiz",
-        name="Postiz",
-        category="social",
-        auth="api_key",
-        required_secrets=("api_key",),
-        metadata_fields=("workspace",),
-        description="Postiz social scheduling and publishing workflows.",
-        env_vars=("POSTIZ_API_KEY",),
-    ),
-    Provider(
-        id="apify",
-        name="Apify",
-        category="research",
-        auth="api_token",
-        required_secrets=("api_token",),
-        metadata_fields=("default_actor",),
-        description="Apify research actors and scrape jobs.",
-        env_vars=("APIFY_TOKEN",),
-    ),
-    Provider(
-        id="github",
-        name="GitHub",
-        category="work",
-        auth="api_token",
-        # `api_key` matches the slot a GitHub token connected with `--custom`
-        # before this entry existed already uses, so those keep resolving.
-        required_secrets=("api_key",),
-        metadata_fields=("owner",),
-        description=(
-            "A GitHub token for scripts and agents that call the GitHub API directly. "
-            "Day-to-day issue and pull request work still goes through `gh`."
-        ),
-        env_vars=("GITHUB_TOKEN", "GH_TOKEN"),
-    ),
-    Provider(
-        id="ga4",
-        name="Google Analytics 4",
-        category="analytics",
-        auth="oauth_access_token",
-        required_secrets=("access_token",),
-        metadata_fields=("property_id",),
-        description=(
-            "Read access to one Google Analytics 4 property. Record the numeric "
-            "`property_id` so the probe knows which property to check."
-        ),
-    ),
-    Provider(
-        id="hledger",
-        name="hledger",
-        category="finance",
-        auth="local_file",
-        required_secrets=(),
-        metadata_fields=("journal_path", "vault_path"),
-        description=(
-            "Local hledger journal metadata for the private books vault. "
-            "`core/finance/books.md` is the source of truth for storage mode; "
-            "real ledgers stay outside the tracked business repo."
-        ),
-    ),
-    Provider(
-        id="transcription",
-        name="Whisper / transcription",
-        category="media",
-        auth="api_key_or_local",
-        required_secrets=("api_key",),
-        metadata_fields=("engine", "model"),
-        description="Whisper-compatible transcription provider or local transcription engine.",
-        env_vars=("OPENAI_API_KEY", "WHISPER_API_KEY"),
-    ),
-)
-
-PROVIDER_GUIDANCE: dict[str, dict[str, Any]] = {
-    "github": {
-        "priority": 1,
-        "why": (
-            "GitHub is the task, proposal, review, and shipped-work layer for the business repo."
-        ),
-        "use_when": (
-            "Use for daily task tracking, public issue drafts, pull requests, reviews, "
-            "and team visibility."
-        ),
-        "defer_when": (
-            "You can start solo local setup without it, but issue, proposal, and team "
-            "loops will be limited."
-        ),
-        "status_command": "mb connect doctor --json",
-    },
-    "cloudflare": {
-        "priority": 2,
-        "why": (
-            "Cloudflare is the default low-lock-in rail for sites, DNS, Pages, and future Workers."
-        ),
-        "use_when": (
-            "Use when the business needs a landing page, custom domain, deploy, or DNS check."
-        ),
-        "defer_when": "Defer until you are ready to publish or connect a domain.",
-        "status_command": "mb connect doctor --json",
-    },
-    "google": {
-        "priority": 3,
-        "why": (
-            "Google/Workspace is the bridge for existing Docs, Sheets, Drive, and workspace assets."
-        ),
-        "use_when": (
-            "Use when the business has source material in Google Drive or needs "
-            "spreadsheet/docs context."
-        ),
-        "defer_when": (
-            "Do not connect it just because a Google account exists; connect it when "
-            "a workflow needs it."
-        ),
-        "status_command": "mb connect doctor --json",
-    },
-    "meta": {
-        "priority": 4,
-        "why": (
-            "Meta Ads readiness lets ad workflows use account, campaign, insights, "
-            "creative, and pixel context through Meta's official Ads CLI."
-        ),
-        "use_when": (
-            "Use when the business is generating, reviewing, or learning from Meta/Facebook ads. "
-            "Main Branch stores the token outside the repo and only treats live account "
-            "access as ready after read-only CLI smoke passes."
-        ),
-        "defer_when": (
-            "Defer for organic, research, or site work that does not need ad-account facts."
-        ),
-        "status_command": "mb connect doctor --json",
-    },
-    "apify": {
-        "priority": 5,
-        "why": (
-            "Apify is the optional research sidecar for scraping, YouTube, Instagram, "
-            "and web mining."
-        ),
-        "use_when": (
-            "Use when research or organic workflows need structured external data collection."
-        ),
-        "defer_when": "Defer for first-pass reference setup or local-only thinking.",
-        "status_command": "mb connect doctor --json",
-    },
-}
-
-META_SETUP_REQUIREMENTS = (
-    "Meta Business Portfolio / Business Manager access",
-    "An ad account assigned to the user or system user",
-    "The Business portfolio ID from Meta business info when available",
-    "A Meta developer app selected during token generation",
-    "A system user token or individual user token with assigned assets",
-    "Possible second-admin approval in stricter Business Manager setups",
-)
-
-META_TOKEN_SCOPES = (
-    "business_management",
-    "ads_management",
-    "pages_show_list",
-    "pages_read_engagement",
-    "pages_manage_ads",
-    "catalog_management",
-    "read_insights",
-)
-
-META_READ_SMOKE_COMMANDS: tuple[tuple[str, list[str], bool], ...] = (
-    ("adaccount_list", ["meta", "-o", "json", "ads", "adaccount", "list"], False),
-    ("campaign_list", ["meta", "-o", "json", "ads", "campaign", "list"], False),
-    (
-        "insights_get",
-        [
-            "meta",
-            "-o",
-            "json",
-            "ads",
-            "insights",
-            "get",
-            "--fields",
-            "spend,impressions,clicks,ctr,cpc",
-        ],
-        False,
-    ),
-    ("dataset_list", ["meta", "-o", "json", "ads", "dataset", "list"], True),
-)
 
 
 def provider_map() -> dict[str, Provider]:
@@ -4629,488 +4466,6 @@ def _http_get_json(
     }
 
 
-def _meta_env(secret: str, metadata: dict[str, Any]) -> dict[str, str]:
-    keep = ("PATH", "HOME", "LANG", "LC_ALL", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE")
-    env = {key: os.environ[key] for key in keep if key in os.environ}
-    env["ACCESS_TOKEN"] = secret
-    env["AD_ACCOUNT_ID"] = str(metadata.get("ad_account_id") or "").strip()
-    business_id = str(metadata.get("business_id") or "").strip()
-    if business_id:
-        env["BUSINESS_ID"] = business_id
-    return env
-
-
-def _safe_command_check(name: str, args: list[str], result: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "name": name,
-        "command": " ".join(args),
-        "ok": bool(result.get("ok")),
-        "returncode": int(result.get("returncode") or 0),
-        "stdout_present": bool(str(result.get("stdout") or "")),
-        "stderr_present": bool(str(result.get("stderr") or "")),
-        "safe_to_share": True,
-    }
-
-
-def _run_meta_command(
-    run: CommandRunner,
-    args: list[str],
-    repo: Path,
-    env: dict[str, str] | None = None,
-) -> dict[str, Any]:
-    try:
-        return run(args, repo, VALIDATION_TIMEOUT_SECONDS, env=env)
-    except TypeError:
-        return run(args, repo, VALIDATION_TIMEOUT_SECONDS)
-
-
-def _looks_like_admin_approval(result: dict[str, Any]) -> bool:
-    text = f"{result.get('stdout') or ''}\n{result.get('stderr') or ''}".lower()
-    admin_words = ("admin", "business admin", "administrator")
-    approval_words = ("approval", "approve", "pending", "waiting")
-    return any(word in text for word in admin_words) and any(
-        word in text for word in approval_words
-    )
-
-
-def _meta_validation_result(
-    *,
-    ok: bool,
-    state: str,
-    checked_at: str,
-    summary: str,
-    checks: list[dict[str, Any]],
-    repair: str = "",
-    repair_command: str = "",
-) -> dict[str, Any]:
-    return {
-        "ok": ok,
-        "state": state,
-        "checked_at": checked_at,
-        # Meta's only success path is a passing read-only account smoke, which
-        # is a real provider call.
-        "provider_verified": ok,
-        "summary": summary,
-        "repair": repair,
-        "repair_command": repair_command,
-        "safe_to_share": True,
-        "upstream": {
-            "endpoint_family": "meta_ads_cli",
-            "checks": checks,
-            "safe_to_share": True,
-        },
-    }
-
-
-def _validate_meta_with_cli(
-    provider: Provider,
-    secret: str,
-    metadata: dict[str, Any],
-    repo: Path,
-    *,
-    which_func: Which | None = None,
-    command_runner: CommandRunner | None = None,
-) -> dict[str, Any]:
-    checked_at = _now()
-    checks: list[dict[str, Any]] = []
-    prereq_state = _meta_prerequisite_state(
-        which_func=which_func,
-        command_runner=command_runner,
-    )
-    if prereq_state:
-        repair = _meta_repair(prereq_state)
-        checks.append(
-            {
-                "name": "local_prerequisites",
-                "ok": False,
-                "state": prereq_state,
-                "safe_to_share": True,
-            }
-        )
-        return _meta_validation_result(
-            ok=False,
-            state=prereq_state,
-            checked_at=checked_at,
-            summary=repair["summary"],
-            checks=checks,
-            repair=repair["repair"],
-            repair_command=repair["repair_command"],
-        )
-    if not secret:
-        repair = _meta_repair("missing_secret", ["access_token"])
-        return _meta_validation_result(
-            ok=False,
-            state="missing_secret",
-            checked_at=checked_at,
-            summary=repair["summary"],
-            checks=checks,
-            repair=repair["repair"],
-            repair_command=repair["repair_command"],
-        )
-    ad_account_id = str(metadata.get("ad_account_id") or "").strip()
-    if not ad_account_id:
-        repair = _meta_repair("missing_metadata")
-        return _meta_validation_result(
-            ok=False,
-            state="missing_metadata",
-            checked_at=checked_at,
-            summary=repair["summary"],
-            checks=checks,
-            repair=repair["repair"],
-            repair_command=repair["repair_command"],
-        )
-
-    run = command_runner or _run_command
-    env = _meta_env(secret, metadata)
-    auth_args = ["meta", "auth", "status"]
-    auth = _run_meta_command(run, auth_args, repo, env)
-    checks.append(_safe_command_check("auth_status", auth_args, auth))
-    if not auth.get("ok"):
-        state = "waiting_for_admin_approval" if _looks_like_admin_approval(auth) else "auth_failed"
-        repair = _meta_repair(state)
-        return _meta_validation_result(
-            ok=False,
-            state=state,
-            checked_at=checked_at,
-            summary=repair["summary"],
-            checks=checks,
-            repair=repair["repair"],
-            repair_command=repair["repair_command"],
-        )
-
-    for name, args, needs_business_id in META_READ_SMOKE_COMMANDS:
-        if needs_business_id and not str(metadata.get("business_id") or "").strip():
-            checks.append(
-                {
-                    "name": name,
-                    "command": " ".join(args),
-                    "ok": True,
-                    "skipped": True,
-                    "reason": "business_id metadata not set",
-                    "safe_to_share": True,
-                }
-            )
-            continue
-        result = _run_meta_command(run, args, repo, env)
-        checks.append(_safe_command_check(name, args, result))
-        if not result.get("ok"):
-            state = (
-                "waiting_for_admin_approval"
-                if _looks_like_admin_approval(result)
-                else "read_smoke_failed"
-            )
-            repair = _meta_repair(state)
-            return _meta_validation_result(
-                ok=False,
-                state=state,
-                checked_at=checked_at,
-                summary=repair["summary"],
-                checks=checks,
-                repair=repair["repair"],
-                repair_command=repair["repair_command"],
-            )
-
-    return _meta_validation_result(
-        ok=True,
-        state="ready",
-        checked_at=checked_at,
-        summary=f"{provider.name} read-only account smoke passed.",
-        checks=checks,
-    )
-
-
-# Read-only resources the Stripe probe lists to learn what a key may read.
-# Each is a GET with limit=1; the body is never returned.
-STRIPE_SCOPE_PROBES: tuple[tuple[str, str], ...] = (
-    ("products", "https://api.stripe.com/v1/products?limit=1"),
-    ("prices", "https://api.stripe.com/v1/prices?limit=1"),
-    ("customers", "https://api.stripe.com/v1/customers?limit=1"),
-    ("charges", "https://api.stripe.com/v1/charges?limit=1"),
-    ("balance", "https://api.stripe.com/v1/balance"),
-)
-GITHUB_API_HEADERS = {
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "mainbranch-mb-connect",
-}
-GITHUB_TOKEN_KINDS: tuple[tuple[str, str], ...] = (
-    ("github_pat_", "fine_grained"),
-    ("ghp_", "classic"),
-    ("gho_", "oauth"),
-    ("ghu_", "app_user"),
-    ("ghs_", "app_installation"),
-)
-# Share-safe probe facts carried from a probe into the recorded validation.
-PROBE_DETAIL_KEYS: tuple[str, ...] = (
-    "scopes",
-    "token_kind",
-    "token_scopes",
-    "token_scopes_withheld",
-)
-GITHUB_TOKEN_KIND_NAMES = frozenset({kind for _prefix, kind in GITHUB_TOKEN_KINDS} | {"unknown"})
-GA4_PROPERTY_RE = re.compile(r"^(?:properties/)?(\d{1,20})$")
-
-
-def _probe_stripe(provider: Provider, secret: str) -> dict[str, Any]:
-    """Which of a fixed set of read resources does this key allow?
-
-    A 2xx means allowed and a 403 means the key is valid but restricted from
-    that resource. A 401 anywhere means Stripe rejected the key itself.
-    """
-    scopes: dict[str, str] = {}
-    first_upstream: dict[str, Any] = {}
-    for resource, url in STRIPE_SCOPE_PROBES:
-        result = _http_get_json(
-            url,
-            {"Authorization": f"Bearer {secret}"},
-            provider_name=provider.name,
-            endpoint_family=f"stripe_{resource}_read",
-        )
-        raw_upstream = result.get("upstream")
-        upstream: dict[str, Any] = raw_upstream if isinstance(raw_upstream, dict) else {}
-        if not first_upstream:
-            first_upstream = upstream
-        status = upstream.get("http_status")
-        if status == 401:
-            return {**result, "state": "invalid", "scopes": scopes}
-        if result.get("ok"):
-            scopes[resource] = "allowed"
-        elif status == 403:
-            scopes[resource] = "refused"
-        else:
-            scopes[resource] = "unknown"
-    allowed = [name for name, verdict in scopes.items() if verdict == "allowed"]
-    refused = [name for name, verdict in scopes.items() if verdict == "refused"]
-    if not allowed and not refused:
-        return {
-            "ok": False,
-            "state": "unvalidated",
-            "summary": "Stripe validation could not reach the service or got no clear answer.",
-            "upstream": first_upstream,
-            "scopes": scopes,
-        }
-    if allowed:
-        summary = f"Stripe key validated; reads allowed: {', '.join(allowed)}"
-    else:
-        summary = "Stripe key validated, but every probed read was refused"
-    if refused:
-        summary += f"; refused: {', '.join(refused)}"
-    return {
-        "ok": True,
-        "state": "ready",
-        "summary": summary + ".",
-        "upstream": first_upstream,
-        "scopes": scopes,
-    }
-
-
-def _github_token_kind(secret: str) -> str:
-    for prefix, kind in GITHUB_TOKEN_KINDS:
-        if secret.startswith(prefix):
-            return kind
-    return "unknown"
-
-
-GITHUB_SCOPE_RE = re.compile(r"[a-z][a-z_]{0,31}(?::[a-z][a-z_]{0,31})?")
-
-
-def _probe_github(provider: Provider, secret: str) -> dict[str, Any]:
-    """Authenticated-user read, plus the scopes GitHub reports for the token."""
-    result = _http_get_json(
-        "https://api.github.com/user",
-        {"Authorization": f"Bearer {secret}", **GITHUB_API_HEADERS},
-        provider_name=provider.name,
-        endpoint_family="github_authenticated_user",
-        response_headers=("X-OAuth-Scopes",),
-    )
-    kind = _github_token_kind(secret)
-    raw_headers = result.get("headers")
-    headers: dict[str, Any] = raw_headers if isinstance(raw_headers, dict) else {}
-    raw_scopes = headers.get("X-OAuth-Scopes")
-    reported = (
-        [scope.strip() for scope in str(raw_scopes).split(",") if scope.strip()]
-        if raw_scopes is not None
-        else []
-    )
-    # Only scope names in GitHub's own grammar ("repo", "read:org") go into
-    # output and stored validation; anything else is counted, never shown.
-    token_scopes = [scope for scope in reported if GITHUB_SCOPE_RE.fullmatch(scope)]
-    withheld = len(reported) - len(token_scopes)
-    probed = {**result, "token_kind": kind, "token_scopes": token_scopes}
-    if withheld:
-        probed["token_scopes_withheld"] = withheld
-    if result.get("ok"):
-        if raw_scopes is not None:
-            listed = ", ".join(token_scopes) or "none"
-            note = f" ({withheld} unrecognized value(s) withheld)" if withheld else ""
-            probed["summary"] = f"GitHub token authenticated; scopes: {listed}{note}."
-        else:
-            probed["summary"] = (
-                "GitHub token authenticated. GitHub does not list a fine-grained or app "
-                "token's permissions through the API; check them in the token's settings."
-            )
-    return probed
-
-
-def _probe_ga4(provider: Provider, secret: str, metadata: dict[str, Any]) -> dict[str, Any]:
-    """Read one property's metadata from the GA4 Admin API."""
-    raw_property = str(metadata.get("property_id") or "").strip()
-    match = GA4_PROPERTY_RE.fullmatch(raw_property)
-    if not match:
-        reason = "is not a numeric GA4 property id" if raw_property else "is not recorded"
-        return {
-            "ok": False,
-            "state": "unvalidated",
-            "summary": f"GA4 validation needs `property_id` metadata, which {reason}.",
-            "repair": (
-                "Find the numeric property id under GA4 Admin > Property details, then run "
-                "`mb connect ga4 --metadata property_id=<property-id>` and "
-                "`mb connect test ga4`."
-            ),
-            "repair_command": "mb connect ga4 --metadata property_id=<property-id>",
-            "upstream": {
-                "endpoint_family": "ga4_property_read",
-                "http_status": None,
-                "response_received": False,
-                "error_codes": [],
-                "error_messages": [],
-                "safe_to_share": True,
-            },
-        }
-    return _http_get_json(
-        f"https://analyticsadmin.googleapis.com/v1beta/properties/{match.group(1)}",
-        {"Authorization": f"Bearer {secret}"},
-        provider_name=provider.name,
-        endpoint_family="ga4_property_read",
-    )
-
-
-def _validate_with_provider(
-    provider: Provider,
-    secret: str,
-    metadata: dict[str, Any] | None = None,
-    *,
-    repo: Path | None = None,
-    which_func: Which | None = None,
-    command_runner: CommandRunner | None = None,
-) -> dict[str, Any]:
-    checked_at = _now()
-    metadata = metadata or {}
-    if provider.id == "cloudflare":
-        token_type = _cloudflare_token_type(metadata, secret)
-        if token_type == "account":
-            account_id = str(metadata.get("account_id") or "").strip()
-            if not account_id:
-                return {
-                    "ok": False,
-                    "state": "unvalidated",
-                    "checked_at": checked_at,
-                    "summary": (
-                        "Cloudflare account-token validation requires non-secret "
-                        "`account_id` metadata."
-                    ),
-                    "repair": (
-                        "Run `mb connect cloudflare --metadata token_type=account "
-                        "--metadata account_id=<account-id>`, then "
-                        "`mb connect test cloudflare`."
-                    ),
-                    "repair_command": (
-                        "mb connect cloudflare --metadata token_type=account "
-                        "--metadata account_id=<account-id>"
-                    ),
-                    "safe_to_share": True,
-                    "upstream": {
-                        "endpoint_family": "cloudflare_account_token_verify",
-                        "http_status": None,
-                        "response_received": False,
-                        "error_codes": [],
-                        "error_messages": [],
-                        "safe_to_share": True,
-                    },
-                }
-            url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/tokens/verify"
-            endpoint_family = "cloudflare_account_token_verify"
-        else:
-            url = "https://api.cloudflare.com/client/v4/user/tokens/verify"
-            endpoint_family = "cloudflare_user_token_verify"
-        result = _http_get_json(
-            url,
-            {"Authorization": f"Bearer {secret}"},
-            provider_name=provider.name,
-            endpoint_family=endpoint_family,
-        )
-        raw_upstream = result.get("upstream")
-        upstream: dict[str, Any] = raw_upstream if isinstance(raw_upstream, dict) else {}
-        if token_type == "account" and upstream.get("http_status") == 404:
-            fallback = _http_get_json(
-                f"https://api.cloudflare.com/client/v4/accounts/{account_id}",
-                {"Authorization": f"Bearer {secret}"},
-                provider_name=provider.name,
-                endpoint_family="cloudflare_account_read",
-            )
-            raw_fallback_upstream = fallback.get("upstream")
-            fallback_upstream: dict[str, Any] = (
-                raw_fallback_upstream if isinstance(raw_fallback_upstream, dict) else {}
-            )
-            fallback_upstream["fallback_from"] = endpoint_family
-            fallback["upstream"] = fallback_upstream
-            if fallback.get("ok"):
-                fallback["summary"] = (
-                    "Cloudflare account-scoped credential validated with account read fallback."
-                )
-            result = fallback
-    elif provider.id == "apify":
-        result = _http_get_json(
-            "https://api.apify.com/v2/users/me",
-            {"Authorization": f"Bearer {secret}"},
-            provider_name=provider.name,
-            endpoint_family="apify_user_me",
-        )
-    elif provider.id == "stripe":
-        result = _probe_stripe(provider, secret)
-    elif provider.id == "github":
-        result = _probe_github(provider, secret)
-    elif provider.id == "ga4":
-        result = _probe_ga4(provider, secret, metadata)
-    elif provider.id == "meta":
-        return _validate_meta_with_cli(
-            provider,
-            secret,
-            metadata,
-            repo or Path.cwd(),
-            which_func=which_func,
-            command_runner=command_runner,
-        )
-    else:
-        # No safe read-only probe exists for this provider, so the only fact
-        # available is that a credential is stored. Saying "ready" here would
-        # claim a provider call that never happened.
-        return {
-            "ok": False,
-            "state": UNVERIFIED_STATE,
-            "checked_at": checked_at,
-            "provider_verified": False,
-            "summary": (
-                f"{provider.name} has a stored credential, but Main Branch has no "
-                "automated way to confirm it works with the provider."
-            ),
-            "repair": _unverified_repair(provider)["repair"],
-            "safe_to_share": True,
-        }
-    return {
-        "ok": bool(result["ok"]),
-        "state": str(result["state"]),
-        "checked_at": checked_at,
-        "provider_verified": bool(result["ok"]),
-        "summary": str(result["summary"]),
-        "repair": str(result.get("repair") or ""),
-        "repair_command": str(result.get("repair_command") or ""),
-        "safe_to_share": True,
-        "upstream": result.get("upstream", {}),
-        **{key: result[key] for key in PROBE_DETAIL_KEYS if key in result},
-    }
-
-
 def _user_scope_not_recorded_detail(
     exc: OSError | UserScopeReadOnlyError | ConfigCorruptError,
 ) -> str:
@@ -6320,255 +5675,9 @@ def business_identity(repo: str | Path = ".") -> dict[str, Any]:
     }
 
 
-def render_identity(result: dict[str, Any]) -> None:
-    print(f"mb connect identity  {result['repo']}")
-    print(result["summary"])
-    for item in result["providers"]:
-        mark = "ok" if item["complete"] else "warn"
-        print(f"  {mark}  {item['provider']}")
-        for field, value in item["identity"].items():
-            shown = value if value else "(unrecorded)"
-            print(f"        {field}: {shown}")
-
-
-def render_list(result: dict[str, Any]) -> None:
-    for provider in result["providers"]:
-        print(
-            f"{provider['id']:<14} {provider['state']:<14} "
-            f"{provider['auth']:<22} {provider['description']}"
-        )
-
-
-def render_plan(result: dict[str, Any]) -> None:
-    print(f"mb connect plan  {result['repo']}")
-    print("Choose the provider that matches the business job in front of you:")
-    for index, step in enumerate(result["steps"], start=1):
-        state = "ready" if step["ready"] else step["state"]
-        print(f"{index}. {step['name']} ({state})")
-        print(f"   why: {step['why']}")
-        print(f"   use when: {step['use_when']}")
-        if not step["ready"]:
-            print(f"   next: {step['next_command']}")
-
-
-def state_label(state: str) -> str:
-    """Human phrasing for a provider state. JSON keeps the machine value."""
-    if state == NOT_CHECKED_STATE:
-        return "not checked"
-    return "stored, unverified" if state == UNVERIFIED_STATE else state
-
-
-def render_status(result: dict[str, Any]) -> None:
-    summary = result["summary"]
-    print(f"mb connect status  {result['repo']}")
-    line = (
-        f"configured: {summary['configured']}  "
-        f"healthy: {summary['healthy']}  needs repair: {summary['needs_repair']}"
-    )
-    if summary.get("unverified"):
-        line += f"  unverified: {summary['unverified']}"
-    if summary.get("not_checked"):
-        line += f"  not checked: {summary['not_checked']}"
-    print(line)
-    github = result.get("github") or {}
-    if github:
-        state = "ok" if github.get("ok") else "warn"
-        print(f"  {state}  github: {github.get('state')}")
-        if github.get("repair_command"):
-            print(f"       next: {github['repair_command']}")
-    if not result["providers"]:
-        print("no providers connected")
-        return
-    for item in result["providers"]:
-        state = "ok" if item["ok"] else "warn"
-        label = f" ({item['account_label']})" if item["account_label"] else ""
-        print(f"  {state}  {item['provider']}{label}: {state_label(item['state'])}")
-        if item["repair_command"]:
-            print(f"       next: {item['repair_command']}")
-
-
-def render_provider_status(result: dict[str, Any]) -> None:
-    state = "ok" if result["ok"] else "warn"
-    label = f" ({result['account_label']})" if result["account_label"] else ""
-    print(
-        f"mb connect status {result['provider']}{label}: {state} ({state_label(result['state'])})"
-    )
-    if result.get("summary"):
-        print(f"summary: {result['summary']}")
-    if result.get("credential_mode") == "oauth":
-        _render_google_products(result)
-    if result.get("repair_command"):
-        print(f"next: {result['repair_command']}")
-
-
-def _render_google_products(result: dict[str, Any]) -> None:
-    """One line per Google product: granted or not, and its last recorded check."""
-
-    raw_oauth = result.get("oauth")
-    grants = raw_oauth.get("grants") if isinstance(raw_oauth, dict) else None
-    granted = set(grants) if isinstance(grants, list) else set()
-    raw_validation = result.get("validation")
-    raw_products = raw_validation.get("products") if isinstance(raw_validation, dict) else None
-    products = raw_products if isinstance(raw_products, dict) else {}
-    # A read that Google refused records reauth_required without product checks.
-    unchecked = (
-        "not checked since the sign-in expired"
-        if result.get("state") == GOOGLE_REAUTH_REQUIRED_STATE
-        else "not checked yet"
-    )
-    for name in GOOGLE_OAUTH_PRODUCTS:
-        if name not in granted:
-            print(f"  {name}: not granted")
-            continue
-        raw_product = products.get(name)
-        product: dict[str, Any] = raw_product if isinstance(raw_product, dict) else {}
-        state = product.get("state")
-        if not state or state == "not_checked":
-            last = unchecked
-        elif state in {"ok", "grant_missing"}:
-            last = state
-        else:
-            last = f"{state} ({product.get('rule') or 'no rule'})"
-        print(f"  {name}: granted, last check: {last}")
-
-
-def render_doctor(result: dict[str, Any]) -> None:
-    print(f"mb connect doctor  {result['repo']}")
-    for check in result["checks"]:
-        state = "ok" if check["ok"] else "warn"
-        print(f"  {state}  {check['name']}: {state_label(check['state'])}")
-        if check["repair_command"]:
-            print(f"       next: {check['repair_command']}")
-    probe_gap = result.get("probe_gap") or {}
-    if probe_gap.get("providers"):
-        print(f"  note  no provider probe: {', '.join(probe_gap['providers'])}")
-        print(f"       {probe_gap['summary']}")
-
-
-def render_test_result(result: dict[str, Any]) -> None:
-    if result.get("provider") == "google" and "products" in result:
-        from mb import google_probe
-
-        google_probe.render_test_result(result)
-        return
-    status = result["status"]
-    state = "ok" if result["ok"] else "warn"
-    validation = result.get("validation") or status.get("validation") or {}
-    # An unrecorded check shows its own outcome; status still holds the last one.
-    shown = (
-        str(validation.get("state") or status["state"])
-        if result.get("not_recorded_reason")
-        else status["state"]
-    )
-    print(f"mb connect test {result['provider']}: {state} ({state_label(shown)})")
-    summary = validation.get("summary")
-    if summary:
-        print(f"summary: {summary}")
-    upstream = validation.get("upstream") if isinstance(validation, dict) else {}
-    if isinstance(upstream, dict) and upstream.get("endpoint_family"):
-        details = [f"endpoint: {upstream['endpoint_family']}"]
-        if upstream.get("http_status") is not None:
-            details.append(f"http: {upstream['http_status']}")
-        codes = upstream.get("error_codes")
-        if isinstance(codes, list) and codes:
-            details.append(f"codes: {', '.join(str(code) for code in codes[:3])}")
-        print("provider: " + "  ".join(details))
-    scopes = validation.get("scopes") if isinstance(validation, dict) else None
-    if isinstance(scopes, dict) and scopes:
-        print("reads: " + "  ".join(f"{name}={verdict}" for name, verdict in scopes.items()))
-    if result.get("not_recorded_reason") == "connect_yaml_tracked":
-        print(
-            "recorded: no (.mb/connect.yaml is tracked by git, so checks are not written to "
-            f"it; `mb connect status {result['provider']}` shows the last check a person "
-            "recorded)"
-        )
-        next_command = str(validation.get("repair_command") or "")
-    else:
-        next_command = str(status.get("repair_command") or "")
-    if result.get("not_recorded_reason") == "user_scope_read_only":
-        render_user_scope_not_recorded()
-    elif result.get("not_recorded_reason") == "user_scope_write_failed":
-        render_user_scope_write_failed(result)
-    if next_command:
-        print(f"next: {next_command}")
-
-
 def render_user_scope_not_recorded() -> None:
     shown = UserScopeReadOnlyError(_user_scope_path()).shown
     print(f"recorded: no (the user-scope connect file {shown} is read-only)")
-
-
-def not_recorded_line(detail: str) -> str:
-    """The ``recorded: no (...)`` line, as ``mb connect test`` shows it."""
-
-    return f"recorded: no ({detail})"
-
-
-def render_user_scope_write_failed(result: dict[str, Any]) -> None:
-    detail = result.get("not_recorded_detail") or "the user-scope file was not written"
-    print(not_recorded_line(str(detail)))
-
-
-def render_rotate_result(result: dict[str, Any]) -> None:
-    stored = "stored" if result["stored"] else "not stored"
-    print(f"mb connect rotate {result['provider']}: re-read from 1Password, {stored}")
-    render_test_result(result)
-
-
-def render_hydrate_result(result: dict[str, Any]) -> None:
-    print(f"mb connect hydrate  {result['repo']}")
-    if result["hydrated"]:
-        print(f"hydrated: {', '.join(result['hydrated'])}")
-        print(f"metadata: {result['config_path']}")
-    else:
-        print("no user-scoped provider metadata found for this repo")
-    if result["missing"]:
-        print(f"missing: {', '.join(result['missing'])}")
-    if result.get("repair_command"):
-        print(f"next: {result['repair_command']}")
-
-
-def render_connect_result(result: dict[str, Any]) -> None:
-    status = result["status"]
-    setup = result.get("setup") if result["provider"] == "meta" else {}
-    if isinstance(setup, dict) and setup.get("requirements"):
-        print("Meta Ads setup requirements:")
-        for item in setup["requirements"]:
-            print(f"  - {item}")
-    if status["state"] == "ready":
-        print(f"connected {result['provider']} and ready")
-    elif status["state"] == "unvalidated":
-        print(f"stored {result['provider']} credential; validation still needed")
-    elif status["state"] == BACKEND_FAILURE_STATE:
-        print(f"connected {result['provider']} metadata; credential backend is unhealthy")
-        print(f"summary: {status['summary']}")
-        print(f"repair: {status['repair']}")
-    elif not result["ok"]:
-        print(f"connected {result['provider']} metadata; credential still needs repair")
-    else:
-        print(f"connected {result['provider']} metadata")
-    print(f"metadata: {result['config_path']}")
-    if result.get("scope") == "user":
-        print(f"user scope: {result['user_scope_path']}")
-    print(f"secrets: {result['credential_boundary']}")
-    rotated = result.get("rotated_sibling_refs") or []
-    if rotated:
-        print(
-            f"rotated {len(rotated)} sibling ref(s) to the new credential (other repos/worktrees)"
-        )
-    stale = result.get("stale_sibling_refs") or []
-    if stale:
-        print(
-            f"WARNING: {len(stale)} sibling ref(s) could not be updated "
-            "and still hold the OLD credential:"
-        )
-        for ref in stale:
-            print(f"  - {ref}")
-    source = result.get("credential_source") or {}
-    if source.get("type") == "env" and source.get("env_var"):
-        print(f"credential source: env {source['env_var']}")
-    if status["repair_command"]:
-        print(f"next: {status['repair_command']}")
 
 
 def read_stdin_token() -> str:
