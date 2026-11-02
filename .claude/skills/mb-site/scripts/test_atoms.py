@@ -685,7 +685,7 @@ def test_pages_create_project_ok_round_trip() -> None:
         data=PagesCreateProjectData(
             project_name="mb-git-test",
             source_type="github",
-            repo_owner="noontide-co",
+            repo_owner="example-co",
             repo_name="thelastbill-test",
             production_branch="main",
             project_id="b6dacee6-fa1e-497f-b81b-369927a475a7",
@@ -702,7 +702,7 @@ def test_pages_create_project_ok_round_trip() -> None:
     parsed = PagesCreateProjectEnvelope.model_validate_json(env.model_dump_json())
     assert parsed.data.created_now is True
     assert parsed.data.source_type == "github"
-    assert parsed.data.repo_owner == "noontide-co"
+    assert parsed.data.repo_owner == "example-co"
 
 
 def test_pages_create_project_idempotent_already_existed() -> None:
@@ -712,7 +712,7 @@ def test_pages_create_project_idempotent_already_existed() -> None:
         data=PagesCreateProjectData(
             project_name="mb-git-test",
             source_type="github",
-            repo_owner="noontide-co",
+            repo_owner="example-co",
             repo_name="thelastbill-test",
             production_branch="main",
             project_id="b6dacee6-fa1e-497f-b81b-369927a475a7",
@@ -741,14 +741,14 @@ def test_existing_project_source_matches_github_match() -> None:
         "source": {
             "type": "github",
             "config": {
-                "owner": "noontide-co",
+                "owner": "example-co",
                 "repo_name": "thelastbill-test",
                 "production_branch": "main",
             },
         }
     }
     assert _existing_project_source_matches(
-        payload, "github", "noontide-co", "thelastbill-test", "main"
+        payload, "github", "example-co", "thelastbill-test", "main"
     ) is True
 
 
@@ -764,14 +764,14 @@ def test_existing_project_source_matches_owner_mismatch() -> None:
         }
     }
     assert _existing_project_source_matches(
-        payload, "github", "noontide-co", "thelastbill-test", "main"
+        payload, "github", "example-co", "thelastbill-test", "main"
     ) is False
 
 
 def test_existing_project_source_matches_type_mismatch() -> None:
     """direct-upload project (source: null) should not match github request."""
     assert _existing_project_source_matches(
-        {"source": None}, "github", "noontide-co", "thelastbill-test", "main"
+        {"source": None}, "github", "example-co", "thelastbill-test", "main"
     ) is False
 
 
@@ -1036,7 +1036,7 @@ def test_stripe_create_payment_link_ok_round_trip() -> None:
             price_id="price_123",
             amount_cents=10000,
             currency="usd",
-            statement_descriptor="NOONTIDE LASTBILL",
+            statement_descriptor="EXAMPLE LASTBILL",
             success_url="https://thelastbill.com/start/thanks/",
             created_now=True,
         ),
@@ -1108,9 +1108,9 @@ def test_stripe_form_encode_booleans() -> None:
 
 
 def test_stripe_truncate_descriptor() -> None:
-    assert stripe_module._truncate_descriptor("  NOONTIDE  ") == "NOONTIDE"
-    assert stripe_module._truncate_descriptor("NOONTIDE THE LAST BILL EXTRA") == "NOONTIDE THE LAST BILL"
-    assert len(stripe_module._truncate_descriptor("NOONTIDE THE LAST BILL EXTRA")) == 22
+    assert stripe_module._truncate_descriptor("  EXAMPLE  ") == "EXAMPLE"
+    assert stripe_module._truncate_descriptor("EXAMPLE CO THE LAST BILL EXTRA") == "EXAMPLE CO THE LAST BI"
+    assert len(stripe_module._truncate_descriptor("EXAMPLE CO THE LAST BILL EXTRA")) == 22
 
 
 def test_stripe_validate_offer_slug_ok() -> None:
@@ -1130,12 +1130,12 @@ def test_stripe_validate_offer_slug_rejects_leading_hyphen() -> None:
 
 
 def test_stripe_validate_statement_descriptor_ok() -> None:
-    assert stripe_module._validate_statement_descriptor("NOONTIDE") is None
-    assert stripe_module._validate_statement_descriptor("NOONTIDE LAST BILL") is None
+    assert stripe_module._validate_statement_descriptor("EXAMPLE") is None
+    assert stripe_module._validate_statement_descriptor("EXAMPLE LAST BILL") is None
 
 
 def test_stripe_validate_statement_descriptor_rejects_special_chars() -> None:
-    assert stripe_module._validate_statement_descriptor("NOON<>TIDE") is not None
+    assert stripe_module._validate_statement_descriptor("EXAM<>PLE") is not None
 
 
 def test_stripe_classify_error_unauthenticated() -> None:
@@ -1198,6 +1198,7 @@ def test_stripe_cli_missing_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
         "create-payment-link", "thelastbill",
         "--amount", "10000",
         "--success-url", "https://thelastbill.com/start/thanks/",
+        "--statement-descriptor", "EXAMPLE CO",
     ])
     assert payload["status"] == "degraded"
     assert payload["error"]["code"] == "missing_api_key"
@@ -1249,6 +1250,22 @@ def test_stripe_cli_invalid_statement_descriptor(monkeypatch: pytest.MonkeyPatch
     assert payload["error"]["code"] == "invalid_statement_descriptor"
 
 
+def test_stripe_cli_refuses_missing_statement_descriptor_before_any_stripe_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("STRIPE_API_KEY", "sk_test_dummy")
+
+    def fake_call(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("Stripe must not be called without a statement descriptor")
+
+    monkeypatch.setattr(stripe_module, "_stripe_call", fake_call)
+    payload = _run_stripe([
+        "create-payment-link", "thelastbill",
+        "--amount", "10000",
+        "--success-url", "https://thelastbill.com/start/thanks/",
+    ])
+    assert payload["status"] == "degraded"
+    assert payload["error"]["code"] == "missing_statement_descriptor"
+
+
 def test_stripe_cli_invalid_offer_slug(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("STRIPE_API_KEY", "sk_test_dummy")
     payload = _run_stripe([
@@ -1286,6 +1303,7 @@ def test_stripe_cli_idempotent_returns_existing(monkeypatch: pytest.MonkeyPatch)
         "create-payment-link", "thelastbill",
         "--amount", "10000",
         "--success-url", "https://thelastbill.com/start/thanks/",
+        "--statement-descriptor", "EXAMPLE CO",
     ])
     assert payload["status"] == "ok"
     assert payload["data"]["payment_link_url"] == "https://buy.stripe.com/EXISTING"
@@ -1327,6 +1345,7 @@ def test_stripe_cli_creates_when_no_existing(monkeypatch: pytest.MonkeyPatch) ->
         "create-payment-link", "thelastbill",
         "--amount", "10000",
         "--success-url", "https://thelastbill.com/start/thanks/",
+        "--statement-descriptor", "EXAMPLE CO",
     ])
     assert payload["status"] == "ok"
     assert payload["data"]["payment_link_url"] == "https://buy.stripe.com/NEW"
@@ -1356,6 +1375,7 @@ def test_stripe_cli_unauthenticated_passthrough(monkeypatch: pytest.MonkeyPatch)
         "create-payment-link", "thelastbill",
         "--amount", "10000",
         "--success-url", "https://thelastbill.com/start/thanks/",
+        "--statement-descriptor", "EXAMPLE CO",
     ])
     assert payload["status"] == "degraded"
     assert payload["error"]["code"] == "stripe_unauthenticated"

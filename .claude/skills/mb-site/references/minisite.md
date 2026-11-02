@@ -204,7 +204,7 @@ The "kind of payment" is operator-declared in `offer.md` — `deposit`, `full`, 
 | `amount` | offer.md `payment_amount_usd` × 100 (cents) | offer.md frontmatter |
 | `currency` | `usd` | hardcoded V1; multi-currency is V2 |
 | `description` | offer.md `payment_description` or generated | offer.md or LLM |
-| `statement_descriptor` | offer.md `statement_descriptor` or `NOONTIDE` | offer.md or fallback (max 22 chars) |
+| `statement_descriptor` | offer.md `statement_descriptor` (required, no default) | offer.md (5-22 chars). If missing, ask the owner; the script refuses before any Stripe call |
 | `metadata.mb_offer` | `<offer-slug>` | derived from offer's directory name |
 | `metadata.mb_kind` | `"deposit"` (V1 hardcoded) | tool constant |
 | `success_url` | `https://<domain>/start/thanks/` | derived from `sites.json` `domain` |
