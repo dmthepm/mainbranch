@@ -82,13 +82,7 @@ See **[references/cwd-detection.md](references/cwd-detection.md)** for the full 
 
 ### 0. Check Chrome Extension (Optional, Helpful for Skool)
 
-**Before gathering context, mention the Chrome extension:**
-
-> "The Claude in Chrome extension lets me read your sales pages, Skool community, and web content directly. It's optional but helpful.
->
-> To check if it's installed: open Chrome, go to `chrome://extensions`, and look for 'Claude'. If you don't have it: https://claude.ai/chrome"
-
-**If not installed or user declines:** Proceed with URL fetching, Playwright, or manual screenshots. The extension is convenient but not required.
+Mention once: "The Claude in Chrome extension lets me read your sales pages, Skool community, and web content directly. It's optional: check `chrome://extensions` for 'Claude', or install from https://claude.ai/chrome." If missing or declined, proceed with URL fetching, Playwright, or manual screenshots.
 
 ### 1. Confirm Repo + Working Directory
 
@@ -130,15 +124,7 @@ organizations can be free; do not imply that "org" means paid. Default to
 
 ### 1a. Check Optional Tools (Inform, Don't Block)
 
-**Local transcription (for mining your own recordings):**
-```bash
-which mlx_whisper 2>/dev/null || which whisper-cli 2>/dev/null; which ffmpeg
-```
-
-If missing, note for later:
-> "Optional: For transcribing your own videos/voice memos, you'll want a whisper variant. `pip3 install mlx-whisper` is fastest on Apple Silicon. We can set that up later with `/mb-think`."
-
-Don't block setup on this. Continue and mention it at the end.
+Check `which mlx_whisper || which whisper-cli; which ffmpeg`. If missing, note for later: "Optional: for transcribing your own videos/voice memos you'll want a whisper variant (`pip3 install mlx-whisper` is fastest on Apple Silicon); we can set that up later with `/mb-think`." Don't block setup; mention it at the end.
 
 ### 2. Ask Business Type
 
@@ -255,57 +241,7 @@ done
 touch core/product-ladder.md
 ```
 
-Full structure (single-offer):
-```
-{business-name}/
-├── CLAUDE.md              # Always loaded - business brain
-├── README.md              # Human-readable overview
-├── .env                   # Secrets (gitignored)
-├── .gitignore             # Include .env
-│
-├── core/                  # Evergreen business brain
-│   ├── soul.md            # Why you exist
-│   ├── offer.md           # What you sell / brand thesis
-│   ├── audience.md        # Who buys
-│   ├── voice.md           # How you sound
-│   ├── content-strategy.md # Business-level content strategy and layer index
-│   ├── marketing/          # Optional distribution, channel, account layers
-│   ├── people/             # Optional founder/person voice source material
-│   ├── proof/
-│   │   ├── testimonials.md
-│   │   └── angles/        # Proven messaging entry points
-│   ├── brand/             # Visual identity and brand systems
-│   ├── operations/        # Business-type specific operating context
-│   ├── finance/           # Ledger and tax artifacts
-│   └── offers/            # Per-offer specifics when multi-offer
-│
-├── research/              # Dated investigations
-│   └── YYYY-MM-DD-topic-[source].md
-│
-├── decisions/             # Dated choices with rationale
-│   └── YYYY-MM-DD-topic.md
-│
-├── bets/                  # Operating bets with target, deadline, and result
-│   └── YYYY-MM-DD-topic.md
-│
-├── log/                   # Running activity log
-│
-└── pushes/                # Coordinated pushes and their artifacts
-    └── YYYY-MM-DD-push-name/
-```
-
-Full structure (multi-offer — adds offer folders and `product-ladder.md`):
-```
-{business-name}/
-├── ...                    # Same as above, plus:
-├── core/
-│   ├── product-ladder.md  # How offers relate
-│   └── offers/            # Offer-specific overrides
-│       ├── community/
-│       │   └── offer.md   # Offer-specific details
-│       └── course/
-│           └── offer.md
-```
+The full single-offer and multi-offer folder trees are in [references/repo-scaffolding.md](references/repo-scaffolding.md) (Folder Structure).
 
 ### 4a. API Key Environment, Config, and .gitignore
 
@@ -384,25 +320,7 @@ from `references/git-workflow.md`.
 
 ### 10. Report Gaps
 
-| File | Status |
-|------|--------|
-| core/soul.md | [OK] Complete / [WARN] Missing [X] |
-| core/offer.md | [OK] Complete / [WARN] Missing [X] |
-| core/audience.md | [OK] Complete / [WARN] Missing [X] |
-| core/voice.md | [OK] Complete / [WARN] Missing [X] |
-| core/proof/testimonials.md | [OK] Has content / [FAIL] Empty |
-| core/proof/angles/ | [OK] [N] angles / [WARN] None yet |
-| core/operations/ | [OK] Populated / [WARN] Needs [X] |
-
-**Multi-offer additional checks (if applicable):**
-
-| File | Status |
-|------|--------|
-| core/offers/[name]/offer.md | [OK] Complete / [WARN] Thin (< 20 lines) / [FAIL] Missing |
-| core/product-ladder.md | [OK] Complete / [WARN] Placeholder |
-| active offer | [OK] Selected for session / [INFO] Not persisted |
-
-Ask user for missing pieces or note for later.
+Report status ([OK] complete / [WARN] missing X / [FAIL] empty) for `core/soul.md`, `core/offer.md`, `core/audience.md`, `core/voice.md`, `core/proof/testimonials.md` (has content), `core/proof/angles/` (N angles), and `core/operations/` (populated). Multi-offer adds `core/offers/[name]/offer.md` (complete / thin under 20 lines / missing), `core/product-ladder.md` (complete / placeholder) and whether the active offer is selected for the session or not persisted. Ask for missing pieces or note them for later.
 
 ---
 
@@ -435,18 +353,7 @@ See `references/git-workflow.md` for the full guide.
 
 ## Recovering from Compaction
 
-If conversation compacts mid-setup:
-
-**For the user:** Type `/mb-setup` again and describe where you were:
-- "We're in the middle of gathering context for my Skool community"
-- "I was giving you screenshots, you hadn't created files yet"
-- "You created the folder structure but we haven't sorted content"
-
-**For Claude:** When resuming:
-1. Check if business repo exists (look for current markers; if CWD looks like an old Main Branch repo, run `mb status --json --peek` and `mb doctor repair --plan` from CWD before fallback)
-2. If exists, check which files are populated vs empty
-3. Resume from the appropriate step based on what's done
-4. Confirm with user: "I see [business-name] with [X] files. Looks like we're at step [N]. Continue?"
+The user types `/mb-setup` again and says where they were ("gathering context for my Skool community", "you hadn't created files yet"). To resume: check whether the business repo exists (current markers; if CWD looks like an old Main Branch repo, run `mb status --json --peek` and `mb doctor repair --plan` from CWD first), check which files are populated, resume from the matching step, and confirm: "I see [business-name] with [X] files. Looks like we're at step [N]. Continue?"
 
 ---
 
@@ -484,17 +391,4 @@ Once setup is complete, tell the user:
 >
 > **Remember:** Type `/mb-help` + your question anytime. It has answers about Terminal basics, the business folder, CLI, skills, troubleshooting, and more."
 
-**If whisper-cpp was missing during setup:**
-
-> "One more thing: To transcribe your own videos and voice memos, install whisper-cpp:
-> ```bash
-> brew install whisper-cpp ffmpeg
-> mkdir -p ~/.whisper
-> curl -o ~/.whisper/ggml-base.en.bin -L \
->   'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin'
-> ```
-> Then `/mb-think` can mine your recordings directly."
-
-**If the user wants image generation:**
-
-> "Want to generate actual images for ads and content? See `references/nano-banana-setup.md` for Nano Banana setup (uses your existing Google API key)."
+If whisper-cpp was missing during setup, offer: `brew install whisper-cpp ffmpeg`, `mkdir -p ~/.whisper`, then download `ggml-base.en.bin` from `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin` into `~/.whisper/`, so `/mb-think` can mine recordings. If the user wants image generation, point to `references/nano-banana-setup.md` (uses the existing Google API key).

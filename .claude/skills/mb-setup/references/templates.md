@@ -10,11 +10,16 @@ Copy and customize these templates when creating reference files.
 ---
 type: context
 status: active
+entity: [Legal entity name, e.g. Example LLC]
+contact: [Public contact email, e.g. hello@example.com]
 ---
 
 # The Offer
 
 ## What We Sell
+
+`entity` and `contact` are the legal business name and public contact email.
+Site skills put them in every page footer, so fill them in before a site ships.
 
 [One paragraph: What is this product/service?]
 
@@ -590,88 +595,9 @@ status: draft
 
 ---
 
-## decisions/YYYY-MM-DD-topic.md
+## decisions/ and research/ files
 
-```markdown
----
-type: decision
-date: YYYY-MM-DD
-status: proposed
----
-
-# Decision: [Topic]
-
-## Context
-
-[What's happening, what prompted this decision]
-
-## Research Summary
-
-[Summary of research that informed this]
-See: `research/YYYY-MM-DD-topic.md`
-
-## Options
-
-### Option A: [Name] (selected)
-**Pros:**
-**Cons:**
-
-### Option B: [Name] (rejected)
-**Pros:**
-**Cons:**
-
-## Decision
-
-[The actual choice with rationale]
-
-## Consequences
-
-[What becomes easier, harder, and what you're accepting]
-
-## What Changes
-
-[Which reference files are affected and what the key changes are]
-```
-
----
-
-## research/YYYY-MM-DD-topic-[source].md
-
-```markdown
----
-type: research
-date: YYYY-MM-DD
-source: [gemini | claude-code | web | expert | mining]
-topics: [topic1, topic2]
-status: complete
----
-
-# [Research Topic]
-
-## Question
-
-[What we were trying to learn]
-
-## Key Findings
-
-1. [Finding 1]
-2. [Finding 2]
-3. [Finding 3]
-
-## Implications
-
-[What this means for the business]
-
-## Next Steps
-
-- [ ] [Action this research suggests]
-
----
-
-## Raw Notes
-
-[Detailed findings, quotes, data]
-```
+Decision files (`decisions/YYYY-MM-DD-topic.md`: Context, Research Summary, Options with the selected one marked, Decision, Consequences, What Changes) and research files (`research/YYYY-MM-DD-topic-[source].md`: Question, Key Findings, Implications, Next Steps, Raw Notes) use the templates bundled with `/mb-think`; scaffold them there when the operator makes their first decision or research note.
 
 ---
 

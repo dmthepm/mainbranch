@@ -54,7 +54,7 @@ status: proposed
 dial: convert | story | brand          # required
 archetype: wounded-healer              # optional but recommended
 audience_current_archetype: victim     # optional
-copy_framework_tag: Compact-Landing    # optional, see section-patterns.md
+copy_framework_tag: Compact-Landing    # optional, see website-build.md
 headline_formulas_picked:              # optional, suggested 2-3
   - "outcome-without-pain"
   - "for-audience-who-tried-X"

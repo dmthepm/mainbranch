@@ -182,15 +182,7 @@ Pattern:
 2. **Pointer to full file** — "Full system: `core/voice.md`"
 3. **Claude loads on-demand** — When actually needed
 
-Example:
-```markdown
-## Voice (Quick Reference)
-
-**Tone:** Calm, grounded, never preachy
-**Key phrases:** "Wearable notes to self", "Stay awake. Stay happy."
-
-**Full system:** `core/voice.md`
-```
+Example: the "Voice (Quick Reference)" block above (tone and key phrases here, `Full system: core/voice.md` as the pointer).
 
 ---
 

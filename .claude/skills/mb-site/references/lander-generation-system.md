@@ -40,7 +40,7 @@ One page, no nav dependency, mobile-first:
 - FAQ or objections section;
 - final CTA;
 - privacy/terms links or clear hosted equivalents;
-- footer with the required business entity.
+- footer with the `entity` and `contact` from `offer.md` (if missing, ask the owner and, with their OK, record them in `offer.md`).
 
 The page can link to a hosted checkout, booking, or form, but it must not assume
 provider setup that `mb site check` or operator approval has not verified.
@@ -71,7 +71,7 @@ For paid traffic, the generated HTML must support the measurement rubric:
 Before calling the lander ready for operator review:
 
 - all required files exist;
-- footer/entity is present;
+- footer/entity is present: `ENTITY` (from `offer.md`) is non-empty and not the `<legal entity from offer.md>` placeholder, `grep -c -F "$ENTITY" index.html` is at least 1, and `grep -l "&lt;legal entity" index.html` prints nothing;
 - CTA links are real or explicitly marked as placeholders;
 - page has title, description, canonical URL when known, OG/Twitter metadata;
 - keyword cluster appears naturally without stuffing;

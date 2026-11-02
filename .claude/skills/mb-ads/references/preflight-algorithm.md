@@ -66,25 +66,7 @@ See `docs/system-architecture.md` (current path resolution) for the full algorit
 
 ### Scoring Logic
 
-```
-Resolve offer.md and audience.md paths first using the shared primitive
-contract.
-
-For each file:
-  if not exists → 0
-  if exists and lines < 20 → 1
-  if exists and 20 ≤ lines < 80 → 2
-  if exists and lines ≥ 80 → 3
-
-For angles/:
-  count = number of .md files (excluding README.md)
-  if count == 0 → 0
-  if count == 1 → 1
-  if count == 2-3 → 2
-  if count >= 4 → 3
-
-Composite = sum of all 6 scores (max 18)
-```
+Resolve offer and audience paths first. Each file: missing = 0, under 20 lines = 1, 20-79 = 2, 80+ = 3. `angles/`: count `.md` files excluding README.md (0 = 0, 1 = 1, 2-3 = 2, 4+ = 3). Composite = sum of all 6 scores (max 18).
 
 ---
 

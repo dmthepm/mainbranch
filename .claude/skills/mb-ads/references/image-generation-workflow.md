@@ -153,51 +153,18 @@ External creative research, including Grok or ad-research synthesis, is only a
 source signal until verified against primary sources. Do not commit raw Grok
 dumps, screenshots, provider payloads, or unverified claims.
 
-Use this shape inside push-local `image-index.md`:
+Use this shape inside push-local `image-index.md` (a full worked example lives
+in the image-rail test fixtures; omit fields you have no value for):
 
 ```yaml
 schema: mainbranch.image_index.v0
 push_slug: 2026-05-ad-test
-experiment_frame: first_creative_playbook_router_experiment
 conversion_language: conversion_informed
-creative_playbook_ids:
-  - native_problem_scene
-  - specific_object_metaphor
-  - proof_artifact
-  - myth_vs_fact
-  - with_without_transformation
-  - crossed_out_problem_list
-  - founder_pov
-  - high_contrast_poster
-  - simple_chart_comparison
-  - testimonials_with_artifact
-  - us_vs_them_split
-  - simple_list_framework
-review_board_question: Which playbook produced the best actual ad candidate?
 review_rule: Beautiful but no click reason = reject.
 ad_readiness_gate:
-  state: ready
-  required_fields:
-    - offer
-    - audience
-    - campaign_goal
-    - claim_proof_boundary
+  state: ready            # hard-stop fields: offer, audience, campaign_goal, claim_proof_boundary
   hard_stop_missing: []
-  hard_stop_missing_fields: []
-  soft_warning_missing:
-    - proof
-    - customer_language
-    - brand_visual_style
-    - prior_outcomes
-    - meta_summary
-    - reference_images
-  soft_warning_missing_fields:
-    - proof
-    - customer_language
-    - brand_visual_style
-    - prior_outcomes
-    - meta_summary
-    - reference_images
+  soft_warning_missing: [proof, customer_language, brand_visual_style, prior_outcomes, meta_summary, reference_images]
 image_generation_gate:
   required_before_provider_generation:
     - selected_concept
@@ -206,256 +173,54 @@ image_generation_gate:
     - image_index_target
     - credential_state
     - operator_approval_for_live_provider_call
-selected_source_bites:
-  - concept_id: lost-thread-branch-map
-    source_file: research/customer-language.md
-    source_type: customer_language
-    extracted_phrase: I keep losing the thread
-    visual_translation: tangled red thread becoming one clean branch map
 post_processing_plan:
-  status: planned_not_implemented
   resize_target: 1440x1800
-  overlay_expected: true
-  overlay_method: future_deterministic_overlay_step
-  export_format: png_source_then_jpeg_or_png_final
-  compression_target: future_export_step
+  overlay_method: deterministic_overlay_step
   validation: Preview in Meta Ads Manager before launch.
-placement_presets:
-  facebook_feed_portrait_4x5:
-    aspect_ratio: 4:5
-    nearest_provider_size: 1024x1536
-    recommended_generation_size: 1440x1800
-    final_export_size: 1440x1800
-    safe_zone:
-      top: 10%
-      bottom: 10%
-      sides: 10%
-      notes: Keep focal point and overlay text inside conservative feed margins.
-    deterministic_overlay_expected: true
-    source_boundary: Default Meta feed format (with 9:16 for Stories/Reels); 1440x1800 minimum per ad-media-specs.md. Verify current Ads Manager specs before launch.
-    validation: Preview in Meta Ads Manager before launch.
-  facebook_feed_square_1x1:
-    aspect_ratio: 1:1
-    nearest_provider_size: 1024x1024
-    recommended_generation_size: 1440x1440
-    final_export_size: 1080x1080
-    safe_zone:
-      top: 10%
-      bottom: 10%
-      sides: 10%
-      notes: Keep the focal point centered for mobile feed crop.
-    deterministic_overlay_expected: true
-    source_boundary: Planning preset for square feed/carousel-style creative. Verify current Ads Manager specs before launch.
-    validation: Preview in Meta Ads Manager before launch.
-  facebook_story_reels_9x16:
-    aspect_ratio: 9:16
-    nearest_provider_size: 1024x1792
-    recommended_generation_size: 1440x2560
-    final_export_size: 1080x1920
-    safe_zone:
-      top: 14%
-      bottom: 35%
-      sides: 6%
-      notes: Keep critical content inside the center safe band.
-    deterministic_overlay_expected: true
-    source_boundary: 9:16 vertical guidance checked against public Meta Reels guidance; verify current Ads Manager specs before launch.
-    validation: Preview Stories/Reels placements before launch.
-reference_roles:
-  - logo
-  - product_photo
-  - style_reference
-  - screenshot_reference
-  - background
-  - mask_source
+placement_presets:       # sizes and safe zones: see ad-media-specs.md; verify current Ads Manager specs
+  facebook_feed_portrait_4x5: {aspect_ratio: "4:5", recommended_generation_size: 1440x1800, final_export_size: 1440x1800, safe_zone: {top: 10%, bottom: 10%, sides: 10%}}
+  facebook_feed_square_1x1: {aspect_ratio: "1:1", recommended_generation_size: 1440x1440, final_export_size: 1080x1080, safe_zone: {top: 10%, bottom: 10%, sides: 10%}}
+  facebook_story_reels_9x16: {aspect_ratio: "9:16", recommended_generation_size: 1440x2560, final_export_size: 1080x1920, safe_zone: {top: 14%, bottom: 35%, sides: 6%}}
+reference_roles: [logo, product_photo, style_reference, screenshot_reference, background, mask_source]
 concepts:
   - concept_id: lost-thread-branch-map
     status: planned
     prompt_key: lost-thread-branch-map.v1
     creative_playbook_id: specific_object_metaphor
-    creative_playbook:
-      id: specific_object_metaphor
-      status: candidate
-      use_when:
-        - audience speaks in systems, workflows, and operating clarity
-        - offer promise is about memory, process, or context continuity
-      default_avoid:
-        - generic SaaS gradient
-        - fake dashboard
-        - hologram UI
-        - robot assistant
-      useful_metaphors:
-        - dependency graph
-        - broken pipeline
-        - incident board
-        - branch map
-        - lost thread
-      risky_metaphors:
-        - glowing brain
-        - robot assistant
-        - generic command center
-      prompt_bias:
-        - tactile systems
-        - real artifacts
-        - visible consequence
-        - source-bite metaphor
-    router_inputs:
-      niche: founder_tool
-      offer_type: open_source_business_os
-      audience: solo founder or operator
-      source_bite_type: customer_language
-      proof_available: false
-      brand_style: tactile, technical, irreverent
-      platform: facebook_feed
-    router_reason: >
-      The source bite is emotional and abstract, so a specific object metaphor,
-      native problem scene, or bold meme/poster is more useful than chart proof.
-    playbook_fit:
-      source_bite_fit: 5
-      offer_fit: 5
-      audience_fit: 4
-      visual_distinctiveness: 5
-      conversion_pattern_fit: 4
-    external_pattern_signal:
-      source_type: grok_synthesis
-      pattern: specific_object_metaphor
-      confidence: medium
-      primary_source_verified: false
-    reference_influence_test:
-      mode: none
-      effect_on_specificity: 4
-      effect_on_native_feed_fit: 4
-      effect_on_ai_slop_risk: 2
-    reference_influence:
-      mode: none
-      influence_score: null
-      copy_risk: pass
+    router_inputs: {niche: founder_tool, offer_type: open_source_business_os, audience: solo founder or operator, source_bite_type: customer_language, proof_available: false, platform: facebook_feed}
+    router_reason: The source bite is emotional and abstract, so a specific object metaphor beats chart proof.
+    playbook_fit: {source_bite_fit: 5, offer_fit: 5, audience_fit: 4, visual_distinctiveness: 5, conversion_pattern_fit: 4}
     source_bite:
       source_file: research/customer-language.md
       source_type: customer_language
       extracted_phrase: I keep losing the thread
-      insight: The customer does not just feel disorganized; continuity breaks across tools.
+      insight: Continuity breaks across tools.
       visual_translation: tangled red thread becoming one clean branch map
-    genericness_check:
-      could_fit_notion: false
-      could_fit_asana: false
-      could_fit_quickbooks: false
-      could_fit_generic_coaching_offer: false
-      could_fit_generic_productivity_app: false
-      could_fit_any_coaching_offer: false
-      could_fit_accounting_software: false
-      specific_to_this_offer: 5
-      reason: The branch-map and durable-memory metaphor expresses the repo-backed business-memory promise.
-    avoidance_strategy:
-      avoids:
-        - stock-photo business imagery
-        - clean desk productivity cliché
-        - website hero composition
-        - fake dashboard
-        - generic SaaS gradient
-      intentionally_uses: []
-      reason: Uses a customer-language source-bite metaphor instead of generic productivity imagery.
+    genericness_check: {could_fit_generic_productivity_app: false, could_fit_any_coaching_offer: false, could_fit_accounting_software: false, specific_to_this_offer: 5, reason: "..."}
+    avoidance_strategy: {avoids: [stock-photo business imagery, fake dashboard, generic SaaS gradient], intentionally_uses: [], reason: "..."}
+    reference_influence: {mode: none, influence_score: null, copy_risk: pass}
     viewer_scroll_context: cold Facebook feed
     first_second_read: lost business thread becomes one durable branch map
-    audience_state: operator is resuming work after context switching across tools
-    visual_job: make continuity loss visible before showing the repo-backed memory fix
-    visual_metaphor: tangled red thread resolving into a clean branch map and archive
-    composition: tactile maze of red thread and scattered cards, with one clear branch path and upper-right overlay space
-    visual_hierarchy:
-      primary_focal_point: red thread becoming a branch map
-      secondary_focal_point: central archive object
-      text_zone: upper right
-    camera_language: slight top-down editorial ad composition
-    style_strength: specific metaphor, restrained production polish
+    audience_state: resuming work after context switching
+    visual_job: make continuity loss visible before showing the fix
+    visual_metaphor: tangled red thread resolving into a clean branch map
+    composition: one clear branch path, upper-right overlay space
+    visual_hierarchy: {primary_focal_point: red thread becoming a branch map, text_zone: upper right}
+    camera_language: slight top-down editorial
+    style_strength: specific metaphor, restrained polish
     emotional_tone: relief after broken continuity
     placement: facebook_feed_portrait_4x5
     text_overlay_plan: text-free base image; deterministic overlay later, max 4 words
-    source_files:
-      - core/offer.md
-      - core/audience.md
-      - core/brand/visual-style.md
-      - pushes/2026-05-ad-test/push.md
+    source_files: [core/offer.md, core/audience.md, pushes/2026-05-ad-test/push.md]
     claim_boundary: do not imply guaranteed revenue or Meta partnership
-    references:
-      - id: style-001
-        role: style_reference
-        path: mb-media://references/style-001.png
-        safe_to_share: false
-        use_for: color mood and composition
-        do_not_copy: exact subject, logos, text, or private details
-    reference_trait_extraction:
-      - reference_id: style-001
-        traits:
-          palette: muted warm neutrals with one grounded accent
-          composition: simple focal object with visible surrounding context
-          lighting: natural, tactile, not glossy studio light
-        do_not_copy: exact subject, text, logos, layout, or private details
-    prompt: >
-      Create a Facebook image ad base scene with a clear focal point, mobile-safe
-      whitespace, no rendered text, no real logos, and no private data.
-    negative_constraints:
-      - no real Meta UI
-      - no real logos
-      - no tiny text
-      - no revenue screenshots
-      - no before/after income claim
+    references: [{id: style-001, role: style_reference, path: "mb-media://references/style-001.png", safe_to_share: false, use_for: color mood, do_not_copy: exact subject, logos, text}]
+    prompt: Create a Facebook image ad base scene with a clear focal point, mobile-safe whitespace, no rendered text, no real logos, no private data.
+    negative_constraints: [no real Meta UI, no real logos, no tiny text, no revenue screenshots, no before/after income claim]
     likely_click_reason: A founder who feels context slipping away recognizes the lost-thread problem before reading the overlay.
-    review:
+    review:                # rubric: see Creative Review Rubric below
       status: accepted
-      one_second_clarity: pass
-      visual_hook_strength: pass
-      ad_usefulness: pass
-      source_bite_fit: pass
-      genericness_risk: pass
-      avoidance_strategy_fit: pass
-      avoidance_risk: pass
-      prompt_record_complete: pass
-      reference_copy_risk: pass
-      export_readiness: pass
-      readability: pass
-      placement_fit: pass
-      brand_fit: pass
-      claim_safety: pass
-      fake_ui_risk: pass
-      policy_risk: pass
-      private_data_risk: pass
-      ai_generic_risk: pass
-      click_reason_fit: pass
-      visual_quality:
-        composition: 5
-        style: 5
-        polish_control: 5
-      ad_quality:
-        thumb_stop: 5
-        problem_clarity: 5
-        desire_clarity: 5
-        curiosity_gap: 5
-        offer_relevance: 5
-        likely_click_reason: A founder who feels context slipping away recognizes the lost-thread problem before reading the overlay.
-      risk:
-        ai_slop_risk: 1
-        genericness_risk: 1
-        compliance_risk: pass
-      avoidance_check:
-        stock_photo_risk: pass
-        website_hero_risk: pass
-        clean_desk_cliche_risk: pass
-        generic_saas_risk: pass
-        ai_slop_risk: pass
-        overpolished_risk: pass
-        native_feed_fit: 5
-        too_safe_to_stop_scroll: pass
-        notes: []
-      scores:
-        one_second_clarity: 5
-        visual_hook_strength: 5
-        specificity: 5
-        brand_fit: 5
-        source_bite_fit: 5
-        specific_to_this_offer: 5
-        native_feed_fit: 5
-        ai_generic_risk: 1
+      scores: {one_second_clarity: 5, visual_hook_strength: 5, specificity: 5, brand_fit: 5, source_bite_fit: 5, specific_to_this_offer: 5, native_feed_fit: 5, ai_generic_risk: 1}
       decision: accept
-      notes: []
 assets:
   - asset_id: lost-thread-branch-map-001
     concept_id: lost-thread-branch-map
@@ -608,23 +373,7 @@ checked against current primary docs and pinned per run.
 
 ## Detection
 
-At triage, check whether an approved image provider is available. Use
-`mb status --json --peek` / `mb connect doctor --json` first for provider
-readiness when available. Those commands may not prove a media API key exists;
-only check environment variables when the selected mode actually needs image
-generation.
-
-```bash
-python3 -c "from openai import OpenAI; print('openai OK')" 2>/dev/null
-python3 -c "from google import genai; print('google-genai OK')" 2>/dev/null
-```
-
-If a provider is available, show the provider/model, estimated cost, output
-path, and required approval before generating. If unavailable, output text
-prompts only:
-
-> "Image prompts saved. Paste them into your chosen image tool, or configure an
-> approved provider before asking Main Branch to generate files directly."
+At triage use `mb status --json --peek` / `mb connect doctor --json` for provider readiness; those may not prove a media API key exists, so check environment variables only when the selected mode needs generation. If a provider is available, show provider/model, estimated cost, output path and required approval before generating. If not, output text prompts only: "Image prompts saved. Paste them into your chosen image tool, or configure an approved provider before asking Main Branch to generate files directly."
 
 ---
 
@@ -649,39 +398,18 @@ permission to copy the source image.
 
 ```yaml
 references:
-  - id: logo
-    role: logo
-    path: mb-media://brand/logo.png
-    safe_to_share: false
-    approval_required: true
-    privacy_level: private
-    use_for: brand mark placement only after explicit approval
-    do_not_copy: private file path or unapproved lockup variants
-  - id: product
-    role: product_photo
-    path: mb-media://pushes/2026-05-ad-test/references/product.webp
-    safe_to_share: false
-    approval_required: true
-    privacy_level: private
-    use_for: product shape and scale
-    do_not_copy: background clutter, labels, or private details
   - id: inspo-001
-    role: style_reference
+    role: style_reference          # also: logo, product_photo, screenshot_reference, background, mask_source
     path: mb-media://pushes/2026-05-ad-test/references/inspo-001.png
     safe_to_share: false
     approval_required: true
     privacy_level: private
-    use_for:
-      - composition tension
-      - gritty lighting
-      - scroll-stopping object metaphor
-    do_not_copy:
-      - exact subject
-      - exact layout
-      - text
-      - brand marks
+    use_for: [composition tension, gritty lighting, scroll-stopping object metaphor]
+    do_not_copy: [exact subject, exact layout, text, brand marks]
     operator_note: I like how specific and hard to ignore this feels.
 ```
+
+Logo references use brand-mark placement only after explicit approval and must not copy private file paths or unapproved lockup variants.
 
 ---
 
@@ -801,32 +529,7 @@ that all providers expose the same provenance, watermarking, or C2PA behavior.
 
 ## Format Pair: 4:5 + 9:16
 
-For Meta static creative, plan the default pair as **4:5** (Feeds) and
-**9:16** (Stories and Reels). Both go into one creative through placement rules.
-1:1 remains accepted on Feeds; use the `facebook_feed_square_1x1` preset only
-when a placement or reused asset needs it. Treat placement specs as
-provider-specific and check current platform requirements before launch.
-
-### Design Strategy
-
-Compose each ratio for its placement rather than cropping one from the other:
-
-- **9:16:** product, hook text and disclosures between 14% and 65% of the
-  height; the top 14% and bottom 35% sit under Meta's interface and hold the
-  scene's own background, not a flat block.
-- **4:5:** the whole product in frame with margin; words on a flat area.
-
-When one generation must serve both, generate the 9:16 with the critical
-content inside the 4:5 centre band, then crop the 4:5 from it and check both
-against the composition rules in [ad-media-specs.md](ad-media-specs.md).
-
-### Prompt Strategy for Format Pair
-
-For each concept, generate the 9:16 and the 4:5 (or the 9:16 with a 4:5 crop
-planned). Prompts should specify:
-- Critical content inside the safe band for its ratio
-- Atmospheric/contextual elements in the margins
-- Aspect ratio: `"aspect_ratio": "9:16"` / `"4:5"` or the matching resolution
+Plan the default pair as 4:5 (Feeds) and 9:16 (Stories and Reels); 1:1 only via the `facebook_feed_square_1x1` preset when a placement or reused asset needs it. Compose each ratio for its placement rather than cropping one from the other; when one generation must serve both, generate the 9:16 with critical content inside the 4:5 centre band, crop the 4:5, and check both against [ad-media-specs.md](ad-media-specs.md) (safe bands, composition, current Ads Manager specs). Each concept prompt states the aspect ratio, critical content inside its safe band, and atmospheric elements in the margins.
 
 ---
 
@@ -882,22 +585,7 @@ deterministic post-processing step such as Pillow.
 
 ### Text Positioning (Critical)
 
-On 9:16 vertical images, the bottom ~25-30% is covered by UI overlays (caption, CTA button, likes bar). Text must sit **above true center** to stay in the safe zone.
-
-```
-┌──────────────────┐
-│   TOP UI (10%)   │  ← progress bar, account icon
-│                  │
-│                  │
-│   ██ TEXT ██     │  ← Place text at 35-40% from top
-│                  │     (above geometric center)
-│                  │
-│                  │
-│  BOTTOM UI (25%) │  ← caption, CTA, likes — AVOID
-└──────────────────┘
-```
-
-**Pillow positioning:** Set text Y coordinate to `int(height * 0.38)` (38% from top), NOT `height // 2` (50%). This keeps text safely above the bottom UI zone while looking visually centered within the usable area.
+On 9:16 images the bottom ~25-30% is covered by UI (caption, CTA, likes) and the top ~10% by the progress bar and account icon. Place text at 35-40% from the top: Pillow Y = `int(height * 0.38)`, not `height // 2`.
 
 ### Prompt Pattern for Text-Free Backgrounds
 
@@ -913,30 +601,7 @@ Leave generous clean space in the center-upper area for white text.
 
 ## Batch Generation Flow
 
-**Order: Copy → Compliance Review + Image Generation (parallel)**
-
-Compliance review and image generation run in PARALLEL after copy is saved, not sequentially. The post-generation pipeline (see SKILL.md → Automatic Post-Generation Pipeline) orchestrates this.
-
-For a typical ad campaign with 5 angles (15 images):
-
-```
-1. Copy saved to output file
-2. Approved checkpoint pre-review (preserves original)
-3. Main conversation writes prompts.json to disk (keyed by target filename)
-4. PARALLEL (all agents spawned in a single message):
-   a. Compliance agents (5-6 lenses, read-only) → findings report
-   b. Image agents (1 per image, if user approved and provider configured):
-      - Each agent reads its prompt(s) from prompts.json
-      - Reads visual-style.md for brand context
-      - Generates 9:16 image via the selected provider/model
-      - Post-processes: resize, JPEG compress, and the 4:5 feed version
-      - Verifies file(s) exist on disk
-      - Returns: file path(s) + status (success/fail) + cost
-5. Synthesize: collect all image agent results, retry any failures,
-   surface P1s, show the P2/P3 proposed diff, apply copy fixes only after
-   explicit approval, write review-log.md if approved, and write image-index.md
-6. Approved checkpoint post-review (user confirms)
-```
+Order: copy saved -> approved pre-review checkpoint -> main conversation writes `prompts.json` (keyed by target filename) -> compliance agents and image agents spawn in parallel in one message -> synthesize (retry failed images, surface P1s, show the P2/P3 diff, apply copy fixes only after approval, write `review-log.md` if approved, write `image-index.md`) -> approved post-review checkpoint. The pipeline steps live in [post-generation-pipeline.md](post-generation-pipeline.md).
 
 ---
 
@@ -946,19 +611,7 @@ Image generation uses **one subagent per image** (or per 2-3 images for large ba
 
 ### How It Works
 
-1. **Main conversation prepares `prompts.json`** before spawning any agents. Each key is the target filename, each value contains the prompt text, style (on-brand/freestyle), and brand context.
-
-2. **All agents spawn in a single message** — compliance agents AND image agents together. Use `subagent_type: "general-purpose"` for all.
-
-3. **Each image agent:**
-   - Reads its assigned prompt(s) from `prompts.json` (by filename key)
-   - Uses the already-configured provider environment for this run
-   - Calls the selected provider/model (single image per API call)
-   - Post-processes immediately (resize, PNG to JPEG, compress under 300KB)
-   - Verifies the final JPEG exists in configured media storage
-   - Returns: `{ output_reference: "mb-media://pushes/2026-05-ad-test/images/001_01_graphic_vertical.jpg", status: "success", provider: "openai", model: "gpt-image-2", cost_estimate: "$X from current provider pricing" }` (or `status: "fail"` with error message)
-
-4. **Main conversation collects results** from all image agents, retries any failures with fresh single-image agents.
+Main conversation writes `prompts.json` (key = target filename; value = prompt text, style on-brand/freestyle, brand context) before spawning anything. All agents, compliance and image, spawn in one message as `general-purpose`. Each image agent reads its prompt(s), uses the already-configured provider environment, makes one API call per image, post-processes immediately, verifies the final JPEG in configured media storage, and returns `{output_reference: "mb-media://pushes/2026-05-ad-test/images/001_01_graphic_vertical.jpg", status, provider, model, cost_estimate}` (or `status: "fail"` with the error). Main collects results and retries failures with fresh single-image agents.
 
 ### Batching Strategy
 
@@ -1018,17 +671,7 @@ pushes/YYYY-MM-DD-static-ads-{campaign}/
 `image-index.md` stores logical media references that resolve to configured
 storage, not generated binaries in the push folder:
 
-```yaml
-assets:
-  - asset_id: 001_01_graphic_vertical
-    output_reference: mb-media://pushes/YYYY-MM-DD-static-ads-{campaign}/images/001_01_graphic_vertical.jpg
-    storage_backend: mb-media
-    committed_binary: false
-  - asset_id: 001_02_lofi_vertical
-    output_reference: mb-media://pushes/YYYY-MM-DD-static-ads-{campaign}/images/001_02_lofi_vertical.jpg
-    storage_backend: mb-media
-    committed_binary: false
-```
+Each asset carries `asset_id`, `output_reference: mb-media://pushes/YYYY-MM-DD-static-ads-{campaign}/images/<name>.jpg`, `storage_backend: mb-media` and `committed_binary: false`.
 
 ### Image Naming Convention
 
@@ -1047,91 +690,4 @@ Examples:
 
 ## Image Index Metadata
 
-Every generated image batch gets an `image-index.md` with:
-
-- 3 to 6 planned/reviewed concepts when the task is image creative direction;
-- creative playbook IDs, router inputs/reasons, and fit scores for each
-  candidate;
-- concept-to-asset links through `concept_id`;
-- provider and model, or `manual`;
-- docs-checked date;
-- source files read;
-- prompt text or prompt file key;
-- placement preset and safe-zone notes;
-- reference image roles, safe logical paths, `use_for`, and `do_not_copy`;
-- structured review status and checks;
-- output dimensions and format;
-- post-processing settings;
-- cost estimate and actual cost when known;
-- failure/retry count;
-- safe logical media references;
-- storage backend label;
-- approval state.
-
-### Creative Review Rubric
-
-Review generated or manually produced images before treating them as campaign
-assets. Record structured checks:
-
-```yaml
-review:
-  status: needs_revision
-  one_second_clarity: pass
-  visual_hook_strength: pass
-  ad_usefulness: pass
-  readability: warning
-  placement_fit: pass
-  brand_fit: warning
-  claim_safety: pass
-  fake_ui_risk: fail
-  policy_risk: warning
-  private_data_risk: pass
-  ai_generic_risk: warning
-  click_reason_fit: pass
-  visual_quality:
-    composition: 4
-    style: 4
-    polish_control: 3
-  ad_quality:
-    thumb_stop: 4
-    problem_clarity: 4
-    desire_clarity: 3
-    curiosity_gap: 4
-    offer_relevance: 3
-    likely_click_reason: The audience recognizes the source-bite problem fast.
-  risk:
-    ai_slop_risk: 3
-    genericness_risk: 3
-    compliance_risk: warning
-  scores:
-    one_second_clarity: 4
-    visual_hook_strength: 4
-    specificity: 3
-    brand_fit: 3
-    ai_generic_risk: 3
-  decision: revise
-  notes:
-    - Avoid fake Meta dashboard elements.
-    - Leave more upper-right whitespace for overlay.
-```
-
-The review should answer: what the image is supposed to do, who it is for,
-what pain or desire it visualizes, why the composition and placement fit, what
-claim boundary it respects, and whether to accept, revise, regenerate, or
-reject it.
-
-Beautiful but no click reason = reject. Separate image quality from ad quality:
-a polished composition with no audience-specific reason to click is not a
-usable ad candidate.
-
-## Fallback (No Provider)
-
-If no image provider is configured:
-
-1. Generate text prompts only (structured JSON format)
-2. Save prompts and the intended logical media references to `image-index.md`
-3. Note: "Image prompts saved as text. To generate images, paste these into your chosen image tool or configure an approved provider for a future run."
-
----
-
-*See also: image-prompt-templates.md for template library, preflight-algorithm.md for readiness scoring.*
+Every generated image batch gets an `image-index.md` carrying the schema above: concepts with playbook IDs, router inputs and fit scores; `concept_id` links to assets; provider and model (or `manual`); docs-checked date; source files read; prompt text or key; placement preset and safe zones; reference roles, safe logical paths, `use_for` and `do_not_copy`; structured review; output dimensions, format and post-processing; estimated and actual cost; failure/retry count; storage backend label; approval state.

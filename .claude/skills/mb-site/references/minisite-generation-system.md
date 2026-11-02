@@ -51,7 +51,7 @@ The home hero CTA, secondary CTA, and any pricing CTA all use the same `url` fro
 - 6 main pages max (privacy + terms + start/thanks don't count toward the visible navigation). Mandatory: home + how-it-works. LLM-picked: 2–4 more from `proof/`, `pricing/`, `faq/` (or others when warranted, e.g. `about/`, `contact/`). Don't pad to hit a number.
 - URL-readable paths (`how-it-works/`, not `page-2/`)
 - Every page has a `<title>` (under 60 chars), `<meta name="description">` (under 160 chars), canonical link, OG + Twitter Card meta, viewport, charset
-- Every page ends with the **Noontide footer** (see below) as the last visible element
+- Every page ends with the **parent-entity footer** (see below) as the last visible element
 - Mobile-first responsive — design for 375px first, scale up
 - Semantic HTML: `<header>`, `<main>`, `<section>`, `<footer>`. No div soup.
 - JSON-LD: at minimum, an `Organization` block on `/`. If you ship `/faq/`, add `FAQPage`. If pricing, `Product` or `Offer`.
@@ -64,22 +64,22 @@ The home hero CTA, secondary CTA, and any pricing CTA all use the same `url` fro
 - No external fonts unless you've weighed the cost — system fonts and `font-display: swap` for self-hosted .woff2 are both fine
 - No JS frameworks. Tiny vanilla JS for one or two interactions is fine. No build step.
 
-### The Noontide footer
+### The parent-entity footer
 
-Last visible element on every `.html` page. Default content:
+Last visible element on every `.html` page. Template (replace the placeholders from `offer.md`):
 
 ```html
 <footer class="site-footer">
   <p>
-    A product of <strong>Noontide Collective LLC</strong> ·
+    A product of <strong>&lt;legal entity from offer.md&gt;</strong> ·
     <a href="/privacy/">Privacy</a> ·
     <a href="/terms/">Terms</a> ·
-    <a href="mailto:hello@noontide.co">Contact</a>
+    <a href="mailto:&lt;contact email from offer.md&gt;">Contact</a>
   </p>
 </footer>
 ```
 
-If `offer.md` declares a different parent entity (e.g., `entity: DM-LLC` and `contact: dm@example.com`), substitute. Otherwise use the default verbatim. The skill will grep every page for "Noontide Collective LLC" or the declared replacement — missing footers fail validation.
+Take the parent entity and contact email from the owner's `offer.md` (e.g., `entity: Example LLC`, `contact: hello@example.com`). Never default to Main Branch's or Noontide's entity. If `offer.md` has no `entity` (or `contact`), ask the owner before generating and, with their OK, record the answer in `offer.md` so it is not asked again. Validation fails on an empty entity, on the literal `&lt;legal entity` placeholder, and on any page (nested ones included) missing the entity value; see `minisite-buildout.md`.
 
 ### What NOT to ship
 

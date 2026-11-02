@@ -7,7 +7,7 @@ operator makes the next business move.
 
 This is a decision layer, not a scraping implementation. After choosing the
 depth, use [research-phase.md](research-phase.md),
-[research-architecture.md](research-architecture.md), and the source-specific
+[research-routing-quick-ref.md](research-routing-quick-ref.md), and the source-specific
 references for tool routing.
 
 ## The Rule

@@ -118,18 +118,7 @@ and the site record is typically `pushes/<YYYY-MM-DD-slug>/site.md`. Site
 files themselves live in the linked site repo (Cloudflare Pages, etc.) and
 are not duplicated in the business repo.
 
-Reverse references from the site repo should use the role-neutral
-`.mainbranch/repo.json` descriptor with engine push paths
-(`linked.pushes: ["pushes/<...>/push.md"]`). Existing site repos may still use
-`.mainbranch/source.json`; its historical `campaign_path` key should point
-at the current push record when possible. Treat old `campaigns/` records as
-migration input and run `mb migrate campaigns --plan` before relying on them.
-
-If `core/vocabulary.md` defines display words (e.g. `terms.push.singular:
-launch`), speak the operator's word in conversation while still writing
-engine files. If the repo still has legacy `campaigns/` records,
-recommend `mb doctor` and `mb migrate campaigns --plan` before creating
-new push work.
+Reverse references from the site repo use the role-neutral `.mainbranch/repo.json` descriptor with engine push paths (`linked.pushes: ["pushes/<...>/push.md"]`); older site repos may still use `.mainbranch/source.json` (its `campaign_path` should point at the current push record). If `core/vocabulary.md` defines display words (e.g. `terms.push.singular: launch`), speak the operator's word while still writing engine files. Legacy `campaigns/` records are migration input: run `mb doctor` and `mb migrate campaigns --plan` before relying on them or creating new push work.
 
 When creating `push.md`, include the validator-required frontmatter and fill
 the values from repo truth or operator answers:
@@ -242,11 +231,11 @@ Ask the operator. Do not assume.
 > **A. New site from scratch.** Pick a shape.
 > - **Lander** (1 page, all-in-one). Use for focused one-off offer tests, retargeting, or paid-traffic landers. Load [`references/lander-build.md`](references/lander-build.md).
 > - **Minisite** (~4-6 pages, static HTML). V1 default for paid-ad lander tests, single-offer first deploys, payment, lead-form, and booking funnels. Load [`references/minisite-build.md`](references/minisite-build.md).
-> - **Website** (full site, usually with build step). Legacy Next.js templates work today. Load [`references/website-build.md`](references/website-build.md).
+> - **Website** (full site, usually with build step). Static-first on Cloudflare Pages, with an optional build step. Load [`references/website-build.md`](references/website-build.md).
 >
 > **B. Iterating on an existing site.**
 > - Editing pages, adding sections, updating copy: load the current shape build reference.
-> - Publishing existing work: load the shape publish section or [`references/deployment.md`](references/deployment.md) for legacy Netlify.
+> - Publishing existing work: load the current shape build reference and follow its publish step; publishing asks for approval every time (see the approval gates above).
 >
 > **C. Graduating to a different shape.**
 > - Lander -> minisite, minisite -> website, website -> website + CMS. Load [`references/graduation.md`](references/graduation.md).
@@ -285,19 +274,10 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 
 - [`references/lander-build.md`](references/lander-build.md) - 1-page shape stub.
 - [`references/minisite-build.md`](references/minisite-build.md) - minisite step router.
-- [`references/website-build.md`](references/website-build.md) - legacy Next.js website flow.
+- [`references/website-build.md`](references/website-build.md) - website flow (static-first, optional build step).
 - [`references/graduation.md`](references/graduation.md) - paths between shapes and CMS bolt-on.
 
-**Minisite step detail**
-
-- [`references/minisite-research.md`](references/minisite-research.md) - research subagents and persisted findings.
-- [`references/minisite-brief.md`](references/minisite-brief.md) - brief draft, dial, archetype, schema, review, and lock.
-- [`references/minisite-setup.md`](references/minisite-setup.md) - domain, repo, DNS, and Cloudflare Pages setup.
-- [`references/minisite-conversion.md`](references/minisite-conversion.md) - conversion endpoint selection and `.mainbranch/conversion.json`.
-- [`references/concept-variations.md`](references/concept-variations.md) - parallel home-page concepts.
-- [`references/minisite-buildout.md`](references/minisite-buildout.md) - remaining pages and build validation.
-- [`references/minisite-publish.md`](references/minisite-publish.md) - raw publish, pre-publish review, final push.
-- [`references/minisite-iterate.md`](references/minisite-iterate.md) - post-build edits, regeneration, and graduation signals.
+**Minisite step detail:** [`references/minisite-build.md`](references/minisite-build.md) routes each step (research, brief, setup, conversion, concept variations, build-out, publish, iterate) to its own reference; load only the current step.
 
 **Generation + design**
 
@@ -307,8 +287,6 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 - [`references/anti-patterns.md`](references/anti-patterns.md) - AI tells and generation anti-patterns.
 - [`references/archetypes.md`](references/archetypes.md) - 9-archetype picker. Load picked detail lazily.
 - [`references/headline-formulas.md`](references/headline-formulas.md) - formulas grouped by frame.
-- [`references/frontend-design.md`](references/frontend-design.md) - website typography, color, motion.
-- [`references/section-patterns.md`](references/section-patterns.md) - website section catalog.
 
 **Visibility, hosting, and checks**
 
@@ -325,6 +303,5 @@ If the operator cannot articulate the shape, ask: "What goal are you trying to h
 
 - [`references/naming-heuristic.md`](references/naming-heuristic.md) - domain naming playbook.
 - [`references/cloudflare-pages-link.md`](references/cloudflare-pages-link.md) - Cloudflare Pages GitHub App handshake.
-- [`references/deployment.md`](references/deployment.md) - legacy Netlify fallback.
 - [`references/examples.md`](references/examples.md) - usage examples.
 - [`references/troubleshooting.md`](references/troubleshooting.md) - common fixes.

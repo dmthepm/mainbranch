@@ -6,11 +6,7 @@ Google's Gemini-powered image generation for creating ad visuals and content ima
 
 ## What It Does
 
-Nano Banana generates images from text prompts using Google's Gemini models. In Main Branch, this means:
-
-- `/mb-ads` can generate actual image creatives (not just text prompts)
-- `/mb-organic` can create social media visuals
-- Any skill can request image generation when needed
+Nano Banana generates images from text prompts with Google's Gemini models, so `/mb-ads`, `/mb-organic` and `/mb-think` can produce actual image creatives instead of only text prompts. Without it, skills output text image prompts you paste into another image tool.
 
 ---
 
@@ -66,59 +62,19 @@ You should see `nano-banana` listed with available tools.
 
 ---
 
-## Available MCP Servers
+## MCP Servers
 
-| Server | Install | Best For |
-|--------|---------|----------|
-| `nano-banana-mcp` (ConechoAI) | `npx nano-banana-mcp` | Simple, reliable |
-| `nanobanana-mcp-server` (Python) | `uvx nanobanana-mcp-server@latest` | Python users |
-| `nanobanana-mcp` (YCSE) | Most feature-rich | Session consistency, style persistence |
-
-**Recommended:** `nano-banana-mcp` (ConechoAI) for simplicity.
+Recommended: `nano-banana-mcp` (ConechoAI, simple and reliable). Alternatives: `nanobanana-mcp-server` (Python, `uvx nanobanana-mcp-server@latest`) and `nanobanana-mcp` (YCSE, most feature-rich, session consistency and style persistence).
 
 ---
 
-## How Skills Use It
+## Model and Pricing
 
-| Skill | How It Uses Image Gen |
-|-------|----------------------|
-| `/mb-ads` | Generate actual ad creatives from image prompts (graphic, lo-fi, interrupt styles) |
-| `/mb-organic` | Create social media visuals for reels covers, carousel images, post graphics |
-| `/mb-think` | Generate concept visuals during research/ideation |
+Nano Banana is an optional image provider. `/mb-ads` defaults to the provider in its image workflow (OpenAI GPT Image 2 is the first readiness target); use Nano Banana when the operator prefers Google or wants a comparison rail.
 
-**Without Nano Banana:** Skills output text image prompts (descriptions of what the image should look like). You paste these into Midjourney, DALL-E, or another tool manually.
+Uses Google AI Studio credits (same as Gemini research). Do not pin an image model ID from memory: read the current Nano Banana model name and price at [ai.google.dev/gemini-api/docs/image-generation](https://ai.google.dev/gemini-api/docs/image-generation) or from the MCP server's tool list, and use the current image-generation model, not a text or "flash" research model. A test with the wrong model tells you nothing useful.
 
-**With Nano Banana:** Skills can generate images directly. Text prompts become actual images.
-
----
-
-## Pricing
-
-Uses Google AI Studio credits (same as Gemini research):
-
-**The ONLY model to use (copy-paste exactly):**
-
-```
-gemini-3-pro-image-preview
-```
-
-| Model | SDK String | Cost | Quality |
-|-------|-----------|------|---------|
-| Nano Banana Pro | `gemini-3-pro-image-preview` | ~$0.13/image | **Use this for everything.** 4K, accurate text rendering |
-
-**NEVER use Flash models for image generation.** Quality is not ad-grade. Not even for testing — a test with the wrong model tells you nothing useful.
-
-**NEVER use:** `gemini-2.0-flash-preview-image-generation`, `gemini-2.5-flash-image`, or any other model name. They will either 404 or produce unusable output.
-
-**Imagen 4** (standalone text-to-image, no conversational editing):
-
-| Model | Cost | Quality |
-|-------|------|---------|
-| Imagen 4 Fast | ~$0.02/image | Quick generation |
-| Imagen 4 Standard | ~$0.04/image | Balanced |
-| Imagen 4 Ultra | ~$0.06/image | Highest fidelity |
-
-Free tier includes limited image generation. Paid credits scale to hundreds of images.
+Free tier includes limited image generation; paid credits scale up.
 
 ---
 

@@ -1,9 +1,24 @@
 # Ad Review Workflow
 
+Review ads through 6 compliance and quality lenses before shipping. Reviews are read-only until proposed changes are shown and explicitly approved.
+
+## The 6 Lenses
+
+| Lens | Location | What It Checks |
+|------|----------|----------------|
+| FTC Compliance | `references/lenses/ftc-compliance.md` | Federal regulations, earnings claims |
+| Meta Policy | `references/lenses/meta-policy.md` | Platform triggers, Personal Attributes |
+| Copy Quality | `references/lenses/copy-quality.md` | Schwartz, Hormozi, Suby frameworks |
+| Visual Standards | `references/lenses/visual-standards.md` | Safe zones, OCR, prohibited visuals |
+| Voice Authenticity | `references/lenses/voice-authenticity.md` | AI tells, brand voice |
+| Substantiation | `references/lenses/substantiation.md` | Claims inventory, proof matching |
+
+Severity: **P1** blocks launch (legal/platform risk); **P2** fix before launch; **P3** nice to have.
+Status: **BLOCKED** any P1; **REVIEW REQUIRED** multiple P2 or borderline P1; **CLEAR** no P1, minimal P2.
+
 ## Phase 0: Pre-Review Checkpoint
 
-Before reviewing, run the checkpoint plan to preserve the original after
-operator approval:
+Preserve the original after operator approval; show the planned files, message and any blockers before saving:
 
 ```bash
 mb checkpoint --plan --json
@@ -11,50 +26,33 @@ mb checkpoint --validate "[drafted] {type} ad batch" --json
 mb checkpoint --message "[drafted] {type} ad batch" --yes
 ```
 
-Show the planned files/message and any blockers before saving. This ensures the
-original version is preserved in git history without raw git ceremony.
-
 ## Phase 1: Gather Input
 
-Identify what's being reviewed:
-- Single ad concept (copy + visual description)
-- Full campaign batch (multiple ads)
-- Specific component (just headlines, just hooks)
+A single ad concept (copy + visual description), a full campaign batch, or one component (headlines, hooks).
 
 ## Phase 2: Run Lenses in Parallel
 
-Spawn 6 agents, one per lens. Each agent:
-
-1. Reads its lens file from this skill's bundled `references/lenses/` directory
-2. Applies the checklist to the ad content
-3. Returns findings with severity (P1/P2/P3)
-
-**Parallel execution prompt for each lens:**
+Spawn one `general-purpose` Task agent per lens, all in a single message. Each agent gets the ad content inline (not just a file path), reads its lens file from this skill's bundled `references/lenses/` directory (never cwd-relative), and only the business context that lens needs (FTC and Substantiation: offer.md, testimonials.md, typicality.md; Meta Policy: offer.md; Copy Quality: offer.md, audience.md, skool-surfaces.md if present; Voice Authenticity: voice.md; Visual Standards: none). Agents are read-only: they report, never write or fix.
 
 ```
 You are reviewing ad copy through the [LENS NAME] lens.
-
 Read: [path to lens file]
-
-Review this content:
-[AD CONTENT]
-
-For each checklist item in the lens:
-1. Evaluate: Pass or Fail?
-2. If Fail, cite the specific violation
-3. Assign severity: P1 (blocks), P2 (fix before launch), P3 (improve if time)
-4. Suggest specific fix based on "Safe" examples in the lens
-
-Return findings as:
-- Issue: [what's wrong]
-- Severity: P1/P2/P3
-- Evidence: [specific text that violates]
-- Fix: [how to correct it]
+Review this content: [AD CONTENT]
+For each checklist item: Pass or Fail; if Fail cite the specific violation.
+For each issue return:
+  - severity: P1 | P2 | P3   (P1 blocks, P2 fix before launch, P3 improve if time)
+  - item_ref: which ad/line
+  - issue: what's wrong
+  - evidence: exact text that violates
+  - rule: which check this violates
+  - fix: specific rewrite based on the lens's "Safe" examples
+Return "NO ISSUES" explicitly if everything passes.
+Do NOT write any files. Do NOT fix anything. Report only.
 ```
 
 ## Phase 3: Synthesize Report
 
-Combine all lens findings into a single review report:
+Combine all lens findings into one report, deduplicating where lenses overlap (FTC and Substantiation often flag the same issue):
 
 ```markdown
 # Ad Review Report

@@ -2,7 +2,7 @@
 
 Detailed workflow for research mode in `/mb-think`.
 
-**See also:** [research-architecture.md](research-architecture.md) for full routing and tool selection logic.
+**See also:** [research-routing-quick-ref.md](research-routing-quick-ref.md) for full routing and tool selection logic.
 
 ---
 
@@ -66,14 +66,13 @@ the output with `brief_format: grok-8` and include all eight categories.
 | `-claude-web.md` | Claude.ai web interface |
 | `-x-social.md` | X/Twitter social research (Grok MCP) |
 | `-yt-mining.md` | YouTube transcript mining (Apify) |
-| `-ig-mining.md` | Instagram mining (Apify or manual) |
+| `-competitor-mine.md` | Competitor content mining (Instagram, sites, videos; Apify or manual). `/mb-organic` reads this name |
 | `-customer-mining.md` | Customer calls, surveys, support, onboarding, cancellation language |
 | `-review-mining.md` | Public reviews and rating-backed customer language |
 | `-winning-ad-research.md` | Competitor gap maps, ad/script teardown, winning blueprint research |
 | `-content-comment-mining.md` | TikTok, YouTube, Instagram, or X comment language mining |
 | `-local-mining.md` | Local video/audio transcription |
 | `-voice-mining.md` | Voice memo transcription |
-| `-competitor-mining.md` | Competitor site mining |
 | `-internal-mining.md` | Internal data (emails, DMs, reviews) |
 | `-source-mining.md` | Authenticated/private source synthesis after manifest-first review |
 | `-audit.md` | Site or system audit |
@@ -266,6 +265,8 @@ Then fetch results with `mcp__apify__get-actor-output` using the returned datase
 3. Synthesize immediately — extract frameworks, quotes, patterns
 4. Save synthesis, not raw transcript
 
+**Before a large Apify mining run** (many posts, several competitors, or a hashtag sweep): show the owner an estimated cost (posts × the actor's per-post price) and get their OK first. Offer a quick scan as the cheaper option.
+
 **If MCP fails:**
 1. Check Apify account has credits
 2. Verify video has captions (some don't)
@@ -287,7 +288,7 @@ Then fetch results with `mcp__apify__get-actor-output` using the returned datase
 1. Synthesize key findings (don't dump raw transcript)
 2. Extract quotable moments
 3. Note messaging patterns
-4. Save to `research/YYYY-MM-DD-[topic]-mining.md`
+4. Save competitor content to `research/YYYY-MM-DD-[topic]-competitor-mine.md` (other sources: the suffix table above)
 5. For private or authenticated sources, keep raw output in ignored scratch and
    record proof candidates with permission fields before public use
 
@@ -549,3 +550,20 @@ Research is complete when:
 ## Template
 
 See [templates/research-template.md](templates/research-template.md) for full file structure.
+
+---
+
+## Parallel Research Agents
+
+When research needs 2+ sources (YouTube + web, X + codebase, competitor mining + deep research), spawn one Task agent per source in a single message with `subagent_type: "general-purpose"` (has Write, Edit, Bash, MCP access). Do not use `run_in_background: true`: background agents cannot access MCP tools (Apify, etc.) or prompt for permissions.
+
+Each agent:
+- gets a focused prompt: one source, one research question, no full business context;
+- writes its own dated file (for example `research/YYYY-MM-DD-topic-yt-mining.md`);
+- verifies the write (Read or `ls`) after writing;
+- returns the file path, write status and a 5-bullet summary;
+- on write failure, returns the full research content so the main conversation can write it (works around a known Claude Code subagent write persistence bug).
+
+After all agents return, check the files landed, write any that failed from the returned content, then synthesize across summaries. Heavy raw content stays in subagent contexts. For authenticated or private sources, run the source-ingestion rail first and keep raw transcripts and provider payloads out of committed files by default.
+
+Multi-source output example: `research/2026-01-26-guarantee-x-social.md`, `-competitors.md`, `-psychology-gemini-deep.md`, plus `-synthesis.md` that references the individual files.

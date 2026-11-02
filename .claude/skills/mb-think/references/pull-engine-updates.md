@@ -1,7 +1,7 @@
 # Main Branch Update Check
 
-Standard command for checking or applying Main Branch updates at the start of
-any skill invocation. CWD is the business folder. **Do not silently swallow
+Standard command for checking or applying Main Branch updates at the start of any
+skill invocation. CWD is the business folder. **Do not silently swallow
 failures.** Users on stale code get broken features.
 
 `mb update` owns the install-mode mechanics. It detects pipx vs source
@@ -34,38 +34,3 @@ mb update --repo . --json 2>&1
 > You can continue, but some features may not work as expected."
 
 **Do not skip this warning.** A user running stale Main Branch is the #1 cause of "why doesn't X work" support questions.
-
----
-
-## Business Folder Remote Check (start skill only)
-
-Once the business folder is confirmed, check whether it has remote updates from
-`REPO_PATH`:
-
-```bash
-if git -C "$REPO_PATH" remote get-url origin >/dev/null 2>&1; then
-  git -C "$REPO_PATH" pull origin main 2>&1
-else
-  echo "NO_REMOTE"
-fi
-```
-
-### Handle the Result
-
-| Result | What to say |
-|--------|-------------|
-| "Already up to date." | Say nothing |
-| "Updating..." / files changed | "Updated local business files from GitHub for [folder-name]." |
-| "NO_REMOTE" | Say nothing — local-only repo, no remote configured |
-| Any other error | Show the warning below |
-
-### If The Remote Check Fails
-
-> "Couldn't check GitHub updates for [folder-name]. You may be working on older reference files.
->
-> Try: Open GitHub Desktop -> select [folder-name] -> click 'Fetch origin'"
-
-### Why This Check Exists
-
-- `mb update` keeps the installed CLI and skills current.
-- The business folder remote check keeps the operator's own business files current.

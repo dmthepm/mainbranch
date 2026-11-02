@@ -136,3 +136,59 @@ session state like `current_offer` there. Treat it as audit input, not durable
 business truth, and do not write it as the active-offer mechanism. Older
 `.vip/config.yaml` files may have been tracked as shared settings; audit them
 with `mb doctor repair --plan --json` before reusing any values.
+
+---
+
+## Folder Structure
+
+Full structure (single-offer):
+```
+{business-name}/
+├── CLAUDE.md              # Always loaded - business brain
+├── README.md              # Human-readable overview
+├── .env                   # Secrets (gitignored)
+├── .gitignore             # Include .env
+│
+├── core/                  # Evergreen business brain
+│   ├── soul.md            # Why you exist
+│   ├── offer.md           # What you sell / brand thesis
+│   ├── audience.md        # Who buys
+│   ├── voice.md           # How you sound
+│   ├── content-strategy.md # Business-level content strategy and layer index
+│   ├── marketing/          # Optional distribution, channel, account layers
+│   ├── people/             # Optional founder/person voice source material
+│   ├── proof/
+│   │   ├── testimonials.md
+│   │   └── angles/        # Proven messaging entry points
+│   ├── brand/             # Visual identity and brand systems
+│   ├── operations/        # Business-type specific operating context
+│   ├── finance/           # Ledger and tax artifacts
+│   └── offers/            # Per-offer specifics when multi-offer
+│
+├── research/              # Dated investigations
+│   └── YYYY-MM-DD-topic-[source].md
+│
+├── decisions/             # Dated choices with rationale
+│   └── YYYY-MM-DD-topic.md
+│
+├── bets/                  # Operating bets with target, deadline, and result
+│   └── YYYY-MM-DD-topic.md
+│
+├── log/                   # Running activity log
+│
+└── pushes/                # Coordinated pushes and their artifacts
+    └── YYYY-MM-DD-push-name/
+```
+
+Full structure (multi-offer — adds offer folders and `product-ladder.md`):
+```
+{business-name}/
+├── ...                    # Same as above, plus:
+├── core/
+│   ├── product-ladder.md  # How offers relate
+│   └── offers/            # Offer-specific overrides
+│       ├── community/
+│       │   └── offer.md   # Offer-specific details
+│       └── course/
+│           └── offer.md
+```

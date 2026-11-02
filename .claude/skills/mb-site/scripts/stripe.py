@@ -17,8 +17,7 @@ Invocation: `python3 stripe.py <subcommand> [args]`
 Output: companyctx-shape envelope JSON on stdout, logs on stderr.
 Exit code: 0 on ok|partial, 1 on degraded.
 
-Idempotency model (per `noontide-co/noontide-ops`
-decisions/2026-04-27-credential-provisioning.md):
+Idempotency model (per the credential-provisioning decision):
 
   1. Search products by metadata `mb_offer:<slug>` AND `mb_kind:deposit`.
      If found AND product has stashed `mb_payment_link_url` in metadata
@@ -29,7 +28,7 @@ decisions/2026-04-27-credential-provisioning.md):
      create call to survive transient retries within the search-API's
      eventual-consistency window (~minutes-to-hours).
 
-Spec: see `.claude/reference/minisite.md` ("Stripe payment-link
+Spec: see `references/minisite.md` ("Stripe payment-link
 defaults" table) for the canonical defaults this atom encodes.
 
 Test mode vs live mode: the atom is mode-agnostic — it uses whatever key
@@ -68,7 +67,8 @@ STATEMENT_DESCRIPTOR_RE = re.compile(r"^[A-Za-z0-9 .\-]{5,22}$")
 # Stripe's documented minimum charge is $0.50 USD (50 cents).
 MIN_AMOUNT_CENTS = 50
 
-DEFAULT_STATEMENT_DESCRIPTOR = "NOONTIDE"
+# No default statement descriptor: the owner's customers see it on card
+# statements, so it must come from the owner's offer.md.
 
 # Main Branch metadata keys per minisite spec. The `mb_` prefix namespaces
 # our products from anything else in the operator's Stripe account.
@@ -90,6 +90,7 @@ StripeErrorCode = Literal[
     "invalid_currency",
     "invalid_offer_slug",
     "invalid_statement_descriptor",
+    "missing_statement_descriptor",
     "invalid_success_url",
     "missing_api_key",
     "account_not_configured",
@@ -443,7 +444,7 @@ def cli() -> None:
 @click.option(
     "--statement-descriptor",
     default=None,
-    help=f"Card statement descriptor (max {STATEMENT_DESCRIPTOR_MAX} chars). Defaults to {DEFAULT_STATEMENT_DESCRIPTOR!r}.",
+    help=f"Card statement descriptor from the owner's offer.md (max {STATEMENT_DESCRIPTOR_MAX} chars). Required; there is no default.",
 )
 @click.option(
     "--success-url",
@@ -506,7 +507,31 @@ def create_payment_link(
         sys.exit(emit(env))
     currency_lower = currency.lower()
 
-    descriptor = _truncate_descriptor(statement_descriptor or DEFAULT_STATEMENT_DESCRIPTOR)
+    if not success_url.startswith("https://"):
+        env = CreatePaymentLinkEnvelope(
+            status="degraded",
+            data=CreatePaymentLinkData(offer_slug=offer_slug, success_url=success_url),
+            error=StripeError(
+                code="invalid_success_url",
+                message=f"Success URL must be HTTPS: {success_url!r}",
+                suggestion="Pass --success-url=https://<domain>/start/thanks/.",
+            ),
+        )
+        sys.exit(emit(env))
+
+    if not (statement_descriptor or "").strip():
+        env = CreatePaymentLinkEnvelope(
+            status="degraded",
+            data=CreatePaymentLinkData(offer_slug=offer_slug),
+            error=StripeError(
+                code="missing_statement_descriptor",
+                message="No statement descriptor given. It appears on the customer's card statement and must come from the owner's offer.md.",
+                suggestion="Ask the owner for `statement_descriptor` in offer.md, then pass --statement-descriptor.",
+            ),
+        )
+        sys.exit(emit(env))
+
+    descriptor = _truncate_descriptor(statement_descriptor)
     desc_err = _validate_statement_descriptor(descriptor)
     if desc_err:
         env = CreatePaymentLinkEnvelope(
@@ -516,18 +541,6 @@ def create_payment_link(
                 code="invalid_statement_descriptor",
                 message=desc_err,
                 suggestion="Use 5–22 ASCII letters/digits/spaces/dots/hyphens.",
-            ),
-        )
-        sys.exit(emit(env))
-
-    if not success_url.startswith("https://"):
-        env = CreatePaymentLinkEnvelope(
-            status="degraded",
-            data=CreatePaymentLinkData(offer_slug=offer_slug, success_url=success_url),
-            error=StripeError(
-                code="invalid_success_url",
-                message=f"Success URL must be HTTPS: {success_url!r}",
-                suggestion="Pass --success-url=https://<domain>/start/thanks/.",
             ),
         )
         sys.exit(emit(env))

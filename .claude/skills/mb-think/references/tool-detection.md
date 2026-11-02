@@ -135,19 +135,4 @@ comes from `mb connect`.
 
 ## Intent-Based Tool Surfacing
 
-When user's intent matches an unavailable tool, **surface the option once per session**:
-
-| User Intent | If Tool Missing | Message |
-|-------------|-----------------|---------|
-| YouTube URL | Apify | "YouTube transcripts need Apify MCP (5 min setup). Set up? Paste transcript? Skip?" |
-| "X sentiment" | Grok | "X sentiment is best with Grok (real-time). Use web search? Set up Grok (5 min, $5 credit)?" |
-| "deep research" | Gemini | "Deep synthesis works best with Gemini (free tier). Web search fallback? Set up (3 min)?" |
-| Local file | whisper | "Local transcription needs whisper (10 min). Set up? External service? Skip?" |
-| "ad performance", "what's working", "check my CPA" | Meta Ads account context | "Pulling ad account data needs a Meta Ads connection. Run `mb connect plan`, research from reference only, or skip?" |
-
-**Rules:**
-- Surface once per session per tool (track in session state)
-- Always offer working fallback
-- Never block research
-
-See [tool-surfacing.md](tool-surfacing.md) for full details on progressive disclosure.
+When the user's intent matches an unavailable tool, surface the option once per session per tool (track in session state), always offer a working fallback, and never block research. Messages and fallback quality: [tool-surfacing.md](tool-surfacing.md).

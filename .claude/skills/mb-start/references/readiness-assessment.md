@@ -437,136 +437,17 @@ planning to `/mb-think`; route derivative social output to `/mb-organic`.
 
 ## 7. Display Format
 
-How to present the readiness assessment to the user. Adapt by experience level.
+Adapt by experience level. **Every gap is actionable:** `[specific missing section/file] + [what it unlocks downstream] + [concrete offer to fix it now]`, using the per-file tables in Section 8. For any score below 18, name exactly which files scored below 3 under a "Gaps:" heading after the score line. This applies at GOOD (12-14) and FULL (15-17) too; users at 13/18 need to know what the missing 5 points are.
 
-**Core principle: Every gap must be actionable.** The formula for any file scoring below 3:
+- **Beginner:** score and tier, one sentence on why richer files help (output skills work best at 12+), then each gap in full:
+  > "**Repo Health: THIN** (score: 9/18) ... **Gaps:** - **voice.md** (1/3): Missing "Never Say" section -- the #1 guard rail for authentic output. Want me to ask you 3 questions to build it? (~5 min) - **angles/** (1/3): 1 angle file. 3+ gives /mb-ads real variety. Want to explore a new angle through /mb-think?"
+- **Intermediate:** score and gaps with brief detail: "**voice.md** (1/3): No "Never Say" section. 3 questions to build it? (~5 min)"
+- **Advanced:** one line, always, even at GOOD/FULL, no explanation: "**9/18** -- voice (1, no Never Say), testimonials (1, only 2), angles (1, single angle)."
+- **18/18:** no structural gaps, but don't claim perfection ("locked", "mature", "production-ready", "all set" are out): "**Repo Health: FULL** (18/18). All reference files present and substantive. For deeper analysis (staleness, cross-file consistency, pipeline health), pick the triage route."
 
-```
-[Specific missing section/file] + [What it unlocks downstream] + [Concrete offer to fix it now]
-```
+**Flags** (Section 3) appear alongside scores: file-level flags (status, staleness, count mismatch) inline, pipeline flags (codification rate, naming) below, after gaps. Beginner/intermediate list them under "Flags:" (for example `soul.md -- status: draft`, `audience.md -- stale (41d since last update)`, `Decisions: 8 codified, 55 accepted`, `Needs review: 4`) and end with "Pick the triage route for deeper analysis." Advanced puts them on the score line ("**18/18** -- flags: soul.md draft, audience.md stale (41d), 4 need review. Triage route for details."). When no flags fire, omit the section entirely (no "Flags: none").
 
-### Gap Display Rules
-
-1. **For ANY score below 18:** Identify exactly which files scored below 3.
-2. **For each gap:** Say what specific section or content is missing, what filling it would unlock for downstream skills, and offer to fix it right there.
-3. **Use the per-file gap tables from Section 8** to determine the specific gap language for each file at each score level.
-4. **Group gaps under a "Gaps:" heading** after the score line.
-
-### Beginner (experience: beginner)
-
-Show the score, then list each gap with full actionable detail:
-
-> "**Repo Health: THIN** (score: 9/18)
->
-> Your reference files tell the AI about your business. Richer files = better output. Output skills like /mb-ads work best at score 12+.
->
-> **Gaps:**
-> - **voice.md** (1/3): Missing "Never Say" section -- this is the #1 guard rail for authentic output. Want me to ask you 3 questions to build it? (~5 min)
-> - **testimonials.md** (1/3): Only 2 testimonials. More proof = better ads. Have screenshots or messages to add?
-> - **angles/** (1/3): 1 angle file. Angles frame every ad and organic piece -- 3+ gives /mb-ads real variety. Want to explore a new angle through /mb-think?
-> - **audience.md** (2/3): Missing "Objections" section -- /mb-ads hooks work best when they preempt resistance. What do people say right before they decide NOT to buy?"
-
-### Intermediate (experience: intermediate)
-
-Show the score, then list gaps with brief actionable detail:
-
-> "**Repo Health: THIN** (9/18)
->
-> **Gaps:**
-> - **voice.md** (1/3): No "Never Say" section -- guard rail for authentic output. 3 questions to build it? (~5 min)
-> - **testimonials.md** (1/3): 2 testimonials. 10+ unlocks stronger ad proof. Have recent wins?
-> - **angles/** (1/3): 1 angle. 3+ prevents ad fatigue. Build one through /mb-think?"
-
-### Advanced (experience: advanced)
-
-Score with gap specifics, no explanation. **One line, always -- even at GOOD/FULL.** Advanced users don't need gap tables or explanation blocks.
-
-> "**9/18** -- voice (1, no Never Say), testimonials (1, only 2), angles (1, single angle)."
-
-**At GOOD/FULL, same one-line format:**
-
-> "**16/18** -- testimonials (2), angles (1). Have recent wins to add? Need 2 more angles for ad variety."
-
-> "**13/18** -- testimonials (2, 7 captured), angles (1, single angle). Gaps: recent wins? New angle through /mb-think?"
-
-### When Score Is GOOD (12-14)
-
-Still show gaps -- this is where the old format failed. Users at 13/18 need to know what the missing 5 points are. **Beginner/intermediate get the full gap display below. Advanced users get the one-line format above.**
-
-> "**Repo Health: GOOD** (13/18)
->
-> **Gaps:**
-> - **testimonials.md** (2/3): 7 testimonials captured. 10+ unlocks stronger ad proof. Have any recent wins to add?
-> - **angles/** (1/3): 1 angle file. 4+ gives /mb-ads real variety. Want to explore a new angle through /mb-think?"
-
-### When Score Is FULL (15-18) But Not Perfect
-
-Still show what would reach 18. **Beginner/intermediate get the gap display below. Advanced users get the one-line format above.**
-
-> "**Repo Health: FULL** (16/18)
->
-> **Gaps:**
-> - **testimonials.md** (2/3): 7 testimonials. 10+ gives /mb-ads and conversion outputs more proof options. Have any recent wins?
-> - **angles/** (1/3): 1 angle file. 4+ lets you test different emotional entry points in ads. Want to build another?"
-
-### When Score Is 18/18
-
-No structural gaps to show, but don't claim perfection — triage finds deeper issues:
-
-> "**Repo Health: FULL** (18/18). All reference files present and substantive. For deeper analysis (staleness, cross-file consistency, pipeline health), pick the triage route."
-
-**Do NOT say:** "locked", "mature", "production-ready", or "all set." 18/18 means structure is complete, not that content is perfect. Triage handles quality.
-
-### Flag Display
-
-Health flags from Section 3 appear alongside structural scores. File-level flags (status, staleness, count mismatch) go inline. Pipeline flags (codification rate, naming) go below.
-
-**Beginner/Intermediate — flags after gaps:**
-
-> "**Repo Health: FULL** (18/18)
->
-> **Flags:**
-> - soul.md — status: draft (you marked this unfinished)
-> - audience.md — stale (41d since last update)
-> - Decisions: 8 codified, 55 accepted
-> - Needs review: 4
-> - Action needed: 2
-> - Stale/orphaned: 1
->
-> Pick the triage route for deeper analysis."
-
-**Advanced — flags on one line:**
-
-> "**18/18** — flags: soul.md draft, audience.md stale (41d), 8 codified + 55 accepted, 4 need review, 2 action needed, 1 stale/orphaned. Triage route for details."
-
-**When GOOD/FULL with both gaps AND flags:**
-
-> "**Repo Health: GOOD** (13/18)
->
-> **Gaps:**
-> - **testimonials.md** (2/3): 7 testimonials. 10+ unlocks stronger proof. Have recent wins?
->
-> **Flags:**
-> - offer.md — stale (35d)
-> - Decisions: 3 codified, 9 accepted
-> - Needs review: 2
-> - Action needed: 1
-> - Stale/orphaned: 1
->
-> Pick the triage route for deeper analysis."
-
-**When no flags fire:** Don't show the Flags section at all. No "Flags: none" or "0 flags" — just omit it.
-
-### Session State Display
-
-If session state items were found, append after the health display:
-
-> "**Since last session:**
-> - Last work: [topic from recent saved checkpoint or journal event]
-> - [N] decisions still being evaluated or integrated
-> - [N] research files without decisions"
-
-Only show items that exist. Skip this section entirely if nothing to report.
+**Session state:** if items exist, append "**Since last session:** last work: [topic from recent checkpoint or journal event]; [N] decisions still being evaluated or integrated; [N] research files without decisions". Show only items that exist.
 
 ---
 
@@ -642,29 +523,12 @@ Use these tables to determine the specific gap language for each file at each sc
 
 ## Anti-Patterns
 
-### 1. Scoring As Audit
-
-The readiness assessment is not a report card. It is a routing tool. Present it as "here's what you can do" not "here's what's wrong." The user should feel oriented, not judged.
-
-### 2. Blocking Too Aggressively
-
-MINIMAL blocks output skills from the numbered list but does not prevent the user from asking for them directly. If a user with a 6/18 score says "I want to run /mb-ads," explain why reference matters and suggest /mb-think -- but if they insist, let them. They will learn from the thin output.
-
-### 3. Over-Explaining to Advanced Users
-
-An advanced user does not need to hear what reference files are. "9/18 -- voice thin" is enough. Respect their time.
-
-### 4. Skipping the Check Entirely
-
-Even when the user states intent clearly ("/mb-start ads"), run the scoring silently. If they are MINIMAL, the gate matters more than speed. If they are GOOD+, route immediately -- the check took 2 seconds and confirmed readiness.
-
-### 5. Nagging About Research
-
-"You have 12 research files without decisions" sounds like debt collection. Frame it as opportunity: "Some research from past sessions could inform decisions when you're ready."
-
-### 6. Making Soul Health Check Feel Like Therapy
-
-"Pull or push?" is a quick calibration, not a therapy session. Ask it. Accept the answer. Move on. If they want to go deeper, they will.
+1. **Scoring as audit.** It is a routing tool: "here's what you can do," not "here's what's wrong."
+2. **Blocking too aggressively.** MINIMAL hides output skills from the numbered list but does not stop a direct request: explain why reference matters, suggest /mb-think, and let them insist.
+3. **Over-explaining to advanced users.** "9/18 -- voice thin" is enough.
+4. **Skipping the check.** Even with clear intent (`/mb-start ads`), run the scoring silently; MINIMAL makes the gate matter, GOOD+ routes immediately.
+5. **Nagging about research.** Frame "12 research files without decisions" as opportunity, not debt.
+6. **Soul check as therapy.** "Pull or push?" is a quick calibration: ask, accept, move on.
 
 ---
 

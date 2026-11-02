@@ -4,7 +4,7 @@ Load this when `/mb-site` needs prerequisites, active offer resolution, required
 
 ## Prerequisites
 
-Default deploy target is Cloudflare Pages. Netlify is supported only as a legacy fallback for pre-V1 Next.js templates; see [`deployment.md`](deployment.md).
+Deploy target is Cloudflare Pages.
 
 | Tool | Required for | Install |
 |---|---|---|
@@ -12,7 +12,7 @@ Default deploy target is Cloudflare Pages. Netlify is supported only as a legacy
 | `gh` CLI authenticated | Repo creation | `brew install gh` then `gh auth login` |
 | Cloudflare API token, account ID, GitHub App install | Domain/DNS/Pages flow | `mb connect cloudflare --token-stdin --metadata token_type=account --metadata account_id=...`, then [`cloudflare-pages-link.md`](cloudflare-pages-link.md) |
 | `offer.md` and `audience.md` | Site generation | Build via `/mb-think` first if missing |
-| Node 18+ and pnpm | Website shape with Next.js or Astro build step | `brew install node && npm install -g pnpm` |
+| Node 18+ and pnpm | Website shape with an Astro or similar build step | `brew install node && npm install -g pnpm` |
 
 Hard-gate Cloudflare-dependent work with:
 
@@ -103,7 +103,7 @@ How business context flows into a generated site:
 Detail per shape:
 
 - Minisite: [`minisite-generation-system.md`](minisite-generation-system.md) and [`anti-patterns.md`](anti-patterns.md).
-- Website: [`section-patterns.md`](section-patterns.md) and [`frontend-design.md`](frontend-design.md).
+- Website: [`website-build.md`](website-build.md).
 
 If the resolved offer cannot clearly answer audience, problem/outcome,
 transformation, mechanism, proof, price/value logic, risk reversal, objections,

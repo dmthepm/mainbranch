@@ -491,7 +491,6 @@ def test_mb_ads_review_references_are_skill_local() -> None:
     text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in [
-            skill_root / "references" / "mode-review.md",
             skill_root / "references" / "review-workflow.md",
             skill_root / "references" / "mode-static-ads.md",
             skill_root / "references" / "post-generation-pipeline.md",
@@ -595,7 +594,7 @@ def test_skill_validate_cli_json_and_exit_codes(
 def test_every_copy_of_the_update_result_table_handles_a_manual_upgrade() -> None:
     """`mb update` can report a manual path on every uv and wheel install.
 
-    Seven bundled files duplicate the `mb update --json` result table. When
+    Six bundled files duplicate the `mb update --json` result table. When
     `new_version` reports what PyPI offers, a copy that only knows the
     `old_version != new_version` row tells the operator "Updated Main Branch"
     on a run that upgraded nothing (#963). Keyed on `manual_update_command`
@@ -612,7 +611,7 @@ def test_every_copy_of_the_update_result_table_handles_a_manual_upgrade() -> Non
         if claimed_update in path.read_text(encoding="utf-8")
     )
 
-    assert len(copies) == 7, [str(path.relative_to(repo_root)) for path in copies]
+    assert len(copies) == 6, [str(path.relative_to(repo_root)) for path in copies]
     missing = [
         str(path.relative_to(repo_root))
         for path in copies

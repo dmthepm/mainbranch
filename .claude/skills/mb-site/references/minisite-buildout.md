@@ -53,10 +53,13 @@ Each missing file is a fix request to the subagent.
 Footer presence:
 
 ```bash
-grep -L "Noontide Collective LLC" *.html **/*.html
+# ENTITY = `entity:` from offer.md frontmatter
+[ -n "$ENTITY" ] && [ "$ENTITY" != "<legal entity from offer.md>" ] || { echo "no entity: ask the owner"; exit 1; }
+find . -name '*.html' -exec grep -L -F "$ENTITY" {} +
+find . -name '*.html' -exec grep -l -F "&lt;legal entity" {} +
 ```
 
-That command should return nothing, or only files where `offer.md` declared a different parent entity.
+Stop if `ENTITY` is empty or still the placeholder. Both `find` commands must print nothing; any file listed is a fix request to the subagent.
 
 OG render:
 
@@ -83,7 +86,7 @@ If two full runs produce identical output, the brief was over-specified or the c
 
 - No `pnpm install`, no `pnpm build`. Static HTML only.
 - No `site-config.ts` pattern. Each minisite generates its own one-off structure.
-- No section-types menu; the Next.js section catalog from [`website-build.md`](website-build.md) does not apply.
+- No section-types menu; each minisite picks its own sections.
 - No Anthropic API key. Generation runs inside the operator's Claude Code session through the `Agent` tool.
 - No multi-endpoint conversion. One minisite has one conversion endpoint; graduate to website shape if you need both.
 

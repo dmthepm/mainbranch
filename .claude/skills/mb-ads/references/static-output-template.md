@@ -45,76 +45,15 @@ Generate all images first. Make a 4:5 for Feeds and a 9:16 for Stories and Reels
 
 ### {batch#}.1_IMG_01 — {Descriptive Name}
 
-**Prompt record:**
+**Concept record** (fields and playbook IDs: the `concepts:` schema in [image-generation-workflow.md](image-generation-workflow.md); `creative_playbook_id` optional):
 ```yaml
 prompt_key: "{descriptive-concept-id}.v1"
 prompt_file: "pushes/{push}/prompts/{descriptive-concept-id}.md"
-```
-
-**Creative playbook (optional):**
-```yaml
-creative_playbook_id: "{native_problem_scene | specific_object_metaphor | proof_artifact | myth_vs_fact | with_without_transformation | crossed_out_problem_list | founder_pov | high_contrast_poster | simple_chart_comparison | testimonials_with_artifact | us_vs_them_split | simple_list_framework}"
-creative_playbook:
-  id: "{same as creative_playbook_id}"
-  status: candidate
-use_when:
-  - "{why this playbook fits the source bite, offer, audience, and brand}"
-default_avoid:
-  - "{niche-specific cliché to avoid}"
-useful_metaphors:
-  - "{niche-specific metaphor}"
-risky_metaphors:
-  - "{niche-specific metaphor to avoid unless intentional}"
-prompt_bias:
-  - "{style or artifact bias for this niche}"
-router_inputs:
-  offer_type: "{offer type}"
-  audience: "{audience}"
-  source_bite_type: "{customer_language | offer | proof | research | founder_note | push_brief}"
-  proof_available: false
-  brand_style: "{visual style summary}"
-  platform: facebook_feed
+creative_playbook_id: "{playbook id or omit}"
 router_reason: "{why this playbook fits this candidate}"
-playbook_fit:
-  source_bite_fit: 1
-  offer_fit: 1
-  audience_fit: 1
-  visual_distinctiveness: 1
-  conversion_pattern_fit: 1
-```
-
-**Source bite:**
-```yaml
-source_file: research/customer-language.md
-source_type: customer_language
-extracted_phrase: "{phrase that makes this concept specific}"
-insight: "{why this is sharper than generic chaos/order language}"
-visual_translation: "{how the phrase becomes a one-second visual}"
-```
-
-**Genericness check:**
-```yaml
-could_fit_notion: false
-could_fit_asana: false
-could_fit_quickbooks: false
-could_fit_generic_coaching_offer: false
-could_fit_generic_productivity_app: false
-could_fit_any_coaching_offer: false
-could_fit_accounting_software: false
-specific_to_this_offer: 4
-reason: "{why this image could only come from this business context}"
-```
-
-**Avoidance strategy:**
-```yaml
-avoids:
-  - stock-photo business imagery
-  - clean desk productivity cliché
-  - website hero composition
-  - fake dashboard
-  - generic SaaS gradient
-intentionally_uses: []
-reason: "{why the concept avoids generic ad imagery or why a soft-avoid pattern is intentional}"
+source_bite: {source_file: research/customer-language.md, source_type: customer_language, extracted_phrase: "{phrase}", insight: "{why sharper than generic}", visual_translation: "{one-second visual}"}
+genericness_check: {specific_to_this_offer: 4, reason: "{why this image could only come from this business context}"}
+avoidance_strategy: {avoids: [stock-photo business imagery, fake dashboard, generic SaaS gradient], intentionally_uses: [], reason: "{...}"}
 ```
 
 **Feed (1440×1800, 4:5):**
@@ -169,80 +108,15 @@ Copy and paste into Ads Manager after images are ready.
 
 ---
 
-### Primary 2 — UGC/Native (~200 words)
+### Primary 2 — UGC/Native (~200 words), Primary 3 — Direct Response (~300), Primary 4 — Pattern Interrupt (~80), Primary 5 — Testimonial (~300)
 
-**Hook:** {hook}
-
-```text
-{Primary text}
-
-{CTA URL}
-```
-
----
-
-### Primary 3 — Direct Response (~300 words)
-
-**Hook:** {hook}
-
-```text
-{Primary text}
-
-{CTA URL}
-```
-
----
-
-### Primary 4 — Pattern Interrupt (~80 words)
-
-**Hook:** {hook}
-
-```text
-{Primary text}
-
-{CTA URL}
-```
-
----
-
-### Primary 5 — Testimonial (~300 words)
-
-**Hook:** {hook}
-
-```text
-{Primary text}
-
-{CTA URL}
-```
+Same block as Primary 1: `**Hook:** {hook}`, then a text block with the primary text and `{CTA URL}`.
 
 ---
 
 ### Headlines — {batch#}_IMG_01
 
-**Headline 1 — Proof-led**
-```text
-{Headline}
-```
-
-**Headline 2 — Mechanism-led**
-```text
-{Headline}
-```
-
-**Headline 3 — Outcome-led**
-```text
-{Headline}
-```
-
-**Headline 4 — Curiosity-led**
-```text
-{Headline}
-```
-
-**Headline 5 — Benefit-led**
-```text
-{Headline}
-```
+Headlines 1-5, each in its own text block: Proof-led, Mechanism-led, Outcome-led, Curiosity-led, Benefit-led.
 
 ---
 
@@ -253,22 +127,7 @@ Copy and paste into Ads Manager after images are ready.
 
 ## Naming Conventions
 
-**Folder:** `pushes/YYYY-MM-DD-static-ads-{campaign}/`
-- Date: `YYYY-MM-DD`
-- Type: `static-ads`
-- Campaign name: lowercase with dashes (required)
-
-**Batch file:** `static-ads-batch-{###}.md`
-- Example: `static-ads-batch-001.md`
-
-**Full path example:** `pushes/2026-01-15-static-ads-january-launch/static-ads-batch-001.md`
-
-**Review log:** `review-log.md` (same folder)
-
-**Image naming:** `{batch}.{ad#}_IMG_{image#}`
-- `001.1_IMG_01` — first image for Ad 1
-- `001.1_IMG_02` — second image for Ad 1
-- `001.2_IMG_01` — first image for Ad 2
+Folder `pushes/YYYY-MM-DD-static-ads-{campaign}/` (campaign name lowercase with dashes, required); batch file `static-ads-batch-{###}.md` (for example `pushes/2026-01-15-static-ads-january-launch/static-ads-batch-001.md`); `review-log.md` in the same folder; images `{batch}.{ad#}_IMG_{image#}` (`001.1_IMG_01` is the first image for Ad 1). Ad and Meta object names: [naming-and-utm.md](naming-and-utm.md).
 
 ---
 
@@ -293,39 +152,4 @@ If a provider generated the image:
 
 ## Image Index
 
-When planning or generating images, create an `image-index.md` in the batch
-folder. It can hold both planned concepts and generated assets. Link assets
-back to concepts with `concept_id`.
-
-Also write a local ignored review board/contact sheet under configured media
-storage. The board answers: "Which playbook produced the best actual ad
-candidate?" Commit only safe `image-index.md` records and distilled findings.
-
-```markdown
-# Image Index — {Campaign Name}
-
-Docs checked: {date}
-Provider: {provider or manual}
-Model: {exact model or n/a}
-Source files: {offer.md, audience.md, visual-style.md, ...}
-Review board: {ignored local path or not written}
-Estimated cost: ${estimate}
-Actual cost: ${actual or unknown}
-Post-processing: {dimensions, format, compression, crop rules}
-Approval state: {draft/reviewed/approved}
-
-## Concepts
-
-| Concept ID | Playbook | Status | Audience State | Visual Job | Likely Click Reason | Review |
-|------------|----------|--------|----------------|------------|---------------------|--------|
-| clean-system-vs-ad-chaos | native_problem_scene | planned | Overwhelmed operator | Show clarity replacing ad chaos | Recognizes the source-bite problem in one second | accepted |
-
-## Assets
-
-| File | Angle | Style | Format | Prompt Key | Retries | Notes |
-|------|-------|-------|--------|------------|---------|-------|
-| 001_01_graphic_feed.jpg | Authority | Graphic | 4:5 | 001_01_graphic | 0 | Feed composition |
-| 001_01_graphic_vertical.jpg | Authority | Graphic | 9:16 | 001_01_graphic | 0 | Full vertical |
-| 001_02_lofi_feed.jpg | Social Proof | Lo-fi | 4:5 | 001_02_lofi | 1 | Manual review needed |
-| ... | ... | ... | ... | ... | ... | ... |
-```
+When planning or generating images, create `image-index.md` in the batch folder, holding planned concepts and generated assets linked by `concept_id`. Also write a local ignored review board/contact sheet under configured media storage that answers "Which playbook produced the best actual ad candidate?"; commit only safe `image-index.md` records and distilled findings. Schema: [image-generation-workflow.md](image-generation-workflow.md). Header fields: docs checked, provider, model, source files, review board path, estimated and actual cost, post-processing, approval state.

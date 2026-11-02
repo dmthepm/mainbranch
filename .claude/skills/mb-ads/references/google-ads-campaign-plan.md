@@ -21,7 +21,7 @@ Use this route:
 
 If the work is repeatable or has approval state, write a plan-only playbook at
 `pushes/<push>/playbooks/google-ads-launch-plan.md` with `type: playbook`.
-When the operator wants the reusable Noontide paid-search recipe, use the
+When the operator wants the reusable paid-search recipe, use the
 `google-ads-search-launch` source under `playbooks/` or its Claude shell under
 `.claude/playbooks/`; that playbook instantiates the push playbook run record
 and calls this skill for campaign planning.
@@ -88,7 +88,7 @@ Useful official starting points:
 - Final URL Expansion in Search:
   <https://support.google.com/google-ads/answer/16230205>
 
-The official docs may recommend more automation than the Noontide
+The official docs may recommend more automation than the reusable
 offer-validation playbook uses by default. When this playbook chooses more
 control, label it as playbook opinion and record any fork in the run record.
 
@@ -299,7 +299,7 @@ privacy and regulated-category posture before using provider-hosted forms.
 
 ### 6. Campaign Settings Defaults
 
-For the Noontide first proof window, default to:
+For the first proof window, default to:
 
 - campaign type: Search;
 - networks: Search Network only, Search Partners off, Display Network off;
@@ -343,7 +343,7 @@ Each ad group should have:
 - policy-safe headlines/descriptions;
 - explicit manual review notes.
 
-For Noontide offer-validation runs, default to Search only, explicit final URL,
+For offer-validation runs, default to Search only, explicit final URL,
 no AI Max, no Final URL Expansion, and no broad match for the first proof
 window unless the operator records a fork. This is not a universal Google Ads
 rule; it is a playbook choice for small-budget tests where query, copy, and URL

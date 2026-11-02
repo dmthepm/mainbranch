@@ -72,7 +72,7 @@ The order matters: `settings.local.json` is harness-authoritative, `local.yaml` 
 | `$ENGINE_PATH` set but `.claude/skills/mb-start/SKILL.md` missing | Stale config pointing at a deleted / renamed checkout | Run `mb skill link --repo .`; it rewrites `.claude/settings.local.json` to the active Main Branch path and removes stale Main Branch paths. |
 | `python3` not found | Minimal environment | Document as a setup prerequisite (every Main Branch user needs python3 in `$PATH`). |
 | `yaml` import fails (fallback path only) | PyYAML not installed | The fallback is best-effort. Surface the underlying message and fall through to "no engine found" recovery. |
-| Resolved path readable but `git pull` fails | Auth / network / locked-file | Surface the warning from `pull-engine-updates.md` ("Common fixes" — GitHub Desktop, Skool subscription, network). |
+| Resolved path readable but `git pull` fails | Auth / network / locked-file | Run `mb update --check --repo .` and show the update-failure warning (network, auth, locked file). |
 
 ---
 
@@ -88,9 +88,6 @@ A reference file that inlines the resolver and *also* customises it should comme
 
 ## Callers that link to this file
 
-- `.claude/skills/mb-update/SKILL.md`
-- `.claude/skills/mb-setup/references/cwd-detection.md`
-- `.claude/skills/mb-help/references/troubleshooting.md` (skills-not-working + git-conflicts sections)
-- `.claude/reference/pull-engine-updates.md`
+- `mb-setup/references/cwd-detection.md`
 
 If you add a new caller, link here. Do not copy the snippet inline.

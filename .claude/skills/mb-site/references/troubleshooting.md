@@ -70,7 +70,7 @@ The minisite shape is static HTML and does not have a build step. If you are get
 
 Minisite: each generation produces self-contained HTML/CSS. The issue is usually stale browser cache or a missing file. Hard-refresh the browser and check `_headers` if cache-control is aggressive.
 
-Website (Next.js): check `globals.css` for correct CSS variable names, `layout.tsx` for font imports, and run `pnpm dev` locally.
+Website with a build step: run the generator's build locally and check the stylesheet and font imports.
 
 ## Business Context Not Found
 
@@ -93,17 +93,13 @@ Run `/mb-site` again and trigger review gates.
 - The Voice gate checks against `voice.md`.
 - If `voice.md` is thin, strengthen it via `/mb-think codify`.
 
-For Website shape, read [`frontend-design.md`](frontend-design.md).
+For Website shape, read [`website-build.md`](website-build.md).
 
 ## Conversion Endpoint URL Not Wired
 
 Check `<site_repo>/.mainbranch/conversion.json`.
 
 The generation subagent reads `kind`, `url`, and `render`, then substitutes the URL into CTA hrefs. If the file is missing or has `https://CONVERSION-PLACEHOLDER`, run `/mb-site` again and re-run [`minisite-conversion.md`](minisite-conversion.md).
-
-## Netlify Legacy
-
-If the site is a pre-V1 Next.js template still deploying to Netlify, see [`deployment.md`](deployment.md).
 
 ## See Also
 

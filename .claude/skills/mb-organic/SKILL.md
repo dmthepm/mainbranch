@@ -133,20 +133,7 @@ Also link named playbooks and outcomes through `linked_playbooks` and
 
 ## Triage
 
-Detect if user is in the right place:
-
-| User Says | They Want | Route To |
-|-----------|-----------|----------|
-| "mine", "scrape", "research competitors", "what are they saying" | Research/Mining | `/mb-think` (research mode) |
-| "transcribe", "extract from video" | Mining | `/mb-think` (research mode) |
-| "short clips from sales video", "repurpose this VSL", "social cuts from this sales video" | Repurpose | Continue with [references/sales-video-repurpose.md](references/sales-video-repurpose.md) |
-| "create", "generate", "write scripts", "make content" | Create | Continue in `/mb-organic` |
-
-**If mining intent detected:**
-> "Sounds like you want to research/mine competitor content. That's `/mb-think` territory — it saves to `research/` and feeds your reference files. Should I switch you to `/mb-think`?"
-
-**If unclear:**
-> "Are you trying to mine competitor content (research) or create new scripts (generate)?"
+Mining, scraping, competitor research, transcribing or extracting from video ("mine", "scrape", "research competitors", "what are they saying", "transcribe") is research work: say "Mining is research work — `/mb-think` handles that and saves to your `research/` folder. Should I switch you over?" and route there. "Short clips from sales video", "repurpose this VSL" or "social cuts from this sales video" continue with [references/sales-video-repurpose.md](references/sales-video-repurpose.md). "Create", "generate", "write scripts", "make content" continue here. If unclear, ask: "Are you trying to mine competitor content (research) or create new scripts (generate)?"
 
 ---
 
@@ -161,35 +148,13 @@ repo-health probes.
 
 ---
 
-## About Mining (Lives in /mb-think Now)
+## Mining Lives In /mb-think
 
-Mining competitor content is research work. It belongs in `/mb-think` because:
-- Mining output goes to `research/` folder
-- Extracted insights feed into reference files
-- It's the "Research" phase of the think cycle
+This skill assumes mining already happened: users arrive with concepts from `research/*-competitor-mine.md`, a topic, or their own research. Mining methodology (Visual/Audible/Emotional framework, AI capabilities and limits, why mining flows into reference): [references/mining-methodology.md](references/mining-methodology.md).
 
-**If user wants to mine:** Route them to `/mb-think`. Say:
-> "Mining is research work — `/mb-think` handles that and saves to your `research/` folder. Should I switch you over?"
+If a selected research file has `brief_format: grok-8`, use its downstream handoff before generating: ICP and audience language for hooks, journey stage for format and CTA, competitive landscape for contrast, brand story for voice, content/assets for proof, and metrics/constraints for the success bar. If the brief names a resource-delivery mechanic, write or update a push playbook as a plan only; do not execute provider mutation.
 
-**This skill assumes mining already happened.** Users arrive here with:
-- Concepts from `research/*-competitor-mine.md`
-- A topic they want to turn into content
-- Inspiration from their own research
-
-If a selected research file has `brief_format: grok-8`, use its downstream
-handoff before generating: ICP and audience language for hooks, journey stage
-for format and CTA, competitive landscape for contrast, brand story for voice,
-content/assets for proof, and metrics/constraints for the success bar. If the
-brief names a resource-delivery mechanic, write or update a push playbook as a
-plan only; do not execute provider mutation.
-
-When organic work is meant to sharpen an offer instead of only create content,
-load `.claude/reference/conversion/offer-sharpening.md`. Use the rubric to turn
-audience language, objections, proof angles, and soft CTAs into durable offer
-updates through `/mb-think`; do not treat comments or saves as buyer proof by
-themselves.
-
-For the full mining methodology (Visual/Audible/Emotional framework, AI capabilities and limits, why mining flows into reference) see [references/mining-methodology.md](references/mining-methodology.md).
+When organic work is meant to sharpen an offer instead of only create content, load `.claude/reference/conversion/offer-sharpening.md`. Use the rubric to turn audience language, objections, proof angles, and soft CTAs into durable offer updates through `/mb-think`; do not treat comments or saves as buyer proof by themselves.
 
 ---
 
@@ -253,32 +218,7 @@ Missing files? See [references/first-time-setup.md](references/first-time-setup.
 
 ## Presenting Options (Keep It Tight)
 
-Don't list all modes in chunky blocks. Instead:
-
-1. **Check for existing concepts** — Is there recent mining in `research/`?
-2. **Recommend ONE path** based on their context
-3. **Mention alternatives briefly** in one line
-
-**Example output (concepts exist):**
-```
-Found recent mining (research/2026-01-20-competitor-mine.md) with 10 concepts.
-
-Recommended: Pick a concept and generate a video script.
-
-Other modes: `carousel "concept"`, `static "concept"`
-
-Which concept interests you? Or provide your own topic.
-```
-
-**Example output (no concepts):**
-```
-No recent mining found. Two options:
-
-1. Mine competitors first → `/mb-think` (saves to research/, come back here after)
-2. Skip mining, give me a topic → I'll generate directly
-
-Which works better for you?
-```
+Don't list all modes in chunky blocks. Check for recent mining in `research/`, recommend ONE path based on context, and mention alternatives in one line. With concepts: "Found recent mining (research/...) with 10 concepts. Recommended: pick a concept and generate a video script. Other modes: `carousel "concept"`, `static "concept"`. Which concept interests you? Or provide your own topic." Without: offer (1) mine first via `/mb-think` and return, or (2) give a topic and generate directly.
 
 ---
 
@@ -298,10 +238,7 @@ If no mining exists, prompt: "No mined concepts found. Want to mine competitors 
 
 ### `/mb-organic mine` (Routes to /mb-think)
 
-If user types `/mb-organic mine`, redirect:
-> "Mining is research work now. Routing you to `/mb-think` for mining — it'll save to `research/` and you can come back here to generate scripts from those concepts."
-
-Then invoke `/mb-think`.
+Redirect: "Mining is research work now. Routing you to `/mb-think` for mining — it'll save to `research/` and you can come back here to generate scripts from those concepts." Then invoke `/mb-think`. Before any large Apify mining run, the owner sees an estimated cost and says OK first ([apify-setup.md](references/apify-setup.md)).
 
 ### `/mb-organic video "concept"`
 
@@ -343,19 +280,7 @@ Campaign name is REQUIRED. Ask user if not provided. Examples: `january-hooks`, 
 5. Check `core/content-strategy.md` — What recognition target, pillars, asset jobs, and strategy links are defined?
 6. If the channel/account/person is named, check the matching `core/marketing/` and `core/people/` files before drafting.
 
-**Example context-aware response:**
-```
-Found today's mining (research/2026-01-20-competitor-mine.md):
-- @cassie.schoonover, @likfoon already mined
-- 10 concepts extracted, 2 scripts generated
-
-Options:
-1. Generate from remaining 8 concepts
-2. Mine new competitors → `/mb-think`
-3. Start fresh with your own topic
-
-What should we call this batch? (e.g., "january-hooks", "transformation-reels")
-```
+Offer remaining concepts, mining new competitors via `/mb-think`, or a fresh topic, and ask what to call the batch (examples: `january-hooks`, `transformation-reels`). More examples: [references/examples.md](references/examples.md).
 
 ---
 
@@ -368,15 +293,11 @@ Before saving: show file paths.
 
 ## Full Flow Walkthrough
 
-1. **Check for concepts** — Look in `research/*-competitor-mine.md` or `research/*-mining.md`
-2. **If no concepts** — Ask if they want to mine first (route to `/mb-think`) or provide a topic directly
-3. **Select concept** — User picks from mined concepts or provides their own
-4. **Adapt to brand** — Map concept to user's offer, audience, voice
-5. **Generate scripts** — Use appropriate framework (video/carousel/static)
-6. **Save output** — Scripts to `pushes/YYYY-MM-DD-organic-{slug}/`. Never `campaigns/`; that folder is legacy compatibility only.
-7. **Checkpoint prompt** — run `mb checkpoint --plan --json`, show the proposed checkpoint and blockers, validate the chosen message with `mb checkpoint --validate "..." --json`, then after operator approval save with `mb checkpoint --message "..." --yes`.
-
-**Mining lives in `/mb-think` now.** If user needs to mine competitors, route them there first.
+1. Check for concepts in `research/*-competitor-mine.md`; if none, ask whether to mine first (route to `/mb-think`) or take a topic directly.
+2. User picks a concept or provides their own; map it to their offer, audience and voice.
+3. Generate with the matching framework (video, carousel, static).
+4. Save to `pushes/YYYY-MM-DD-organic-{slug}/`, never `campaigns/` (legacy compatibility only).
+5. Checkpoint prompt: run `mb checkpoint --plan --json`, show the proposed checkpoint and blockers, validate the chosen message with `mb checkpoint --validate "..." --json`, then after operator approval save with `mb checkpoint --message "..." --yes`.
 
 ---
 
@@ -478,6 +399,6 @@ For walkthrough examples (context-aware start, video-only, mining redirect) and 
 
 **Sales video repurposing:** [sales-video-repurpose.md](references/sales-video-repurpose.md)
 
-**Templates:** [mining-template.md](references/mining-template.md), [video-script-template.md](references/video-script-template.md), [carousel-template.md](references/carousel-template.md), [static-template.md](references/static-template.md)
+**Templates:** [video-script-template.md](references/video-script-template.md), [carousel-template.md](references/carousel-template.md), [static-template.md](references/static-template.md)
 
 **Methodology & Examples:** [mining-methodology.md](references/mining-methodology.md), [examples.md](references/examples.md)

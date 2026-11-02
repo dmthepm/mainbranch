@@ -30,7 +30,7 @@ Don't graduate prematurely. Each tier costs operational complexity. Graduate whe
 **Mechanics:**
 1. Run `/mb-site` against the existing project. The minisite generation subagent reads the same offer.md / audience.md and produces a ~4–6 page version. The home page stays focused (linking directly to the conversion endpoint); supporting pages get the proof, mechanism, and faq content.
 2. Confirm `/start/thanks/` is present (minisite shape requires it as the post-conversion landing).
-3. Update `~/.mainbranch/sites.json` `shape` field: `lander` → `minisite`.
+3. Update the `shape` field in the repo-local `.mainbranch/repo.json` (or legacy `~/.mainbranch/sites.json`): `lander` → `minisite`.
 4. `git push` — Cloudflare auto-deploys.
 5. (Optional) Re-run `og_render.py` if the og.svg changed.
 
@@ -42,7 +42,7 @@ Don't graduate prematurely. Each tier costs operational complexity. Graduate whe
 
 **What changes:**
 - ~4–6 pages → 10+ pages (blog, multiple offers, knowledge base, course area, etc.)
-- Static HTML → likely Next.js / Astro with build step (component reuse pays off past ~6 pages)
+- Static HTML → likely Astro or similar with a build step (component reuse pays off past ~6 pages)
 - Possibly: deeper navigation (header nav, footer site map), search, taxonomy
 
 **Two paths:**
@@ -55,19 +55,16 @@ Keep the static HTML, add more directories. Simple, no build step. Works for ~10
 2. Update `sitemap.xml`, `_headers`, internal nav by hand or with a small subagent prompt
 3. `git push` — Cloudflare auto-deploys
 
-### B. Migrate to Next.js / Astro / similar
+### B. Migrate to Astro / similar
 
-Past ~10–15 pages, component reuse + a build step pays off. Two sub-options:
+Past ~10–15 pages, component reuse + a build step pays off. Use a static-site generator (Astro, 11ty, similar); ask the owner before scaffolding one.
 
-- **Re-platform onto a Next.js template** (e.g., the legacy `saas` / `high-ticket` templates) — see [`website-build.md`](website-build.md). The minisite content gets ported to component structures; offer.md / audience.md drive `site-config.ts`. Keep the same domain — just point Cloudflare Pages at a build command (`pnpm build`) and output dir (`out` / `dist`).
-- **Keep static, add a generator** (e.g., 11ty, Astro static mode) — middle ground. Build step but lighter than Next.js.
-
-**Mechanics for path B (Next.js example):**
-1. Create a parallel Next.js repo. The minisite repo's content gets copied/adapted into Next.js components.
-2. Configure CF Pages project's build settings (in dashboard): build command `pnpm build`, output `out`. Or create a fresh Pages project pointed at the new repo.
+**Mechanics:**
+1. Create a parallel repo for the generator. The minisite repo's content gets copied or adapted into components or templates.
+2. Configure the Cloudflare Pages project's build settings (dashboard): build command and output directory for the generator. Or create a fresh Pages project pointed at the new repo.
 3. Test on a `*.pages.dev` URL before flipping the apex domain.
 4. When ready, detach the apex domain from the old project and re-attach to the new one (use the `pages.py set-domain` tool).
-5. Update `~/.mainbranch/sites.json` — `shape: website`, `template: <next-template>`, optionally archive the old minisite repo.
+5. Update the repo-local `.mainbranch/repo.json` (or legacy `~/.mainbranch/sites.json`) with `shape: website`, and optionally archive the old minisite repo.
 
 **Gotcha:** SEO continuity. The minisite's URLs (`/how-it-works/`, `/proof/`, etc.) should map cleanly to the new site's URLs. Use `_redirects` for any path changes.
 

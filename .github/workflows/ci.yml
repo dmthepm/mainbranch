@@ -311,8 +311,8 @@ jobs:
             || { echo "::error::Google Ads launch playbook template missing from wheel"; exit 1; }
           python -m zipfile -l "$wheel" | grep -E '(^|/)mb/_engine/workflows/mb-ads/workflow\.md([[:space:]]|$)' \
             || { echo "::error::canonical mb-ads workflow source missing from wheel"; exit 1; }
-          python -m zipfile -l "$wheel" | grep -E '(^|/)mb/_engine/\.claude/reference/engine-path-resolution\.md([[:space:]]|$)' \
-            || { echo "::error::bundled reference files missing from wheel"; exit 1; }
+          python -m zipfile -l "$wheel" | grep -E '(^|/)mb/_engine/\.claude/skills/mb-setup/references/engine-path-resolution\.md([[:space:]]|$)' \
+            || { echo "::error::bundled skill reference files missing from wheel"; exit 1; }
           python -m zipfile -l "$wheel" | grep -E '(^|/)mb/_engine/\.claude-plugin/plugin\.json([[:space:]]|$)' \
             || { echo "::error::Claude Code plugin prototype missing from wheel"; exit 1; }
           python -m zipfile -l "$wheel" | grep -E '(^|/)mb/_engine/\.claude-plugin/marketplace\.json([[:space:]]|$)' \
@@ -458,7 +458,7 @@ jobs:
           assert dirs, "additionalDirectories empty"
           root = pathlib.Path(dirs[0])
           assert (root / ".claude/skills/mb-start/SKILL.md").is_file(), root
-          assert (root / ".claude/reference/engine-path-resolution.md").is_file(), root
+          assert (root / ".claude/skills/mb-setup/references/engine-path-resolution.md").is_file(), root
           PY
 
       - name: Smoke — mb onboard creates a business repo

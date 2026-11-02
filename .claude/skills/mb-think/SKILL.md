@@ -101,14 +101,7 @@ unless the operator chooses it.
 
 ---
 
-## Two Modes of Work
-
-| Mode | You're doing | Examples |
-|------|--------------|----------|
-| **Enriching the core** | Pulling insights → reference files | Mining videos, making decisions, updating offer.md, **building content-strategy.md** |
-| **Creating for the world** | Reference files → output | Ads, scripts, courses, code, posts |
-
-`/mb-think` is for **enriching the core**. When you're ready to create, use `/mb-ads`, `/mb-organic`, `/mb-site`, or just ask.
+`/mb-think` enriches the core (insights -> reference files). To create for the world (ads, scripts, courses, code, posts), use `/mb-ads`, `/mb-organic`, `/mb-site`, or just ask.
 
 ---
 
@@ -132,6 +125,8 @@ repair language. Apify research remains MCP-first for now: treat it as an
 agent-side research tool surface unless a later CLI contract exposes stable
 provider-readiness facts. Runtime-local tool checks happen only after a
 selected research path needs them and `mb` cannot inspect the tool directly.
+Before any large Apify mining run, the owner sees an estimated cost and says OK first
+([research-phase.md](references/research-phase.md)).
 
 **Quick gist:** On first `/mb-think` invocation, read status/connect facts. When
 the user's intent needs a runtime-local tool, check only that tool, cache
@@ -225,41 +220,11 @@ If unclear, ask: "Are you exploring a question, documenting a decision, or updat
 
 ---
 
-## Research Routing by Intent
+## Research Routing
 
-When routing to research mode, detect research TYPE from user intent:
+Pick the source tool from [research-routing-quick-ref.md](references/research-routing-quick-ref.md) (intent table, tool checks, fallbacks, file suffixes, token limits). Never block on a missing optional tool: use web/codebase search, pasted material, manual exports, or the `mb connect` repair command, and offer setup once. See [tool-detection.md](references/tool-detection.md) for tool-specific fallback wording.
 
-| User Intent | Trigger Phrases | Primary Tool | Fallback |
-|-------------|-----------------|--------------|----------|
-| YouTube research | YouTube URL, "transcribe video", "what does [creator] say" | Apify | Ask for manual transcript |
-| X/Twitter sentiment | "what are people saying", "sentiment on X", "Twitter discourse" | Grok | WebSearch site:x.com |
-| Deep web research | "deep research", "comprehensive analysis", "research everything" | Gemini | Multi-source WebSearch |
-| Local transcription | Local file path (.mp4, .m4a), "transcribe my recording" | whisper | CLI mlx_whisper or whisper-cli |
-| Instagram mining | Instagram handle, "mine [handle]", "competitor posts" | Apify | Manual screenshots |
-| Ad account research | "ad performance", "what's working", "check CPA", "audit my ads" | Verified Meta ad account context | Manual Ads Manager check |
-| Winning-ad research | "customer language", "competitor ads", "review mining", "script teardown", "comment mining" | WebSearch + Apify/Grok when configured | Manual exports, screenshots, pasted transcripts |
-| Keyword gate | "keyword gate", "kill or build", "search demand", "buyer intent", "paid traffic demand" | SERP/search sidecar + Keyword Planner CSV when available | WebSearch + operator-provided exports |
-| General research | Default, "research [topic]", "what do we know" | WebSearch + codebase | Always available |
-
-**Multiple types needed at once?** Spawn them as parallel Task agents in a single message. Example: user says "research what [creator] says on YouTube and what people think on X" — spawn one agent for YouTube transcript mining and another for X/Twitter sentiment simultaneously. Each saves its own research file; main conversation synthesizes when both return.
-
-### Routing Logic
-
-```
-1. Parse user message for intent triggers
-2. Check if preferred tool is available (from session cache)
-3. If multiple sources needed → spawn parallel Task agents (one per source)
-4. If single source → use preferred tool directly
-5. If not available → offer setup ONCE, then use fallback
-6. Never block on missing optional tools
-```
-
-### Fallback Principle
-
-Never block on missing optional tools. Use web/codebase search, pasted source
-material, manual exports, or the provider repair command from `mb connect`.
-See [references/tool-detection.md](references/tool-detection.md) for exact
-tool-specific fallback wording.
+When two or more source types are needed, spawn parallel Task agents in a single message (one per source), as in Full Flow step 2.
 
 ---
 
@@ -306,17 +271,7 @@ Research -> Checkpoint -> Decide -> Checkpoint -> Codify
 
 Gather from codebase, web, user input, local recordings.
 
-**When research involves 2+ sources** (e.g., YouTube + web, X/Twitter + codebase, competitor mining + deep research), spawn parallel Task agents in a single message — one agent per source. Use `subagent_type: "general-purpose"` (has Write, Edit, Bash, MCP access). Each agent:
-- Gets a focused prompt: one source, one research question
-- Writes its own dated file (e.g., `research/YYYY-MM-DD-topic-yt-mining.md`)
-- **Verifies the write:** checks the file exists after writing (use Read or ls)
-- Returns: file path + write status + 5-bullet summary
-- If write failed: returns the **full research content** so main conversation can write it
-- Does NOT need the full business context — just the research question and source instructions
-
-**After all agents return:** Check that files landed on disk. If any agent reported a write failure or the file doesn't exist, write it from the returned content. Then synthesize across summaries. This keeps heavy content out of your main context window while recovering gracefully from the known Claude Code subagent write persistence bug.
-
-**Do NOT run research agents in background** (`run_in_background: true`) — background agents cannot access MCP tools (Apify, etc.) and cannot prompt for permissions.
+**When research involves 2+ sources**, spawn one `general-purpose` Task agent per source in a single message, never with `run_in_background` (background agents cannot use MCP tools or prompt for permissions). Each agent gets one source and one question, writes its own dated file, verifies the write, and returns file path, write status and a 5-bullet summary (the full content if the write failed). Afterwards confirm files landed, write any that failed from the returned content, then synthesize. See [research-phase.md](references/research-phase.md) for the agent brief.
 
 **Mining sources:** Use [research-routing-quick-ref.md](references/research-routing-quick-ref.md)
 and the source-specific references for tool choice and output suffixes.
@@ -333,21 +288,7 @@ Every research output needs:
 
 Synthesis works best when the main conversation is clean — which is exactly what subagents provide. Heavy raw content (transcripts, mined posts) lives in the subagent context windows, and only distilled summaries return to main. For authenticated or private sources, run the source-ingestion rail first and keep raw transcripts/provider payloads out of committed files by default.
 
-**For content mining specifically:** AI shows WHAT worked. You must judge WHY.
-
-Extract three dimensions from mined content:
-- **Visual** — Format, production style, patterns
-- **Audible** — Energy, pacing, delivery
-- **Emotional** — Primary emotion, identity play
-
-**Framework extraction is human judgment work.** AI surfaces the data; you interpret the frameworks. This methodology comes from Koston Williams (6M view video) — the skill isn't copying, it's framework transfer. A competitor's content worked for THEM. Your job is to:
-
-1. See the framework beneath the content
-2. Judge whether it transfers to YOUR context
-3. Adapt it to YOUR voice and audience
-4. Codify what you learned into reference files
-
-Don't skip to content generation. Mining → Human Synthesis → Reference Update → THEN Create.
+**Content mining:** AI shows what worked; you judge why. Extract visual, audible and emotional dimensions, judge whether the framework transfers to your context, adapt it to your voice, and codify before creating: Mining -> Human Synthesis -> Reference Update -> THEN Create. See [research-phase.md](references/research-phase.md).
 
 ### 4. Checkpoint
 
@@ -381,53 +322,11 @@ Apply changes described in `## What Changes` to reference files. Mark decision a
 
 ---
 
-## Research Mode
+## Modes
 
-```
-/mb-think research "topic"
-```
-
-Output: `research/YYYY-MM-DD-topic-claude-code.md`
-
-See [references/research-phase.md](references/research-phase.md) for full workflow.
-
-For ad, customer, review, competitor, and social-comment mining, use
-[references/winning-ad-research.md](references/winning-ad-research.md) to keep
-the research structured before handing off to `/mb-ads` or `/mb-organic`.
-For broad researched briefs that should feed ads, sites, organic content, or a
-push playbook, use
-[references/grok-8-brief-format.md](references/grok-8-brief-format.md) and set
-`brief_format: grok-8` in frontmatter.
-
-For offer-launch demand validation, use
-[references/keyword-gate.md](references/keyword-gate.md). It writes a dated
-keyword-gate research file with a Build / Build with caution / Kill verdict,
-recommended lander cluster, ready-to-buy terms, and negative keyword seeds for
-`/mb-site` and `/mb-ads`.
-
----
-
-## Decide Mode
-
-```
-/mb-think decide "topic"
-```
-
-Output: `decisions/YYYY-MM-DD-topic.md`
-
-See [references/decide-phase.md](references/decide-phase.md) for full workflow.
-
----
-
-## Codify Mode
-
-```
-/mb-think codify decisions/YYYY-MM-DD-topic.md
-```
-
-Or: "/mb-think add new testimonials to my files"
-
-See [references/codify-phase.md](references/codify-phase.md) for full workflow.
+- `/mb-think research "topic"` writes `research/YYYY-MM-DD-topic-claude-code.md` ([research-phase.md](references/research-phase.md)). Ad, customer, review, competitor and comment mining use [winning-ad-research.md](references/winning-ad-research.md); broad briefs set `brief_format: grok-8` ([grok-8-brief-format.md](references/grok-8-brief-format.md)); offer-launch demand uses [keyword-gate.md](references/keyword-gate.md), which writes a Build / Build with caution / Kill verdict with a lander cluster, ready-to-buy terms and negative keyword seeds for `/mb-site` and `/mb-ads`.
+- `/mb-think decide "topic"` writes `decisions/YYYY-MM-DD-topic.md` ([decide-phase.md](references/decide-phase.md)).
+- `/mb-think codify decisions/YYYY-MM-DD-topic.md`, or "add new testimonials to my files" ([codify-phase.md](references/codify-phase.md)).
 
 ---
 
@@ -451,27 +350,7 @@ See [recovery.md](references/recovery.md) for resuming sessions.
 
 ## Recovery
 
-If conversation compacted, check multiple sources:
-
-**1. Claude tasks (current session):**
-```
-TaskList
-```
-
-**2. Recent files and rationale state:**
-```bash
-ls -lt research/*.md 2>/dev/null | head -5
-grep -l "status: proposed\|status: accepted" decisions/*.md 2>/dev/null
-```
-
-**3. GitHub issues (when durable work threads are needed):**
-```bash
-gh issue list --assignee @me --state open
-```
-
-Then confirm: "I see you were working on [topic]. Continue from here?"
-
-See [references/recovery.md](references/recovery.md) for details.
+After compaction, check `TaskList`, `ls -lt research/*.md | head -5`, decisions with `status: proposed|accepted`, and (for durable threads) `gh issue list --assignee @me --state open`. Then confirm: "I see you were working on [topic]. Continue from here?" See [recovery.md](references/recovery.md).
 
 ---
 
@@ -485,16 +364,10 @@ See [references/recovery.md](references/recovery.md) for details.
 
 ## When NOT to Use
 
-- Quick factual questions (just ask)
-- Simple file edits (just edit)
-- Generating content (use `/mb-ads`, `/mb-site`, `/mb-organic`)
-
-Use `/mb-think` when the answer requires investigation and the choice needs documentation.
+Quick factual questions, simple file edits, or generating content (use `/mb-ads`, `/mb-site`, `/mb-organic`). Use `/mb-think` when the answer needs investigation and the choice needs documentation.
 
 ---
 
 ## Why This Matters
 
-Keep what changes the business. Leave the rest in research. Reference files get
-stronger when each accepted decision makes the offer, proof, audience, voice, or
-content strategy clearer.
+Keep what changes the business; leave the rest in research.
