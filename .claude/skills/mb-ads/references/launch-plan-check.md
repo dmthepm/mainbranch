@@ -81,7 +81,7 @@ Sections:
 
 If the work includes repeatable provider setup, resource delivery, or approval
 state, draft a `type: playbook` file under `pushes/<push>/playbooks/` instead
-of hiding the plan in prose. For a reusable Noontide Google Ads Search proof
+of hiding the plan in prose. For a reusable Google Ads Search proof
 run, route through the `playbooks/google-ads-search-launch/playbook.md` source
 or the `.claude/playbooks/google-ads-search-launch/` Claude shell and
 instantiate its push-playbook template.
