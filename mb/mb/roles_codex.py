@@ -70,8 +70,13 @@ def hook_group() -> dict[str, Any]:
 
 
 def _is_ours(hook: object) -> bool:
+    """Only the exact generated command. Anything else is the owner's, even if it mentions us."""
+    return isinstance(hook, dict) and hook.get("command") == CODEX_HOOK_COMMAND
+
+
+def _mentions_us(hook: object) -> bool:
     command = hook.get("command") if isinstance(hook, dict) else None
-    return isinstance(command, str) and _MARK in command
+    return isinstance(command, str) and _MARK in command and not _is_ours(hook)
 
 
 def _current(hook: object) -> bool:
@@ -82,14 +87,14 @@ def _session_groups(doc: Any) -> tuple[list[Any] | None, str | None]:
     """The SessionStart group list, [] when absent, or a reason the file is not safe to merge."""
     if not isinstance(doc, dict):
         return None, "hooks.json must be a JSON object"
-    hooks = doc.get("hooks")
-    if hooks is None:
+    if "hooks" not in doc:
         return [], None
+    hooks = doc["hooks"]
     if not isinstance(hooks, dict):
         return None, '"hooks" must be an object'
-    groups = hooks.get("SessionStart")
-    if groups is None:
+    if "SessionStart" not in hooks:
         return [], None
+    groups = hooks["SessionStart"]
     if not isinstance(groups, list):
         return None, '"hooks.SessionStart" must be a list'
     for group in groups:
@@ -165,6 +170,11 @@ def plan(*, remove: bool = False) -> dict[str, Any]:
         return report
     groups, _ = _session_groups(doc)
     ours = [h for g in groups or [] for h in g.get("hooks", []) if _is_ours(h)]
+    if any(_mentions_us(h) for g in groups or [] for h in g.get("hooks", [])):
+        report["note"] = (
+            "Another SessionStart hook mentions `mb role hook`. It is not the generated "
+            "hook, so it is left as it is. Check it does not load the card twice."
+        )
     installed = any(_current(h) for h in ours) and any(
         g.get("matcher") == CODEX_MATCHER and any(_current(h) for h in g.get("hooks", []))
         for g in groups or []

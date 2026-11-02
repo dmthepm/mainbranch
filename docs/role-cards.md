@@ -124,10 +124,19 @@ mb role codex-hook --apply    # install
 mb role codex-hook --apply --remove   # uninstall
 ```
 
-The install merges into an existing file and keeps every other hook. It is
-idempotent, writes atomically, and leaves a malformed file or a symlinked
+The install merges into an existing file and keeps every other hook: it changes
+only a hook whose command exactly matches the generated one, and tells you if another
+hook mentions `mb role hook`. It is idempotent, writes atomically, and leaves a malformed file or a symlinked
 `hooks.json` untouched. It never edits Codex's trust state or `config.toml`.
 Launch with `MB_ROLE=scout codex` in the business repo.
+
+**What you trust.** Codex reviews the hook once, not each repo. After that it runs in
+every Codex session, including folders you have not trusted, and outside Codex's
+sandbox. With `MB_ROLE` set, any repo with a matching card gets that card and its
+checkpoint into the session, so a repo you cloned can give the agent instructions,
+much as its `AGENTS.md` can. Do not leave `MB_ROLE` set in a shell you use for repos
+you have not read. The hook also runs whichever `mb` comes first on your `PATH`, so
+keep repo folders off `PATH`. Replacing `mb` needs no new review.
 
 The hook walks up from the session folder to the git root looking for
 `core/roles`, so a session in a subfolder or a git worktree finds its repo. In a
@@ -154,7 +163,8 @@ Limits:
   repo's `.codex/hooks.json` is not used.
 - **A bare `codex` that auto-restores a session** may fire no source on some
   versions. Use `codex resume` to be sure. Not proven on 0.164.
-- **Size.** Codex shortens long hook output. The hook sets a 4,000-token limit, enough
-  for a card and its 8 KB checkpoint.
+- **Size.** Past the hook's 4,000-token setting, Codex sends a shortened preview and
+  saves the full text to a file. A usual card with an 8 KB checkpoint fits; a very long
+  card may not. Nothing limits a card field's length yet.
 - **Same refusal limit as Claude.** A hook cannot block a session; the refusal is text.
 - POSIX shell only; no Windows command is installed.

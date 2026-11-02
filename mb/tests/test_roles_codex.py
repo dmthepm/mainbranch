@@ -121,14 +121,33 @@ def test_other_hooks_and_keys_are_preserved(codex_home: Path) -> None:
 def test_stale_copy_of_our_hook_is_replaced_not_duplicated(codex_home: Path) -> None:
     stale = {
         "matcher": "startup",
-        "hooks": [{"type": "command", "command": "mb role hook --runtime codex"}],
+        "hooks": [{"type": "command", "command": roles_codex.CODEX_HOOK_COMMAND, "timeout": 5}],
     }
     _write(codex_home, {"hooks": {"SessionStart": [OTHER_GROUP, stale]}})
     assert roles_codex.plan()["action"] == "replace"
     roles_codex.apply()
     groups = _groups(codex_home)
     assert groups[0] == OTHER_GROUP and len(groups) == 2
-    assert groups[1]["hooks"][0]["command"] == roles_codex.CODEX_HOOK_COMMAND
+    assert groups[1] == roles_codex.hook_group()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'printf "%s\\n" "mb role hook --runtime codex"',
+        "mb role hook --runtime codex",
+        "guard.sh && mb role hook --runtime codex",
+    ],
+)
+def test_a_hook_that_only_mentions_ours_is_never_touched(codex_home: Path, command: str) -> None:
+    theirs = {"matcher": "startup", "hooks": [{"type": "command", "command": command}]}
+    _write(codex_home, {"hooks": {"SessionStart": [theirs]}})
+    assert roles_codex.plan(remove=True)["action"] == "unchanged"
+    assert roles_codex.plan(remove=True)["note"]
+    roles_codex.apply()
+    assert _groups(codex_home) == [theirs, roles_codex.hook_group()]
+    roles_codex.apply(remove=True)
+    assert _groups(codex_home) == [theirs]
 
 
 @pytest.mark.parametrize(
@@ -137,6 +156,8 @@ def test_stale_copy_of_our_hook_is_replaced_not_duplicated(codex_home: Path) -> 
         "{not json",
         "[]",
         '{"hooks": []}',
+        '{"hooks": null}',
+        '{"hooks": {"SessionStart": null}}',
         '{"hooks": {"SessionStart": {}}}',
         '{"hooks": {"SessionStart": ["x"]}}',
         '{"hooks": {"SessionStart": [{"hooks": "x"}]}}',

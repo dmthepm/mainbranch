@@ -2444,6 +2444,8 @@ def role_codex_hook_cmd(
         )
     else:
         verb = "remove" if remove else "install"
+        if report.get("note"):
+            typer.echo(report["note"])
         if report["action"] == "refused":
             typer.echo(f"Refused: {report['problem']}")
         elif report["action"] == "unchanged":
