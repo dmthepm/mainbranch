@@ -31,6 +31,7 @@ from mb import related_links as related_links_mod
 from mb import roles as roles_mod
 from mb import spine as spine_mod
 from mb import topology as topology_mod
+from mb import validate as _validate_mod  # noqa: F401
 from mb.doctor_checks import _FENCE_OPEN_RE as _FENCE_OPEN_RE
 from mb.doctor_checks import _OLD_STATUS_LINE_RE as _OLD_STATUS_LINE_RE
 from mb.doctor_checks import CLOUD_PREFIXES as CLOUD_PREFIXES
@@ -97,7 +98,21 @@ from mb.freshness import (
     package_update_status,
 )
 from mb.gitignore import gitignore_problem
+from mb.migrate import (  # noqa: F401
+    LATEST_SCHEMA_VERSION as LATEST_SCHEMA_VERSION,
+)
+from mb.migrate import (
+    pending_migrations as pending_migrations,
+)
+from mb.migrate import (
+    read_schema_version as read_schema_version,
+)
+from mb.migrate import (
+    schema_write_blocker as schema_write_blocker,
+)
 from mb.skill_validate import run_all as validate_all_skills
+
+validate_mod = _validate_mod
 
 REPAIR_SCHEMA = "mb.doctor.repair"
 REPAIR_SCHEMA_VERSION = 1

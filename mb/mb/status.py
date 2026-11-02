@@ -32,6 +32,7 @@ from mb.freshness import (
     package_update_status,
 )
 from mb.gitignore import gitignore_problem
+from mb.json_result import json_default as json_default  # noqa: F401
 
 # isort: off
 from mb.status_money_path import (

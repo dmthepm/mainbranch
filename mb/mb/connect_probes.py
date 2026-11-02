@@ -382,6 +382,8 @@ def _validate_with_provider(
     which_func: Which | None = None,
     command_runner: CommandRunner | None = None,
 ) -> dict[str, Any]:
+    from mb import connect
+
     checked_at = _now()
     metadata = metadata or {}
     if provider.id == "cloudflare":
@@ -455,13 +457,13 @@ def _validate_with_provider(
             endpoint_family="apify_user_me",
         )
     elif provider.id == "stripe":
-        result = _probe_stripe(provider, secret)
+        result = connect._probe_stripe(provider, secret)
     elif provider.id == "github":
-        result = _probe_github(provider, secret)
+        result = connect._probe_github(provider, secret)
     elif provider.id == "ga4":
-        result = _probe_ga4(provider, secret, metadata)
+        result = connect._probe_ga4(provider, secret, metadata)
     elif provider.id == "meta":
-        return _validate_meta_with_cli(
+        return connect._validate_meta_with_cli(
             provider,
             secret,
             metadata,
