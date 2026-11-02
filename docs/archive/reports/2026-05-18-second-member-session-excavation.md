@@ -166,7 +166,7 @@ adapter, approval boundary, and smoke evidence.
 
 ## Process Artifact
 
-This excavation reused [`docs/session-excavation.md`](../session-excavation.md)
+This excavation reused [`docs/session-excavation.md`](../../session-excavation.md)
 and added a provider/connector pass to that workflow. Future excavations should
 explicitly scan for:
 

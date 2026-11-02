@@ -207,8 +207,8 @@ lands.
 ## Private Vault Boundaries
 
 Use the accepted storage model from
-[docs/books.md](../books.md) and the
-[books foundation decision](../../decisions/2026-05-11-mb-books-foundation.md):
+[docs/books.md](../../books.md) and the
+[books foundation decision](../../../decisions/2026-05-11-mb-books-foundation.md):
 
 - `solo-local`: real books live under `.mb/private/books/`, ignored by the
   business repo. `main.journal`, imports, cache, detailed reports, and
