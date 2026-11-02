@@ -140,6 +140,6 @@ into a first-run repair PR.
 ## Process Artifact
 
 This excavation produced
-[`docs/session-excavation.md`](../session-excavation.md). Future agents should
+[`docs/session-excavation.md`](../../session-excavation.md). Future agents should
 use that workflow before creating public issues from transcripts, chat exports,
 or session logs.
