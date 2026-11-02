@@ -37,7 +37,7 @@ are ignored with a warning. The body is for the owner; the hook does not print i
 ## Trust: cards enter the model's context automatically
 
 The card fields and the checkpoint file are put into the model's context
-automatically on every session start, resume, clear and compaction, with no
+automatically on every session start, resume, clear, fork and compaction, with no
 prompt. Trust them like `CLAUDE.md`: a bad card or a bad checkpoint is a
 prompt-injection path, because whatever it says reaches the model as
 instruction. Review changes to `core/roles/` and to checkpoint files as you
@@ -78,7 +78,7 @@ present.
 ## The SessionStart hook
 
 The Main Branch plugin ships `hooks/hooks.json`, which runs `mb role hook` on
-session `startup`, `resume`, `clear` and `compact`. Claude Code
+session `startup`, `resume`, `clear`, `compact` and `fork`. Claude Code
 adds the hook's stdout to the model's context.
 
 | Situation | What the hook prints |
@@ -104,6 +104,8 @@ Other limits:
   in `.claude/settings.json` is read by `mb doctor` as wired only when its whole command is `mb role hook`, but only the
   plugin route was run for this release.
 - The plugin takes effect after a plugin update and a Claude Code restart.
+- The `fork` trigger follows Claude Code's documented SessionStart sources and is
+  unproven live; only startup, resume, clear and compact were run.
 
 ## Codex
 

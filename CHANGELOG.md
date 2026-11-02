@@ -13,6 +13,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- The Claude Code role hook also runs on `fork` (a session forked from another),
+  matching the documented SessionStart sources. Not yet run live.
 - Role cards in Codex. `mb role codex-hook` previews, and with `--apply` installs,
   one user-level Codex `SessionStart` hook that prints the same role card and
   checkpoint on startup, resume, clear, compact and fork. It merges into an existing
