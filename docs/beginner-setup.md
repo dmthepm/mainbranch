@@ -1,9 +1,9 @@
 # Set up your business folder
 
-Create a folder your agent can read, draft your core business context, and save
-one useful result. Keep the business folder separate from the Main Branch
-engine repository.
+By the end of this page you will have a business folder your agent can read,
+a first draft of your offer, and one saved result.
 
+Keep the business folder separate from the Main Branch engine repository.
 After setup, open that folder in Claude Code or Codex CLI and describe what
 you need. The agent runs Main Branch's checks for you.
 
@@ -95,9 +95,9 @@ cd my-business
 mb doctor
 ```
 
-These names are examples. Choose your own business name and folder path.
-Onboarding creates or connects the folder, prepares supported runtime guidance,
-and shows the next action. Review any existing-folder changes before approving.
+`mb onboard` asks a few questions in the terminal. These names are examples;
+choose your own business name and folder path. Onboarding creates or
+connects the folder, prepares supported runtime guidance, and shows the next action. Review any existing-folder changes before approving.
 
 If you choose a private GitHub backup, use your account and repository name in
 place of the example below. This command can create a remote repository and

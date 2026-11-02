@@ -4,48 +4,47 @@
 
 # Main Branch
 
-Run your business with an AI agent that reads your business files before it
-advises you, then saves the work you approve for the next session.
+Your business, written down where an AI agent can read it.
 
-Main Branch keeps your offers, audience, research, decisions, bets, and lessons
-in a folder you own. Claude Code or Codex helps you work with those files.
-The `mb` command checks the folder, reports current facts, and saves readable
-checkpoints in git history.
+Main Branch keeps your offers, audience, research, decisions, and lessons as
+plain files in a folder you own. Claude Code or Codex reads those files before
+it advises you, proposes work, and saves what you approve. Next session, it
+starts from what you decided, not from a blank chat.
 
 [Set up your business folder](docs/beginner-setup.md) ·
 [Follow a working day](docs/working-day.md) ·
 [Browse the docs](docs/README.md) ·
 [Check runtime support](docs/compatibility.md)
 
-## What you can do
+## What you get
 
-Start with a question about your business. For example:
+- An agent that has read your offer, audience, and voice files before it answers.
+- Proposals you approve, edit, or reject. Nothing publishes, spends, or contacts
+  a customer without your say.
+- Decisions and lessons saved as files, so the next session reads them.
+- Readable saved history in git, with a preview before every save.
+
+## Try it
+
+After setup, open your business folder and ask:
 
 > People keep asking what my service includes. Read my offer and audience
 > files, show me what is unclear, and propose one change before writing.
 
-The agent reads your files and Main Branch's health and status facts. It
-compares options, explains the evidence and uncertainty, and proposes work.
-You choose what to accept. Approved decisions and lessons become files that
-future sessions can read.
+The agent reads your files and Main Branch's health and status facts, shows the
+evidence and what it is unsure about, and proposes one change. You approve it.
+The accepted offer becomes a file the next session reads. The
+[working-day walkthrough](docs/working-day.md) follows a fictional example from
+the first question to the next morning.
 
-Use this loop to clarify an offer, turn research into a decision, plan a bet,
-draft content, review a page, or save a lesson from completed work. The
-[working-day walkthrough](docs/working-day.md) shows a fictional example from
-first question to the next morning.
+The same loop clarifies an offer, turns research into a decision, plans a bet,
+drafts content, reviews a page, or saves a lesson from finished work.
 
-Claude Code supports the bundled production workflows within each workflow's
-limits. Codex supports the daily start, status, setup, think, repair, update,
-help, and close routes. Its bet, ads, organic, site, and books routes remain
-read-only planning. Wiki and skill-authoring workflows are outside current
-Codex support. Check [compatibility](docs/compatibility.md) or run
-`mb workflow list --runtime codex --json` for exact route status.
+## Do this first
 
-## Get started
-
-You need Python, git, and Claude Code or Codex CLI. The
-[setup guide](docs/beginner-setup.md) covers tool installation and guided setup.
-If those tools and pipx are already installed:
+You need Python, git, and Claude Code or Codex CLI, signed in. The
+[setup guide](docs/beginner-setup.md) covers installing each. With those and
+pipx in place:
 
 ```bash
 pipx install mainbranch
@@ -54,18 +53,34 @@ cd my-business
 mb doctor
 ```
 
-"My Business" and `my-business` are example names. Choose your own.
-Keep this business folder separate from a clone of the Main Branch engine.
+`mb onboard` asks you a few questions in the terminal. "My Business" and
+`my-business` are example names; choose your own. A healthy folder ends
+`mb doctor` with:
 
-Open the business folder in Claude Code and run `/mb-start`. In Codex CLI,
-ask it to use the global `mb-start` skill. Tell the agent what you want help
-with. Main Branch prepares runtime guidance during onboarding. If a skill is
-missing, follow the [setup repair steps](docs/beginner-setup.md#common-issues).
+```text
+all good — you're set to run `claude`.
+```
 
-For guided setup, paste the [setup prompt](docs/beginner-setup.md#setup-with-an-agent)
+Then open the folder in Claude Code and run `/mb-start`. In Codex CLI, ask it
+to use the global `mb-start` skill. Tell the agent what you want help with. If a
+skill is missing, follow the [setup repair steps](docs/beginner-setup.md#common-issues).
+
+Prefer to be guided? You can paste the [setup prompt](docs/beginner-setup.md#setup-with-an-agent)
 into your runtime. It asks about your business and proposes the first files
 for your review. Local-only setup is valid. GitHub backup is recommended and
 requires a signed-in account and your approval.
+
+Keep this business folder separate from a clone of the Main Branch engine.
+
+## What works where
+
+Claude Code supports the bundled production workflows within each workflow's
+limits. Codex supports the daily start, status, setup, think, repair, update,
+help, and close routes. Its bet, ads, organic, site, and books routes remain
+read-only planning. Wiki and skill-authoring workflows are outside current
+Codex support. The tailnet audit skills are drafts, and `/mb-seo` is experimental. Check
+[compatibility](docs/compatibility.md) or run
+`mb workflow list --runtime codex --json` for exact route status.
 
 ## Work with it each day
 
