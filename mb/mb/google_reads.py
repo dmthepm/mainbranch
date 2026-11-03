@@ -518,7 +518,7 @@ class ReadFailure(RuntimeError):
 def _entry(target: Path) -> tuple[dict[str, Any] | None, str]:
     try:
         config = connect_mod._read_config(target)
-        repo_id = str(config.get("repo_id") or connect_mod._repo_identity(target)["repo_id"])
+        repo_id = connect_mod._bound_repo_id(target, config)
     except ValueError as exc:
         raise ReadRefusal(
             "connect_config_refused",

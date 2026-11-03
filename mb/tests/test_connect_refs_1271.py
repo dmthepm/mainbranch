@@ -10,6 +10,7 @@ from mb import connect as c
 from mb import google_connect as gc
 from mb.cli import app
 from mb.credential_store import SecretStore
+from tests.connect_binding import bind_folder
 
 
 @pytest.fixture
@@ -38,6 +39,7 @@ def test_foreign_refs_never_read_or_release(repo, monkeypatch, provider, field, 
     ref = c._secret_ref(other_repo or "repo-a", other_provider or provider, other_field or field)
     entry = {"secrets": {field: {"ref": ref, "backend": "local-file"}}}
     c._write_config(repo, {"repo_id": "repo-a", "providers": {provider: entry}})
+    bind_folder(repo, "repo-a")
 
     def forbidden(*args, **kwargs):
         pytest.fail("foreign reference reached a credential consumer")
@@ -110,6 +112,7 @@ def test_matching_oauth_grant_mints(repo, monkeypatch, scope):
     entry = {"secrets": {"oauth_grant": {"ref": ref, "backend": "local-file"}}}
     config = {"repo_id": "repo-a", "providers": {"google": entry} if scope == "repo" else {}}
     c._write_config(repo, config)
+    bind_folder(repo, "repo-a")
     if scope == "user":
         monkeypatch.setattr(c, "_user_scope_provider_entry", lambda *args: entry)
     grant = json.dumps({"client_id": "synthetic-client", "refresh_token": "synthetic-refresh"})
@@ -162,6 +165,7 @@ def test_user_scope_mismatch_reports_without_reading(repo, monkeypatch):
         "secrets": {"api_key": {"ref": "mainbranch://foreign/stripe/api_key"}},
     }
     c._write_config(repo, {"repo_id": "repo-a", "providers": {}})
+    bind_folder(repo, "repo-a")
     monkeypatch.setattr(c, "_user_scope_provider_entry", lambda *args: entry)
 
     def forbidden(*args, **kwargs):

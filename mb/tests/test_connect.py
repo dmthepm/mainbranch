@@ -28,6 +28,7 @@ from mb import connect as connect_mod
 from mb import credential_store as credential_store_mod
 from mb import http_safe as http_safe_mod
 from mb.cli import app
+from tests.connect_binding import bind_folder
 
 runner = CliRunner()
 
@@ -206,6 +207,7 @@ def test_meta_status_preserves_stale_metadata_but_reports_missing_secret(
         encoding="utf-8",
     )
 
+    bind_folder(repo, "repo")
     status = connect_mod.status_provider("meta", repo)
 
     assert status["state"] == "missing_secret"
@@ -809,9 +811,12 @@ def test_connect_normalizes_common_remote_protocol_variants() -> None:
     )
 
 
-def test_connect_preserves_existing_repo_id_to_avoid_orphaned_secrets(
+def test_connect_preserves_existing_repo_id_only_after_the_owner_rebinds(
     tmp_path: Path, monkeypatch
 ) -> None:
+    # Changed on purpose: a repo id already in the file used to be kept on the file's
+    # word alone, so a copied file could pick another repo's keys. A legacy id is
+    # now kept only once the owner has run `mb connect rebind`.
     _local_secret_env(monkeypatch, tmp_path)
     repo = tmp_path / "biz"
     (repo / ".mb").mkdir(parents=True)
@@ -819,6 +824,16 @@ def test_connect_preserves_existing_repo_id_to_avoid_orphaned_secrets(
         yaml.safe_dump({"version": 1, "repo_id": "legacy-random-id", "providers": {}}),
         encoding="utf-8",
     )
+
+    with pytest.raises(connect_mod.ConnectRefusal) as refused:
+        connect_mod.connect_provider("cloudflare", repo=repo, token="cf-secret-token")
+    assert refused.value.rule == "repo_binding_required"
+    assert "mb connect rebind" in str(refused.value)
+    assert "cf-secret-token" not in str(refused.value)
+
+    result = runner.invoke(app, ["connect", "rebind", "--repo", str(repo), "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "use the keys saved under repo id" in result.output
 
     connect_mod.connect_provider("cloudflare", repo=repo, token="cf-secret-token")
 
@@ -2556,6 +2571,7 @@ def test_connect_custom_provider_missing_secret_surfaces_repair(
         encoding="utf-8",
     )
 
+    bind_folder(repo, "repo")
     status = runner.invoke(app, ["connect", "status", "--all", "--repo", str(repo), "--json"])
     assert status.exit_code == 1
     status_payload = json.loads(status.stdout)

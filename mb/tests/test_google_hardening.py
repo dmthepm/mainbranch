@@ -31,6 +31,7 @@ from mb import google_oauth as go
 from mb import google_reads as gr
 from mb import http_safe
 from mb.cli import app
+from tests.connect_binding import rebind_folder
 from tests.test_google_connect import (  # noqa: F401 (fixtures are used by name)
     ACCESS,
     BOTH_SCOPES,
@@ -150,6 +151,8 @@ def test_an_empty_value_removes_the_recorded_property(
 def _track_config(repo: Path) -> None:
     for args in (["init", "-q"], ["add", "-f", ".mb/connect.yaml"]):
         subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    # `git init` changes the folder's identity, so the owner rebinds it.
+    rebind_folder(repo)
 
 
 def _git_status(repo: Path) -> str:
@@ -208,6 +211,7 @@ def test_an_untracked_config_still_records_the_check(
 ) -> None:
     _sign_in(repo, client_file, google, monkeypatch)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True, capture_output=True)
+    rebind_folder(repo)
     _mint(monkeypatch, status=400, payload={"error": "invalid_grant"})
 
     _, result = _test_json(repo)

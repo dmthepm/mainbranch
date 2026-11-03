@@ -1,0 +1,394 @@
+"""A file inside a repo may not choose another repo's keys.
+
+The business folder saves a key under its repo id. A folder whose
+`.mb/connect.yaml` names that id, without ever having saved under it, is
+refused until the owner runs `mb connect rebind`.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import stat
+import subprocess
+import threading
+from pathlib import Path
+from typing import Any
+
+import pytest
+import yaml
+from typer.testing import CliRunner
+
+from mb import connect as c
+from mb.cli import app
+from mb.credential_store import SecretStore
+from tests.connect_binding import bind_folder
+
+runner = CliRunner()
+KEY = "sk_test_business_fixture_key"
+REMOTE = "https://github.com/example-org/example-business.git"
+
+
+@pytest.fixture(autouse=True)
+def _env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MAINBRANCH_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    for provider in c.PROVIDERS:
+        for env_var in provider.env_vars:
+            monkeypatch.delenv(env_var, raising=False)
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+
+def _business(tmp_path: Path) -> Path:
+    """A git folder with a public remote that saved a Stripe key."""
+
+    repo = tmp_path / "business"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "remote", "add", "origin", REMOTE)
+    c.connect_provider("stripe", repo=repo, token=KEY)
+    return repo
+
+
+def _borrower(tmp_path: Path, business: Path, *, providers: dict[str, Any] | None = None) -> Path:
+    """A plain folder whose file names the business's repo id."""
+
+    repo = tmp_path / "borrower"
+    (repo / ".mb").mkdir(parents=True)
+    config = yaml.safe_load((business / ".mb" / "connect.yaml").read_text(encoding="utf-8"))
+    config["providers"] = providers if providers is not None else config["providers"]
+    (repo / ".mb" / "connect.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    return repo
+
+
+def _user_scope_business(tmp_path: Path) -> Path:
+    repo = tmp_path / "business"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "remote", "add", "origin", REMOTE)
+    c.connect_provider("stripe", repo=repo, token=KEY, scope="user")
+    return repo
+
+
+def _no_key_in(value: Any) -> None:
+    assert KEY not in json.dumps(value, default=str)
+
+
+def _refused(callable_: Any, *args: Any, **kwargs: Any) -> c.ConnectRefusal:
+    with pytest.raises(c.ConnectRefusal) as caught:
+        callable_(*args, **kwargs)
+    assert caught.value.rule == "repo_binding_required"
+    assert "mb connect rebind" in str(caught.value)
+    assert KEY not in str(caught.value)
+    return caught.value
+
+
+def test_normal_folder_reads_its_own_key(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+
+    result = c.read_token("stripe", business)
+
+    assert result["ok"] is True
+    assert result["token"] == KEY
+
+
+def test_worktree_of_the_same_remote_is_unaffected(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    _git(
+        business,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@example.com",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "start",
+    )
+    tree = tmp_path / "tree"
+    _git(business, "worktree", "add", "-q", str(tree), "-b", "other")
+    (tree / ".mb").mkdir(exist_ok=True)
+    (tree / ".mb" / "connect.yaml").write_text(
+        (business / ".mb" / "connect.yaml").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    assert c.read_token("stripe", tree)["token"] == KEY
+    assert c.status_provider("stripe", tree)["state"] != "repo_binding_required"
+
+
+def test_borrowed_id_is_refused_for_repo_scope_read(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    refusal = _refused(c.read_token, "stripe", borrower)
+
+    assert f"--repo {borrower}" in str(refusal)
+
+
+def test_borrowed_id_is_refused_for_the_user_scope_fallback(tmp_path: Path) -> None:
+    business = _user_scope_business(tmp_path)
+    borrower = _borrower(tmp_path, business, providers={})
+
+    _refused(c.read_token, "stripe", borrower)
+    assert c.read_metadata("stripe", borrower) == {}
+    assert c.status_provider("stripe", borrower)["state"] == "repo_binding_required"
+
+
+def test_borrowed_id_never_reaches_the_secret_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    def forbidden(*args: Any, **kwargs: Any) -> None:
+        pytest.fail("a borrowed id reached the secret store")
+
+    monkeypatch.setattr(c, "_probe_secret_ref", forbidden)
+    monkeypatch.setattr(SecretStore, "probe", forbidden)
+
+    _refused(c.read_token, "stripe", borrower)
+    status = c.status_provider("stripe", borrower)
+    assert status["state"] == "repo_binding_required"
+    assert status["ok"] is False
+    assert status["secrets"] == {}
+    assert "mb connect rebind" in status["repair_command"]
+    everything = c.status_all(borrower, include_all=True)
+    assert {item["state"] for item in everything["providers"] if item["configured"]} == {
+        "repo_binding_required"
+    }
+    _no_key_in([status, everything])
+
+
+def test_exec_is_refused_with_a_refused_audit_line_and_runs_nothing(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    ran: list[Any] = []
+
+    _refused(
+        c.exec_with_secret,
+        "stripe",
+        ["true"],
+        borrower,
+        runner=lambda *args, **kwargs: ran.append(args),
+    )
+
+    assert ran == []
+    last = c.read_release_audit(limit=1)[0]
+    assert (last["verb"], last["result"], last["reason"]) == (
+        "exec",
+        "refused",
+        "repo_binding_required",
+    )
+    _no_key_in(last)
+
+
+def test_token_command_is_refused_and_audited(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    result = runner.invoke(app, ["connect", "token", "stripe", "--print", "--repo", str(borrower)])
+
+    assert result.exit_code != 0
+    assert KEY not in result.output
+    assert "mb connect rebind" in result.output
+    assert c.read_release_audit(limit=1)[0]["result"] == "refused"
+
+
+def test_test_and_rotate_are_refused(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    _refused(c.test_provider, "stripe", borrower)
+    _refused(c.rotate_provider, "stripe", borrower)
+    for verb in ("test", "rotate"):
+        result = runner.invoke(app, ["connect", verb, "stripe", "--repo", str(borrower)])
+        assert result.exit_code != 0
+        assert KEY not in result.output
+
+
+def test_a_save_in_a_borrowed_folder_is_refused_and_stores_nothing(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business, providers={})
+
+    _refused(c.connect_provider, "stripe", repo=borrower, token="sk_test_attacker_value")
+
+    assert c.read_token("stripe", business)["token"] == KEY
+
+
+def test_legacy_folder_gets_the_exact_rebind_command(tmp_path: Path) -> None:
+    legacy = tmp_path / "legacy"
+    (legacy / ".mb").mkdir(parents=True)
+    (legacy / ".mb" / "connect.yaml").write_text(
+        yaml.safe_dump({"version": 1, "repo_id": "old-random-id", "providers": {}}),
+        encoding="utf-8",
+    )
+
+    refusal = _refused(c.read_token, "stripe", legacy)
+
+    assert f"`mb connect rebind --repo {legacy}`" in str(refusal)
+
+
+def test_rebind_previews_then_allows_and_says_so_plainly(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    preview = runner.invoke(app, ["connect", "rebind", "--repo", str(borrower)])
+    assert preview.exit_code == 0
+    assert "lets this folder use the keys saved under repo id" in preview.output
+    assert "Nothing was changed" in preview.output
+    _refused(c.read_token, "stripe", borrower)
+
+    applied = runner.invoke(app, ["connect", "rebind", "--repo", str(borrower), "--yes"])
+    assert applied.exit_code == 0
+    assert "This folder is now allowed" in applied.output
+    assert c.read_token("stripe", borrower)["token"] == KEY
+    assert KEY not in preview.output + applied.output
+
+
+def test_rebind_in_a_normal_folder_changes_nothing(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    before = (c._repo_bindings_path()).read_text(encoding="utf-8")
+
+    result = c.rebind(business, apply=True)
+
+    assert result["needed"] is False
+    assert result["applied"] is False
+    assert c._repo_bindings_path().read_text(encoding="utf-8") == before
+
+
+def test_remote_moved_in_the_same_folder_needs_a_rebind(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    assert c.read_token("stripe", business)["ok"] is True
+
+    _git(business, "remote", "set-url", "origin", "https://github.com/example-org/renamed.git")
+
+    refusal = _refused(c.read_token, "stripe", business)
+    assert f"--repo {business}" in str(refusal)
+    c.rebind(business, apply=True)
+    assert c.read_token("stripe", business)["token"] == KEY
+
+
+def test_every_save_records_its_folder_by_hash_only(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    identity = c._repo_identity(business)
+
+    path = c._repo_bindings_path()
+    text = path.read_text(encoding="utf-8")
+    data = json.loads(text)
+
+    assert data["repos"][identity["repo_id"]]["folders"] == [identity["basis_sha256"]]
+    assert str(tmp_path) not in text
+    assert "github.com" not in text
+    assert KEY not in text
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(path.parent.stat().st_mode) & 0o077 == 0
+
+
+def test_record_refuses_a_symlink_and_reads_nothing_through_it(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    path = c._repo_bindings_path()
+    other = tmp_path / "elsewhere.json"
+    other.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "repos": {
+                    c._repo_identity(business)["repo_id"]: {
+                        "folders": [c._repo_identity(borrower)["basis_sha256"]]
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    other.chmod(0o600)
+    path.unlink()
+    path.symlink_to(other)
+
+    _refused(c.read_token, "stripe", borrower)
+    with pytest.raises(c.ConnectRefusal) as caught:
+        c.rebind(borrower, apply=True)
+    assert caught.value.rule == "repo_binding_record_unsafe"
+    assert path.is_symlink()
+    assert json.loads(other.read_text(encoding="utf-8"))["version"] == 1
+
+
+def test_record_in_a_symlinked_folder_is_refused(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    folder = c._repo_bindings_path().parent
+    moved = tmp_path / "moved"
+    folder.rename(moved)
+    folder.symlink_to(moved)
+
+    with pytest.raises(c.ConnectRefusal) as caught:
+        c._load_repo_bindings()
+    assert caught.value.rule == "repo_binding_record_unsafe"
+    assert business.exists()
+
+
+def test_record_other_users_can_write_is_not_trusted(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    c.rebind(borrower, apply=True)
+    assert c.read_token("stripe", borrower)["ok"] is True
+
+    c._repo_bindings_path().chmod(0o666)
+
+    _refused(c.read_token, "stripe", borrower)
+
+
+def test_unreadable_record_does_not_open_the_gate(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    c._repo_bindings_path().write_text("not json", encoding="utf-8")
+
+    _refused(c.read_token, "stripe", borrower)
+    assert c.read_token("stripe", business)["ok"] is True
+
+
+def test_concurrent_saves_keep_the_record_whole(tmp_path: Path) -> None:
+    ids = [f"repo-{n}" for n in range(12)]
+    errors: list[BaseException] = []
+
+    def record(repo_id: str) -> None:
+        try:
+            c._record_repo_binding(repo_id, f"{repo_id}-folder")
+        except BaseException as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=record, args=(repo_id,)) for repo_id in ids]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert c._load_repo_bindings() == {repo_id: [f"{repo_id}-folder"] for repo_id in ids}
+
+
+def test_concurrent_processes_keep_the_record_whole(tmp_path: Path) -> None:
+    code = (
+        "import sys; from mb import connect as c; c._record_repo_binding('shared-id', sys.argv[1])"
+    )
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(__import__("sys").path)}
+    procs = [subprocess.Popen(["python", "-c", code, f"folder-{n}"], env=env) for n in range(6)]
+    assert [proc.wait(timeout=60) for proc in procs] == [0] * 6
+
+    assert sorted(c._load_repo_bindings()["shared-id"]) == [f"folder-{n}" for n in range(6)]
+
+
+def test_fixture_helper_records_the_binding(tmp_path: Path) -> None:
+    repo = tmp_path / "plain"
+    repo.mkdir()
+    c._write_config(repo, {"repo_id": "made-up-id", "providers": {}})
+    _refused(c.read_token, "stripe", repo)
+
+    bind_folder(repo, "made-up-id")
+
+    assert c.read_token("stripe", repo)["state"] == "not_connected"

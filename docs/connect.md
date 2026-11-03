@@ -1186,6 +1186,47 @@ grant itself is being written says the grant "may have been stored": on a
 first sign-in the repo does not record it, so sign in again; on `--reauth`
 it may have replaced the old grant, so run `mb connect test google`.
 
+## Repo identity and which folder may use which keys
+
+Keys are stored under a repo id. A repo's id comes from its public git remote,
+or from its git folder when it has no remote, so anyone can work it out. A file
+in a repo must therefore never decide which repo's keys the folder gets.
+
+- A folder whose `.mb/connect.yaml` holds its own id works as it always did. That
+  includes every worktree and clone of the same remote.
+- Every save (`mb connect <provider>`, `mb connect google --oauth`,
+  `mb connect hydrate`) records the folder in
+  `$MAINBRANCH_HOME/connect/repo-bindings.json`: for each repo id, the hashes of
+  the folders that saved under it. It holds no path, remote or key. It is kept
+  like the other Main Branch state: file mode `0600`, folder `0700`, written
+  atomically under the save lock, and refused if it is a symlink or other users
+  can write it.
+- If the file names a different id than the folder's own, `mb connect token`,
+  `exec`, `status`, `test`, `rotate`, the user-scope fallback and any new save work
+  only when this folder is in the record for that id. Otherwise they stop with
+  `repo_binding_required`, read no key, and the release audit line says `refused`.
+- Moving a folder is fine as long as its remote stays. A folder that changes its
+  git remote, runs `git init` after connecting, or comes from before this record
+  existed (an old random id) is refused with the exact command to run.
+
+```bash
+mb connect rebind --repo .          # preview: changes nothing
+mb connect rebind --repo . --yes    # record this folder for the id in its file
+```
+
+`rebind` lets this folder use the keys saved under the repo id its
+`.mb/connect.yaml` names. Run it only for the business that folder belongs to.
+Nothing is trusted on first use, and an agent should not run `--yes` on its own.
+
+What this closes: a copied or template `.mb/connect.yaml` that names another
+repo's id no longer releases that repo's key, in repo scope or through user scope.
+
+What it does not close: a process running as the same OS user can still edit
+`repo-bindings.json`, run `rebind --yes`, or read the secret store directly, so
+this separates repos from files in repos, not from the person's own account. A
+folder that sets the same git remote as a business has that business's id by
+definition and is treated as that business.
+
 ## User Scope
 
 Writing the user-scope file keeps its other top-level keys as they were. It
@@ -1310,6 +1351,9 @@ a time saves a given credential through them, and they need
 connect that stores no token (metadata only, or a provider with no secrets)
 never touches the lock, so it does not need that folder. Removing a connection
 is planned in [#1263](https://github.com/dmthepm/mainbranch/issues/1263).
+
+Since 0.6.18 every save also takes `save-transaction.lock` across the whole Main
+Branch home, so saves for different providers wait on each other too.
 
 A second command waits about five seconds, then stops before it writes
 anything, says "Another mb connect is saving the <Provider> credential right

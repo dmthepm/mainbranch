@@ -537,7 +537,7 @@ def test_google(
     """
 
     config = connect_mod._read_config(target)
-    repo_id = str(config.get("repo_id") or connect_mod._repo_identity(target)["repo_id"])
+    repo_id = connect_mod._bound_repo_id(target, config)
     entry = config["providers"].get(provider.id)
     if not isinstance(entry, dict):
         entry = connect_mod._user_scope_provider_entry(repo_id, provider.id) or {}
