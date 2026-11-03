@@ -17,6 +17,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal, get_args
 
+from mb import machine_manifest as manifest_loader
 from mb import machine_probe as probe
 
 State = Literal["pass", "fail", "warn", "not_verified", "attested", "skipped", "not_applicable"]
@@ -42,6 +43,7 @@ Reason = Literal[
     "reboot_pending",
     "desktop_absent",
     "location_unknown",
+    "not_checked",
 ]
 REASONS = frozenset(get_args(Reason))
 STATES: tuple[State, ...] = (
@@ -604,7 +606,44 @@ def registry(os_id: str) -> tuple[CheckSpec, ...]:
 REGISTRY: tuple[CheckSpec, ...] = ()
 
 
-def doctor() -> dict[str, Any]:
+def doctor(manifest: Path | None = None) -> dict[str, Any]:
+    policy = None
+    failure = None
+    metadata: dict[str, Any] = {"source": "default_path" if manifest is None else "caller_selected"}
+    try:
+        policy, metadata = manifest_loader.load(manifest)
+    except manifest_loader.IntegrityError:
+        failure = 1
+    except manifest_loader.ManifestError:
+        failure = 2
+    if failure is not None:
+        checks = []
+        if failure == 1:
+            checks.append(
+                check_result(
+                    CheckSpec(
+                        "manifest.integrity",
+                        "docs/machine-setup.md#admin-account-and-agent-accounts",
+                        lambda _: [],
+                    ),
+                    [ReadResult("manifest", "fail", {})],
+                )
+            )
+        counts = Counter(check["state"] for check in checks)
+        return {
+            "schema": "mb.machine.doctor",
+            "schema_version": 1,
+            "safe_to_share": False,
+            "ok": False,
+            "exit_code": failure,
+            "scope": "self",
+            "manifest": metadata,
+            "platform": {"id": "not_checked"},
+            "run_as": {"account": getpass.getuser(), "role": "unknown"},
+            "summary": {state: counts[state] for state in STATES},
+            "checks": checks,
+            "errors": [{"code": "manifest.invalid"}] if failure == 2 else [],
+        }
     deadline = time.monotonic() + 60
     detected, reads = detect_platform(deadline)
     checks = [
@@ -621,8 +660,51 @@ def doctor() -> dict[str, Any]:
     checks.extend(
         check_result(spec, spec.run(deadline)) for spec in (*registry(detected["id"]), *REGISTRY)
     )
+    if policy is not None:
+        integrity = CheckSpec(
+            "manifest.integrity",
+            "docs/machine-setup.md#admin-account-and-agent-accounts",
+            lambda _: [],
+        )
+        checks = [check for check in checks if check["id"] != "manifest.integrity"]
+        checks.append(
+            check_result(
+                integrity,
+                [
+                    _unknown("manifest", "caller_selected_policy")
+                    if manifest is not None
+                    else _verdict("manifest", True)
+                ],
+            )
+        )
+        checks.append(
+            check_result(
+                CheckSpec(
+                    "manifest.coverage",
+                    "docs/machine-setup.md#admin-account-and-agent-accounts",
+                    lambda _: [],
+                ),
+                [
+                    ReadResult(section, "not_verified", {}, "not_checked")
+                    for section in policy
+                    if section != "manifest_version"
+                ],
+            )
+        )
+        if (
+            detected["id"] in {"ubuntu", "omarchy"}
+            and policy["host"]["os"]["family"] != detected["family"]
+        ):
+            checks[0] = check_result(
+                CheckSpec(
+                    "host.os-release",
+                    "docs/machine-setup.md#part-3-the-operating-system",
+                    lambda _: [],
+                ),
+                [*reads, _verdict("manifest_os_matches", False)],
+            )
     code = exit_code(checks)
-    # No manifest handling in this release. Missing policy prevents assurance.
+    # Deferred manifest checks keep the baseline incomplete.
     if code == 0:
         code = 3
     counts = Counter(check["state"] for check in checks)
@@ -635,7 +717,7 @@ def doctor() -> dict[str, Any]:
         "platform": detected,
         "run_as": {"account": getpass.getuser(), "role": "unknown"},
         "scope": "self",
-        "manifest": {"source": "none", "reason": "no_manifest"},
+        "manifest": metadata,
         "summary": {state: counts[state] for state in STATES},
         "checks": checks,
     }
@@ -645,7 +727,18 @@ def human_report(report: dict[str, Any]) -> str:
     lines = ["Machine doctor: scope self, current account only."]
     for check in report["checks"]:
         lines.extend([check["section"], f"  {check['id']}: {check['state']}"])
+        if check["id"] == "manifest.coverage":
+            for read in check["reads"]:
+                lines.append(f"  {read['name']}: not checked")
+        if check["reason"] == "caller_selected_policy":
+            lines.append("  Caller-selected policy: trust is not verified.")
         if check["does_not_prove"]:
             lines.append(f"  Does not prove: {check['does_not_prove']}")
-    lines.append("No manifest: baseline verification is incomplete.")
+    lines.append(
+        "No manifest: baseline verification is incomplete."
+        if report["manifest"]["source"] == "none"
+        else "Manifest verification failed; no other checks ran."
+        if report["exit_code"] == 1 and len(report["checks"]) == 1
+        else "Manifest policy loaded; baseline verification is incomplete."
+    )
     return "\n".join(lines)

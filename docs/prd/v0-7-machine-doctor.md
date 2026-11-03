@@ -150,6 +150,15 @@ heavy-work lock, backup age limits, update model. The pack's two synthetic
 examples (Ubuntu, and Omarchy administered from a Mac) are the reference
 fixtures, once the deltas are applied.
 
+D5 implementation note: the schema describes structural rules. The runtime
+validator also checks size-class references, which draft 2020-12 cannot express
+for arbitrary keys in another object. Loaded sections awaiting D6–D9 checks
+are reported under `manifest.coverage` as `not_verified`, reason `not_checked`,
+so loading policy cannot imply that those controls passed. Manifest text may
+not hold control characters, since Python's `$` also matches before a final
+newline. Skip and attestation
+execution remains deferred to D6.
+
 Parsing: strict, a 256 KB cap, and every `additionalProperties: false` kept.
 An unknown key, an invalid value, an unknown check id, or a `size_class` that
 names no `size_classes` key is a manifest error (exit `2`, no checks run).

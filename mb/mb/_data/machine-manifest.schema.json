@@ -1,0 +1,1321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainbranch.dev/schemas/machine-manifest.schema.json",
+  "title": "Main Branch machine desired state",
+  "description": "Desired state only. Checks are reviewed engine code, never manifest commands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "labels",
+    "host",
+    "owner",
+    "businesses",
+    "shared_tools",
+    "runtime",
+    "remote_access",
+    "heavy_work",
+    "backups",
+    "hardening",
+    "checks"
+  ],
+  "properties": {
+    "manifest_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Implementation names, configurable per box. The defaults are synthetic.",
+      "required": [
+        "run_dir",
+        "shared_group",
+        "tool_root",
+        "nft_table"
+      ],
+      "properties": {
+        "run_dir": {
+          "type": "string",
+          "pattern": "^/run/[a-z0-9_-]+$",
+          "default": "/run/box-users",
+          "description": "Root-managed runtime directory for shared platform files (for example the heavy lock)."
+        },
+        "shared_group": {
+          "$ref": "#/$defs/unix_name",
+          "default": "box-users",
+          "description": "The one group the owner and every business user share, used only for the heavy lock."
+        },
+        "tool_root": {
+          "type": "string",
+          "pattern": "^/opt/[a-z0-9-]+$",
+          "default": "/opt/box-tools",
+          "description": "Root of the shared, read-only tool tree; `<tool_root>/bin` is first on every user's PATH."
+        },
+        "nft_table": {
+          "type": "string",
+          "pattern": "^inet [a-z_]+$",
+          "default": "inet box_users",
+          "description": "Own nftables table for the per-user egress fence (advanced)."
+        }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hostname",
+        "os",
+        "power",
+        "disk"
+      ],
+      "properties": {
+        "hostname": {
+          "$ref": "#/$defs/hostname"
+        },
+        "role": {
+          "enum": [
+            "agent-host"
+          ],
+          "default": "agent-host"
+        },
+        "os": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "family",
+            "distribution",
+            "release_model"
+          ],
+          "description": "Two families are described: Ubuntu LTS and Arch-based rolling releases (Arch, Omarchy). Checks name the families they apply to; see `check.os`.",
+          "properties": {
+            "family": {
+              "enum": [
+                "ubuntu",
+                "arch"
+              ]
+            },
+            "distribution": {
+              "enum": [
+                "ubuntu",
+                "arch",
+                "omarchy"
+              ]
+            },
+            "release_model": {
+              "enum": [
+                "lts",
+                "rolling"
+              ]
+            },
+            "version_id": {
+              "type": "string",
+              "pattern": "^[0-9]{2}\\.[0-9]{2}$",
+              "description": "Ubuntu only: /etc/os-release VERSION_ID of an LTS release. A rolling release has none."
+            },
+            "install_media_verified": {
+              "type": "boolean",
+              "description": "Owner attestation: the ISO was checked against its signed checksum before writing the stick."
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "family": {
+                    "const": "ubuntu"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "version_id"
+                ],
+                "properties": {
+                  "distribution": {
+                    "const": "ubuntu"
+                  },
+                  "release_model": {
+                    "const": "lts"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "family": {
+                    "const": "arch"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "distribution": {
+                    "enum": [
+                      "arch",
+                      "omarchy"
+                    ]
+                  },
+                  "release_model": {
+                    "const": "rolling"
+                  },
+                  "version_id": false
+                }
+              }
+            }
+          ]
+        },
+        "power": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "after_power_loss",
+            "sleep"
+          ],
+          "properties": {
+            "after_power_loss": {
+              "const": "power-on",
+              "description": "Firmware setting; owner attestation."
+            },
+            "wake_on_lan": {
+              "type": "boolean"
+            },
+            "sleep": {
+              "const": "never",
+              "description": "Sleep, suspend and hibernate targets masked."
+            }
+          }
+        },
+        "disk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "encryption"
+          ],
+          "properties": {
+            "encryption": {
+              "enum": [
+                "luks2-tpm2",
+                "luks2-passphrase",
+                "none-by-decision"
+              ]
+            },
+            "tpm2_pcrs": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 23
+              },
+              "uniqueItems": true
+            },
+            "header_backup_offhost": {
+              "type": "boolean",
+              "description": "Owner attestation: a LUKS header copy is kept off the box, never in git."
+            },
+            "min_free_percent": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90
+            },
+            "unattended_boot": {
+              "type": "boolean",
+              "description": "true only when the disk unlocks without a person (TPM). With a passphrase, the box waits at the prompt after every reboot or power cut."
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "encryption": {
+                    "const": "luks2-passphrase"
+                  }
+                },
+                "required": [
+                  "encryption"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "unattended_boot": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "desktop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "session",
+            "auto_login",
+            "screen_lock_minutes",
+            "agents_in_desktop_session"
+          ],
+          "description": "A graphical session on the always-on box belongs to the owner only. Auto-login hands that session to anyone who powers the box on; with TPM unlock nothing else stands in the way.",
+          "properties": {
+            "session": {
+              "enum": [
+                "none",
+                "desktop"
+              ]
+            },
+            "environment": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$",
+              "description": "For example gnome or hyprland."
+            },
+            "auto_login": {
+              "const": false
+            },
+            "screen_lock_minutes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "agents_in_desktop_session": {
+              "const": false,
+              "description": "Agents run in their business users' own services, never in the owner's desktop session."
+            }
+          }
+        }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user",
+        "admin_key_fingerprint",
+        "sudo"
+      ],
+      "properties": {
+        "user": {
+          "$ref": "#/$defs/unix_name"
+        },
+        "admin_key_fingerprint": {
+          "$ref": "#/$defs/key_fingerprint"
+        },
+        "sudo": {
+          "const": "password-required",
+          "description": "The owner types sudo; agents never do."
+        },
+        "sudo_into_business": {
+          "const": false,
+          "description": "No sudoers rule names a business user as its run-as target. This removes a direct, convenient path only: an administrator with unrestricted root remains trusted and can still become any business user. The operational control is password-gated, attended root use; a technical barrier needs a separately restricted root-command policy."
+        }
+      }
+    },
+    "businesses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uid_range",
+        "home_mode",
+        "sizing_basis",
+        "size_classes",
+        "users"
+      ],
+      "properties": {
+        "uid_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max"
+          ],
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 1000
+            },
+            "max": {
+              "type": "integer",
+              "maximum": 59999
+            }
+          }
+        },
+        "home_mode": {
+          "const": "0700"
+        },
+        "tmpdir_mode": {
+          "const": "0700",
+          "description": "Private TMPDIR per user, with a user tmpfiles rule."
+        },
+        "sizing_basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "host_ram_gb",
+            "reserved_host_gb"
+          ],
+          "description": "Slice limits must be sized from the box's actual RAM, the expected workload and the capacity reserved for the host itself. The example's numbers are illustrative, not portable defaults.",
+          "properties": {
+            "host_ram_gb": {
+              "type": "integer",
+              "minimum": 8
+            },
+            "reserved_host_gb": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "size_classes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/slice_limits"
+          }
+        },
+        "users": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "business",
+              "user",
+              "uid",
+              "size_class"
+            ],
+            "properties": {
+              "business": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]{1,30}$"
+              },
+              "user": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,30}-agent$"
+              },
+              "uid": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 59999
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/unix_name"
+                },
+                "uniqueItems": true,
+                "description": "Supplementary groups. Never sudo, adm, docker, lxd or the owner's group."
+              },
+              "size_class": {
+                "type": "string"
+              },
+              "sudo": {
+                "const": false
+              },
+              "browsers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "profile",
+                    "port",
+                    "start"
+                  ],
+                  "properties": {
+                    "profile": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{1,40}$"
+                    },
+                    "port": {
+                      "type": "integer",
+                      "minimum": 1024,
+                      "maximum": 65535,
+                      "description": "Loopback debug port, intended for the owning uid only."
+                    },
+                    "start": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "shared_tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "writable_by_others",
+        "tools"
+      ],
+      "description": "The tree at `labels.tool_root`.",
+      "properties": {
+        "owner": {
+          "const": "root:root"
+        },
+        "writable_by_others": {
+          "const": false
+        },
+        "version_manager": {
+          "const": "mise",
+          "description": "One mise config per host, in git. No `latest` pins."
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/pinned_tool"
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "herdr",
+        "claude_code",
+        "codex",
+        "mb"
+      ],
+      "description": "Terminal and agent runtime. Each is a pinned tool in the shared tree. Per-user sign-in happens as that user; auth files are never copied between users.",
+      "properties": {
+        "herdr": {
+          "$ref": "#/$defs/runtime_tool"
+        },
+        "claude_code": {
+          "$ref": "#/$defs/runtime_tool"
+        },
+        "codex": {
+          "$ref": "#/$defs/runtime_tool"
+        },
+        "mb": {
+          "$ref": "#/$defs/runtime_tool"
+        },
+        "session_unit": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9@._-]{1,128}\\.service$",
+          "default": "herdr.service"
+        }
+      }
+    },
+    "remote_access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ssh",
+        "tailscale",
+        "admin_client",
+        "vnc"
+      ],
+      "properties": {
+        "ssh": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "password_authentication",
+            "kbd_interactive_authentication",
+            "pubkey_authentication",
+            "allowed_sources"
+          ],
+          "properties": {
+            "password_authentication": {
+              "const": false
+            },
+            "kbd_interactive_authentication": {
+              "const": false
+            },
+            "pubkey_authentication": {
+              "const": true
+            },
+            "host_key_pinned_from_console": {
+              "type": "boolean",
+              "description": "Owner attestation."
+            },
+            "allowed_sources": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/host_address"
+              },
+              "description": "Exact owner-selected source addresses (single hosts only). Never a whole LAN, tailnet or shared-address range."
+            },
+            "agent_keys_restricted": {
+              "type": "boolean",
+              "description": "Any key an agent holds carries restrict, from= and command= options."
+            }
+          }
+        },
+        "tailscale": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min_version",
+            "run_ssh",
+            "serve_ports"
+          ],
+          "properties": {
+            "min_version": {
+              "$ref": "#/$defs/semver"
+            },
+            "run_ssh": {
+              "const": false,
+              "description": "Tailscale is the network only; OpenSSH does logins, so authorized_keys options apply."
+            },
+            "serve_ports": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "description": "Ports a runbook names. Empty means no serve config."
+            },
+            "funnel": {
+              "const": false
+            },
+            "tagged_node": {
+              "type": "boolean",
+              "description": "The node carries a tag, so owner-wide grants do not cover it."
+            }
+          }
+        },
+        "admin_client": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "os",
+            "ssh_key_store",
+            "herdr",
+            "screen"
+          ],
+          "description": "The machine the owner administers from. It holds the admin key; the box never does.",
+          "properties": {
+            "os": {
+              "enum": [
+                "macos",
+                "linux",
+                "windows"
+              ]
+            },
+            "ssh_key_store": {
+              "enum": [
+                "password-manager-agent",
+                "hardware-key"
+              ]
+            },
+            "herdr": {
+              "enum": [
+                "over-ssh",
+                "none"
+              ],
+              "description": "Agent sessions are attached over SSH, never through an open port."
+            },
+            "screen": {
+              "enum": [
+                "none",
+                "vnc-over-ssh-forward"
+              ]
+            }
+          }
+        },
+        "vnc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "none",
+                "ssh-forward-only"
+              ],
+              "description": "A VNC server, if any, listens on loopback or a Unix socket and is reached only through an SSH forward. Never an open port on the LAN or tailnet."
+            },
+            "listen": {
+              "enum": [
+                "loopback",
+                "unix-socket"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "ssh-forward-only"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "listen"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "heavy_work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lock_name",
+        "lock_mode",
+        "env_var",
+        "wrapper",
+        "max_wait_seconds",
+        "default_timeout_seconds"
+      ],
+      "description": "One lock file for every user, owner included, at `<labels.run_dir>/<lock_name>`, owned by the owner and `labels.shared_group`.",
+      "properties": {
+        "lock_name": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]+$"
+        },
+        "lock_mode": {
+          "const": "0660"
+        },
+        "env_var": {
+          "type": "string",
+          "pattern": "^[A-Z_]+$"
+        },
+        "wrapper": {
+          "type": "string",
+          "description": "Command that runs one job in a transient user scope with a memory cap and no swap.",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "max_wait_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "default_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "backups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "schedule",
+        "paths",
+        "restore_test"
+      ],
+      "properties": {
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "host"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "pull-from-backup-host",
+                "push-restic"
+              ]
+            },
+            "host": {
+              "$ref": "#/$defs/hostname"
+            },
+            "offsite": {
+              "type": "boolean"
+            }
+          }
+        },
+        "schedule": {
+          "type": "string",
+          "description": "systemd OnCalendar expression of the collection on this box."
+        },
+        "max_age_hours": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "May use {user} for every business user and the owner."
+        },
+        "restore_test": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required_before_business_data",
+            "max_age_days"
+          ],
+          "properties": {
+            "required_before_business_data": {
+              "const": true
+            },
+            "max_age_days": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "record": {
+              "type": "string",
+              "description": "Root-owned JSON record of the last restore test. A doctor selects only its `date` and `result` fields.",
+              "pattern": "^/var/lib/[a-z0-9-]+/[a-z0-9._-]+\\.json$"
+            }
+          }
+        }
+      }
+    },
+    "hardening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firewall",
+        "updates",
+        "firmware_auto_apply",
+        "ipc_isolation"
+      ],
+      "properties": {
+        "firewall": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "default_incoming"
+          ],
+          "properties": {
+            "tool": {
+              "enum": [
+                "ufw",
+                "nftables",
+                "firewalld"
+              ]
+            },
+            "default_incoming": {
+              "const": "deny"
+            }
+          }
+        },
+        "firmware_auto_apply": {
+          "const": false,
+          "description": "Firmware never auto-applies: a firmware change can move the TPM PCRs and leave the disk waiting for its passphrase."
+        },
+        "ipc_isolation": {
+          "const": "separate-platform-review",
+          "description": "Advanced IPC isolation between business users (local daemon sockets, D-Bus, abstract sockets) needs a separate platform review. This pack defines no check for it."
+        },
+        "agent_shell": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Advanced, pending design concept: business sessions start under a Landlock scope with no_new_privs.",
+          "properties": {
+            "landlock": {
+              "type": "boolean"
+            },
+            "abstract_unix_scope": {
+              "type": "boolean"
+            }
+          }
+        },
+        "egress_fence": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Advanced, pending design concept: a per-uid nftables fence keyed on a socket mark set by a cgroup BPF program. The table name is `labels.nft_table`.",
+          "properties": {
+            "socket_mark": {
+              "type": "boolean"
+            },
+            "deny": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "lan",
+                  "tailnet",
+                  "link-local",
+                  "multicast",
+                  "other-business-loopback"
+                ]
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "proc_hidepid": {
+          "enum": [
+            "off",
+            "invisible"
+          ],
+          "description": "Advanced, pending design concept."
+        },
+        "unit_text_public": {
+          "const": true,
+          "description": "Every local user can read system unit text, so secrets go only through LoadCredential(Encrypted)=, a root-only file or stdin."
+        },
+        "kill_guard": {
+          "type": "boolean",
+          "description": "Advanced, pending design concept: pattern kills (pkill -f) refused for agents."
+        },
+        "updates": {
+          "description": "How the OS updates. Ubuntu LTS: unattended security updates, no automatic reboot. A rolling release: no unattended updates; the owner runs the full system update on a cadence, after a filesystem snapshot, and reboots after kernel or core-library updates.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model",
+                "origins",
+                "auto_reboot"
+              ],
+              "properties": {
+                "model": {
+                  "const": "unattended-security"
+                },
+                "origins": {
+                  "type": "array",
+                  "items": {
+                    "const": "security"
+                  },
+                  "minItems": 1
+                },
+                "auto_reboot": {
+                  "const": false
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model",
+                "cadence_days",
+                "snapshot_before",
+                "reboot_after"
+              ],
+              "properties": {
+                "model": {
+                  "const": "rolling-manual"
+                },
+                "cadence_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 14
+                },
+                "snapshot_before": {
+                  "const": true
+                },
+                "snapshot_tool": {
+                  "enum": [
+                    "snapper",
+                    "timeshift",
+                    "other"
+                  ]
+                },
+                "reboot_after": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "kernel",
+                      "systemd",
+                      "glibc",
+                      "firmware",
+                      "graphics-driver"
+                    ]
+                  }
+                },
+                "aur_packages_reviewed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9@._+-]+$"
+                  },
+                  "description": "Foreign (AUR) packages the owner has read the build script of. Nothing from the AUR goes into the shared tool tree."
+                }
+              }
+            }
+          ]
+        },
+        "apparmor_userns_profile": {
+          "type": "boolean",
+          "description": "Ubuntu only: Ubuntu restricts unprivileged user namespaces, so sandboxes such as bubblewrap need an AppArmor profile. Not used on Arch."
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skip": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "reason"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "host.os-release",
+                  "host.no-sleep",
+                  "host.power-on-after-loss",
+                  "host.disk-luks2-tpm",
+                  "host.disk-luks2-tpm-arch",
+                  "host.disk-filevault",
+                  "host.desktop-no-autologin",
+                  "host.desktop-no-autologin-arch",
+                  "host.screen-lock",
+                  "owner.sudo-needs-password",
+                  "owner.no-sudo-into-business",
+                  "businesses.users-and-homes",
+                  "businesses.no-privileged-groups",
+                  "businesses.private-tmpdir",
+                  "businesses.slice-limits",
+                  "sessions.linger",
+                  "runtime.herdr-per-user",
+                  "sessions.started-without-login",
+                  "runtime.claude-autoupdate-off",
+                  "credentials.store-available",
+                  "shared_tools.root-owned-readonly",
+                  "shared_tools.pins-match",
+                  "shared_tools.path-order",
+                  "heavy_work.lock",
+                  "heavy_work.capped-run",
+                  "backups.fresh",
+                  "backups.restore-tested",
+                  "remote_access.sshd-keys-only",
+                  "remote_access.tailscale-version",
+                  "remote_access.tailscale-no-ssh",
+                  "remote_access.tailscale-serve-named",
+                  "remote_access.offbox-listeners",
+                  "hardening.firewall-default-deny",
+                  "hardening.unattended-security-only",
+                  "hardening.update-snapshot",
+                  "hardening.aur-reviewed",
+                  "hardening.reboot-pending",
+                  "hardening.reboot-pending-arch",
+                  "hardening.firmware-manual",
+                  "manifest.integrity"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+              }
+            }
+          }
+        },
+        "attest": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "read",
+              "answer",
+              "at"
+            ],
+            "properties": {
+              "id": {
+                "enum": [
+                  "host.os-release",
+                  "host.no-sleep",
+                  "host.power-on-after-loss",
+                  "host.disk-luks2-tpm",
+                  "host.disk-luks2-tpm-arch",
+                  "host.disk-filevault",
+                  "host.desktop-no-autologin",
+                  "host.desktop-no-autologin-arch",
+                  "host.screen-lock",
+                  "owner.sudo-needs-password",
+                  "owner.no-sudo-into-business",
+                  "businesses.users-and-homes",
+                  "businesses.no-privileged-groups",
+                  "businesses.private-tmpdir",
+                  "businesses.slice-limits",
+                  "sessions.linger",
+                  "runtime.herdr-per-user",
+                  "sessions.started-without-login",
+                  "runtime.claude-autoupdate-off",
+                  "credentials.store-available",
+                  "shared_tools.root-owned-readonly",
+                  "shared_tools.pins-match",
+                  "shared_tools.path-order",
+                  "heavy_work.lock",
+                  "heavy_work.capped-run",
+                  "backups.fresh",
+                  "backups.restore-tested",
+                  "remote_access.sshd-keys-only",
+                  "remote_access.tailscale-version",
+                  "remote_access.tailscale-no-ssh",
+                  "remote_access.tailscale-serve-named",
+                  "remote_access.offbox-listeners",
+                  "hardening.firewall-default-deny",
+                  "hardening.unattended-security-only",
+                  "hardening.update-snapshot",
+                  "hardening.aur-reviewed",
+                  "hardening.reboot-pending",
+                  "hardening.reboot-pending-arch",
+                  "hardening.firmware-manual",
+                  "manifest.integrity"
+                ]
+              },
+              "read": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$"
+              },
+              "answer": {
+                "enum": [
+                  "yes",
+                  "no"
+                ]
+              },
+              "at": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hostname": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+    },
+    "unix_name": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_-]{0,31}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-.+][0-9A-Za-z.-]+)?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "key_fingerprint": {
+      "type": "string",
+      "pattern": "^SHA256:[A-Za-z0-9+/]{43}$",
+      "description": "Public fingerprint only, never key material."
+    },
+    "host_address": {
+      "type": "string",
+      "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/32$|^[0-9a-f:]+/128$",
+      "description": "One host: IPv4 /32 or IPv6 /128."
+    },
+    "slice_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_high",
+        "capped_run_max"
+      ],
+      "description": "Illustrative per-class user-slice ceilings. Size them from `businesses.sizing_basis`.",
+      "properties": {
+        "memory_high": {
+          "type": "string",
+          "pattern": "^[0-9]+[MG]$"
+        },
+        "memory_max": {
+          "type": "string",
+          "pattern": "^[0-9]+[MG]$"
+        },
+        "tasks_max": {
+          "type": "integer",
+          "minimum": 64
+        },
+        "capped_run_max": {
+          "type": "string",
+          "pattern": "^[0-9]+[MG]$",
+          "description": "Largest per-job cap for this class, below memory_high."
+        }
+      }
+    },
+    "pinned_tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "source"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "latest",
+              "lts",
+              "*"
+            ]
+          }
+        },
+        "source": {
+          "enum": [
+            "mise",
+            "upstream-tarball",
+            "npm-tarball",
+            "apt"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Required for tarball sources."
+        },
+        "bins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "enum": [
+                  "upstream-tarball",
+                  "npm-tarball"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "sha256"
+            ]
+          }
+        }
+      ]
+    },
+    "runtime_tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "pinned_by",
+        "auto_update"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "Name of the entry in shared_tools.tools."
+        },
+        "pinned_by": {
+          "const": "shared_tools"
+        },
+        "auto_update": {
+          "const": false,
+          "description": "Self-update off; the owner moves the pin."
+        },
+        "per_user_auth": {
+          "enum": [
+            "device-code",
+            "none",
+            "stdin-secret"
+          ],
+          "description": "How each business user signs in, as that user."
+        },
+        "per_user_server": {
+          "type": "boolean",
+          "description": "One server per business uid, as a user unit."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "host": {
+            "properties": {
+              "os": {
+                "properties": {
+                  "family": {
+                    "const": "ubuntu"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "hardening": {
+            "properties": {
+              "updates": {
+                "properties": {
+                  "model": {
+                    "const": "unattended-security"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "host": {
+            "properties": {
+              "os": {
+                "properties": {
+                  "family": {
+                    "const": "arch"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "hardening": {
+            "properties": {
+              "updates": {
+                "properties": {
+                  "model": {
+                    "const": "rolling-manual"
+                  }
+                }
+              },
+              "apparmor_userns_profile": false
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$comment": "Runtime additionally checks size_class references and calendar timestamps. JSON Schema cannot compare arbitrary object keys with values elsewhere in the instance."
+}

@@ -2270,11 +2270,17 @@ machine_app = typer.Typer(help="Inspect machine configuration without changing i
 app.add_typer(machine_app, name="machine")
 
 
+MACHINE_MANIFEST_OPTION = typer.Option(None, "--manifest")
+
+
 @machine_app.command("doctor")
-def machine_doctor_cmd(json_out: bool = typer.Option(False, "--json")) -> None:
+def machine_doctor_cmd(
+    json_out: bool = typer.Option(False, "--json"),
+    manifest: Path | None = MACHINE_MANIFEST_OPTION,
+) -> None:
     """Check the current account's machine configuration."""
     try:
-        report = machine_doctor_mod.doctor()
+        report = machine_doctor_mod.doctor(manifest)
     except Exception:
         report = {
             "schema": "mb.machine.doctor",
@@ -2294,7 +2300,12 @@ def machine_doctor_cmd(json_out: bool = typer.Option(False, "--json")) -> None:
         typer.echo(json.dumps(payload, indent=2, default=json_default))
     else:
         typer.echo(
-            "Machine doctor: scope self. No verdict: internal error."
+            "Machine doctor: scope self. No verdict: "
+            + (
+                "invalid manifest."
+                if report.get("errors") == [{"code": "manifest.invalid"}]
+                else "internal error."
+            )
             if report["exit_code"] == 2
             else machine_doctor_mod.human_report(report)
         )
