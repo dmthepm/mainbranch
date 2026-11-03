@@ -90,10 +90,10 @@ verified, treated as open).
   Claude's output also lists a plugin's `mcpServers`.
 - V (docs): plugin `dependencies` accept semver ranges, resolved from git tags
   named `<plugin>--v<version>`. U: OpenSEO and Impeccable publishing such
-  tags is from the brief and is rechecked at bump time. Until they do, ranges
+  tags is from that research and is rechecked at bump time. Until they do, ranges
   cannot resolve, so the lock file (not `dependencies`) is the contract.
 - U: Codex git marketplaces auto-upgrade at each start unless added with
-  `--ref`; the brief cites source at a Codex tag. Not re-read here. Treat as
+  `--ref`; that research cites source at a Codex tag. Not re-read here. Treat as
   true for the design (it only makes the pin check stricter) and confirm on a
   Codex smoke run.
 - U: `npx skills check` / `npx impeccable check` as check-only precedents.
@@ -470,7 +470,7 @@ offers a hook, the limit is a hook.
   rather than restating a table.
 - **Cannot enforce:** the provider's own balance, calls made outside Claude
   Code, or a runtime with no hook. Codex has no tool hook of this kind in the
-  brief's reading, so on Codex the rows say `not_enforced` and the wrapper
+  research's reading, so on Codex the rows say `not_enforced` and the wrapper
   asks first. The limit is stated, not implied.
 - **Fail closed for spend, quiet for everything else.** If the approval file
   is unreadable, the paid call is blocked. A broken usage logger never blocks
@@ -628,7 +628,7 @@ asks for when skill discovery or doctor changes.
 13. **hledger writes.** *Recommend* the wrapper states: reads through
     hledger's own reports (`-O json`), writes only through `import --dry`,
     `hledger check`, then a commit the owner approves; any hledger MCP only
-    in read-only mode. Unverified (from the brief); confirm in the hledger
+    in read-only mode. Unverified (from that research); confirm in the hledger
     docs before the wrapper says it.
 14. **Facts not yet verified.** The Claude local-scope `mcpServers` location,
     the Codex MCP table layout, the `UserPromptExpansion` input fields, and the
