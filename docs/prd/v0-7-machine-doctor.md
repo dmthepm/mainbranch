@@ -636,8 +636,10 @@ No reboot-test assurance is claimed.
 
 ### D8 implementation details
 
-Pinned directories use `<tool_root>/installs/<name>/<version>`. The schema has
-no install-layout field, so doctor uses this fixed convention and does not
+Pinned directories use `<tool_root>/mise/installs/<name>/<version>` when
+`shared_tools.version_manager` is `mise` (mise's data folder under the tool
+root), else `<tool_root>/installs/<name>/<version>`. The schema has no
+install-layout field, so doctor uses this fixed convention and does not
 expand a version or bin string as a path or command. Versions outside one safe
 path segment stay unverified. Tool files and directories reject symlinks; this
 conservative check does not establish a symlink-based installation's pins.
@@ -659,3 +661,20 @@ A missing `max_age_hours`, optional in the pack schema, keeps freshness
 unverified because no expiry can be established. These sections leave
 `manifest.coverage` on supported Linux because all their rows now emit reads;
 unverified, attested and skipped outcomes remain non-passing.
+
+### D9 partial implementation limits
+
+Shared bin symlinks are an explicit metadata-only exception to the blanket
+symlink refusal. Doctor reads the link through a pinned directory descriptor,
+requires an absolute target inside the declared install version, then walks
+its components without following links. Root ownership and write permissions
+are checked throughout. Neither the link nor its target is executed.
+
+The disk rows trace root's device ancestry with named TYPE/MOUNTPOINTS fields.
+They always retain an unverified LUKS2 header read. A TPM option alone remains
+unverified until its device identity can be matched to root, because an entry
+for an unrelated disk cannot prove root's unlock policy. Omarchy passphrase
+policy checks unattended_boot is false. These partial reads do not fulfill the
+complete disk contract yet. Screen lock, Tailscale version/Serve, listener
+attribution and Omarchy update/snapshot rows still await implementation.
+No additional manifest sections leave not_checked coverage in this slice.

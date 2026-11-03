@@ -3,6 +3,7 @@
 import copy
 import json
 import os
+import stat
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -139,6 +140,8 @@ def test_caller_selected_never_assures(tmp_path: Path, monkeypatch: pytest.Monke
     )
     monkeypatch.setattr(doctor, "registry", lambda _: ())
     monkeypatch.setattr(doctor, "account_checks", lambda *args: [])
+    monkeypatch.setattr(doctor, "tool_checks", lambda *args: [])
+    monkeypatch.setattr(doctor, "linux_checks", lambda *args: [])
     report = doctor.doctor(path)
     assert report["exit_code"] == 3
     assert report["manifest"]["source"] == "caller_selected"
@@ -1036,3 +1039,234 @@ def test_d8_backup_age_missing_limit(monkeypatch: pytest.MonkeyPatch, missing: b
         ]
     result = d8_result(data, "backups.fresh")
     assert result["state"] == ("not_verified" if missing else "fail")
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "good",
+        "relative",
+        "outside",
+        "version",
+        "chain",
+        "parent-link",
+        "writable",
+        "owner",
+        "target-owner",
+        "link-owner",
+        "parent-write",
+        "denied",
+    ],
+)
+def test_d9_bin_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str) -> None:
+    root = tmp_path / "tools"
+    (root / "bin").mkdir(parents=True)
+    install = root / "installs" / "demo" / "1.2.3"
+    install.mkdir(parents=True)
+    target = install / "demo"
+    target.write_text("never executed")
+    target.chmod(0o755)
+    link = root / "bin" / "demo"
+    destination = str(target)
+    if kind == "relative":
+        destination = "../installs/demo/1.2.3/demo"
+    elif kind == "outside":
+        destination = str(tmp_path / "outside")
+    elif kind == "version":
+        destination = str(root / "installs" / "demo" / "9.9.9" / "demo")
+    elif kind == "chain":
+        alias = install / "alias"
+        alias.symlink_to(target)
+        destination = str(alias)
+    elif kind == "parent-link":
+        alias = install / "alias"
+        alias.symlink_to(install, target_is_directory=True)
+        destination = str(alias / "demo")
+    link.symlink_to(destination)
+    real_fstat, real_stat = os.fstat, os.stat
+
+    # Synthetic root ownership also makes this test independent of runner uid
+    # and /tmp's world-writable mode. The descriptor traversal remains real.
+    def trusted_fstat(fd: int) -> os.stat_result:
+        info = real_fstat(fd)
+        return d8_info(
+            stat.S_IFMT(info.st_mode) | (0o777 if kind == "parent-write" else 0o755),
+            1234 if kind == "owner" else 0,
+        )
+
+    def trusted_stat(*args: Any, **kwargs: Any) -> os.stat_result:
+        info = real_stat(*args, **kwargs)
+        mode = stat.S_IFMT(info.st_mode) | (0o777 if kind == "writable" else 0o755)
+        uid = (
+            1234
+            if (kind == "target-owner" and stat.S_ISREG(info.st_mode))
+            or (kind == "link-owner" and stat.S_ISLNK(info.st_mode))
+            else 0
+        )
+        return d8_info(mode, uid)
+
+    monkeypatch.setattr(os, "fstat", trusted_fstat)
+    monkeypatch.setattr(os, "stat", trusted_stat)
+    if kind == "denied":
+        monkeypatch.setattr(os, "readlink", Mock(side_effect=PermissionError))
+    monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("execution forbidden")))
+    result = doctor._tool_bin("bin", link, root, {"name": "demo", "version": "1.2.3"})
+    assert result.state == (
+        "pass"
+        if kind == "good"
+        else "fail"
+        if kind in {"chain", "writable", "target-owner"}
+        else "not_verified"
+    )
+
+
+@pytest.mark.parametrize(
+    "body,expected",
+    [
+        (b'{"blockdevices":[{"type":"crypt","mountpoints":["/"]}]}', True),
+        (
+            b'{"blockdevices":[{"type":"crypt","mountpoints":[null],"children":[{"type":"lvm","mountpoints":["/"]}]}]}',
+            True,
+        ),
+        (
+            b'{"blockdevices":[{"type":"part","mountpoints":["/"]},{"type":"crypt","mountpoints":["/data"]}]}',
+            False,
+        ),
+        (b'{"blockdevices":[{"type":"crypt","mountpoints":["/data"]}]}', None),
+        (b'{"blockdevices":[{"type":"crypt","mountpoints":"/"}]}', None),
+        (b'{"blockdevices":null}', None),
+        (b"[]", None),
+        (b"bad", None),
+    ],
+)
+def test_d9_root_chain(body: bytes, expected: bool | None) -> None:
+    assert doctor._root_encrypted(body) is expected
+
+
+def d9_row(data: dict[str, Any], check: str, os_id: str = "ubuntu") -> dict[str, Any]:
+    data["checks"] = {
+        "skip": [
+            {"id": spec.id, "reason": "fixture"} for spec in doctor.LINUX_SPECS if spec.id != check
+        ]
+    }
+    return next(c for c in doctor.linux_checks(data, os_id, 999999999) if c["id"] == check)
+
+
+@pytest.mark.parametrize(
+    "case,state",
+    [("pass", "pass"), ("fail", "fail"), ("denied", "not_verified"), ("malformed", "not_verified")],
+)
+def test_d9_firewall(monkeypatch: pytest.MonkeyPatch, case: str, state: str) -> None:
+    data = example()
+    data["hardening"]["firewall"]["tool"] = "ufw"
+
+    def text(path: Path, prefix: Path) -> tuple[str, doctor.Reason | None]:
+        if case == "denied":
+            return "", "probe_error"
+        if case == "malformed":
+            return (
+                "ENABLED=yes\nENABLED=no\nDEFAULT_INPUT_POLICY=DROP\nDEFAULT_INPUT_POLICY=ACCEPT",
+                None,
+            )
+        if path.name == "ufw.conf":
+            return "ENABLED=" + ("no" if case == "fail" else "yes"), None
+        return 'DEFAULT_INPUT_POLICY="DROP"', None
+
+    monkeypatch.setattr(doctor, "_text", text)
+    row = d9_row(data, "hardening.firewall-default-deny")
+    assert row["state"] == state
+    assert len(row["reads"]) == 2
+
+
+@pytest.mark.parametrize(
+    "case,state",
+    [("pass", "pass"), ("fail", "fail"), ("denied", "not_verified"), ("malformed", "not_verified")],
+)
+def test_d9_aur(monkeypatch: pytest.MonkeyPatch, case: str, state: str) -> None:
+    data = example("omarchy")
+    data["hardening"]["updates"]["aur_packages_reviewed"] = ["demo"]
+
+    def run(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        assert os_id == "omarchy" and argv == ("/usr/bin/pacman", "-Qm")
+        if case == "denied":
+            return probe.ProbeResult(reason="probe_error")
+        return probe.ProbeResult(
+            {"pass": b"demo 1.2.3\n", "fail": b"unknown 1.2.3\n", "malformed": b"bad line extra"}[
+                case
+            ],
+            0,
+        )
+
+    monkeypatch.setattr(probe, "run_probe", run)
+    row = d9_row(data, "hardening.aur-reviewed", "omarchy")
+    assert row["state"] == state
+    assert "unknown" not in json.dumps(row)
+
+
+@pytest.mark.parametrize(
+    "case,state",
+    [("pass", "pass"), ("fail", "fail"), ("denied", "not_verified"), ("malformed", "not_verified")],
+)
+def test_d9_disk_reads(monkeypatch: pytest.MonkeyPatch, case: str, state: str) -> None:
+    data = example("omarchy")
+    data["host"]["disk"].update(encryption="luks2-passphrase", unattended_boot=False)
+
+    def run(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        assert argv == ("/usr/bin/lsblk", "--json", "--output", "TYPE,MOUNTPOINTS")
+        if case == "denied":
+            return probe.ProbeResult(reason="probe_error")
+        body = (
+            b"bad"
+            if case == "malformed"
+            else json.dumps(
+                {
+                    "blockdevices": [
+                        {"type": "part" if case == "fail" else "crypt", "mountpoints": ["/"]}
+                    ]
+                }
+            ).encode()
+        )
+        return probe.ProbeResult(body, 0)
+
+    monkeypatch.setattr(probe, "run_probe", run)
+    row = d9_row(data, "host.disk-luks2-tpm-arch", "omarchy")
+    assert row["reads"][0]["state"] == state
+    assert row["state"] != "pass"
+    assert row["reads"][-2]["reason"] == "needs_root"
+
+
+def test_d9_skip_and_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = example()
+    data["checks"] = {"skip": [{"id": spec.id, "reason": "fixture"} for spec in doctor.LINUX_SPECS]}
+    monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("skipped probe")))
+    monkeypatch.setattr(doctor, "_text", Mock(side_effect=AssertionError("skipped read")))
+    for os_id in ("ubuntu", "omarchy"):
+        assert all(c["state"] == "skipped" for c in doctor.linux_checks(data, os_id, 999999999))
+        specs = doctor.registry(os_id, include_policy=True)
+        assert len({s.id for s in specs}) == len(specs)
+        for spec in doctor.LINUX_SPECS:
+            assert spec.id in manifest.CHECK_IDS
+            if spec.run_as == "owner-attests":
+                assert spec.fix_text
+
+
+@pytest.mark.parametrize("value", ['"DROP', "DROP extra", "DROP;true", "$(ignored)"])
+def test_d9_firewall_values_are_data(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    data = example()
+    data["hardening"]["firewall"]["tool"] = "ufw"
+    monkeypatch.setattr(
+        doctor,
+        "_text",
+        lambda path, prefix: (
+            "ENABLED=yes" if path.name == "ufw.conf" else "DEFAULT_INPUT_POLICY=" + value,
+            None,
+        ),
+    )
+    assert d9_row(data, "hardening.firewall-default-deny")["state"] != "pass"
+
+
+def test_d9_mise_install_layout(tmp_path: Path) -> None:
+    root = tmp_path / "tools"
+    policy = {"shared_tools": {"version_manager": "mise"}}
+    assert doctor._install_base(root, policy) == root / "mise" / "installs"
+    assert doctor._install_base(root, {"shared_tools": {}}) == root / "installs"

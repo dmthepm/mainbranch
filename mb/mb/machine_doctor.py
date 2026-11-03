@@ -602,7 +602,7 @@ def registry(os_id: str, *, include_policy: bool = False) -> tuple[CheckSpec, ..
         ),
     )
     return tuple(spec for spec in specs if os_id in spec.platforms) + (
-        (*ACCOUNT_SPECS, *TOOL_SPECS) if include_policy else ()
+        (*ACCOUNT_SPECS, *TOOL_SPECS, *LINUX_SPECS) if include_policy else ()
     )
 
 
@@ -751,10 +751,92 @@ def _tool_metadata(name: str, path: Path, root: Path, directory: bool = False) -
     )
 
 
+def _install_base(root: Path, policy: dict[str, Any]) -> Path:
+    """Where pinned versions live: mise keeps them in its data folder, ``<tool_root>/mise``."""
+    if policy["shared_tools"].get("version_manager") == "mise":
+        return root / "mise" / "installs"
+    return root / "installs"
+
+
+def _tool_bin(
+    name: str, path: Path, root: Path, tool: dict[str, Any], installs: Path | None = None
+) -> ReadResult:
+    info, error = _metadata(path, root)
+    if info is not None or error != "ambiguous_config":
+        return _tool_metadata(name, path, root)
+    # A bin link is the sole exception to the no-symlink metadata rule.
+    descriptor = None
+    try:
+        descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+        for component in path.parts[1:-1]:
+            parent = os.fstat(descriptor)
+            if parent.st_uid != 0 or parent.st_mode & 0o022:
+                return _unknown(name)
+            child = os.open(
+                component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor
+            )
+            os.close(descriptor)
+            descriptor = child
+        parent = os.fstat(descriptor)
+        link = os.stat(path.name, dir_fd=descriptor, follow_symlinks=False)
+        if (
+            parent.st_uid != 0
+            or parent.st_mode & 0o022
+            or not stat.S_ISLNK(link.st_mode)
+            or link.st_uid != 0
+            or link.st_gid != 0
+        ):
+            return _unknown(name)
+        target = Path(os.readlink(path.name, dir_fd=descriptor))
+    except OSError:
+        return _unknown(name, "probe_error")
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    version = tool["version"]
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]*", version) or version.lower() in {
+        "latest",
+        "lts",
+    }:
+        return _unknown(name)
+    install = (installs or root / "installs") / tool["name"] / version
+    if not target.is_absolute() or ".." in target.parts or not target.is_relative_to(install):
+        return _unknown(name)
+    descriptor = None
+    try:
+        descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+        for component in target.parts[1:-1]:
+            parent = os.fstat(descriptor)
+            if parent.st_uid != 0 or parent.st_mode & 0o022:
+                return _unknown(name)
+            child = os.open(
+                component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor
+            )
+            os.close(descriptor)
+            descriptor = child
+        parent = os.fstat(descriptor)
+        final = os.stat(target.name, dir_fd=descriptor, follow_symlinks=False)
+        good = (
+            parent.st_uid == 0
+            and not parent.st_mode & 0o022
+            and final.st_uid == 0
+            and final.st_gid == 0
+            and not final.st_mode & 0o022
+            and stat.S_ISREG(final.st_mode)
+        )
+        return _verdict(name, good, trusted_target=good)
+    except OSError:
+        return _unknown(name, "probe_error")
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 def tool_checks(policy: dict[str, Any], os_id: str, scope: str = "self") -> list[dict[str, Any]]:
     if os_id not in {"ubuntu", "omarchy"}:
         return []
     root = Path(policy["labels"]["tool_root"])
+    installs = _install_base(root, policy)
     tools = policy["shared_tools"]["tools"]
     heavy = policy["heavy_work"]
     lock = Path(policy["labels"]["run_dir"]) / heavy["lock_name"]
@@ -772,7 +854,7 @@ def tool_checks(policy: dict[str, Any], os_id: str, scope: str = "self") -> list
                 if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", binary):
                     reads.append(_unknown(name))
                 else:
-                    reads.append(_tool_metadata(name, root / "bin" / binary, root))
+                    reads.append(_tool_bin(name, root / "bin" / binary, root, tool, installs))
         return reads
 
     def pins() -> list[ReadResult]:
@@ -785,9 +867,7 @@ def tool_checks(policy: dict[str, Any], os_id: str, scope: str = "self") -> list
             elif version.lower() in {"latest", "lts"}:
                 reads.append(_verdict(name, False, pinned=False))
             else:
-                reads.append(
-                    _tool_metadata(name, root / "installs" / tool["name"] / version, root, True)
-                )
+                reads.append(_tool_metadata(name, installs / tool["name"] / version, root, True))
         return reads
 
     def lock_reads() -> list[ReadResult]:
@@ -1345,26 +1425,213 @@ def account_checks(
     return results
 
 
+LINUX_SPECS = (
+    CheckSpec(
+        "host.power-on-after-loss",
+        "docs/machine-setup.md#part-2-picking-a-machine",
+        lambda _: [],
+        source="engine",
+        run_as="owner-attests",
+        fix_text="Check the BIOS power-on setting and record dated evidence.",
+    ),
+    CheckSpec(
+        "host.disk-luks2-tpm",
+        "docs/machine-setup.md#ubuntu-lts-recommended-default",
+        lambda _: [],
+        "TPM binding to verified boot, Secure Boot and PCR policy need root.",
+        platforms=("ubuntu",),
+    ),
+    CheckSpec(
+        "host.disk-luks2-tpm-arch",
+        "docs/machine-setup.md#omarchy-arch-based",
+        lambda _: [],
+        "TPM binding to verified boot, Secure Boot and PCR policy need root.",
+        platforms=("omarchy",),
+    ),
+    CheckSpec(
+        "hardening.firewall-default-deny",
+        "docs/machine-setup.md#managing-it-from-a-mac",
+        lambda _: [],
+        "The live ruleset and SSH source list require root.",
+    ),
+    CheckSpec(
+        "hardening.aur-reviewed",
+        "docs/machine-setup.md#omarchy-arch-based",
+        lambda _: [],
+        platforms=("omarchy",),
+    ),
+    CheckSpec(
+        "hardening.firmware-manual",
+        "docs/machine-setup.md#backups-and-updates",
+        lambda _: [],
+        run_as="owner-attests",
+        fix_text="Check firmware does not auto-apply and record dated evidence.",
+    ),
+)
+
+
+def _root_encrypted(data: bytes) -> bool | None:
+    """Follow only paths ending at the root mount; unrelated crypt nodes do not count."""
+    try:
+        document = json.loads(data)
+        roots: list[bool] = []
+
+        def visit(node: Any, encrypted: bool, depth: int) -> None:
+            if depth > 64 or not isinstance(node, dict) or not isinstance(node.get("type"), str):
+                raise ValueError
+            mounts = node.get("mountpoints")
+            if not isinstance(mounts, list) or any(
+                m is not None and not isinstance(m, str) for m in mounts
+            ):
+                raise ValueError
+            encrypted = encrypted or node["type"] == "crypt"
+            if "/" in mounts:
+                roots.append(encrypted)
+            children = node.get("children", [])
+            if not isinstance(children, list):
+                raise ValueError
+            for child in children:
+                visit(child, encrypted, depth + 1)
+
+        devices = document["blockdevices"]
+        if not isinstance(devices, list):
+            raise ValueError
+        for device in devices:
+            visit(device, False, 0)
+        return all(roots) if roots else None
+    except (ValueError, KeyError, TypeError, RecursionError):
+        return None
+
+
+def linux_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[dict[str, Any]]:
+    if os_id not in {"ubuntu", "omarchy"}:
+        return []
+    linux: probe.Platform = "ubuntu" if os_id == "ubuntu" else "omarchy"
+    skips = {entry["id"]: entry["reason"] for entry in policy["checks"].get("skip", [])}
+
+    def disk() -> list[ReadResult]:
+        result = probe.run_probe(
+            linux, ("/usr/bin/lsblk", "--json", "--output", "TYPE,MOUNTPOINTS"), deadline=deadline
+        )
+        if result.reason or result.returncode != 0:
+            reads = [_unknown("root_encrypted", result.reason or "probe_error")]
+        else:
+            encrypted = _root_encrypted(result.data)
+            reads = (
+                [_unknown("root_encrypted")]
+                if encrypted is None
+                else [_verdict("root_encrypted", encrypted, encrypted=encrypted)]
+            )
+        wanted = policy["host"]["disk"]["encryption"]
+        if linux == "omarchy" and wanted == "luks2-passphrase":
+            reads.append(
+                _verdict("passphrase_boot", policy["host"]["disk"].get("unattended_boot") is False)
+            )
+        elif wanted == "luks2-tpm2":
+            path = Path("/etc/crypttab" if linux == "ubuntu" else "/etc/crypttab.initramfs")
+            text, error = _text(path, Path("/etc"))
+            if error:
+                reads.append(_unknown("tpm_option", error))
+            else:
+                rows = [
+                    line.split()
+                    for line in text.splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")
+                ]
+                # Config alone cannot tie the TPM entry to the mounted root.
+                if any(len(row) != 4 for row in rows):
+                    reads.append(_unknown("tpm_option"))
+                elif not any(
+                    any(option.startswith("tpm2-device=") for option in row[3].split(","))
+                    for row in rows
+                ):
+                    reads.append(_verdict("tpm_option", False, configured=False))
+                else:
+                    reads.append(_unknown("tpm_option", "not_checked"))
+        else:
+            reads.append(_verdict("encryption_policy", False))
+        reads.append(_unknown("luks2_header", "needs_root"))
+        return reads
+
+    def firewall() -> list[ReadResult]:
+        if policy["hardening"]["firewall"]["tool"] != "ufw":
+            return [_unknown("firewall_config", "not_checked")]
+        reads = []
+        for name, path, key, expected in (
+            ("ufw_enabled", "/etc/ufw/ufw.conf", "ENABLED", "yes"),
+            ("input_policy", "/etc/default/ufw", "DEFAULT_INPUT_POLICY", "DROP"),
+        ):
+            text, error = _text(Path(path), Path("/etc"))
+            if error:
+                reads.append(_unknown(name, error))
+                continue
+            values = re.findall(r"^\s*" + key + r"\s*=\s*([^#\n]+)", text, re.M)
+            if len(values) != 1:
+                reads.append(_unknown(name))
+            else:
+                try:
+                    tokens = shlex.split(values[0])
+                except ValueError:
+                    tokens = []
+                if len(tokens) != 1:
+                    reads.append(_unknown(name))
+                    continue
+                value = tokens[0]
+                reads.append(_verdict(name, value == expected, matches=value == expected))
+        return reads
+
+    def aur() -> list[ReadResult]:
+        result = probe.run_probe(linux, ("/usr/bin/pacman", "-Qm"), deadline=deadline)
+        if result.reason or result.returncode != 0:
+            return [_unknown("foreign_packages", result.reason or "probe_error")]
+        try:
+            rows = [line.split() for line in result.data.decode().splitlines()]
+            if any(len(row) != 2 or not re.fullmatch(r"[a-z0-9@._+-]+", row[0]) for row in rows):
+                return [_unknown("foreign_packages")]
+            packages = {row[0] for row in rows}
+            reviewed = set(policy["hardening"]["updates"].get("aur_packages_reviewed", []))
+            return [
+                _verdict(
+                    "foreign_packages", packages <= reviewed, all_reviewed=packages <= reviewed
+                )
+            ]
+        except UnicodeError:
+            return [_unknown("foreign_packages")]
+
+    results = []
+    now = datetime.now(timezone.utc)
+    for spec in LINUX_SPECS:
+        if os_id not in spec.platforms:
+            continue
+        if spec.id in skips:
+            reads = [
+                ReadResult(
+                    "manifest_skip", "skipped", {"reason": skips[spec.id]}, "skipped_by_manifest"
+                )
+            ]
+        else:
+            reads = (
+                disk()
+                if "disk-luks" in spec.id
+                else firewall()
+                if spec.id.endswith("firewall-default-deny")
+                else aur()
+                if spec.id.endswith("aur-reviewed")
+                else []
+            )
+            reads += attestation_reads(policy, spec.id, now)
+        results.append(check_result(spec, reads))
+    return results
+
+
 def policy_checks(
     policy: dict[str, Any], os_id: str, deadline: float, scope: str = "self"
 ) -> list[dict[str, Any]]:
     specs = {spec.id: spec for spec in (*registry(os_id), *REGISTRY)}
-    if os_id in {"ubuntu", "omarchy"}:
-        for check_id, _ in manifest_loader.ATTESTABLE:
-            if check_id.startswith(("owner.", "backups.")):
-                continue
-            if check_id.endswith("-arch") != (os_id == "omarchy") and "disk-luks" in check_id:
-                continue
-            specs.setdefault(
-                check_id,
-                CheckSpec(
-                    check_id,
-                    "docs/machine-setup.md#backups-and-updates",
-                    lambda _: [],
-                ),
-            )
     skips = {entry["id"]: entry["reason"] for entry in policy["checks"].get("skip", [])}
     for check_id in skips:
+        if check_id in {s.id for s in LINUX_SPECS}:
+            continue
         if check_id.startswith(
             (
                 "owner.",
@@ -1413,7 +1680,10 @@ def policy_checks(
             reads = spec.run(deadline) + attestation_reads(policy, spec.id, now)
         results.append(check_result(spec, reads))
     return (
-        results + account_checks(policy, os_id, deadline, scope) + tool_checks(policy, os_id, scope)
+        results
+        + account_checks(policy, os_id, deadline, scope)
+        + tool_checks(policy, os_id, scope)
+        + linux_checks(policy, os_id, deadline)
     )
 
 

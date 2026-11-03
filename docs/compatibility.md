@@ -451,3 +451,11 @@ metadata. It never executes shared tools or the wrapper. Backup freshness uses
 owner attestations; bounded restore records supply only their date and result.
 Unreadable records retain an unverified read alongside any owner evidence.
 These rows have synthetic fixture evidence only.
+
+With a manifest, Linux checks also trace the encrypted root device, inspect
+ufw's enabled/default-input settings and compare Omarchy foreign packages with
+the reviewed list. BIOS and firmware controls use dated owner attestations.
+The disk header and the identity match between TPM configuration and root
+remain unverified. Screen lock, Tailscale version/Serve, listener attribution
+and Omarchy upgrade/snapshot checks are still pending. This is partial Linux
+coverage, with no additional live-host compatibility claim.

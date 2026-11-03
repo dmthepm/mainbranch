@@ -28,6 +28,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ## [0.6.21] - 2026-11-03
 
 ### Added
+- Machine doctor traces root disk encryption, checks configured ufw defaults
+  and reviewed foreign packages on Omarchy, and reports dated BIOS and firmware
+  evidence. Disk header and TPM-to-root verification remain incomplete. Shared
+  tool links are accepted only inside the declared version's install directory
+  with root-owned, read-only components.
+
 - Machine doctor checks shared-tool ownership and pin directories, the current
   business account's tool path and heavy-work lock, and dated backup evidence.
   It inspects the job wrapper without running it. Restore records expose only
