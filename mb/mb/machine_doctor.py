@@ -533,7 +533,7 @@ def credential_store(_: float) -> list[ReadResult]:
     return [_unknown("store_available", "probe_missing")]
 
 
-def registry(os_id: str) -> tuple[CheckSpec, ...]:
+def registry(os_id: str, *, include_policy: bool = False) -> tuple[CheckSpec, ...]:
     if os_id not in {"ubuntu", "omarchy"}:
         return ()
     linux: probe.Platform = "ubuntu" if os_id == "ubuntu" else "omarchy"
@@ -601,7 +601,55 @@ def registry(os_id: str) -> tuple[CheckSpec, ...]:
             source="engine",
         ),
     )
-    return tuple(spec for spec in specs if os_id in spec.platforms)
+    return tuple(spec for spec in specs if os_id in spec.platforms) + (
+        ACCOUNT_SPECS if include_policy else ()
+    )
+
+
+ACCOUNT_SPECS = tuple(
+    CheckSpec(
+        check_id,
+        "docs/machine-setup.md#" + anchor,
+        lambda _: [_unknown("manifest", "no_manifest")],
+        limitation,
+        run_as=role,
+        source=source,
+        fix_text="Review password-required sudo and business run-as rules as the owner."
+        if role == "owner-attests"
+        else None,
+    )
+    for check_id, anchor, role, source, limitation in (
+        ("owner.sudo-needs-password", "admin-account-and-agent-accounts", "owner", "pack", None),
+        (
+            "owner.no-sudo-into-business",
+            "admin-account-and-agent-accounts",
+            "owner-attests",
+            "pack",
+            "Root can still become any user; the admin stays trusted.",
+        ),
+        ("businesses.users-and-homes", "one-user-account-per-business", "any", "pack", None),
+        (
+            "businesses.no-privileged-groups",
+            "admin-account-and-agent-accounts",
+            "any",
+            "pack",
+            "A sudoers user rule, which requires root to read.",
+        ),
+        ("businesses.private-tmpdir", "shared-tools-private-data", "each-business", "pack", None),
+        ("businesses.slice-limits", "sessions-that-survive-a-reboot", "any", "pack", None),
+        ("sessions.linger", "sessions-that-survive-a-reboot", "any", "engine", None),
+        ("runtime.herdr-per-user", "sessions-that-survive-a-reboot", "each-business", "pack", None),
+        (
+            "sessions.started-without-login",
+            "part-4-first-week",
+            "each-business",
+            "engine",
+            "The first login this boot is not retained by this bounded probe; "
+            "complete the reboot test.",
+        ),
+        ("runtime.claude-autoupdate-off", "backups-and-updates", "each-business", "pack", None),
+    )
+)
 
 
 REGISTRY: tuple[CheckSpec, ...] = ()
@@ -688,7 +736,17 @@ def account_checks(
     if os_id not in {"ubuntu", "omarchy"}:
         return []
     linux: probe.Platform = "ubuntu" if os_id == "ubuntu" else "omarchy"
-    accounts, groups, reason = _accounts()
+    accounts: dict[str, tuple[int, int, Path]] = {}
+    groups: dict[str, tuple[int, set[str]]] = {}
+    reason: Reason | None = None
+    loaded = False
+
+    def load_accounts() -> None:
+        nonlocal accounts, groups, reason, loaded
+        if not loaded:
+            accounts, groups, reason = _accounts()
+            loaded = True
+
     users = policy["businesses"]["users"]
     owner = policy["owner"]["user"]
     current_uid = os.getuid()
@@ -705,22 +763,18 @@ def account_checks(
         limitation: str | None = None,
         source: str = "pack",
     ) -> None:
-        local = role in {"any", "owner-attests"} or (
-            subject in accounts and accounts[subject][0] == current_uid
-        )
+        # Scope selection uses validated declared identities, not a database read.
+        declared_uid = next((u["uid"] for u in users if u["user"] == subject), None)
+        local = role in {"any", "owner-attests"} or declared_uid == current_uid
+        if role == "owner":
+            if check_id not in skips:
+                load_accounts()
+            local = check_id in skips or (
+                subject in accounts and accounts[subject][0] == current_uid
+            )
         if not local and scope == "self":
             return
-        spec = CheckSpec(
-            check_id,
-            "docs/machine-setup.md#" + anchor,
-            lambda _: [],
-            limitation,
-            source=source,
-            run_as=role,
-            fix_text="Review password-required sudo and business run-as rules as the owner."
-            if role == "owner-attests"
-            else None,
-        )
+        spec = next(spec for spec in ACCOUNT_SPECS if spec.id == check_id)
         if check_id in skips:
             reads = [
                 ReadResult(
@@ -729,10 +783,16 @@ def account_checks(
             ]
         elif not local:
             reads = [_unknown("account", "other_account")]
-        elif reason:
-            reads = [_unknown("account_database", reason)]
         else:
-            reads = run()
+            if check_id in {
+                "owner.sudo-needs-password",
+                "businesses.users-and-homes",
+                "businesses.no-privileged-groups",
+            }:
+                load_accounts()
+                reads = [_unknown("account_database", reason)] if reason else run()
+            else:
+                reads = run()
         result = check_result(spec, reads)
         result["subject"] = subject
         results.append(result)
@@ -820,14 +880,14 @@ def account_checks(
 
         emit("businesses.users-and-homes", "one-user-account-per-business", "any", name, homes)
         forbidden = {"sudo", "adm", "wheel", "docker", "lxd", owner}
-        # The owner's primary group can have a different name.
-        forbidden.update(
-            group
-            for group, (gid, _) in groups.items()
-            if owner in accounts and gid == accounts[owner][1]
-        )
 
+        # The owner's primary group can have a different name.
         def unprivileged(name: str = name, forbidden: set[str] = forbidden) -> list[ReadResult]:
+            forbidden = forbidden | {
+                group
+                for group, (gid, _) in groups.items()
+                if owner in accounts and gid == accounts[owner][1]
+            }
             good = name in accounts and not any(membership(name, group) for group in forbidden)
             return [_verdict("unprivileged_groups", good, unprivileged=good)]
 
@@ -857,6 +917,72 @@ def account_checks(
         emit(
             "businesses.private-tmpdir", "shared-tools-private-data", "each-business", name, tmpdir
         )
+
+        def slice_limits(user: dict[str, Any] = user, uid: int = uid) -> list[ReadResult]:
+            result = probe.run_probe(
+                linux,
+                (
+                    "/usr/bin/systemctl",
+                    "show",
+                    f"user-{uid}.slice",
+                    "--property=MemoryHigh",
+                    "--property=MemoryMax",
+                    "--property=TasksMax",
+                ),
+                deadline=deadline,
+            )
+            reads: list[ReadResult] = []
+            if result.reason or result.returncode != 0:
+                reads.append(_unknown("slice_limits", result.reason or "probe_error"))
+            else:
+                try:
+                    pairs = [line.split("=", 1) for line in result.data.decode().splitlines()]
+                    fields = dict(pairs)
+                    if len(pairs) != len(fields) or set(fields) != {
+                        "MemoryHigh",
+                        "MemoryMax",
+                        "TasksMax",
+                    }:
+                        raise ValueError
+                    limits = policy["businesses"]["size_classes"][user["size_class"]]
+                    for key, prop in (
+                        ("memory_high", "MemoryHigh"),
+                        ("memory_max", "MemoryMax"),
+                        ("tasks_max", "TasksMax"),
+                    ):
+                        value = fields[prop]
+                        if value != "infinity" and not value.isdecimal():
+                            raise ValueError
+                        if key not in limits:
+                            continue
+                        wanted = limits[key]
+                        expected = (
+                            wanted
+                            if isinstance(wanted, int)
+                            else int(wanted[:-1]) * 1024 ** (3 if wanted[-1] == "G" else 2)
+                        )
+                        matches = value != "infinity" and int(value) == expected
+                        reads.append(_verdict(key, matches, matches=matches))
+                except (ValueError, UnicodeError):
+                    reads = [_unknown("slice_limits")]
+            text, error = _text(Path("/proc/meminfo"), Path("/proc"))
+            values = re.findall(r"^MemTotal:\s+([0-9]+) kB$", text, re.M)
+            if error or len(values) != 1:
+                reads.append(_unknown("host_ram", error or "ambiguous_config"))
+            else:
+                expected_ram = policy["businesses"]["sizing_basis"]["host_ram_gb"] * 1024**3
+                matches = abs(int(values[0]) * 1024 - expected_ram) <= expected_ram * 0.1
+                reads.append(
+                    ReadResult(
+                        "host_ram",
+                        "pass" if matches else "warn",
+                        {"within_ten_percent": matches},
+                        None if matches else "not_checked",
+                    )
+                )
+            return reads
+
+        emit("businesses.slice-limits", "sessions-that-survive-a-reboot", "any", name, slice_limits)
 
         def linger(name: str = name) -> list[ReadResult]:
             result = probe.read_file(
@@ -894,8 +1020,9 @@ def account_checks(
             if result.reason or result.returncode != 0:
                 return {}, result.reason or "probe_error"
             try:
-                fields = dict(line.split("=", 1) for line in result.data.decode().splitlines())
-                if set(fields) != set(properties):
+                pairs = [line.split("=", 1) for line in result.data.decode().splitlines()]
+                fields = dict(pairs)
+                if len(pairs) != len(fields) or set(fields) != set(properties):
                     return {}, "ambiguous_config"
                 return fields, None
             except (ValueError, UnicodeError):
@@ -929,6 +1056,34 @@ def account_checks(
             "each-business",
             name,
             runtime,
+        )
+
+        def started() -> list[ReadResult]:
+            fields, error = unit_fields(("ActiveEnterTimestampMonotonic",))
+            if error:
+                return [_unknown("startup_before_login", error)]
+            value = fields["ActiveEnterTimestampMonotonic"]
+            if not value.isdecimal():
+                return [_unknown("startup_before_login")]
+            # Active state alone cannot establish the first login this boot.
+            # Closed logind sessions disappear from /run, so do not infer a pass.
+            return [
+                ReadResult(
+                    "startup_before_login", "warn", {"unit_started": int(value) > 0}, "not_checked"
+                )
+            ]
+
+        emit(
+            "sessions.started-without-login",
+            "part-4-first-week",
+            "each-business",
+            name,
+            started,
+            source="engine",
+            limitation=(
+                "The first login this boot is not retained by this bounded probe; "
+                "complete the reboot test."
+            ),
         )
 
         def updater() -> list[ReadResult]:
@@ -1098,7 +1253,12 @@ def doctor(manifest: Path | None = None, scope: str = "self") -> dict[str, Any]:
                 [
                     ReadResult(section, "not_verified", {}, "not_checked")
                     for section in policy
-                    if section not in {"manifest_version", "checks"}
+                    if section
+                    not in (
+                        {"manifest_version", "checks", "owner", "runtime"}
+                        if detected["id"] in {"ubuntu", "omarchy"}
+                        else {"manifest_version", "checks"}
+                    )
                 ],
             )
         )

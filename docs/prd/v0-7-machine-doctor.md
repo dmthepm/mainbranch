@@ -615,3 +615,21 @@ account checks are policy-bound additions outside the static registry; full
 registry metadata validation remains required. No D7 section is removed from
 `manifest.coverage`, since this lane does not complete the section contract.
 The implementation is a partial handoff for further work, not D7 acceptance.
+
+### D7 continuation implementation limits
+
+The account checks share a lazy local passwd/group read. A skipped check does
+not load those databases or run its probes. Policy-bound specs are available
+through `registry(..., include_policy=True)` for metadata validation; baseline
+runs without a manifest keep their existing registry.
+
+Slice limits compare systemd's byte counts with binary M/G manifest sizes.
+Optional ceilings are compared only when declared. Host RAM drift above 10%
+warns. Owner and runtime sections leave `manifest.coverage` on supported Linux;
+businesses and sessions remain there conservatively.
+
+`started-without-login` reads `ActiveEnterTimestampMonotonic` and warns rather
+than passing. This differs from the planned timestamp comparison: bounded
+current logind records lose closed sessions and cannot prove the first login
+this boot. A durable boot-scoped login evidence source is still required.
+No reboot-test assurance is claimed.

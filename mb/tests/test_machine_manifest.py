@@ -386,7 +386,12 @@ def test_skip_prevents_probe_and_preserves_other_coverage(monkeypatch: pytest.Mo
     )
     report = doctor.doctor(Path("fixture"))
     coverage = next(c for c in report["checks"] if c["id"] == "manifest.coverage")
-    assert {r["name"] for r in coverage["reads"]} == set(data) - {"manifest_version", "checks"}
+    assert {r["name"] for r in coverage["reads"]} == set(data) - {
+        "manifest_version",
+        "checks",
+        "owner",
+        "runtime",
+    }
     assert "Skipped: owner choice" in doctor.human_report(report)
 
 
@@ -486,16 +491,15 @@ def test_d7_denied_and_other_accounts(monkeypatch: pytest.MonkeyPatch) -> None:
     data = example()
     monkeypatch.setattr(os, "getuid", lambda: 999)
     monkeypatch.setattr(doctor, "_accounts", lambda: ({}, {}, "probe_error"))
+    monkeypatch.setattr(probe, "run_probe", lambda *a, **k: probe.ProbeResult(reason="probe_error"))
+    monkeypatch.setattr(probe, "read_file", lambda *a, **k: probe.ProbeResult(reason="probe_error"))
     results = doctor.account_checks(data, "ubuntu", 0, "all")
     assert results
-    for check in results:
-        assert check["state"] == "not_verified"
-        assert check["reason"] == (
-            "probe_error" if check["as"] in {"any", "owner-attests"} else "other_account"
-        )
-    assert any(
-        c["id"] == "runtime.herdr-per-user" and c["reason"] == "other_account" for c in results
-    )
+    by_id = {c["id"]: c for c in results}
+    assert by_id["businesses.users-and-homes"]["reason"] == "probe_error"
+    assert by_id["businesses.no-privileged-groups"]["reason"] == "probe_error"
+    assert by_id["owner.no-sudo-into-business"]["reason"] == "attestation_missing"
+    assert by_id["runtime.herdr-per-user"]["reason"] == "other_account"
 
 
 @pytest.mark.parametrize(
@@ -522,3 +526,230 @@ def test_d7_directory_denied(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(Path, "lstat", denied)
     assert doctor._directory("home", Path("/home/fixture-agent"), 2001).reason == "probe_error"
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["bad", "a:x:1:1::relative:/bin/sh", "a:x:1:1::/home/a:/bin/sh\na:x:2:2::/home/b:/bin/sh"],
+)
+def test_d7b_account_parser_refuses_malformed(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
+    monkeypatch.setattr(doctor, "_text", lambda *a: (text, None))
+    assert doctor._accounts() == ({}, {}, "ambiguous_config")
+
+
+@pytest.mark.parametrize("group", ["bad", "a:x:1:\na:x:2:"])
+def test_d7b_group_parser(monkeypatch: pytest.MonkeyPatch, group: str) -> None:
+    monkeypatch.setattr(
+        doctor,
+        "_text",
+        lambda path, prefix: ("a:x:1:1::/home/a:/bin/sh" if path.name == "passwd" else group, None),
+    )
+    assert doctor._accounts()[2] == "ambiguous_config"
+
+
+def d7b_only(monkeypatch: pytest.MonkeyPatch, check_id: str) -> dict[str, Any]:
+    data = example()
+    data["businesses"]["users"] = data["businesses"]["users"][:1]
+    data["checks"]["skip"] = [
+        {"id": spec.id, "reason": "fixture"} for spec in doctor.ACCOUNT_SPECS if spec.id != check_id
+    ]
+    monkeypatch.setattr(os, "getuid", lambda: data["businesses"]["users"][0]["uid"])
+    return data
+
+
+def test_d7b_all_skipped_reads_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = d7b_only(monkeypatch, "none")
+
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("skipped check read local state")
+
+    monkeypatch.setattr(doctor, "_accounts", forbidden)
+    monkeypatch.setattr(probe, "run_probe", forbidden)
+    monkeypatch.setattr(probe, "read_file", forbidden)
+    monkeypatch.setattr(Path, "lstat", forbidden)
+    results = doctor.account_checks(data, "ubuntu", 0, "all")
+    assert len(results) == 10
+    assert all(c["state"] == "skipped" for c in results)
+
+
+@pytest.mark.parametrize("member", [True, False])
+def test_d7b_owner_membership(monkeypatch: pytest.MonkeyPatch, member: bool) -> None:
+    data = d7b_only(monkeypatch, "owner.sudo-needs-password")
+    uid = os.getuid()
+    owner = data["owner"]["user"]
+    monkeypatch.setattr(
+        doctor,
+        "_accounts",
+        lambda: (
+            {owner: (uid, 1000, Path("/home/fixture-owner"))},
+            {"sudo": (27, {owner} if member else set())},
+            None,
+        ),
+    )
+    result = next(
+        c
+        for c in doctor.account_checks(data, "ubuntu", 0)
+        if c["id"] == "owner.sudo-needs-password"
+    )
+    assert result["reads"][0]["state"] == ("pass" if member else "fail")
+
+
+@pytest.mark.parametrize(
+    "high,ram,state", [(4 * 1024**3, 32, "pass"), (1, 32, "fail"), (4 * 1024**3, 16, "warn")]
+)
+def test_d7b_slice_limits(monkeypatch: pytest.MonkeyPatch, high: int, ram: int, state: str) -> None:
+    data = d7b_only(monkeypatch, "businesses.slice-limits")
+    user = data["businesses"]["users"][0]
+    limits = data["businesses"]["size_classes"][user["size_class"]]
+    limits.update(memory_high="4G", memory_max="6G", tasks_max=4096)
+    data["businesses"]["sizing_basis"]["host_ram_gb"] = 32
+
+    def run(platform: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        assert argv == (
+            "/usr/bin/systemctl",
+            "show",
+            f"user-{user['uid']}.slice",
+            "--property=MemoryHigh",
+            "--property=MemoryMax",
+            "--property=TasksMax",
+        )
+        return probe.ProbeResult(
+            f"MemoryHigh={high}\nMemoryMax={6 * 1024**3}\nTasksMax=4096\n".encode(), 0
+        )
+
+    monkeypatch.setattr(probe, "run_probe", run)
+    monkeypatch.setattr(doctor, "_text", lambda *a: (f"MemTotal: {ram * 1024**2} kB\n", None))
+    result = next(
+        c for c in doctor.account_checks(data, "ubuntu", 0) if c["id"] == "businesses.slice-limits"
+    )
+    assert result["state"] == state
+
+
+@pytest.mark.parametrize("value", [None, "relative", "/tmp/../private", "/tmp/symlink/private"])
+def test_d7b_tmpdir_boundaries(monkeypatch: pytest.MonkeyPatch, value: str | None) -> None:
+    data = d7b_only(monkeypatch, "businesses.private-tmpdir")
+    if value is None:
+        monkeypatch.delenv("TMPDIR", raising=False)
+    else:
+        monkeypatch.setenv("TMPDIR", value)
+    monkeypatch.setattr(
+        Path, "lstat", lambda _: os.stat_result((0o120700, 0, 0, 1, os.getuid(), 0, 0, 0, 0, 0))
+    )
+    result = next(
+        c
+        for c in doctor.account_checks(data, "ubuntu", 0)
+        if c["id"] == "businesses.private-tmpdir"
+    )
+    assert result["state"] == ("fail" if value is None else "not_verified")
+
+
+@pytest.mark.parametrize(
+    "body,reason",
+    [
+        (b"", "probe_error"),
+        (
+            b"UnitFileState=enabled\nUnitFileState=enabled\nActiveState=active\nSlice=background.slice",
+            None,
+        ),
+    ],
+)
+def test_d7b_runtime_denied_duplicate(
+    monkeypatch: pytest.MonkeyPatch, body: bytes, reason: Any
+) -> None:
+    data = d7b_only(monkeypatch, "runtime.herdr-per-user")
+    monkeypatch.setattr(probe, "run_probe", lambda *a, **k: probe.ProbeResult(body, 0, reason))
+    result = next(
+        c for c in doctor.account_checks(data, "ubuntu", 0) if c["id"] == "runtime.herdr-per-user"
+    )
+    assert result["state"] == "not_verified"
+    assert result["reason"] == (reason or "ambiguous_config")
+
+
+def test_d7b_registry_metadata() -> None:
+    specs = {s.id: s for s in doctor.registry("ubuntu", include_policy=True)}
+    assert set(s.id for s in doctor.ACCOUNT_SPECS) <= manifest.CHECK_IDS
+    assert len(specs) == len(doctor.registry("ubuntu", include_policy=True))
+    guide = (Path(__file__).resolve().parents[2] / "docs/machine-setup.md").read_text()
+    import re
+
+    anchors = {
+        re.sub(r"[^\w\- ]", "", h.lower()).replace(" ", "-")
+        for h in re.findall(r"^#{1,6} (.+)$", guide, re.M)
+    }
+    for spec in doctor.ACCOUNT_SPECS:
+        assert spec.section.split("#")[1] in anchors
+        if spec.run_as == "owner-attests":
+            assert spec.fix_text
+    assert "Root" in (specs["owner.no-sudo-into-business"].does_not_prove or "")
+    assert "sudoers" in (specs["businesses.no-privileged-groups"].does_not_prove or "")
+
+
+@pytest.mark.parametrize("mismatch,listable", [(True, False), (False, True), (False, False)])
+def test_d7b_home_uid_access(
+    monkeypatch: pytest.MonkeyPatch, mismatch: bool, listable: bool
+) -> None:
+    data = d7b_only(monkeypatch, "businesses.users-and-homes")
+    user = data["businesses"]["users"][0]
+    uid = user["uid"]
+    data["businesses"]["users"].append({**user, "user": "fixture-other", "uid": uid + 1})
+    accounts = {
+        user["user"]: (uid + int(mismatch), uid, Path("/home/fixture-a")),
+        "fixture-other": (uid + 1, uid + 1, Path("/home/fixture-b")),
+    }
+    monkeypatch.setattr(doctor, "_accounts", lambda: (accounts, {}, None))
+    monkeypatch.setattr(doctor, "_directory", lambda name, *a: doctor.ReadResult(name, "pass", {}))
+    monkeypatch.setattr(doctor, "_text", lambda *a: ("Umask:\t0022\n", None))
+
+    class Directory:
+        def __enter__(self) -> None:
+            if not listable:
+                raise PermissionError
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+    monkeypatch.setattr(os, "scandir", lambda *a: Directory())
+    result = next(
+        c
+        for c in doctor.account_checks(data, "ubuntu", 0)
+        if c["id"] == "businesses.users-and-homes" and c["subject"] == user["user"]
+    )
+    reads = {r["name"]: r["state"] for r in result["reads"]}
+    assert reads["declared_uid"] == ("fail" if mismatch else "pass")
+    assert reads["umask"] == "fail"
+    assert reads["other_home_unlistable"] == ("fail" if listable else "pass")
+
+
+def test_d7b_cli_scope(monkeypatch: pytest.MonkeyPatch) -> None:
+    from mb import cli
+
+    # Exercise Typer's option routing while keeping machine probes out of CLI fixtures.
+    called = []
+
+    def fake(manifest: Any = None, scope: str = "self") -> dict[str, Any]:
+        called.append(scope)
+        if scope not in {"self", "all"}:
+            raise ValueError("Invalid scope")
+        return {"exit_code": 3}
+
+    monkeypatch.setattr(doctor, "doctor", fake)
+    result = CliRunner().invoke(cli.app, ["machine", "doctor", "--scope", "all", "--json"])
+    assert result.exit_code == 3
+    assert called == ["all"]
+    result = CliRunner().invoke(cli.app, ["machine", "doctor", "--scope", "invalid", "--json"])
+    assert result.exit_code == 2
+
+
+def test_d7b_startup_never_infers_reboot_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = d7b_only(monkeypatch, "sessions.started-without-login")
+    monkeypatch.setattr(
+        probe,
+        "run_probe",
+        lambda *a, **k: probe.ProbeResult(b"ActiveEnterTimestampMonotonic=123\n", 0),
+    )
+    result = next(
+        c
+        for c in doctor.account_checks(data, "ubuntu", 0)
+        if c["id"] == "sessions.started-without-login"
+    )
+    assert result["state"] == "warn"

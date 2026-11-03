@@ -30,8 +30,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ### Added
 - Machine doctor checks declared business accounts, private homes and temporary
   directories, group membership, reboot persistence and session-unit settings.
-  `--scope all` lists other accounts as unverified. Resource limits and proof
-  that sessions started before login remain unimplemented.
+  It compares resource limits with each account's size class and warns when
+  host memory has changed. `--scope all` lists other accounts as unverified.
+  Startup-before-login remains a warning until the reboot test is proved.
 
 - Machine doctor honors manifest skips and dated owner attestations. Skipped
   checks and owner evidence never count as passing. Expired evidence stays

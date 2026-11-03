@@ -439,6 +439,8 @@ OS detection. Fixture coverage does not establish real-host runtime support.
 Machine doctor with a manifest also reads local account and group databases,
 home privacy, the current business account's umask and private temporary
 directory, linger markers and user-session unit settings on Ubuntu and Omarchy.
-`--scope all` lists checks for other accounts as unverified. Slice-limit and
-startup-before-login checks are still pending. These additions have synthetic
+`--scope all` lists checks for other accounts as unverified. Slice limits are
+compared with declared size classes; host RAM drift above 10% warns. The
+startup-before-login row warns because a unit timestamp cannot prove the
+first login this boot. Sessions coverage remains incomplete. These additions have synthetic
 fixture evidence only; no new real-host assurance is claimed.
