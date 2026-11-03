@@ -985,6 +985,7 @@ _CONNECT_SUBCOMMANDS = frozenset(
         "rotate",
         "token",
         "hydrate",
+        "rebind",
         "repair",
     }
 )
@@ -1163,7 +1164,7 @@ def connect_cmd(
         help=(
             "Provider to connect, or `list` / `plan` / `status` / `doctor` / `hygiene` / "
             "`identity` / `test` / `exec` / `rotate` / `token` / `audit` / `policy` / "
-            "`hydrate` / `repair`."
+            "`hydrate` / `rebind` / `repair`."
         ),
     ),
     provider: str = typer.Argument(
@@ -1310,6 +1311,11 @@ def connect_cmd(
             "With `mb connect repair`, let macOS ask once whether this mb install may read "
             "each stored credential. Needs a terminal."
         ),
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="With `mb connect rebind`, allow this folder to use the keys of the repo id it names.",
     ),
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
 ) -> None:
@@ -1463,6 +1469,16 @@ def connect_cmd(
         else:
             connect_mod.render_hydrate_result(result)
         raise typer.Exit(0 if result["ok"] else 1)
+    if target == "rebind":
+        try:
+            result = connect_mod.rebind(repo, apply=yes)
+        except ValueError as exc:
+            _connect_error_exit("mb connect rebind", exc, json_out=json_out)
+        if json_out:
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.echo(result["message"])
+        raise typer.Exit(0)
     if target == "policy":
         result = connect_mod.caller_policy_status(repo)
         if json_out:

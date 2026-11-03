@@ -27,6 +27,7 @@ from mb import credential_store
 from mb import google_connect as gc
 from mb import google_oauth as go
 from mb.cli import app
+from tests.connect_binding import rebind_folder
 from tests.test_google_connect import (  # noqa: F401 (fixtures are used by name)
     ACCESS,
     REFRESH,
@@ -168,6 +169,7 @@ def test_a_git_failure_outside_any_checkout_still_records(
 
 def test_an_untracked_file_in_a_checkout_still_reads_as_untracked(repo: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True, capture_output=True)
+    rebind_folder(repo)
     (repo / ".mb").mkdir()
     (repo / ".mb" / "connect.yaml").write_text("version: 1\n", encoding="utf-8")
 
@@ -535,6 +537,7 @@ def test_another_providers_check_still_records_when_untracked(
 ) -> None:
     _connect_stripe(repo)
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True, capture_output=True)
+    rebind_folder(repo)
     _stripe_check(monkeypatch, ok=True)
 
     result = runner.invoke(app, ["connect", "test", "stripe", "--repo", str(repo), "--json"])
@@ -592,6 +595,7 @@ def test_a_probe_less_check_exits_0_tracked_or_not(repo: Path, tracked: bool) ->
         _track_config(repo)
     else:
         subprocess.run(["git", "init", "-q"], cwd=repo, check=True, capture_output=True)
+        rebind_folder(repo)
     before = _yaml(repo)
 
     result = runner.invoke(app, ["connect", "test", "google", "--repo", str(repo)])

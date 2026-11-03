@@ -25,6 +25,7 @@ from mb import credential_store
 from mb import doctor as doctor_mod
 from mb import google_connect as gc
 from mb.cli import app
+from tests.connect_binding import rebind_folder
 from tests.test_google_connect import (  # noqa: F401 (fixtures are used by name)
     _google_entry,
     _oauth,
@@ -239,6 +240,7 @@ def test_doctor_row_in_an_untracked_repo_reads_the_recorded_status(
     _connect_stripe(repo)
     _record_stale_failure(repo, "stripe")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True, capture_output=True)
+    rebind_folder(repo)
     _stripe_check(monkeypatch, ok=True)
     _dossier(repo, "Stripe", "stripe")
 

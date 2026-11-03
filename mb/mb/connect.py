@@ -14,6 +14,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import threading
 import urllib.parse
 from collections import deque
 from collections.abc import Callable, Iterator
@@ -220,6 +221,11 @@ from mb.engine import repo_flag
 
 CONFIG_RELATIVE_PATH = Path(".mb") / "connect.yaml"
 USER_SCOPE_RELATIVE_PATH = Path("connect") / "user-scope.yaml"
+REPO_BINDINGS_RELATIVE_PATH = Path("connect") / "repo-bindings.json"
+# A folder hash is 64 hex characters; 1 MiB holds thousands of folders.
+REPO_BINDINGS_MAX_BYTES = 1024 * 1024
+REPO_BINDING_RULE = "repo_binding_required"
+REPO_BINDING_RECORD_RULE = "repo_binding_record_unsafe"
 SENSITIVE_KEY_PARTS = ("token", "secret", "password", "credential", "api_key", "apikey", "key")
 SAFE_METADATA_KEYS = {
     "token_type",
@@ -678,11 +684,18 @@ def _read_config(repo: Path) -> dict[str, Any]:
     }
 
 
+_GIT_LOCATION_ENV = frozenset({"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"})
+
+
 def _git_output(repo: Path, args: list[str]) -> str:
+    # The folder's own git answers, not whatever a hook or shell pointed GIT_DIR at,
+    # so a folder's identity does not change with the caller's environment.
+    env = {key: value for key, value in os.environ.items() if key not in _GIT_LOCATION_ENV}
     try:
         proc = subprocess.run(
             ["git", *args],
             cwd=repo,
+            env=env,
             capture_output=True,
             text=True,
             timeout=3,
@@ -742,10 +755,171 @@ def _repo_identity(repo: Path) -> dict[str, str]:
     return {"source": source, "repo_id": digest[:32], "basis_sha256": digest}
 
 
-def _ensure_repo_id(config: dict[str, Any], repo: Path) -> str:
+# The save lock re-enters inside one process, so threads here need their own turn.
+_BINDINGS_WRITE_LOCK = threading.Lock()
+
+
+def _repo_bindings_path() -> Path:
+    return _home() / REPO_BINDINGS_RELATIVE_PATH
+
+
+def _bindings_unsafe(reason: str) -> ConnectRefusal:
+    return ConnectRefusal(
+        REPO_BINDING_RECORD_RULE,
+        f"The Main Branch folder record of which folders may use which repo's keys {reason}. "
+        "Nothing was changed. Move or fix the file connect/repo-bindings.json in the Main "
+        "Branch home, then rerun the command.",
+    )
+
+
+def _check_bindings_file(info: os.stat_result) -> None:
+    if not stat.S_ISREG(info.st_mode):
+        raise _bindings_unsafe("is not a regular file")
+    if info.st_mode & 0o022:
+        raise _bindings_unsafe("can be written by other users")
+    if info.st_size > REPO_BINDINGS_MAX_BYTES:
+        raise _bindings_unsafe("is too large")
+
+
+def _load_repo_bindings() -> dict[str, list[str]]:
+    """Read the home record: repo id -> folder identities (``basis_sha256``) that saved under it.
+
+    Raises ``ConnectRefusal`` for a symlink, a non-regular file, a file other users
+    can write, or content that is not the expected shape. A missing file is empty.
+    """
+
+    path = _repo_bindings_path()
+    try:
+        if stat.S_ISLNK(os.lstat(path.parent).st_mode):
+            raise _bindings_unsafe("sits behind a symlink")
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return {}
+    except OSError:
+        raise _bindings_unsafe("could not be read") from None
+    _check_bindings_file(info)
+    try:
+        fd = os.open(
+            path,
+            os.O_RDONLY
+            | os.O_NOFOLLOW
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+        )
+        with os.fdopen(fd, "rb") as handle:
+            _check_bindings_file(os.fstat(handle.fileno()))
+            data = handle.read(REPO_BINDINGS_MAX_BYTES + 1)
+        if len(data) > REPO_BINDINGS_MAX_BYTES:
+            raise _bindings_unsafe("is too large")
+        raw = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError, RecursionError):
+        raise _bindings_unsafe("is unreadable or invalid") from None
+    repos = raw.get("repos") if isinstance(raw, dict) else None
+    if not isinstance(repos, dict):
+        raise _bindings_unsafe("is not in the expected shape")
+    bindings: dict[str, list[str]] = {}
+    for repo_id, item in repos.items():
+        folders = item.get("folders") if isinstance(item, dict) else None
+        if not isinstance(folders, list) or not all(isinstance(entry, str) for entry in folders):
+            raise _bindings_unsafe("is not in the expected shape")
+        bindings[str(repo_id)] = list(folders)
+    return bindings
+
+
+def _record_repo_binding(repo_id: str, basis_sha256: str) -> None:
+    """Add this folder identity under ``repo_id`` in the home record.
+
+    Takes the home save lock (re-entered when a save already holds it), so two
+    saves never rewrite the record from the same old copy. A folder already
+    recorded writes nothing. The record holds hashes only, never a path, a
+    remote or a key.
+    """
+
+    if basis_sha256 in _load_repo_bindings().get(repo_id, ()):
+        return
+    try:
+        with _BINDINGS_WRITE_LOCK, save_transaction(_home()):
+            bindings = _load_repo_bindings()
+            folders = bindings.setdefault(repo_id, [])
+            if basis_sha256 in folders:
+                return
+            folders.append(basis_sha256)
+            path = _repo_bindings_path()
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            with suppress(OSError):
+                path.parent.chmod(stat.S_IMODE(path.parent.stat().st_mode) & 0o700)
+            data = {
+                "version": 1,
+                "repos": {
+                    key: {"folders": sorted(value)} for key, value in sorted(bindings.items())
+                },
+            }
+            atomic_write_text(path, json.dumps(data, indent=2) + "\n", mode=0o600)
+    except CredentialBusyError as exc:
+        raise ConnectRefusal(REPO_BINDING_RECORD_RULE, str(exc)) from None
+    except OSError:
+        raise _bindings_unsafe("could not be written") from None
+
+
+def _rebind_command(repo: Path) -> str:
+    return f"mb connect rebind{repo_flag(repo)}"
+
+
+def _repo_binding(target: Path, config: dict[str, Any]) -> tuple[str, ConnectRefusal | None]:
+    """The repo id this folder may use, and the refusal when its file names another's.
+
+    A folder whose config id is its own derived id (the normal case, worktrees
+    included) needs no record. A different id is honoured only when this folder
+    saved under it or the owner ran ``mb connect rebind``: a file inside the
+    repo never decides which repo's keys it gets.
+    """
+
+    identity = _repo_identity(target)
+    claimed = str(config.get("repo_id") or "").strip()
+    if not claimed or claimed == identity["repo_id"]:
+        return identity["repo_id"], None
+    try:
+        known = identity["basis_sha256"] in _load_repo_bindings().get(claimed, ())
+    except ConnectRefusal:
+        known = False
+    if known:
+        return claimed, None
+    return claimed, ConnectRefusal(
+        REPO_BINDING_RULE,
+        "This folder's .mb/connect.yaml names a repo id that this folder has never saved "
+        "keys under, so no key was read or released. If this folder is the same business "
+        "(moved, re-cloned or its git remote changed), run "
+        f"`{_rebind_command(target)}` to review it; only the owner may approve it with "
+        "--yes, so an agent asks first. Otherwise connect the provider again from this folder.",
+    )
+
+
+def _bound_repo_id(target: Path, config: dict[str, Any]) -> str:
+    repo_id, refusal = _repo_binding(target, config)
+    if refusal is not None:
+        raise refusal
+    return repo_id
+
+
+def _readable_repo_id(target: Path, config: dict[str, Any]) -> str:
+    """The bound repo id, or ``""`` when the folder is not bound to the id in its file."""
+
+    repo_id, refusal = _repo_binding(target, config)
+    return "" if refusal is not None else repo_id
+
+
+def _ensure_repo_id(config: dict[str, Any], repo: Path, *, record: bool = False) -> str:
+    """The repo id a save uses, refused when the file names an id this folder may not use.
+
+    ``record`` writes the folder into the home record. Pass it only where the
+    save lock is held, so the record is rewritten whole.
+    """
+
     identity = _repo_identity(repo)
     existing = str(config.get("repo_id") or "").strip()
-    repo_id = existing or identity["repo_id"]
+    repo_id = _bound_repo_id(repo, config)
+    if record:
+        _record_repo_binding(repo_id, identity["basis_sha256"])
     config["repo_id"] = repo_id
     config["repo_identity"] = {
         "source": identity["source"],
@@ -753,6 +927,54 @@ def _ensure_repo_id(config: dict[str, Any], repo: Path) -> str:
         "repo_id_source": "existing_config" if existing else identity["source"],
     }
     return repo_id
+
+
+def rebind(repo: str | Path = ".", *, apply: bool = False) -> dict[str, Any]:
+    """Let this folder use the repo id its ``.mb/connect.yaml`` names. Owner-run.
+
+    Without ``apply`` it only reports. With it the folder is recorded in the home
+    record, after which release, status, test, rotate and exec read the keys
+    stored under that id.
+    """
+
+    target = Path(repo).resolve()
+    config = _read_config(target)
+    identity = _repo_identity(target)
+    claimed = str(config.get("repo_id") or "").strip()
+    if not claimed:
+        return {
+            "ok": True,
+            "applied": False,
+            "needed": False,
+            "repo": str(target),
+            "message": "This folder has no saved repo id, so there is nothing to rebind.",
+        }
+    _repo_id, refusal = _repo_binding(target, config)
+    result: dict[str, Any] = {
+        "ok": True,
+        "applied": False,
+        "needed": refusal is not None,
+        "repo": str(target),
+        "repo_id": claimed,
+        "message": "",
+    }
+    if refusal is None:
+        result["message"] = "This folder already may use the keys saved under its repo id."
+        return result
+    warning = (
+        "Rebinding lets this folder use the keys saved under repo id "
+        f"{claimed[:8]}. Run it only if this folder is that business."
+    )
+    if not apply:
+        result["message"] = (
+            f"{warning} Nothing was changed. The owner reruns with --yes to allow it; "
+            "an agent asks the owner first and never adds --yes on its own."
+        )
+        return result
+    _record_repo_binding(claimed, identity["basis_sha256"])
+    result["applied"] = True
+    result["message"] = f"{warning} This folder is now allowed."
+    return result
 
 
 def _write_config(repo: Path, config: dict[str, Any]) -> Path:
@@ -1891,7 +2113,7 @@ def _connect_provider(
     if source:
         _check_source_ref(source)
     config = _read_config(target)
-    repo_id = _ensure_repo_id(config, target)
+    repo_id = _ensure_repo_id(config, target, record=True)
     credential_deadline = new_credential_deadline()
     providers = config["providers"]
     raw_existing_entry = providers.get(provider.id)
@@ -2470,8 +2692,8 @@ def resolve_provider(provider_id: str, repo: str | Path = ".") -> Provider:
             config = _read_config(target)
             if isinstance(config["providers"].get(key), dict):
                 return _custom_provider(key)
-            repo_id = str(config.get("repo_id") or _repo_identity(target)["repo_id"])
-            if _user_scope_provider_entry(repo_id, key) is not None:
+            repo_id = _readable_repo_id(target, config)
+            if repo_id and _user_scope_provider_entry(repo_id, key) is not None:
                 return _custom_provider(key)
         raise
 
@@ -2520,8 +2742,48 @@ def _status_entry(provider: Provider, repo: str | Path) -> Any:
     entry = config["providers"].get(provider.id)
     if isinstance(entry, dict):
         return entry
-    repo_id = str(config.get("repo_id") or _repo_identity(target)["repo_id"])
-    return _user_scope_provider_entry(repo_id, provider.id)
+    repo_id = _readable_repo_id(target, config)
+    return _user_scope_provider_entry(repo_id, provider.id) if repo_id else None
+
+
+def _unbound_status(
+    provider: Provider, refusal: ConnectRefusal, config: dict[str, Any], target: Path
+) -> dict[str, Any]:
+    """Status for a folder whose file names a repo id it may not use: nothing is read."""
+
+    command = _rebind_command(target)
+    summary = str(refusal)
+    configured = isinstance(config["providers"].get(provider.id), dict)
+    return {
+        "provider": provider.id,
+        "name": provider.name,
+        "connected": False,
+        "configured": configured,
+        "ok": False,
+        "state": refusal.rule,
+        "stored": False,
+        "has_probe": has_provider_probe(provider.id),
+        "provider_verified": False,
+        "verified_at": "",
+        "summary": summary,
+        "repair": summary,
+        "repair_command": command,
+        "safe_to_share": True,
+        "account_label": "",
+        "metadata": {},
+        "secrets": {},
+        "last_checked_at": "",
+        "scope": "repo",
+        "user_scope_available": False,
+        "hydrated": False,
+        "validation": {
+            "state": refusal.rule,
+            "checked_at": "",
+            "provider_verified": False,
+            "verified_at": "",
+            "summary": summary,
+        },
+    }
 
 
 def _provider_status(
@@ -2536,8 +2798,9 @@ def _provider_status(
     provider = resolve_provider(provider_id, repo)
     target = Path(repo).resolve()
     config = _read_config(target)
-    identity = _repo_identity(target)
-    repo_id = str(config.get("repo_id") or identity["repo_id"])
+    repo_id, refusal = _repo_binding(target, config)
+    if refusal is not None:
+        return _unbound_status(provider, refusal, config, target)
     entry = config["providers"].get(provider.id)
     if not isinstance(entry, dict):
         user_entry = _user_scope_provider_entry(repo_id, provider.id)
@@ -2854,7 +3117,7 @@ def hydrate(
 
 def _hydrate_locked(target: Path, repo: str | Path, provider_id: str) -> dict[str, Any]:
     config = _read_config(target)
-    repo_id = _ensure_repo_id(config, target)
+    repo_id = _ensure_repo_id(config, target, record=True)
     data = _read_user_scope()
     raw_repo = data["repos"].get(repo_id)
     repo_entry = raw_repo if isinstance(raw_repo, dict) else {}
@@ -2905,7 +3168,7 @@ def _recorded_keychain_refs(repo: Path) -> list[tuple[str, str, str]]:
     """
 
     config = _read_config(repo)
-    repo_id = str(config.get("repo_id") or _repo_identity(repo)["repo_id"])
+    repo_id = _bound_repo_id(repo, config)
     entries: dict[str, dict[str, Any]] = {}
     user_repo = _read_user_scope()["repos"].get(repo_id)
     user_repo = user_repo if isinstance(user_repo, dict) else {}
@@ -3269,7 +3532,7 @@ def _check_entry_refs(provider: Provider, entry: Any, repo_id: str) -> None:
 
 def _check_repo_entry_refs(provider: Provider, entry: Any, target: Path) -> None:
     config = _read_config(target)
-    repo_id = str(config.get("repo_id") or _repo_identity(target)["repo_id"])
+    repo_id = _bound_repo_id(target, config)
     _check_entry_refs(provider, entry, repo_id)
 
 
@@ -3320,8 +3583,7 @@ def read_token(provider_id: str, repo: str | Path = ".") -> dict[str, Any]:
     field = provider.required_secrets[0]
     target = Path(repo).resolve()
     config = _read_config(target)
-    identity = _repo_identity(target)
-    repo_id = str(config.get("repo_id") or identity["repo_id"])
+    repo_id = _bound_repo_id(target, config)
     entry = config["providers"].get(provider.id)
     source = "repo"
     if not isinstance(entry, dict):
@@ -3411,7 +3673,9 @@ def read_metadata(provider_id: str, repo: str | Path = ".") -> dict[str, str]:
     provider = resolve_provider(provider_id, repo)
     target = Path(repo).resolve()
     config = _read_config(target)
-    repo_id = str(config.get("repo_id") or _repo_identity(target)["repo_id"])
+    repo_id = _readable_repo_id(target, config)
+    if not repo_id:
+        return {}
     entry = config["providers"].get(provider.id)
     if not isinstance(entry, dict):
         entry = _user_scope_provider_entry(repo_id, provider.id)
@@ -4054,7 +4318,7 @@ def _connected_entry(provider: Provider, repo: Path) -> tuple[dict[str, Any] | N
     entry = config["providers"].get(provider.id)
     if isinstance(entry, dict):
         return entry, "repo"
-    repo_id = str(config.get("repo_id") or _repo_identity(repo)["repo_id"])
+    repo_id = _bound_repo_id(repo, config)
     user_entry = _user_scope_provider_entry(repo_id, provider.id)
     if isinstance(user_entry, dict):
         return user_entry, "user"
@@ -4520,6 +4784,14 @@ def _record_validation_locked(
     for key in ("repo_id", "repo_identity"):
         if not fresh.get(key) and config.get(key):
             fresh[key] = config[key]
+    # The file may have been edited since the check: never attach this result
+    # to a different id, and bind the id read now before writing anything.
+    checked_id = str(config.get("repo_id") or "")
+    if checked_id and str(fresh.get("repo_id") or "") != checked_id:
+        return {"recorded": False, "not_recorded_reason": "repo_id_changed"}
+    bound_id = _readable_repo_id(target, fresh)
+    if not bound_id:
+        return {"recorded": False, "not_recorded_reason": REPO_BINDING_RULE}
     current = fresh["providers"].get(provider_id)
     if isinstance(current, dict):
         entry = {
@@ -4538,7 +4810,7 @@ def _record_validation_locked(
         }
         try:
             _write_user_scope_provider(
-                str(config.get("repo_id") or _repo_identity(target)["repo_id"]),
+                bound_id,
                 repo_identity=identity,
                 provider_id=provider_id,
                 entry=entry,
@@ -4753,9 +5025,9 @@ def status_all(
     target = Path(repo).resolve()
     deadline = new_credential_deadline()
     config = _read_config(target)
-    identity = _repo_identity(target)
-    repo_id = str(config.get("repo_id") or identity["repo_id"])
-    user_repo = _read_user_scope()["repos"].get(repo_id)
+    repo_id = _repo_binding(target, config)[0]
+    bound_id = _readable_repo_id(target, config)
+    user_repo = _read_user_scope()["repos"].get(bound_id) if bound_id else None
     user_repo = user_repo if isinstance(user_repo, dict) else {}
     user_providers = user_repo.get("providers")
     configured = {

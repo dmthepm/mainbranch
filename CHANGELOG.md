@@ -25,6 +25,19 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   role, save to its checkpoint file, and say to start a new lane with `MB_ROLE`.
   See [role cards](docs/role-cards.md).
 
+### Security
+
+- A `.mb/connect.yaml` copied from somewhere else can no longer name another
+  repo's id to reach that repo's keys. A folder now uses an id other than its own
+  only if it saved under it, or you ran the new `mb connect rebind` (preview,
+  then `--yes`). Otherwise token, exec, status, test, rotate, hydrate and saves
+  stop with `repo_binding_required` and the audit log says `refused`. A folder
+  that changed its git remote or came from an older release needs one rebind.
+  A process running as your own user can still edit that record. See
+  [connect](docs/connect.md#repo-identity-and-which-folder-may-use-which-keys).
+- Main Branch asks git about a folder without the caller's `GIT_DIR`, so a git
+  hook no longer changes which repo a folder is.
+
 ### Changed
 
 - The Main Branch plugin is now pinned to the exact 0.6.20 release commit. New

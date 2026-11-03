@@ -854,7 +854,7 @@ def _bootstrap(
     except CredentialBusyError as exc:
         raise GoogleConnectError(str(exc), state=exc.state) from None
     config = connect_mod._read_config(target)
-    repo_id = connect_mod._ensure_repo_id(config, target)
+    repo_id = connect_mod._ensure_repo_id(config, target, record=True)
     existing = _existing_entry(config, repo_id)
     normalized_scope, metadata, user_metadata_only = _decide(
         existing,
@@ -1312,7 +1312,7 @@ def _record_read_state(target: Path, grant_ref: str, *, reauth_required: bool) -
         connect_mod._save_lock(target, create=False),
     ):
         config = connect_mod._read_config(target)
-        repo_id = str(config.get("repo_id") or connect_mod._repo_identity(target)["repo_id"])
+        repo_id = connect_mod._bound_repo_id(target, config)
         repo_entry = config["providers"].get(PROVIDER_ID)
         entry = (
             repo_entry
