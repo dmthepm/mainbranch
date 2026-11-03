@@ -2277,10 +2277,11 @@ MACHINE_MANIFEST_OPTION = typer.Option(None, "--manifest")
 def machine_doctor_cmd(
     json_out: bool = typer.Option(False, "--json"),
     manifest: Path | None = MACHINE_MANIFEST_OPTION,
+    scope: str = typer.Option("self", "--scope", help="self or all accounts"),
 ) -> None:
     """Check the current account's machine configuration."""
     try:
-        report = machine_doctor_mod.doctor(manifest)
+        report = machine_doctor_mod.doctor(manifest, scope)
     except Exception:
         report = {
             "schema": "mb.machine.doctor",

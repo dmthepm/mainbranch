@@ -435,3 +435,10 @@ separate non-passing states; expired backup evidence fails. Caller-selected poli
 assurance. The check subset remains incomplete with exit 3 unless a check
 fails with exit 1; invalid manifests exit 2 before probes run. macOS only has partial
 OS detection. Fixture coverage does not establish real-host runtime support.
+
+Machine doctor with a manifest also reads local account and group databases,
+home privacy, the current business account's umask and private temporary
+directory, linger markers and user-session unit settings on Ubuntu and Omarchy.
+`--scope all` lists checks for other accounts as unverified. Slice-limit and
+startup-before-login checks are still pending. These additions have synthetic
+fixture evidence only; no new real-host assurance is claimed.

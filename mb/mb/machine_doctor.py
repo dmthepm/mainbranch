@@ -639,10 +639,325 @@ def attestation_reads(policy: dict[str, Any], check_id: str, now: datetime) -> l
     return reads
 
 
-def policy_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[dict[str, Any]]:
+def _accounts() -> tuple[
+    dict[str, tuple[int, int, Path]], dict[str, tuple[int, set[str]]], Reason | None
+]:
+    """Read bounded local account databases, never a credential database."""
+    accounts: dict[str, tuple[int, int, Path]] = {}
+    groups: dict[str, tuple[int, set[str]]] = {}
+    for filename in ("passwd", "group"):
+        text, reason = _text(Path("/etc") / filename, Path("/etc"))
+        if reason:
+            return {}, {}, reason
+        try:
+            for line in text.splitlines():
+                fields = line.split(":")
+                if filename == "passwd":
+                    name, _, uid, gid, _, home, _ = fields
+                    if name in accounts or not Path(home).is_absolute():
+                        raise ValueError
+                    accounts[name] = (int(uid), int(gid), Path(home))
+                else:
+                    name, _, gid, members = fields
+                    if name in groups:
+                        raise ValueError
+                    groups[name] = (int(gid), set(members.split(",")))
+        except ValueError:
+            return {}, {}, "ambiguous_config"
+    return accounts, groups, None
+
+
+def _directory(name: str, path: Path, uid: int) -> ReadResult:
+    try:
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            return _unknown(name)
+        good = (
+            stat.S_ISDIR(info.st_mode)
+            and info.st_uid == uid
+            and stat.S_IMODE(info.st_mode) == 0o700
+        )
+        return _verdict(name, good, private=good)
+    except OSError:
+        return _unknown(name, "probe_error")
+
+
+def account_checks(
+    policy: dict[str, Any], os_id: str, deadline: float, scope: str = "self"
+) -> list[dict[str, Any]]:
+    if os_id not in {"ubuntu", "omarchy"}:
+        return []
+    linux: probe.Platform = "ubuntu" if os_id == "ubuntu" else "omarchy"
+    accounts, groups, reason = _accounts()
+    users = policy["businesses"]["users"]
+    owner = policy["owner"]["user"]
+    current_uid = os.getuid()
+    skips = {entry["id"]: entry["reason"] for entry in policy["checks"].get("skip", [])}
+    results = []
+
+    def emit(
+        check_id: str,
+        anchor: str,
+        role: str,
+        subject: str,
+        run: Callable[[], list[ReadResult]],
+        *,
+        limitation: str | None = None,
+        source: str = "pack",
+    ) -> None:
+        local = role in {"any", "owner-attests"} or (
+            subject in accounts and accounts[subject][0] == current_uid
+        )
+        if not local and scope == "self":
+            return
+        spec = CheckSpec(
+            check_id,
+            "docs/machine-setup.md#" + anchor,
+            lambda _: [],
+            limitation,
+            source=source,
+            run_as=role,
+            fix_text="Review password-required sudo and business run-as rules as the owner."
+            if role == "owner-attests"
+            else None,
+        )
+        if check_id in skips:
+            reads = [
+                ReadResult(
+                    "manifest_skip", "skipped", {"reason": skips[check_id]}, "skipped_by_manifest"
+                )
+            ]
+        elif not local:
+            reads = [_unknown("account", "other_account")]
+        elif reason:
+            reads = [_unknown("account_database", reason)]
+        else:
+            reads = run()
+        result = check_result(spec, reads)
+        result["subject"] = subject
+        results.append(result)
+
+    def membership(user: str, group: str) -> bool:
+        return (
+            user in accounts
+            and group in groups
+            and (accounts[user][1] == groups[group][0] or user in groups[group][1])
+        )
+
+    admin_group = "sudo" if os_id == "ubuntu" else "wheel"
+    emit(
+        "owner.sudo-needs-password",
+        "admin-account-and-agent-accounts",
+        "owner",
+        owner,
+        lambda: [
+            _verdict(
+                "owner_in_admin_group",
+                membership(owner, admin_group),
+                member=membership(owner, admin_group),
+            ),
+            *attestation_reads(policy, "owner.sudo-needs-password", datetime.now(timezone.utc)),
+        ],
+    )
+    emit(
+        "owner.no-sudo-into-business",
+        "admin-account-and-agent-accounts",
+        "owner-attests",
+        owner,
+        lambda: attestation_reads(
+            policy, "owner.no-sudo-into-business", datetime.now(timezone.utc)
+        ),
+        limitation="Root can still become any user; the admin stays trusted.",
+    )
+
+    for user in users:
+        name, uid = user["user"], user["uid"]
+
+        def homes(
+            user: dict[str, Any] = user, name: str = name, uid: int = uid
+        ) -> list[ReadResult]:
+            found = accounts.get(name)
+            bounds = policy["businesses"]["uid_range"]
+            reads = [
+                _verdict(
+                    "declared_uid",
+                    found is not None and found[0] == uid and bounds["min"] <= uid <= bounds["max"],
+                    matches=found is not None and found[0] == uid,
+                )
+            ]
+            reads.append(
+                _directory("home_private", found[2], uid)
+                if found
+                else _verdict("home_private", False, exists=False)
+            )
+            if current_uid == uid:
+                # /proc exposes the current mask without changing process state.
+                status, error = _text(Path(f"/proc/{os.getpid()}/status"), Path("/proc"))
+                mask = re.search(r"^Umask:\s+([0-7]{4})$", status, re.M)
+                reads.append(
+                    _unknown("umask", error or "ambiguous_config")
+                    if error or not mask
+                    else _verdict("umask", mask[1] == "0077", private=mask[1] == "0077")
+                )
+                for other in users:
+                    if other["user"] == name:
+                        continue
+                    account = accounts.get(other["user"])
+                    if not account:
+                        reads.append(_unknown("other_home_unlistable"))
+                        continue
+                    try:
+                        with os.scandir(account[2]):
+                            pass
+                        reads.append(_verdict("other_home_unlistable", False, listable=True))
+                    except PermissionError:
+                        reads.append(_verdict("other_home_unlistable", True, listable=False))
+                    except OSError:
+                        reads.append(_unknown("other_home_unlistable", "probe_error"))
+            elif scope == "all":
+                reads.append(_unknown("business_home_access", "other_account"))
+            return reads
+
+        emit("businesses.users-and-homes", "one-user-account-per-business", "any", name, homes)
+        forbidden = {"sudo", "adm", "wheel", "docker", "lxd", owner}
+        # The owner's primary group can have a different name.
+        forbidden.update(
+            group
+            for group, (gid, _) in groups.items()
+            if owner in accounts and gid == accounts[owner][1]
+        )
+
+        def unprivileged(name: str = name, forbidden: set[str] = forbidden) -> list[ReadResult]:
+            good = name in accounts and not any(membership(name, group) for group in forbidden)
+            return [_verdict("unprivileged_groups", good, unprivileged=good)]
+
+        emit(
+            "businesses.no-privileged-groups",
+            "admin-account-and-agent-accounts",
+            "any",
+            name,
+            unprivileged,
+            limitation="A sudoers user rule, which requires root to read.",
+        )
+
+        def tmpdir(uid: int = uid) -> list[ReadResult]:
+            value = os.environ.get("TMPDIR")
+            if not value:
+                return [_verdict("private_tmpdir", False, set=False)]
+            if not Path(value).is_absolute() or ".." in Path(value).parts:
+                return [_unknown("private_tmpdir")]
+            # Reject symlink ancestors as well as the final directory.
+            try:
+                if any(stat.S_ISLNK(p.lstat().st_mode) for p in Path(value).parents):
+                    return [_unknown("private_tmpdir")]
+            except OSError:
+                return [_unknown("private_tmpdir", "probe_error")]
+            return [_directory("private_tmpdir", Path(value), uid)]
+
+        emit(
+            "businesses.private-tmpdir", "shared-tools-private-data", "each-business", name, tmpdir
+        )
+
+        def linger(name: str = name) -> list[ReadResult]:
+            result = probe.read_file(
+                Path("/var/lib/systemd/linger") / name, prefix=Path("/var/lib/systemd/linger")
+            )
+            if result.reason == "probe_missing":
+                return [_verdict("linger", False, enabled=False)]
+            return (
+                [_unknown("linger", result.reason)]
+                if result.reason
+                else [_verdict("linger", True, enabled=True)]
+            )
+
+        emit(
+            "sessions.linger",
+            "sessions-that-survive-a-reboot",
+            "any",
+            name,
+            linger,
+            source="engine",
+        )
+
+        def unit_fields(properties: tuple[str, ...]) -> tuple[dict[str, str], Reason | None]:
+            result = probe.run_probe(
+                linux,
+                (
+                    "/usr/bin/systemctl",
+                    "--user",
+                    "show",
+                    policy["runtime"].get("session_unit", "herdr.service"),
+                    *(f"--property={key}" for key in properties),
+                ),
+                deadline=deadline,
+            )
+            if result.reason or result.returncode != 0:
+                return {}, result.reason or "probe_error"
+            try:
+                fields = dict(line.split("=", 1) for line in result.data.decode().splitlines())
+                if set(fields) != set(properties):
+                    return {}, "ambiguous_config"
+                return fields, None
+            except (ValueError, UnicodeError):
+                return {}, "ambiguous_config"
+
+        def runtime() -> list[ReadResult]:
+            fields, error = unit_fields(("UnitFileState", "ActiveState", "Slice"))
+            if error:
+                return [_unknown("session_unit", error)]
+            return [
+                _verdict(
+                    "unit_enabled",
+                    fields["UnitFileState"] == "enabled",
+                    enabled=fields["UnitFileState"] == "enabled",
+                ),
+                _verdict(
+                    "unit_active",
+                    fields["ActiveState"] == "active",
+                    active=fields["ActiveState"] == "active",
+                ),
+                _verdict(
+                    "unit_slice",
+                    bool(fields["Slice"]) and fields["Slice"] != "app.slice",
+                    outside_app_slice=bool(fields["Slice"]) and fields["Slice"] != "app.slice",
+                ),
+            ]
+
+        emit(
+            "runtime.herdr-per-user",
+            "sessions-that-survive-a-reboot",
+            "each-business",
+            name,
+            runtime,
+        )
+
+        def updater() -> list[ReadResult]:
+            fields, error = unit_fields(("Environment",))
+            if error:
+                return [_unknown("autoupdater_disabled", error)]
+            try:
+                values = [
+                    item.split("=", 1)[1]
+                    for item in shlex.split(fields["Environment"])
+                    if item.startswith("DISABLE_AUTOUPDATER=")
+                ]
+            except ValueError:
+                return [_unknown("autoupdater_disabled")]
+            disabled = values == ["1"]
+            return [_verdict("autoupdater_disabled", disabled, disabled=disabled)]
+
+        emit("runtime.claude-autoupdate-off", "backups-and-updates", "each-business", name, updater)
+    return results
+
+
+def policy_checks(
+    policy: dict[str, Any], os_id: str, deadline: float, scope: str = "self"
+) -> list[dict[str, Any]]:
     specs = {spec.id: spec for spec in (*registry(os_id), *REGISTRY)}
     if os_id in {"ubuntu", "omarchy"}:
         for check_id, _ in manifest_loader.ATTESTABLE:
+            if check_id.startswith("owner."):
+                continue
             if check_id.endswith("-arch") != (os_id == "omarchy") and "disk-luks" in check_id:
                 continue
             specs.setdefault(
@@ -655,6 +970,8 @@ def policy_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[d
             )
     skips = {entry["id"]: entry["reason"] for entry in policy["checks"].get("skip", [])}
     for check_id in skips:
+        if check_id.startswith(("owner.", "businesses.", "sessions.", "runtime.")):
+            continue
         if check_id in {"host.os-release", "manifest.integrity"}:
             continue
         if os_id not in {"ubuntu", "omarchy"}:
@@ -690,10 +1007,12 @@ def policy_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[d
         else:
             reads = spec.run(deadline) + attestation_reads(policy, spec.id, now)
         results.append(check_result(spec, reads))
-    return results
+    return results + account_checks(policy, os_id, deadline, scope)
 
 
-def doctor(manifest: Path | None = None) -> dict[str, Any]:
+def doctor(manifest: Path | None = None, scope: str = "self") -> dict[str, Any]:
+    if scope not in {"self", "all"}:
+        raise ValueError("Invalid scope")
     policy = None
     failure = None
     metadata: dict[str, Any] = {"source": "default_path" if manifest is None else "caller_selected"}
@@ -723,7 +1042,7 @@ def doctor(manifest: Path | None = None) -> dict[str, Any]:
             "safe_to_share": False,
             "ok": False,
             "exit_code": failure,
-            "scope": "self",
+            "scope": scope,
             "manifest": metadata,
             "platform": {"id": "not_checked"},
             "run_as": {"account": getpass.getuser(), "role": "unknown"},
@@ -745,7 +1064,7 @@ def doctor(manifest: Path | None = None) -> dict[str, Any]:
         )
     ]
     checks.extend(
-        policy_checks(policy, detected["id"], deadline)
+        policy_checks(policy, detected["id"], deadline, scope)
         if policy is not None
         else [
             check_result(spec, spec.run(deadline))
@@ -824,7 +1143,7 @@ def doctor(manifest: Path | None = None) -> dict[str, Any]:
         "exit_code": code,
         "platform": detected,
         "run_as": {"account": getpass.getuser(), "role": "unknown"},
-        "scope": "self",
+        "scope": scope,
         "manifest": metadata,
         "summary": {state: counts[state] for state in STATES},
         "checks": checks,
@@ -832,7 +1151,11 @@ def doctor(manifest: Path | None = None) -> dict[str, Any]:
 
 
 def human_report(report: dict[str, Any]) -> str:
-    lines = ["Machine doctor: scope self, current account only."]
+    lines = [
+        "Machine doctor: scope self, current account only."
+        if report.get("scope", "self") == "self"
+        else "Machine doctor: scope all, other accounts are not verified."
+    ]
     for check in report["checks"]:
         lines.extend([check["section"], f"  {check['id']}: {check['state']}"])
         for read in check["reads"]:

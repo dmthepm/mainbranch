@@ -28,6 +28,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ## [0.6.21] - 2026-11-03
 
 ### Added
+- Machine doctor checks declared business accounts, private homes and temporary
+  directories, group membership, reboot persistence and session-unit settings.
+  `--scope all` lists other accounts as unverified. Resource limits and proof
+  that sessions started before login remain unimplemented.
+
 - Machine doctor honors manifest skips and dated owner attestations. Skipped
   checks and owner evidence never count as passing. Expired evidence stays
   unverified, or fails when a backup or restore test is overdue. Invalid

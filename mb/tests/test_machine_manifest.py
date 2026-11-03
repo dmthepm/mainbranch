@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 
 from mb import machine_doctor as doctor
 from mb import machine_manifest as manifest
+from mb import machine_probe as probe
 from mb.cli import app
 
 FIXTURES = Path(__file__).parent / "fixtures/machine-manifest"
@@ -137,6 +138,7 @@ def test_caller_selected_never_assures(tmp_path: Path, monkeypatch: pytest.Monke
         ),
     )
     monkeypatch.setattr(doctor, "registry", lambda _: ())
+    monkeypatch.setattr(doctor, "account_checks", lambda *args: [])
     report = doctor.doctor(path)
     assert report["exit_code"] == 3
     assert report["manifest"]["source"] == "caller_selected"
@@ -413,3 +415,110 @@ def test_deferred_baseline_skip_is_reported(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(doctor, "registry", lambda _: ())
     checks = doctor.policy_checks(data, "ubuntu", 0)
     assert next(c for c in checks if c["id"] == "shared_tools.pins-match")["state"] == "skipped"
+
+
+@pytest.mark.parametrize("good", [True, False])
+def test_d7_account_reads(monkeypatch: pytest.MonkeyPatch, good: bool) -> None:
+    data = example()
+    data["businesses"]["users"] = data["businesses"]["users"][:1]
+    user = data["businesses"]["users"][0]
+    name, uid = user["user"], user["uid"]
+    owner = data["owner"]["user"]
+    monkeypatch.setattr(os, "getuid", lambda: uid)
+    accounts = {
+        name: (uid, 2001, Path("/home/fixture-agent")),
+        owner: (1000, 1000, Path("/home/fixture-owner")),
+    }
+    groups = {"sudo": (27, {owner} if good else {name}), owner: (1000, set())}
+    monkeypatch.setattr(doctor, "_accounts", lambda: (accounts, groups, None))
+    monkeypatch.setenv("TMPDIR", "/tmp/private-fixture")
+
+    def directory(read: str, path: Path, expected: int) -> doctor.ReadResult:
+        return doctor._verdict(read, good, private=good)
+
+    monkeypatch.setattr(doctor, "_directory", directory)
+    monkeypatch.setattr(
+        Path, "lstat", lambda _: os.stat_result((0o40700, 0, 0, 1, uid, 2001, 0, 0, 0, 0))
+    )
+
+    def read_file(path: Path, **kwargs: Any) -> probe.ProbeResult:
+        if str(path) == f"/proc/{os.getpid()}/status":
+            return probe.ProbeResult(data=b"Umask:\t0077\n" if good else b"Umask:\t0022\n")
+        return probe.ProbeResult() if good else probe.ProbeResult(reason="probe_missing")
+
+    monkeypatch.setattr(probe, "read_file", read_file)
+
+    def run_probe(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        if "--property=Environment" in argv:
+            body = "Environment=TOKEN=private-fixture DISABLE_AUTOUPDATER=" + ("1" if good else "0")
+        else:
+            body = (
+                "UnitFileState="
+                + ("enabled" if good else "disabled")
+                + "\nActiveState="
+                + ("active" if good else "inactive")
+                + "\nSlice="
+                + ("background.slice" if good else "app.slice")
+            )
+        return probe.ProbeResult(data=body.encode(), returncode=0)
+
+    monkeypatch.setattr(probe, "run_probe", run_probe)
+    results = doctor.account_checks(data, "ubuntu", 0)
+    expected = "pass" if good else "fail"
+    reads = {r["name"]: r for c in results for r in c["reads"]}
+    for read in (
+        "home_private",
+        "unprivileged_groups",
+        "private_tmpdir",
+        "linger",
+        "unit_enabled",
+        "unit_active",
+        "unit_slice",
+        "autoupdater_disabled",
+    ):
+        assert reads[read]["state"] == expected, read
+    if good:
+        assert reads["umask"]["state"] == "pass"
+    assert "private-fixture" not in json.dumps(results)
+
+
+def test_d7_denied_and_other_accounts(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = example()
+    monkeypatch.setattr(os, "getuid", lambda: 999)
+    monkeypatch.setattr(doctor, "_accounts", lambda: ({}, {}, "probe_error"))
+    results = doctor.account_checks(data, "ubuntu", 0, "all")
+    assert results
+    for check in results:
+        assert check["state"] == "not_verified"
+        assert check["reason"] == (
+            "probe_error" if check["as"] in {"any", "owner-attests"} else "other_account"
+        )
+    assert any(
+        c["id"] == "runtime.herdr-per-user" and c["reason"] == "other_account" for c in results
+    )
+
+
+@pytest.mark.parametrize(
+    "mode,owner,expected",
+    [
+        (0o40700, 2001, "pass"),
+        (0o40755, 2001, "fail"),
+        (0o40700, 1000, "fail"),
+        (0o120700, 2001, "not_verified"),
+    ],
+)
+def test_d7_directory_protections(
+    monkeypatch: pytest.MonkeyPatch, mode: int, owner: int, expected: str
+) -> None:
+    monkeypatch.setattr(
+        Path, "lstat", lambda _: os.stat_result((mode, 0, 0, 1, owner, 0, 0, 0, 0, 0))
+    )
+    assert doctor._directory("home", Path("/home/fixture-agent"), 2001).state == expected
+
+
+def test_d7_directory_denied(monkeypatch: pytest.MonkeyPatch) -> None:
+    def denied(_: Path) -> Any:
+        raise PermissionError
+
+    monkeypatch.setattr(Path, "lstat", denied)
+    assert doctor._directory("home", Path("/home/fixture-agent"), 2001).reason == "probe_error"

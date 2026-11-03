@@ -600,3 +600,18 @@ Omarchy boxes also have `host.screen-lock` NOT VERIFIED. macOS always exits
 4. The v0-7 target in this file name is tentative.
 
 Next: the code batch runs on #1248.
+
+### D7 partial implementation note
+
+The bounded D7 lane adds local `/etc/passwd` and `/etc/group` reads, account
+identity and home permissions, current-process umask and cross-home directory
+access, private TMPDIR, linger markers, and user-unit enablement, activity,
+slice and updater flag reads. Enablement and activity use named `systemctl
+show` properties instead of separate `is-enabled` and `is-active` invocations
+to keep the reads bounded. It does not query network account providers.
+
+Slice limits and startup-before-login comparison remain unimplemented. The
+account checks are policy-bound additions outside the static registry; full
+registry metadata validation remains required. No D7 section is removed from
+`manifest.coverage`, since this lane does not complete the section contract.
+The implementation is a partial handoff for further work, not D7 acceptance.
