@@ -85,6 +85,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `/mb-grow` (draft): a daily growth loop for one agent per business. It reads
+  the goal number from `core/growth/goal.md`, picks one move, acts only inside
+  the limits the owner writes in `core/growth/autonomy.md`, logs it in
+  `state/growth/log.md`, and reviews the week with evidence of impact.
+  Spending, publishing, customer contact and account changes always ask.
 - The Claude Code role hook also runs on `fork` (a session forked from another),
   matching the documented SessionStart sources. Not yet run live.
 - Role cards in Codex. `mb role codex-hook` previews, and with `--apply` installs,
