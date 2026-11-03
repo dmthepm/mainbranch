@@ -50,7 +50,9 @@ them, then wait.
 1. **Read the number.** Read it from the source named in `goal.md`, never from
    memory or an old log. Write the value with its time and source. If it cannot
    be read, today's move is fixing the read path: name the missing connection or
-   key and route it (see "Platform gaps"). Never guess a number.
+   key and route it (see "Platform gaps"). Never guess a number. Some sources
+   lag: Search Console's final numbers arrive 2 to 3 days late, so read the
+   latest final day and say which day it is.
 2. **Check yesterday's move.** Find its expected signal in the log. Record what
    happened, or "too early" with the date it can be read.
 3. **Pick one move.** Score the candidates in
@@ -66,7 +68,13 @@ them, then wait.
 5. **Log it.** One entry in `state/growth/log.md` (format below). Commit it with
    the checkpoint flow the repo already uses.
 
-One move a day is the default. `autonomy.md` may allow more.
+Record each step's outcome as you go. A run that stops partway says which step
+it stopped at, never "done". Before acting, read today's entry: if a step
+already finished today, do not repeat it.
+
+One move a day is the default. `autonomy.md` may allow more, but never more than
+three pull requests a day. Changes made without asking are labelled unreviewed
+until the owner merges or accepts them.
 
 ## Talking to other agents
 
