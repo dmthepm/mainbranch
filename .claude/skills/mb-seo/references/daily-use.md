@@ -1,4 +1,8 @@
-# OpenSEO Daily Use
+# OpenSEO Spend and Schedule Limits
+
+Procedures live in OpenSEO's own skills ([upstream-skills.md](upstream-skills.md)).
+This file keeps only the spend and schedule exceptions they do not enforce. They
+were read against the v0.1.21 pin; recheck them when the pin moves.
 
 Use the MCP server named `openseo-<BIZ>` for this business. If the name does not
 match this business, stop.
