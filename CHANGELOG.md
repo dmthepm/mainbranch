@@ -15,6 +15,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New
   installs get that release, and owners move only when a new release is pinned.
+- `/mb-seo` is now the business layer around OpenSEO's own 12 skills. It names
+  each one with a short before-and-after handoff instead of restating their steps.
+  For a self-hosted copy it documents a skills-only install at a verified pin, in
+  place of the blanket "do not install the plugin" rule, and adds a hardening
+  checklist for the Access guard. Still experimental.
 
 ## [0.6.21] - 2026-11-03
 

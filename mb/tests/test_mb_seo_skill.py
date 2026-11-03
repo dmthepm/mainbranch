@@ -183,3 +183,34 @@ def test_ai_agents_reference_is_routed_and_makes_no_promises() -> None:
     flat = _flat(reference)
     assert "Never promise citations or AI traffic." in flat
     assert "The owner approves every site edit." in flat
+
+
+UPSTREAM_SKILLS = (
+    "seo-coach",
+    "seo-project-setup",
+    "keyword-research",
+    "keyword-clustering",
+    "seo-audit",
+    "competitor-analysis",
+    "competitive-landscape",
+    "link-prospecting",
+    "ai-prompt-research",
+    "ai-visibility-audit",
+    "local-seo",
+    "seo-report",
+)
+
+
+def test_mb_seo_names_every_upstream_skill_with_a_handoff() -> None:
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    handoffs = (SKILL_DIR / "references/upstream-skills.md").read_text(encoding="utf-8")
+    for name in UPSTREAM_SKILLS:
+        assert f"`{name}`" in skill
+        assert f"| `{name}` |" in handoffs
+
+
+def test_mb_seo_install_is_skills_only_at_a_verified_ref() -> None:
+    setup = SETUP.read_text(encoding="utf-8")
+    assert "Install the skills only" in setup
+    assert "Do not install the upstream OpenSEO plugin" not in setup
+    assert "beca5c1f5c728acfb243249107dbfaded0ef552e" in setup
