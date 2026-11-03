@@ -633,3 +633,29 @@ than passing. This differs from the planned timestamp comparison: bounded
 current logind records lose closed sessions and cannot prove the first login
 this boot. A durable boot-scoped login evidence source is still required.
 No reboot-test assurance is claimed.
+
+### D8 implementation details
+
+Pinned directories use `<tool_root>/installs/<name>/<version>`. The schema has
+no install-layout field, so doctor uses this fixed convention and does not
+expand a version or bin string as a path or command. Versions outside one safe
+path segment stay unverified. Tool files and directories reject symlinks; this
+conservative check does not establish a symlink-based installation's pins.
+Tarball checksums and binary contents remain unproved.
+
+The shell's first PATH entry must equal `<tool_root>/bin`. This narrows "under
+tool_root" to the bin directory promised by the schema. Other-account shell
+environments stay unverified. Heavy-lock metadata uses descriptor-pinned
+parents, checks a regular file, exact mode 0660 and the declared group. The
+wrapper's refusal behavior always stays unverified because it is never run.
+
+Restore records have a 4096-byte cap, reject symlinks and duplicate JSON keys,
+and require the opened file to be root-owned without group or other write.
+Only `date` and `result` leave the parser. Dates accept a calendar date at UTC
+midnight or a UTC timestamp; result is `pass` or `fail`. Future or malformed
+records stay unverified. Unreadable records retain that unverified read beside
+the fallback owner attestation so evidence does not hide the failed read.
+A missing `max_age_hours`, optional in the pack schema, keeps freshness
+unverified because no expiry can be established. These sections leave
+`manifest.coverage` on supported Linux because all their rows now emit reads;
+unverified, attested and skipped outcomes remain non-passing.

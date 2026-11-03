@@ -28,6 +28,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ## [0.6.21] - 2026-11-03
 
 ### Added
+- Machine doctor checks shared-tool ownership and pin directories, the current
+  business account's tool path and heavy-work lock, and dated backup evidence.
+  It inspects the job wrapper without running it. Restore records expose only
+  the date and result; overdue restore tests fail.
+
 - Machine doctor checks declared business accounts, private homes and temporary
   directories, group membership, reboot persistence and session-unit settings.
   It compares resource limits with each account's size class and warns when

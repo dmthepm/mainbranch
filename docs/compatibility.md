@@ -444,3 +444,10 @@ compared with declared size classes; host RAM drift above 10% warns. The
 startup-before-login row warns because a unit timestamp cannot prove the
 first login this boot. Sessions coverage remains incomplete. These additions have synthetic
 fixture evidence only; no new real-host assurance is claimed.
+
+Machine doctor also checks declared shared-tool files and install directories,
+the current business shell's PATH, heavy-lock mode and group, and wrapper
+metadata. It never executes shared tools or the wrapper. Backup freshness uses
+owner attestations; bounded restore records supply only their date and result.
+Unreadable records retain an unverified read alongside any owner evidence.
+These rows have synthetic fixture evidence only.

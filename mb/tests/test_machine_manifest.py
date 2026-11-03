@@ -391,6 +391,9 @@ def test_skip_prevents_probe_and_preserves_other_coverage(monkeypatch: pytest.Mo
         "checks",
         "owner",
         "runtime",
+        "shared_tools",
+        "heavy_work",
+        "backups",
     }
     assert "Skipped: owner choice" in doctor.human_report(report)
 
@@ -676,7 +679,7 @@ def test_d7b_registry_metadata() -> None:
         re.sub(r"[^\w\- ]", "", h.lower()).replace(" ", "-")
         for h in re.findall(r"^#{1,6} (.+)$", guide, re.M)
     }
-    for spec in doctor.ACCOUNT_SPECS:
+    for spec in (*doctor.ACCOUNT_SPECS, *doctor.TOOL_SPECS):
         assert spec.section.split("#")[1] in anchors
         if spec.run_as == "owner-attests":
             assert spec.fix_text
@@ -753,3 +756,283 @@ def test_d7b_startup_never_infers_reboot_pass(monkeypatch: pytest.MonkeyPatch) -
         if c["id"] == "sessions.started-without-login"
     )
     assert result["state"] == "warn"
+
+
+def d8_only(monkeypatch: pytest.MonkeyPatch, check_id: str) -> dict[str, Any]:
+    data = example()
+    data["checks"] = {
+        "skip": [{"id": s.id, "reason": "fixture"} for s in doctor.TOOL_SPECS if s.id != check_id]
+    }
+    monkeypatch.setattr(os, "getuid", lambda: data["businesses"]["users"][0]["uid"])
+    return data
+
+
+def d8_result(data: dict[str, Any], check_id: str) -> dict[str, Any]:
+    return next(c for c in doctor.tool_checks(data, "ubuntu") if c["id"] == check_id)
+
+
+def d8_info(mode: int = 0o100755, uid: int = 0, gid: int = 0) -> os.stat_result:
+    return os.stat_result((mode, 0, 0, 1, uid, gid, 0, 0, 0, 0))
+
+
+@pytest.mark.parametrize(
+    "mode,uid,gid,state",
+    [
+        (0o100755, 0, 0, "pass"),
+        (0o100775, 0, 0, "fail"),
+        (0o100755, 1234, 0, "fail"),
+        (0o100755, 0, 1234, "fail"),
+        (0o040755, 0, 0, "fail"),
+    ],
+)
+def test_d8_tool_metadata(
+    monkeypatch: pytest.MonkeyPatch, mode: int, uid: int, gid: int, state: str
+) -> None:
+    monkeypatch.setattr(doctor, "_metadata", lambda *a: (d8_info(mode, uid, gid), None))
+    assert (
+        doctor._tool_metadata("fixture", Path("/opt/tools/bin/x"), Path("/opt/tools")).state
+        == state
+    )
+
+
+@pytest.mark.parametrize("error", ["probe_error", "probe_missing", "ambiguous_config"])
+def test_d8_metadata_errors(monkeypatch: pytest.MonkeyPatch, error: doctor.Reason) -> None:
+    monkeypatch.setattr(doctor, "_metadata", lambda *a: (None, error))
+    assert (
+        doctor._tool_metadata("fixture", Path("/opt/tools/x"), Path("/opt/tools")).reason == error
+    )
+
+
+def test_d8_metadata_confinement(tmp_path: Path) -> None:
+    target = tmp_path / "target"
+    target.write_text("private")
+    alias = tmp_path / "alias"
+    alias.symlink_to(target)
+    assert doctor._metadata(alias, tmp_path)[1] == "ambiguous_config"
+    assert doctor._metadata(tmp_path / ".." / "outside", tmp_path)[1] == "ambiguous_config"
+    assert doctor._metadata(Path("/outside"), tmp_path)[1] == "ambiguous_config"
+    assert doctor._metadata(target, tmp_path)[0] is not None
+    parent = tmp_path / "parent"
+    parent.symlink_to(tmp_path, target_is_directory=True)
+    assert doctor._metadata(parent / "target", tmp_path)[0] is None
+
+
+def test_d8_metadata_denied(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(os, "open", Mock(side_effect=PermissionError))
+    assert doctor._metadata(tmp_path / "file", tmp_path)[1] == "probe_error"
+
+
+@pytest.mark.parametrize("bad", [False, True])
+def test_d8_tools_and_pins(monkeypatch: pytest.MonkeyPatch, bad: bool) -> None:
+    data = d8_only(monkeypatch, "shared_tools.root-owned-readonly")
+    monkeypatch.setattr(
+        doctor,
+        "_metadata",
+        lambda path, *a: (
+            d8_info(
+                (0o040777 if bad else 0o040755)
+                if path.name in ("box-tools", "bin")
+                else (0o100777 if bad else 0o100755)
+            ),
+            None,
+        ),
+    )
+    assert d8_result(data, "shared_tools.root-owned-readonly")["state"] == (
+        "fail" if bad else "pass"
+    )
+    data = d8_only(monkeypatch, "shared_tools.pins-match")
+    monkeypatch.setattr(doctor, "_metadata", lambda *a: (d8_info(0o040755), None))
+    if bad:
+        data["shared_tools"]["tools"][0]["version"] = "LATEST"
+    assert d8_result(data, "shared_tools.pins-match")["state"] == ("fail" if bad else "pass")
+
+
+@pytest.mark.parametrize("field,value", [("version", "../../outside"), ("bins", ["/outside"])])
+def test_d8_data_paths_not_expanded(
+    monkeypatch: pytest.MonkeyPatch, field: str, value: Any
+) -> None:
+    check = "shared_tools.pins-match" if field == "version" else "shared_tools.root-owned-readonly"
+    data = d8_only(monkeypatch, check)
+    data["shared_tools"]["tools"][0][field] = value
+    seen = []
+
+    def metadata(path: Path, *a: Any) -> tuple[os.stat_result, None]:
+        seen.append(path)
+        return d8_info(
+            0o040755 if path.name in ("box-tools", "bin") or "installs" in path.parts else 0o100755
+        ), None
+
+    monkeypatch.setattr(doctor, "_metadata", metadata)
+    assert d8_result(data, check)["state"] == "not_verified"
+    assert all(
+        ".." not in p.parts and p.is_relative_to(Path(data["labels"]["tool_root"])) for p in seen
+    )
+
+
+@pytest.mark.parametrize("matches", [True, False])
+def test_d8_environment(monkeypatch: pytest.MonkeyPatch, matches: bool) -> None:
+    for check, variable, expected in (
+        ("shared_tools.path-order", "PATH", "/opt/box-tools/bin"),
+        ("heavy_work.lock", "HEAVY_LOCK", "/run/box-users/heavy.lock"),
+    ):
+        data = d8_only(monkeypatch, check)
+        monkeypatch.setenv(variable, expected if matches else "/wrong")
+        monkeypatch.setattr(doctor, "_metadata", lambda *a: (d8_info(0o100660, gid=2222), None))
+        monkeypatch.setattr(doctor, "_accounts", lambda: ({}, {"box-users": (2222, set())}, None))
+        reads = d8_result(data, check)["reads"]
+        assert reads[-1]["state"] == ("pass" if matches else "fail")
+        monkeypatch.setattr(os, "getuid", lambda: 9999)
+        assert d8_result(data, check)["reads"][-1]["reason"] == "other_account"
+
+
+@pytest.mark.parametrize(
+    "mode,gid,error,state",
+    [
+        (0o100660, 2222, None, "pass"),
+        (0o100666, 2222, None, "fail"),
+        (0o100660, 3333, None, "fail"),
+        (0o100660, 2222, "probe_error", "not_verified"),
+        (0o100660, 2222, "ambiguous_config", "not_verified"),
+    ],
+)
+def test_d8_lock(
+    monkeypatch: pytest.MonkeyPatch, mode: int, gid: int, error: doctor.Reason | None, state: str
+) -> None:
+    data = d8_only(monkeypatch, "heavy_work.lock")
+    monkeypatch.setattr(doctor, "_metadata", lambda *a: (d8_info(mode, gid=gid), error))
+    monkeypatch.setattr(doctor, "_accounts", lambda: ({}, {"box-users": (2222, set())}, None))
+    assert d8_result(data, "heavy_work.lock")["reads"][0]["state"] == state
+
+
+def test_d8_wrapper_never_runs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    data = d8_only(monkeypatch, "heavy_work.capped-run")
+    root = tmp_path / "tools"
+    (root / "bin").mkdir(parents=True)
+    marker = tmp_path / "executed"
+    wrapper = root / "bin" / "capped-run"
+    wrapper.write_text(f"#!/bin/sh\ntouch {marker}\n")
+    wrapper.chmod(0o755)
+    data["labels"]["tool_root"] = str(root)
+    monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("execution forbidden")))
+    result = d8_result(data, "heavy_work.capped-run")
+    assert result["reads"][1]["state"] == "not_verified"
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize(
+    "body,state",
+    [
+        (b'{"date":"2026-11-01","result":"pass","extra":"SECRET_FIXTURE"}', "pass"),
+        (b'{"date":"2020-01-01","result":"pass"}', "fail"),
+        (b'{"date":"2026-11-01","result":"fail"}', "fail"),
+        (b'{"date":"2099-01-01","result":"pass"}', "not_verified"),
+        (b'{"date":"2026-02-30","result":"pass"}', "not_verified"),
+        (b'{"date":"2026-11-01","result":"SECRET_FIXTURE"}', "not_verified"),
+        (b'{"date":"2026-11-01","date":"2020-01-01","result":"pass"}', "not_verified"),
+        (b"[]", "not_verified"),
+        (b"bad", "not_verified"),
+    ],
+)
+def test_d8_restore_fields(monkeypatch: pytest.MonkeyPatch, body: bytes, state: str) -> None:
+    data = d8_only(monkeypatch, "backups.restore-tested")
+
+    def read(path: Path, *, prefix: Path, byte_cap: int, root_owned: bool) -> probe.ProbeResult:
+        assert path == Path(data["backups"]["restore_test"]["record"])
+        assert prefix == Path("/var/lib") and byte_cap == 4096 and root_owned
+        return probe.ProbeResult(body)
+
+    monkeypatch.setattr(probe, "read_file", read)
+    result = d8_result(data, "backups.restore-tested")
+    assert result["state"] == state
+    assert "SECRET_FIXTURE" not in json.dumps(result)
+    assert set(result["reads"][0]["observed"]) <= {"date", "result"}
+
+
+@pytest.mark.parametrize("error", ["probe_error", "probe_missing", "ambiguous_config"])
+def test_d8_restore_fallback(monkeypatch: pytest.MonkeyPatch, error: probe.ProbeReason) -> None:
+    data = d8_only(monkeypatch, "backups.restore-tested")
+    data["checks"]["attest"] = [
+        {
+            "id": "backups.restore-tested",
+            "read": "restore_test_attested",
+            "answer": "yes",
+            "at": "2026-11-01T00:00:00Z",
+        }
+    ]
+    monkeypatch.setattr(probe, "read_file", lambda *a, **k: probe.ProbeResult(reason=error))
+    result = d8_result(data, "backups.restore-tested")
+    assert result["reads"][0]["reason"] == error
+    assert result["reads"][1]["state"] == "attested"
+    assert result["state"] != "pass"
+
+
+def test_d8_all_skips(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = d8_only(monkeypatch, "none")
+    monkeypatch.setattr(doctor, "_metadata", Mock(side_effect=AssertionError("skipped read")))
+    monkeypatch.setattr(probe, "read_file", Mock(side_effect=AssertionError("skipped read")))
+    assert [c["state"] for c in doctor.tool_checks(data, "ubuntu")] == ["skipped"] * 7
+    specs = {s.id: s for s in doctor.registry("ubuntu", include_policy=True)}
+    for spec in doctor.TOOL_SPECS:
+        assert spec.id in manifest.CHECK_IDS and specs[spec.id] == spec
+        if spec.run_as == "owner-attests":
+            assert spec.fix_text
+
+
+@pytest.mark.parametrize(
+    "check",
+    ["shared_tools.root-owned-readonly", "shared_tools.pins-match", "heavy_work.capped-run"],
+)
+@pytest.mark.parametrize("error", ["probe_error", "ambiguous_config", "probe_missing"])
+def test_d8_row_metadata_errors(
+    monkeypatch: pytest.MonkeyPatch, check: str, error: doctor.Reason
+) -> None:
+    data = d8_only(monkeypatch, check)
+    monkeypatch.setattr(doctor, "_metadata", lambda *a: (None, error))
+    result = d8_result(data, check)
+    assert result["state"] == "not_verified"
+    assert result["reads"][0]["reason"] == error
+
+
+@pytest.mark.parametrize(
+    "uid,mode,state",
+    [(0, 0o100644, None), (1234, 0o100644, "ambiguous_config"), (0, 0o100666, "ambiguous_config")],
+)
+def test_d8_restore_root_owned_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uid: int, mode: int, state: str | None
+) -> None:
+    path = tmp_path / "record.json"
+    path.write_text('{"date":"2026-11-01","result":"pass"}')
+    monkeypatch.setattr(os, "fstat", lambda fd: d8_info(mode, uid))
+    assert probe.read_file(path, prefix=tmp_path, root_owned=True).reason == state
+
+
+@pytest.mark.parametrize("kind", ["symlink", "fifo", "large"])
+def test_d8_restore_unsafe_file(tmp_path: Path, kind: str) -> None:
+    path = tmp_path / "record.json"
+    if kind == "symlink":
+        target = tmp_path / "target"
+        target.write_text("SECRET_FIXTURE")
+        path.symlink_to(target)
+    elif kind == "fifo":
+        os.mkfifo(path)
+    else:
+        path.write_bytes(b"x" * 4097)
+    assert probe.read_file(path, prefix=tmp_path, byte_cap=4096).reason is not None
+
+
+@pytest.mark.parametrize("missing", [True, False])
+def test_d8_backup_age_missing_limit(monkeypatch: pytest.MonkeyPatch, missing: bool) -> None:
+    data = d8_only(monkeypatch, "backups.fresh")
+    if missing:
+        del data["backups"]["max_age_hours"]
+    else:
+        data["checks"]["attest"] = [
+            {
+                "id": "backups.fresh",
+                "read": "last_backup",
+                "answer": "yes",
+                "at": "2020-01-01T00:00:00Z",
+            }
+        ]
+    result = d8_result(data, "backups.fresh")
+    assert result["state"] == ("not_verified" if missing else "fail")

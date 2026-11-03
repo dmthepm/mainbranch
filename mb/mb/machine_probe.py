@@ -131,7 +131,9 @@ def run_probe(
         return ProbeResult(reason="probe_error")
 
 
-def read_file(path: Path, *, prefix: Path, byte_cap: int = DEFAULT_BYTE_CAP) -> ProbeResult:
+def read_file(
+    path: Path, *, prefix: Path, byte_cap: int = DEFAULT_BYTE_CAP, root_owned: bool = False
+) -> ProbeResult:
     """Read a regular file below a registry prefix without following symlinks.
 
     Walk from the root using directory descriptors so swapped parent paths
@@ -163,6 +165,9 @@ def read_file(path: Path, *, prefix: Path, byte_cap: int = DEFAULT_BYTE_CAP) -> 
         )
         with os.fdopen(file_descriptor, "rb") as stream:
             if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                return ProbeResult(reason="ambiguous_config")
+            info = os.fstat(stream.fileno())
+            if root_owned and (info.st_uid != 0 or info.st_mode & 0o022):
                 return ProbeResult(reason="ambiguous_config")
             data = stream.read(byte_cap + 1)
             if len(data) > byte_cap:

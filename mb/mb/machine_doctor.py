@@ -602,7 +602,7 @@ def registry(os_id: str, *, include_policy: bool = False) -> tuple[CheckSpec, ..
         ),
     )
     return tuple(spec for spec in specs if os_id in spec.platforms) + (
-        ACCOUNT_SPECS if include_policy else ()
+        (*ACCOUNT_SPECS, *TOOL_SPECS) if include_policy else ()
     )
 
 
@@ -650,6 +650,246 @@ ACCOUNT_SPECS = tuple(
         ("runtime.claude-autoupdate-off", "backups-and-updates", "each-business", "pack", None),
     )
 )
+
+
+TOOL_SPECS = tuple(
+    CheckSpec(
+        check_id,
+        "docs/machine-setup.md#" + anchor,
+        lambda _: [_unknown("manifest", "no_manifest")],
+        limitation,
+        run_as=role,
+        fix_text=fix,
+    )
+    for check_id, anchor, role, limitation, fix in (
+        ("shared_tools.root-owned-readonly", "shared-tools-private-data", "any", None, None),
+        (
+            "shared_tools.pins-match",
+            "shared-tools-private-data",
+            "any",
+            "Tarball checksums are not recomputed. "
+            "Install directories do not prove binary contents.",
+            None,
+        ),
+        (
+            "shared_tools.path-order",
+            "shared-tools-private-data",
+            "each-business",
+            "The PATH of services not started from this shell.",
+            None,
+        ),
+        (
+            "heavy_work.lock",
+            "one-heavy-job-at-a-time",
+            "any + each-business",
+            "That every heavy job actually takes the lock.",
+            None,
+        ),
+        (
+            "heavy_work.capped-run",
+            "one-heavy-job-at-a-time",
+            "any",
+            "Whether the wrapper refuses an uncapped job; doctor never executes it.",
+            None,
+        ),
+        (
+            "backups.fresh",
+            "backups-and-updates",
+            "owner-attests",
+            "Snapshot contents and restorability on the off-box backup host.",
+            "Check the backup host and record the last successful backup date.",
+        ),
+        (
+            "backups.restore-tested",
+            "backups-and-updates",
+            "owner",
+            None,
+            "Restore a home into a scratch account and record the date and result.",
+        ),
+    )
+)
+
+
+def _metadata(path: Path, prefix: Path) -> tuple[os.stat_result | None, Reason | None]:
+    """Inspect metadata through pinned parents, rejecting every symlink."""
+    if not path.is_absolute() or ".." in path.parts or not path.is_relative_to(prefix):
+        return None, "ambiguous_config"
+    descriptor = None
+    try:
+        descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+        for component in path.parts[1:-1]:
+            child = os.open(
+                component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor
+            )
+            os.close(descriptor)
+            descriptor = child
+        info = os.stat(path.name, dir_fd=descriptor, follow_symlinks=False)
+        if stat.S_ISLNK(info.st_mode):
+            return None, "ambiguous_config"
+        return info, None
+    except FileNotFoundError:
+        return None, "probe_missing"
+    except OSError:
+        return None, "probe_error"
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _tool_metadata(name: str, path: Path, root: Path, directory: bool = False) -> ReadResult:
+    info, error = _metadata(path, root)
+    if error or info is None:
+        return _unknown(name, error or "probe_error")
+    correct_type = stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+    good = correct_type and info.st_uid == 0 and info.st_gid == 0 and not info.st_mode & 0o022
+    return _verdict(
+        name,
+        good,
+        root_owned=info.st_uid == 0 and info.st_gid == 0,
+        readonly=not bool(info.st_mode & 0o022),
+        correct_type=correct_type,
+    )
+
+
+def tool_checks(policy: dict[str, Any], os_id: str, scope: str = "self") -> list[dict[str, Any]]:
+    if os_id not in {"ubuntu", "omarchy"}:
+        return []
+    root = Path(policy["labels"]["tool_root"])
+    tools = policy["shared_tools"]["tools"]
+    heavy = policy["heavy_work"]
+    lock = Path(policy["labels"]["run_dir"]) / heavy["lock_name"]
+    now = datetime.now(timezone.utc)
+    skips = {entry["id"]: entry["reason"] for entry in policy["checks"].get("skip", [])}
+
+    def ownership() -> list[ReadResult]:
+        reads = [
+            _tool_metadata("tool_root", root, root, True),
+            _tool_metadata("tool_bin", root / "bin", root, True),
+        ]
+        for index, tool in enumerate(tools):
+            for number, binary in enumerate(tool.get("bins", [tool["name"]])):
+                name = f"tool_{index}_bin_{number}"
+                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", binary):
+                    reads.append(_unknown(name))
+                else:
+                    reads.append(_tool_metadata(name, root / "bin" / binary, root))
+        return reads
+
+    def pins() -> list[ReadResult]:
+        reads = []
+        for index, tool in enumerate(tools):
+            name = f"tool_{index}_pin"
+            version = tool["version"]
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]*", version):
+                reads.append(_unknown(name))
+            elif version.lower() in {"latest", "lts"}:
+                reads.append(_verdict(name, False, pinned=False))
+            else:
+                reads.append(
+                    _tool_metadata(name, root / "installs" / tool["name"] / version, root, True)
+                )
+        return reads
+
+    def lock_reads() -> list[ReadResult]:
+        info, error = _metadata(lock, Path(policy["labels"]["run_dir"]))
+        if error or info is None:
+            reads = [_unknown("lock_mode_and_group", error or "probe_error")]
+        else:
+            _, groups, group_error = _accounts()
+            if group_error:
+                reads = [_unknown("lock_mode_and_group", group_error)]
+            else:
+                group = groups.get(policy["labels"]["shared_group"])
+                matches = group is not None and info.st_gid == group[0]
+                good = (
+                    stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o660 and matches
+                )
+                reads = [
+                    _verdict(
+                        "lock_mode_and_group",
+                        good,
+                        group_matches=matches,
+                        mode_matches=stat.S_IMODE(info.st_mode) == 0o660,
+                    )
+                ]
+        reads.extend(environment("env_var_names_lock", heavy["env_var"], str(lock)))
+        return reads
+
+    def environment(name: str, variable: str, expected: str) -> list[ReadResult]:
+        current = next((u for u in policy["businesses"]["users"] if u["uid"] == os.getuid()), None)
+        if current is None:
+            return [_unknown(name, "other_account")]
+        value = os.environ.get(variable, "")
+        matches = value == expected if variable != "PATH" else value.split(":")[0] == expected
+        reads = [_verdict(name, matches, set=bool(value), matches=matches)]
+        if scope == "all" and any(u["uid"] != os.getuid() for u in policy["businesses"]["users"]):
+            reads.append(_unknown(name + "_other_accounts", "other_account"))
+        return reads
+
+    def wrapper() -> list[ReadResult]:
+        return [
+            _tool_metadata("wrapper_metadata", root / "bin" / heavy["wrapper"], root),
+            _unknown("refuses_uncapped_job", "not_checked"),
+        ]
+
+    def restore() -> list[ReadResult]:
+        setting = policy["backups"]["restore_test"]
+        if "record" not in setting:
+            return attestation_reads(policy, "backups.restore-tested", now)
+        result = probe.read_file(
+            Path(setting["record"]), prefix=Path("/var/lib"), byte_cap=4096, root_owned=True
+        )
+        if result.reason:
+            return [
+                _unknown("restore_test_record", result.reason),
+                *attestation_reads(policy, "backups.restore-tested", now),
+            ]
+        try:
+            data = json.loads(result.data, object_pairs_hook=manifest_loader._pairs)
+            if not isinstance(data, dict) or not isinstance(data.get("date"), str):
+                raise ValueError
+            date = data["date"]
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)?", date):
+                raise ValueError
+            at = datetime.fromisoformat(date.replace("Z", "+00:00"))
+            if at.tzinfo is None:
+                at = at.replace(tzinfo=timezone.utc)
+            outcome = data.get("result")
+            if outcome not in ("pass", "fail"):
+                raise ValueError
+            if at > now:
+                return [_unknown("restore_test_record")]
+            good = outcome == "pass" and now - at <= timedelta(days=setting["max_age_days"])
+            return [_verdict("restore_test_record", good, date=date, result=outcome)]
+        except (ValueError, TypeError, UnicodeError):
+            return [_unknown("restore_test_record")]
+
+    runners = {
+        "shared_tools.root-owned-readonly": ownership,
+        "shared_tools.pins-match": pins,
+        "shared_tools.path-order": lambda: environment("path_order", "PATH", str(root / "bin")),
+        "heavy_work.lock": lock_reads,
+        "heavy_work.capped-run": wrapper,
+        "backups.fresh": lambda: (
+            attestation_reads(policy, "backups.fresh", now)
+            if "max_age_hours" in policy["backups"]
+            else [_unknown("last_backup")]
+        ),
+        "backups.restore-tested": restore,
+    }
+    return [
+        check_result(
+            spec,
+            [
+                ReadResult(
+                    "manifest_skip", "skipped", {"reason": skips[spec.id]}, "skipped_by_manifest"
+                )
+            ]
+            if spec.id in skips
+            else runners[spec.id](),
+        )
+        for spec in TOOL_SPECS
+    ]
 
 
 REGISTRY: tuple[CheckSpec, ...] = ()
@@ -1111,7 +1351,7 @@ def policy_checks(
     specs = {spec.id: spec for spec in (*registry(os_id), *REGISTRY)}
     if os_id in {"ubuntu", "omarchy"}:
         for check_id, _ in manifest_loader.ATTESTABLE:
-            if check_id.startswith("owner."):
+            if check_id.startswith(("owner.", "backups.")):
                 continue
             if check_id.endswith("-arch") != (os_id == "omarchy") and "disk-luks" in check_id:
                 continue
@@ -1125,7 +1365,17 @@ def policy_checks(
             )
     skips = {entry["id"]: entry["reason"] for entry in policy["checks"].get("skip", [])}
     for check_id in skips:
-        if check_id.startswith(("owner.", "businesses.", "sessions.", "runtime.")):
+        if check_id.startswith(
+            (
+                "owner.",
+                "businesses.",
+                "sessions.",
+                "runtime.",
+                "shared_tools.",
+                "heavy_work.",
+                "backups.",
+            )
+        ):
             continue
         if check_id in {"host.os-release", "manifest.integrity"}:
             continue
@@ -1162,7 +1412,9 @@ def policy_checks(
         else:
             reads = spec.run(deadline) + attestation_reads(policy, spec.id, now)
         results.append(check_result(spec, reads))
-    return results + account_checks(policy, os_id, deadline, scope)
+    return (
+        results + account_checks(policy, os_id, deadline, scope) + tool_checks(policy, os_id, scope)
+    )
 
 
 def doctor(manifest: Path | None = None, scope: str = "self") -> dict[str, Any]:
@@ -1255,7 +1507,15 @@ def doctor(manifest: Path | None = None, scope: str = "self") -> dict[str, Any]:
                     for section in policy
                     if section
                     not in (
-                        {"manifest_version", "checks", "owner", "runtime"}
+                        {
+                            "manifest_version",
+                            "checks",
+                            "owner",
+                            "runtime",
+                            "shared_tools",
+                            "heavy_work",
+                            "backups",
+                        }
                         if detected["id"] in {"ubuntu", "omarchy"}
                         else {"manifest_version", "checks"}
                     )
