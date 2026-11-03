@@ -26,8 +26,8 @@ Three pieces, built in this order:
 Rules that hold throughout:
 
 - `mb` never installs, updates, pulls or rewrites a tool's skills. It prints
-  the install command and the release notes link for the owner. Devon's
-  direction: do not help them update; make sure they know.
+  the install command and the release notes link for the owner. Main Branch
+  does not update tools for the owner; it makes sure the owner knows.
 - Nothing leaves the machine. No upload, no counter inside a skill.
 - Optional tools never turn a healthy business red. Info by default; warn only
   when the business's own record says it uses the tool.
@@ -63,8 +63,8 @@ Today facts about third-party tools live in skill prose, so they drift:
 
 ## Verified against primary sources (3 Nov 2026)
 
-A third-party research brief (Grok INT-01) suggested the changes folded in
-below. Its claims were checked before use. Marked V (verified) or U (not
+Outside research suggested the changes folded in below. Its claims were
+checked against primary sources before use. Marked V (verified) or U (not
 verified, treated as open).
 
 - V, Claude docs (marketplace reference): `github`, `url` and `git-subdir`
