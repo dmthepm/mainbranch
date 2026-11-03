@@ -300,8 +300,14 @@ mkdir -p .claude/skills
 cp -R <SCRATCH>/open-seo/plugins/openseo/skills/* .claude/skills/
 ```
 
-That is project scope: the skills live in this business repo and nowhere else. Use
-`~/.claude/skills/` only if the owner wants them in every project.
+Copy from the commit the business's copy is deployed at, so the skills never call
+a tool the app lacks. The example uses the v0.1.21 pin; use the deployed commit.
+
+That is project scope: the skills live in this business repo and nowhere else.
+When each business runs as its own OS user, user scope works too: copy the same
+folders into the skills folder of every Claude profile that user runs, and keep
+the copies identical. A live business set up this way had the 12 skills in both of
+its profiles and only its own MCP entry.
 
 Upstream's `npx skills add every-app/open-seo --skill '*' --agent claude-code`
 installs whatever is on the default branch. The upstream pages read did not show a
