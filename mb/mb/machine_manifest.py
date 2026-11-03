@@ -7,6 +7,7 @@ import json
 import os
 import re
 import stat
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,27 @@ SCHEMA = json.loads((Path(__file__).parent / "_data/machine-manifest.schema.json
 CHECK_IDS = frozenset(
     json.loads((Path(__file__).parent / "_data/machine-check-ids.json").read_text())
 )
+
+
+# Reviewed read identities and maximum ages in days. None means manifest policy.
+ATTESTABLE: dict[tuple[str, str], int | None] = {
+    ("host.power-on-after-loss", "bios_power_on"): 180,
+    ("host.disk-luks2-tpm", "header_offbox"): 365,
+    ("host.disk-luks2-tpm-arch", "header_offbox"): 365,
+    ("owner.sudo-needs-password", "no_nopasswd"): 90,
+    ("owner.no-sudo-into-business", "no_runas_business"): 90,
+    ("backups.fresh", "last_backup"): None,
+    ("backups.restore-tested", "restore_test_attested"): None,
+    ("hardening.firmware-manual", "no_auto_firmware"): 180,
+}
+
+
+def attestation_time(value: str) -> datetime:
+    """Parse a schema-validated UTC timestamp, including calendar validity."""
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError as exc:
+        raise ManifestError("Invalid attestation timestamp") from exc
 
 
 class ManifestError(ValueError):
@@ -146,6 +168,13 @@ def validate(value: Any) -> None:
     _validate(value, SCHEMA)
     if _has_control(value):
         raise ManifestError("Control character in manifest text")
+    identities: set[tuple[str, str]] = set()
+    for entry in value["checks"].get("attest", []):
+        identity = (entry["id"], entry["read"])
+        if identity not in ATTESTABLE or identity in identities:
+            raise ManifestError("Invalid or duplicate attestation identity")
+        identities.add(identity)
+        attestation_time(entry["at"])
     classes = value["businesses"]["size_classes"]
     if any(user["size_class"] not in classes for user in value["businesses"]["users"]):
         raise ManifestError("Unknown size class")

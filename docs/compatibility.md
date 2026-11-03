@@ -430,7 +430,8 @@ mb doctor
 
 `mb machine doctor [--manifest PATH] [--json]` provides a read-only, current-account baseline on
 Ubuntu LTS and Omarchy. Manifest loading validates desired state and checks the default policy file's
-root ownership and permissions. Caller-selected policies never establish
+root ownership and permissions. Manifest skips and dated attestations report
+separate non-passing states; expired backup evidence fails. Caller-selected policies never establish
 assurance. The check subset remains incomplete with exit 3 unless a check
 fails with exit 1; invalid manifests exit 2 before probes run. macOS only has partial
 OS detection. Fixture coverage does not establish real-host runtime support.

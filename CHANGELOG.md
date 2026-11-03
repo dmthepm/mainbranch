@@ -28,6 +28,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ## [0.6.21] - 2026-11-03
 
 ### Added
+- Machine doctor honors manifest skips and dated owner attestations. Skipped
+  checks and owner evidence never count as passing. Expired evidence stays
+  unverified, or fails when a backup or restore test is overdue. Invalid
+  attestation identities stop the run before probes.
 
 - `mb machine doctor` reads a machine manifest: the desired state of the box,
   from root-owned `/etc/mainbranch/machine.json` or `--manifest PATH`. An invalid

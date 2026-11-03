@@ -152,12 +152,12 @@ fixtures, once the deltas are applied.
 
 D5 implementation note: the schema describes structural rules. The runtime
 validator also checks size-class references, which draft 2020-12 cannot express
-for arbitrary keys in another object. Loaded sections awaiting D6–D9 checks
+for arbitrary keys in another object. Loaded sections awaiting D7–D9 checks
 are reported under `manifest.coverage` as `not_verified`, reason `not_checked`,
 so loading policy cannot imply that those controls passed. Manifest text may
 not hold control characters, since Python's `$` also matches before a final
-newline. Skip and attestation
-execution remains deferred to D6.
+newline. D6 evaluates the `checks` section, so only that section is
+removed from coverage. Other sections remain not checked until D7–D9.
 
 Parsing: strict, a 256 KB cap, and every `additionalProperties: false` kept.
 An unknown key, an invalid value, an unknown check id, or a `size_class` that
@@ -199,7 +199,10 @@ Engine-only `checks` section:
   - The registry marks individual reads `attestable`, each with its own
     expiry rule. Attesting a read that isn't attestable is a manifest error
     (exit `2`).
-  - `at` is an RFC 3339 UTC timestamp. One in the future is a manifest error.
+  - `at` is an RFC 3339 UTC timestamp. A future timestamp gives
+    `not_verified`, reason `attestation_stale`, so future-dated evidence
+    cannot establish assurance. D6 follows the approved build brief here;
+    invalid calendar dates remain manifest errors.
 - **Outcome of an attestable read:**
 
   | Manifest says | Read outcome |

@@ -14,6 +14,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal, get_args
 
@@ -606,6 +607,92 @@ def registry(os_id: str) -> tuple[CheckSpec, ...]:
 REGISTRY: tuple[CheckSpec, ...] = ()
 
 
+def attestation_reads(policy: dict[str, Any], check_id: str, now: datetime) -> list[ReadResult]:
+    entries = {(e["id"], e["read"]): e for e in policy["checks"].get("attest", [])}
+    reads = []
+    for identity, days in manifest_loader.ATTESTABLE.items():
+        if identity[0] != check_id:
+            continue
+        name = identity[1]
+        entry = entries.get(identity)
+        if entry is None:
+            reads.append(_unknown(name, "attestation_missing"))
+            continue
+        at = manifest_loader.attestation_time(entry["at"])
+        age = now - at
+        limit = (
+            timedelta(days=days)
+            if days is not None
+            else timedelta(hours=policy["backups"]["max_age_hours"])
+            if check_id == "backups.fresh"
+            else timedelta(days=policy["backups"]["restore_test"]["max_age_days"])
+        )
+        observed = {"at": entry["at"]}
+        if at > now:
+            reads.append(ReadResult(name, "not_verified", observed, "attestation_stale"))
+        elif entry["answer"] == "no" or (age > limit and days is None):
+            reads.append(ReadResult(name, "fail", observed))
+        elif age > limit:
+            reads.append(ReadResult(name, "not_verified", observed, "attestation_stale"))
+        else:
+            reads.append(ReadResult(name, "attested", observed, "owner_attested"))
+    return reads
+
+
+def policy_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[dict[str, Any]]:
+    specs = {spec.id: spec for spec in (*registry(os_id), *REGISTRY)}
+    if os_id in {"ubuntu", "omarchy"}:
+        for check_id, _ in manifest_loader.ATTESTABLE:
+            if check_id.endswith("-arch") != (os_id == "omarchy") and "disk-luks" in check_id:
+                continue
+            specs.setdefault(
+                check_id,
+                CheckSpec(
+                    check_id,
+                    "docs/machine-setup.md#backups-and-updates",
+                    lambda _: [],
+                ),
+            )
+    skips = {entry["id"]: entry["reason"] for entry in policy["checks"].get("skip", [])}
+    for check_id in skips:
+        if check_id in {"host.os-release", "manifest.integrity"}:
+            continue
+        if os_id not in {"ubuntu", "omarchy"}:
+            continue
+        if check_id == "host.disk-filevault":
+            continue
+        if check_id.endswith("-arch") and os_id != "omarchy":
+            continue
+        if os_id == "omarchy" and check_id in {
+            "host.disk-luks2-tpm",
+            "host.desktop-no-autologin",
+            "hardening.reboot-pending",
+            "hardening.unattended-security-only",
+        }:
+            continue
+        specs.setdefault(
+            check_id,
+            CheckSpec(
+                check_id,
+                "docs/machine-setup.md#admin-account-and-agent-accounts",
+                lambda _: [],
+            ),
+        )
+    now = datetime.now(timezone.utc)
+    results = []
+    for spec in specs.values():
+        if spec.id in skips:
+            reads = [
+                ReadResult(
+                    "manifest_skip", "skipped", {"reason": skips[spec.id]}, "skipped_by_manifest"
+                )
+            ]
+        else:
+            reads = spec.run(deadline) + attestation_reads(policy, spec.id, now)
+        results.append(check_result(spec, reads))
+    return results
+
+
 def doctor(manifest: Path | None = None) -> dict[str, Any]:
     policy = None
     failure = None
@@ -658,7 +745,12 @@ def doctor(manifest: Path | None = None) -> dict[str, Any]:
         )
     ]
     checks.extend(
-        check_result(spec, spec.run(deadline)) for spec in (*registry(detected["id"]), *REGISTRY)
+        policy_checks(policy, detected["id"], deadline)
+        if policy is not None
+        else [
+            check_result(spec, spec.run(deadline))
+            for spec in (*registry(detected["id"]), *REGISTRY)
+        ]
     )
     if policy is not None:
         integrity = CheckSpec(
@@ -687,7 +779,7 @@ def doctor(manifest: Path | None = None) -> dict[str, Any]:
                 [
                     ReadResult(section, "not_verified", {}, "not_checked")
                     for section in policy
-                    if section != "manifest_version"
+                    if section not in {"manifest_version", "checks"}
                 ],
             )
         )
@@ -703,6 +795,22 @@ def doctor(manifest: Path | None = None) -> dict[str, Any]:
                 ),
                 [*reads, _verdict("manifest_os_matches", False)],
             )
+    if policy is not None:
+        for entry in policy["checks"].get("skip", []):
+            if entry["id"] in {"host.os-release", "manifest.integrity"}:
+                for index, check in enumerate(checks):
+                    if check["id"] == entry["id"]:
+                        checks[index] = check_result(
+                            CheckSpec(check["id"], check["section"], lambda _: []),
+                            [
+                                ReadResult(
+                                    "manifest_skip",
+                                    "skipped",
+                                    {"reason": entry["reason"]},
+                                    "skipped_by_manifest",
+                                )
+                            ],
+                        )
     code = exit_code(checks)
     # Deferred manifest checks keep the baseline incomplete.
     if code == 0:
@@ -727,6 +835,11 @@ def human_report(report: dict[str, Any]) -> str:
     lines = ["Machine doctor: scope self, current account only."]
     for check in report["checks"]:
         lines.extend([check["section"], f"  {check['id']}: {check['state']}"])
+        for read in check["reads"]:
+            if read["state"] == "attested":
+                lines.append(f"  NOT VERIFIED (owner attested): {read['observed']['at']}")
+            if read["state"] == "skipped":
+                lines.append(f"  Skipped: {read['observed']['reason']}")
         if check["id"] == "manifest.coverage":
             for read in check["reads"]:
                 lines.append(f"  {read['name']}: not checked")

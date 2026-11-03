@@ -3,6 +3,7 @@
 import copy
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -277,3 +278,138 @@ def test_validator_covers_every_schema_keyword() -> None:
 def test_control_characters_rejected(path: str, value: Any) -> None:
     with pytest.raises(manifest.ManifestError):
         manifest.validate(altered(path, value))
+
+
+NOW = datetime(2026, 11, 3, tzinfo=timezone.utc)
+
+
+def attested_policy(
+    check_id: str, read: str, *, days: float = 0, answer: str = "yes"
+) -> dict[str, Any]:
+    data = example()
+    data["checks"]["attest"] = [
+        {
+            "id": check_id,
+            "read": read,
+            "answer": answer,
+            "at": (NOW - timedelta(days=days)).isoformat().replace("+00:00", "Z"),
+        }
+    ]
+    return data
+
+
+@pytest.mark.parametrize(
+    ("answer", "days", "state", "reason"),
+    [
+        (None, 0, "not_verified", "attestation_missing"),
+        ("no", 0, "fail", None),
+        ("yes", 0, "attested", "owner_attested"),
+        ("yes", 181, "not_verified", "attestation_stale"),
+        ("yes", -1, "not_verified", "attestation_stale"),
+    ],
+)
+def test_attestation_table(answer: str | None, days: float, state: str, reason: str | None) -> None:
+    data = attested_policy(
+        "host.power-on-after-loss", "bios_power_on", days=days, answer=answer or "yes"
+    )
+    if answer is None:
+        data["checks"] = {}
+    read = doctor.attestation_reads(data, "host.power-on-after-loss", NOW)[0]
+    assert (read.state, read.reason) == (state, reason)
+
+
+@pytest.mark.parametrize("identity", list(manifest.ATTESTABLE))
+def test_each_expiry(identity: tuple[str, str]) -> None:
+    check_id, read = identity
+    data = attested_policy(check_id, read)
+    days = manifest.ATTESTABLE[identity]
+    limit = (
+        timedelta(days=days)
+        if days
+        else (
+            timedelta(hours=data["backups"]["max_age_hours"])
+            if check_id == "backups.fresh"
+            else timedelta(days=data["backups"]["restore_test"]["max_age_days"])
+        )
+    )
+    assert doctor.attestation_reads(data, check_id, NOW + limit)[0].state == "attested"
+    expired = doctor.attestation_reads(data, check_id, NOW + limit + timedelta(microseconds=1))[0]
+    assert expired.state == ("fail" if days is None else "not_verified")
+
+
+@pytest.mark.parametrize(
+    "kind", ["non_attestable", "duplicate", "calendar", "advanced_skip", "advanced_attest"]
+)
+def test_bad_attestation_stops_probes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    data = attested_policy("host.power-on-after-loss", "bios_power_on")
+    entry = data["checks"]["attest"][0]
+    if kind == "non_attestable":
+        entry["read"] = "automatic_login"
+    elif kind == "duplicate":
+        data["checks"]["attest"].append({**entry, "answer": "no"})
+    elif kind == "calendar":
+        entry["at"] = "2026-02-30T00:00:00Z"
+    elif kind == "advanced_skip":
+        data["checks"] = {"skip": [{"id": "hardening.ipc-isolation", "reason": "fixture"}]}
+    else:
+        entry["id"] = "hardening.ipc-isolation"
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(data))
+    detect = Mock(side_effect=AssertionError("probe ran"))
+    monkeypatch.setattr(doctor, "detect_platform", detect)
+    assert doctor.doctor(path)["exit_code"] == 2
+    detect.assert_not_called()
+
+
+def test_skip_prevents_probe_and_preserves_other_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = example()
+    data["checks"] = {"skip": [{"id": "host.no-sleep", "reason": "owner choice"}]}
+    run = Mock(side_effect=AssertionError("skipped probe ran"))
+    monkeypatch.setattr(
+        doctor, "registry", lambda _: (doctor.CheckSpec("host.no-sleep", "fixture", run),)
+    )
+    results = doctor.policy_checks(data, "ubuntu", 0)
+    skipped = next(c for c in results if c["id"] == "host.no-sleep")
+    assert skipped["state"] == "skipped"
+    assert skipped["reads"][0]["observed"] == {"reason": "owner choice"}
+    assert doctor.exit_code([skipped]) == 3
+    run.assert_not_called()
+    monkeypatch.setattr(manifest, "load", lambda _: (data, {"source": "caller_selected"}))
+    monkeypatch.setattr(
+        doctor,
+        "detect_platform",
+        lambda _: ({"id": "ubuntu", "family": "ubuntu"}, [doctor.ReadResult("os", "pass", {})]),
+    )
+    report = doctor.doctor(Path("fixture"))
+    coverage = next(c for c in report["checks"] if c["id"] == "manifest.coverage")
+    assert {r["name"] for r in coverage["reads"]} == set(data) - {"manifest_version", "checks"}
+    assert "Skipped: owner choice" in doctor.human_report(report)
+
+
+def test_stale_age_attestation_table_row() -> None:
+    data = attested_policy("backups.fresh", "last_backup", days=10)
+    assert doctor.attestation_reads(data, "backups.fresh", NOW)[0].state == "fail"
+
+
+def test_attested_output_is_never_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = attested_policy("host.power-on-after-loss", "bios_power_on")
+    data["checks"]["attest"][0]["at"] = (
+        datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    )
+    monkeypatch.setattr(doctor, "registry", lambda _: ())
+    checks = doctor.policy_checks(data, "ubuntu", 0)
+    check = next(c for c in checks if c["id"] == "host.power-on-after-loss")
+    assert check["state"] == "attested"
+    assert doctor.exit_code([check]) == 3
+    report = {"checks": [check], "manifest": {"source": "caller_selected"}, "exit_code": 3}
+    assert "NOT VERIFIED (owner attested)" in doctor.human_report(report)
+
+
+def test_deferred_baseline_skip_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = example()
+    data["checks"] = {"skip": [{"id": "shared_tools.pins-match", "reason": "fixture"}]}
+    monkeypatch.setattr(doctor, "registry", lambda _: ())
+    checks = doctor.policy_checks(data, "ubuntu", 0)
+    assert next(c for c in checks if c["id"] == "shared_tools.pins-match")["state"] == "skipped"
