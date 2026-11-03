@@ -51,6 +51,19 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def neutral_terminal_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep help and human output independent of the host's terminal settings.
+
+    Rich reads ``NO_COLOR``, ``FORCE_COLOR`` and ``TERM``; a host that sets
+    ``FORCE_COLOR=0`` or ``TERM=dumb`` changes wrapping and styling, and text
+    assertions then fail on that box only. Tests that need a value set it.
+    """
+
+    for name in ("NO_COLOR", "FORCE_COLOR", "TERM"):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
 def isolated_credential_backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep every test away from the operator's own credential store.
 
