@@ -14,7 +14,10 @@ never bodies, tokens, or the `.env.selfhost` file.
    Recheck at any other pin. That check does not cover `/api/health`: on a live
    cutover, a custom host not yet in the Access app answered 200 there for about a
    minute while app routes failed closed. So Access is the only guard for that
-   path; see "Adding a custom host".
+   path; see "Adding a custom host". The rule to hold upstream code to: no route
+   skips the token check, and a health path that must answer without login returns
+   a fixed liveness body with no data, pinned by a test. Until the pinned code does
+   that, include `/api/health` in every signed-out probe.
 4. **Probe prints status codes only.** It passes only on:
    - an Access-issued 401 for an MCP-style request, with a `www-authenticate`
      header naming the team, an OAuth error body, and no app content; or
@@ -33,7 +36,8 @@ rule: keep them in `.env.selfhost`.
 
 ## Adding a custom host
 
-1. Add the host to the Access app first.
+1. Add the host to the Access app first. This holds in every deploy and
+   post-deploy step: Access covers a hostname before it is attached.
 2. Then attach the Worker's custom domain in deploy config.
 3. Probe every path on the new host, retrying for up to 2 minutes while it
    propagates. Treat any 200 as a fail until it turns into an Access response.
