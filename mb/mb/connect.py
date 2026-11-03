@@ -222,6 +222,8 @@ from mb.engine import repo_flag
 CONFIG_RELATIVE_PATH = Path(".mb") / "connect.yaml"
 USER_SCOPE_RELATIVE_PATH = Path("connect") / "user-scope.yaml"
 REPO_BINDINGS_RELATIVE_PATH = Path("connect") / "repo-bindings.json"
+# A folder hash is 64 hex characters; 1 MiB holds thousands of folders.
+REPO_BINDINGS_MAX_BYTES = 1024 * 1024
 REPO_BINDING_RULE = "repo_binding_required"
 REPO_BINDING_RECORD_RULE = "repo_binding_record_unsafe"
 SENSITIVE_KEY_PARTS = ("token", "secret", "password", "credential", "api_key", "apikey", "key")
@@ -770,6 +772,15 @@ def _bindings_unsafe(reason: str) -> ConnectRefusal:
     )
 
 
+def _check_bindings_file(info: os.stat_result) -> None:
+    if not stat.S_ISREG(info.st_mode):
+        raise _bindings_unsafe("is not a regular file")
+    if info.st_mode & 0o022:
+        raise _bindings_unsafe("can be written by other users")
+    if info.st_size > REPO_BINDINGS_MAX_BYTES:
+        raise _bindings_unsafe("is too large")
+
+
 def _load_repo_bindings() -> dict[str, list[str]]:
     """Read the home record: repo id -> folder identities (``basis_sha256``) that saved under it.
 
@@ -786,15 +797,22 @@ def _load_repo_bindings() -> dict[str, list[str]]:
         return {}
     except OSError:
         raise _bindings_unsafe("could not be read") from None
-    if not stat.S_ISREG(info.st_mode):
-        raise _bindings_unsafe("is not a regular file")
-    if info.st_mode & 0o022:
-        raise _bindings_unsafe("can be written by other users")
+    _check_bindings_file(info)
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0))
-        with os.fdopen(fd, encoding="utf-8") as handle:
-            raw = json.load(handle)
-    except (OSError, ValueError):
+        fd = os.open(
+            path,
+            os.O_RDONLY
+            | os.O_NOFOLLOW
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+        )
+        with os.fdopen(fd, "rb") as handle:
+            _check_bindings_file(os.fstat(handle.fileno()))
+            data = handle.read(REPO_BINDINGS_MAX_BYTES + 1)
+        if len(data) > REPO_BINDINGS_MAX_BYTES:
+            raise _bindings_unsafe("is too large")
+        raw = json.loads(data.decode("utf-8"))
+    except (OSError, ValueError, RecursionError):
         raise _bindings_unsafe("is unreadable or invalid") from None
     repos = raw.get("repos") if isinstance(raw, dict) else None
     if not isinstance(repos, dict):

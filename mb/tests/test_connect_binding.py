@@ -352,6 +352,34 @@ def test_unreadable_record_does_not_open_the_gate(tmp_path: Path) -> None:
     assert c.read_token("stripe", business)["ok"] is True
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"[" * 100_000 + b"]" * 100_000,
+        b'{"repos": {}, "pad": "' + b"x" * (c.REPO_BINDINGS_MAX_BYTES + 1) + b'"}',
+    ],
+    ids=["deep-nesting", "over-cap"],
+)
+def test_hostile_record_is_refused_cleanly(tmp_path: Path, body: bytes) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    c._repo_bindings_path().write_bytes(body)
+
+    _refused(c.read_token, "stripe", borrower)
+    with pytest.raises(c.ConnectRefusal):
+        c._load_repo_bindings()
+
+
+def test_record_fifo_is_refused_without_blocking(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    record = c._repo_bindings_path()
+    record.unlink()
+    os.mkfifo(record, 0o600)
+
+    _refused(c.read_token, "stripe", borrower)
+
+
 def test_concurrent_saves_keep_the_record_whole(tmp_path: Path) -> None:
     ids = [f"repo-{n}" for n in range(12)]
     errors: list[BaseException] = []
