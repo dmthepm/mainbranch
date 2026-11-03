@@ -889,8 +889,8 @@ def _repo_binding(target: Path, config: dict[str, Any]) -> tuple[str, ConnectRef
         "This folder's .mb/connect.yaml names a repo id that this folder has never saved "
         "keys under, so no key was read or released. If this folder is the same business "
         "(moved, re-cloned or its git remote changed), run "
-        f"`{_rebind_command(target)}` to review and allow it. Otherwise connect the provider "
-        "again from this folder.",
+        f"`{_rebind_command(target)}` to review it; only the owner may approve it with "
+        "--yes, so an agent asks first. Otherwise connect the provider again from this folder.",
     )
 
 
@@ -966,7 +966,10 @@ def rebind(repo: str | Path = ".", *, apply: bool = False) -> dict[str, Any]:
         f"{claimed[:8]}. Run it only if this folder is that business."
     )
     if not apply:
-        result["message"] = f"{warning} Nothing was changed. Rerun with --yes to allow it."
+        result["message"] = (
+            f"{warning} Nothing was changed. The owner reruns with --yes to allow it; "
+            "an agent asks the owner first and never adds --yes on its own."
+        )
         return result
     _record_repo_binding(claimed, identity["basis_sha256"])
     result["applied"] = True
@@ -4781,6 +4784,14 @@ def _record_validation_locked(
     for key in ("repo_id", "repo_identity"):
         if not fresh.get(key) and config.get(key):
             fresh[key] = config[key]
+    # The file may have been edited since the check: never attach this result
+    # to a different id, and bind the id read now before writing anything.
+    checked_id = str(config.get("repo_id") or "")
+    if checked_id and str(fresh.get("repo_id") or "") != checked_id:
+        return {"recorded": False, "not_recorded_reason": "repo_id_changed"}
+    bound_id = _readable_repo_id(target, fresh)
+    if not bound_id:
+        return {"recorded": False, "not_recorded_reason": REPO_BINDING_RULE}
     current = fresh["providers"].get(provider_id)
     if isinstance(current, dict):
         entry = {
@@ -4799,7 +4810,7 @@ def _record_validation_locked(
         }
         try:
             _write_user_scope_provider(
-                str(config.get("repo_id") or _repo_identity(target)["repo_id"]),
+                bound_id,
                 repo_identity=identity,
                 provider_id=provider_id,
                 entry=entry,

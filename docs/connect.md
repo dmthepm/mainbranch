@@ -1225,7 +1225,11 @@ What it does not close: a process running as the same OS user can still edit
 `repo-bindings.json`, run `rebind --yes`, or read the secret store directly, so
 this separates repos from files in repos, not from the person's own account. A
 folder that sets the same git remote as a business has that business's id by
-definition and is treated as that business.
+definition and is treated as that business. That includes a remote set through
+git configuration, the environment (`GIT_CONFIG_*`), an include, or a `.git`
+file pointing at another repo's git folder: this protects against a copied
+`.mb/connect.yaml`, not against hostile git metadata. Treat an unpacked archive
+that carries its own `.git` like any other code you did not write.
 
 ## User Scope
 

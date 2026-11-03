@@ -420,3 +420,44 @@ def test_fixture_helper_records_the_binding(tmp_path: Path) -> None:
     bind_folder(repo, "made-up-id")
 
     assert c.read_token("stripe", repo)["state"] == "not_connected"
+
+
+def test_validation_recording_never_writes_under_a_changed_unbound_id(tmp_path: Path) -> None:
+    business = _user_scope_business(tmp_path)
+    config = c._read_config(business)
+    entry = dict(config["providers"]["stripe"])
+    before = c._read_user_scope()
+    path = business / ".mb" / "connect.yaml"
+    edited = yaml.safe_load(path.read_text(encoding="utf-8"))
+    edited["repo_id"] = "foreign-unbound-id"
+    path.write_text(yaml.safe_dump(edited), encoding="utf-8")
+
+    result = c._record_validation(business, config, "stripe", entry)
+
+    assert result == {"recorded": False, "not_recorded_reason": "repo_id_changed"}
+    assert c._user_scope_provider_entry("foreign-unbound-id", "stripe") is None
+    assert c._read_user_scope() == before
+
+
+def test_validation_recording_refuses_an_unbound_id_in_the_file(tmp_path: Path) -> None:
+    business = _user_scope_business(tmp_path)
+    path = business / ".mb" / "connect.yaml"
+    edited = yaml.safe_load(path.read_text(encoding="utf-8"))
+    edited["repo_id"] = "foreign-unbound-id"
+    path.write_text(yaml.safe_dump(edited), encoding="utf-8")
+    config = c._read_config(business)
+
+    result = c._record_validation(business, config, "stripe", dict(config["providers"]["stripe"]))
+
+    assert result == {"recorded": False, "not_recorded_reason": "repo_binding_required"}
+    assert c._user_scope_provider_entry("foreign-unbound-id", "stripe") is None
+
+
+def test_rebind_text_says_only_the_owner_approves(tmp_path: Path) -> None:
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    refusal = _refused(c.read_token, "stripe", borrower)
+    assert "only the owner may approve" in str(refusal)
+    preview = c.rebind(borrower)
+    assert "never adds --yes on its own" in preview["message"]
