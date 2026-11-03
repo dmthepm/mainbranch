@@ -1,6 +1,7 @@
 """Manifest syntax, trust, and policy assurance regressions."""
 
 import copy
+import getpass
 import json
 import os
 import stat
@@ -375,6 +376,9 @@ def test_skip_prevents_probe_and_preserves_other_coverage(monkeypatch: pytest.Mo
     monkeypatch.setattr(
         doctor, "registry", lambda _: (doctor.CheckSpec("host.no-sleep", "fixture", run),)
     )
+    monkeypatch.setattr(doctor, "account_checks", lambda *args: [])
+    monkeypatch.setattr(doctor, "tool_checks", lambda *args: [])
+    monkeypatch.setattr(doctor, "linux_checks", lambda *args: [])
     results = doctor.policy_checks(data, "ubuntu", 0)
     skipped = next(c for c in results if c["id"] == "host.no-sleep")
     assert skipped["state"] == "skipped"
@@ -1270,3 +1274,229 @@ def test_d9_mise_install_layout(tmp_path: Path) -> None:
     policy = {"shared_tools": {"version_manager": "mise"}}
     assert doctor._install_base(root, policy) == root / "mise" / "installs"
     assert doctor._install_base(root, {"shared_tools": {}}) == root / "installs"
+
+
+@pytest.mark.parametrize(
+    "body,expected",
+    [
+        ({}, True),
+        ({"TCP": {"443": {}}, "AllowFunnel": {"demo:443": False}}, True),
+        ({"TCP": {"8443": {}}}, False),
+        ({"AllowFunnel": {"demo:443": True}}, False),
+        ({"AllowFunnel": {"demo:443": "false"}}, None),
+        ({"TCP": []}, None),
+        ({"unknown": {}}, None),
+    ],
+)
+def test_d9b_serve_parser(body: Any, expected: bool | None) -> None:
+    assert doctor._serve_allowed(json.dumps(body).encode(), [443]) is expected
+
+
+@pytest.mark.parametrize(
+    "address,uid,expected",
+    [
+        ("0100007F", "1000", True),
+        ("00000000", "0", False),
+        ("0100000A", "1000", False),
+        ("garbage", "0", None),
+    ],
+)
+def test_d9b_listener_uid_never_exempts(address: str, uid: str, expected: bool | None) -> None:
+    body = (
+        "sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid\n"
+        f"0: {address}:0016 00000000:0000 0A 0:0 00:0 0 {uid} 0 1"
+    )
+    assert doctor._listeners_loopback(body, False) is expected
+
+
+@pytest.mark.parametrize(
+    "case,expected",
+    [
+        ("pass", "pass"),
+        ("fail", "fail"),
+        ("denied", "not_verified"),
+        ("malformed", "not_verified"),
+        ("unrelated", "not_verified"),
+    ],
+)
+def test_d9b_ubuntu_tpm(monkeypatch: pytest.MonkeyPatch, case: str, expected: str) -> None:
+    data = example()
+    data["host"]["disk"]["encryption"] = "luks2-tpm2"
+    body = json.dumps(
+        {
+            "blockdevices": [
+                {
+                    "type": "part",
+                    "uuid": "root-volume",
+                    "mountpoints": [None],
+                    "children": [{"type": "crypt", "uuid": None, "mountpoints": ["/"]}],
+                }
+            ]
+        }
+    ).encode()
+
+    def run(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        assert argv in (
+            ("/usr/bin/lsblk", "--json", "--output", "TYPE,MOUNTPOINTS"),
+            ("/usr/bin/lsblk", "--json", "--output", "TYPE,MOUNTPOINTS,UUID"),
+        )
+        return probe.ProbeResult(body, 0)
+
+    def text(path: Path, prefix: Path) -> tuple[str, doctor.Reason | None]:
+        assert path == Path("/etc/crypttab")
+        if case == "denied":
+            return "", "probe_error"
+        if case == "malformed":
+            return "bad config", None
+        uuid = "other-volume" if case == "unrelated" else "root-volume"
+        return f"root UUID={uuid} none " + (
+            "luks" if case == "fail" else "luks,tpm2-device=auto"
+        ), None
+
+    monkeypatch.setattr(probe, "run_probe", run)
+    monkeypatch.setattr(doctor, "_text", text)
+    row = d9_row(data, "host.disk-luks2-tpm")
+    assert next(r for r in row["reads"] if r["name"] == "tpm_option")["state"] == expected
+    assert row["state"] != "pass"
+
+
+@pytest.mark.parametrize(
+    "check,case,expected",
+    [
+        ("remote_access.tailscale-version", "pass", "pass"),
+        ("remote_access.tailscale-version", "old", "fail"),
+        ("remote_access.tailscale-version", "stopped", "fail"),
+        ("remote_access.tailscale-version", "denied", "not_verified"),
+        ("remote_access.tailscale-version", "malformed", "not_verified"),
+        ("remote_access.tailscale-serve-named", "pass", "pass"),
+        ("remote_access.tailscale-serve-named", "funnel", "fail"),
+        ("remote_access.tailscale-serve-named", "denied", "not_verified"),
+        ("remote_access.tailscale-serve-named", "malformed", "not_verified"),
+    ],
+)
+def test_d9b_tailscale(
+    monkeypatch: pytest.MonkeyPatch, check: str, case: str, expected: str
+) -> None:
+    def run(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        assert argv in (
+            ("/usr/bin/dpkg-query", "-W", "-f=${Version}", "tailscale"),
+            ("/usr/bin/tailscale", "status", "--json"),
+            ("/usr/bin/tailscale", "serve", "status", "--json"),
+        )
+        if case == "denied":
+            return probe.ProbeResult(reason="probe_error")
+        if case == "malformed":
+            return probe.ProbeResult(b"bad", 0)
+        if argv[0].endswith("dpkg-query"):
+            return probe.ProbeResult(b"0.1.0" if case == "old" else b"99.0.0-1", 0)
+        body = (
+            {"BackendState": "Stopped" if case == "stopped" else "Running"}
+            if argv[1] == "status"
+            else {"AllowFunnel": {"demo:443": case == "funnel"}}
+        )
+        return probe.ProbeResult(json.dumps(body).encode(), 0)
+
+    monkeypatch.setattr(probe, "run_probe", run)
+    assert d9_row(example(), check)["state"] == expected
+
+
+@pytest.mark.parametrize(
+    "case,expected",
+    [
+        ("pass", "pass"),
+        ("off", "fail"),
+        ("zero", "fail"),
+        ("denied", "not_verified"),
+        ("malformed", "not_verified"),
+    ],
+)
+def test_d9b_screen(monkeypatch: pytest.MonkeyPatch, case: str, expected: str) -> None:
+    data = example()
+    monkeypatch.setattr(getpass, "getuser", lambda: data["owner"]["user"])
+
+    def run(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        assert argv[0:2] == ("/usr/bin/gsettings", "get")
+        if case == "denied":
+            return probe.ProbeResult(reason="probe_error")
+        value = (
+            b"bad"
+            if case == "malformed"
+            else (b"false" if case == "off" else b"true")
+            if argv[-1] == "lock-enabled"
+            else b"uint32 0"
+            if case == "zero"
+            else b"uint32 60"
+        )
+        return probe.ProbeResult(value, 0)
+
+    monkeypatch.setattr(probe, "run_probe", run)
+    assert d9_row(data, "host.screen-lock")["state"] == expected
+
+
+@pytest.mark.parametrize(
+    "case,expected",
+    [
+        ("recent", "pass"),
+        ("old", "fail"),
+        ("incomplete", "not_verified"),
+        ("denied", "not_verified"),
+        ("malformed", "not_verified"),
+    ],
+)
+def test_d9b_update(monkeypatch: pytest.MonkeyPatch, case: str, expected: str) -> None:
+    date = datetime.now(timezone.utc) - timedelta(days=90 if case == "old" else 1)
+    text = f"[{date.isoformat()}] [PACMAN] starting full system upgrade\n"
+    if case != "incomplete":
+        text += f"[{date.isoformat()}] [ALPM] transaction completed\n"
+    monkeypatch.setattr(
+        doctor,
+        "_text",
+        lambda *args: (
+            ("", "probe_error")
+            if case == "denied"
+            else ("bad" if case == "malformed" else text, None)
+        ),
+    )
+    row = d9_row(example("omarchy"), "hardening.update-snapshot", "omarchy")
+    assert row["reads"][0]["state"] == expected
+    assert row["state"] == ("fail" if case == "old" else "not_verified")
+
+
+@pytest.mark.parametrize(
+    "case,state",
+    [
+        ("loopback", "pass"),
+        ("root-ssh", "not_verified"),
+        ("denied", "not_verified"),
+        ("malformed", "not_verified"),
+    ],
+)
+def test_d9b_listener_row(monkeypatch: pytest.MonkeyPatch, case: str, state: str) -> None:
+    def text(path: Path, prefix: Path) -> tuple[str, doctor.Reason | None]:
+        assert prefix == Path("/proc/net") and path.name in {"tcp", "tcp6"}
+        if case == "denied":
+            return "", "probe_error"
+        if case == "malformed":
+            return "bad", None
+        address = "00000000" if case == "root-ssh" else "0100007F"
+        if path.name == "tcp6":
+            address = "00000000000000000000000001000000"
+        return (
+            "sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid\n"
+            f"0: {address}:0016 0:0 0A 0:0 00:0 0 0 0 1"
+        ), None
+
+    monkeypatch.setattr(doctor, "_text", text)
+    assert d9_row(example(), "remote_access.offbox-listeners")["state"] == state
+
+
+def test_d9b_screen_refuses_other_account_and_omarchy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("no session probe")))
+    monkeypatch.setattr(doctor, "_text", Mock(side_effect=AssertionError("no user config read")))
+    data = example()
+    monkeypatch.setattr(getpass, "getuser", lambda: "different-owner")
+    row = d9_row(data, "host.screen-lock")
+    assert row["reason"] == "other_account"
+    data = example("omarchy")
+    monkeypatch.setattr(getpass, "getuser", lambda: data["owner"]["user"])
+    assert d9_row(data, "host.screen-lock", "omarchy")["reason"] == "not_checked"

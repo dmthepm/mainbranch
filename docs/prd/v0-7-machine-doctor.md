@@ -670,11 +670,22 @@ requires an absolute target inside the declared install version, then walks
 its components without following links. Root ownership and write permissions
 are checked throughout. Neither the link nor its target is executed.
 
-The disk rows trace root's device ancestry with named TYPE/MOUNTPOINTS fields.
-They always retain an unverified LUKS2 header read. A TPM option alone remains
-unverified until its device identity can be matched to root, because an entry
-for an unrelated disk cannot prove root's unlock policy. Omarchy passphrase
-policy checks unattended_boot is false. These partial reads do not fulfill the
-complete disk contract yet. Screen lock, Tailscale version/Serve, listener
-attribution and Omarchy update/snapshot rows still await implementation.
-No additional manifest sections leave not_checked coverage in this slice.
+The disk rows trace root's device ancestry and match crypttab UUID sources to
+root's encrypted backing UUID using an additional TYPE/MOUNTPOINTS/UUID read.
+Other crypttab source formats remain unverified because they need device
+resolution. LUKS2 headers always remain unverified without root.
+
+Ubuntu screen lock reads the owner's GNOME settings. Omarchy stays not checked
+pending the second-install proof required above; no clipboard or user config
+is read. Tailscale version comes from the package database, while fixed status
+and Serve commands read local socket state. Unknown Serve top-level fields
+remain unverified rather than ignoring a possible new exposure mechanism.
+
+Listener reads accept only loopback listeners as proved. Off-box listeners,
+including uid 0 or SSH-port listeners, remain unverified because process
+identity has not been established. The regular-file and no-symlink boundary
+can also refuse procfs reads; no boundary exception was added in this lane.
+Omarchy upgrade age requires a full-upgrade marker followed by a completed
+ALPM transaction; a start marker alone cannot prove a completed upgrade.
+Snapshot presence remains needs_root. No additional manifest sections leave
+not_checked coverage because these contracts still contain incomplete rows.

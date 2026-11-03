@@ -1425,7 +1425,7 @@ def account_checks(
     return results
 
 
-LINUX_SPECS = (
+LINUX_SPECS: tuple[CheckSpec, ...] = (
     CheckSpec(
         "host.power-on-after-loss",
         "docs/machine-setup.md#part-2-picking-a-machine",
@@ -1468,6 +1468,162 @@ LINUX_SPECS = (
         fix_text="Check firmware does not auto-apply and record dated evidence.",
     ),
 )
+
+
+LINUX_SPECS += tuple(
+    CheckSpec(
+        check_id,
+        "docs/machine-setup.md#" + section,
+        lambda _: [],
+        limitation,
+        platforms=platforms,
+        run_as=run_as,
+        fix_text=fix,
+    )
+    for check_id, section, limitation, platforms, run_as, fix in (
+        (
+            "host.screen-lock",
+            "omarchy-arch-based",
+            "Omarchy idle configuration needs a second-install proof.",
+            ("ubuntu", "omarchy"),
+            "owner",
+            None,
+        ),
+        (
+            "remote_access.tailscale-version",
+            "managing-it-from-a-mac",
+            None,
+            ("ubuntu", "omarchy"),
+            "any",
+            None,
+        ),
+        (
+            "remote_access.tailscale-serve-named",
+            "managing-it-from-a-mac",
+            None,
+            ("ubuntu", "omarchy"),
+            "any",
+            None,
+        ),
+        (
+            "remote_access.offbox-listeners",
+            "managing-it-from-a-mac",
+            "Process identity is not established by a listener uid or port.",
+            ("ubuntu", "omarchy"),
+            "any",
+            None,
+        ),
+        (
+            "hardening.update-snapshot",
+            "omarchy-arch-based",
+            "Snapshot presence requires root.",
+            ("omarchy",),
+            "any",
+            "Run omarchy update after taking a snapshot.",
+        ),
+    )
+)
+
+
+def _serve_allowed(data: bytes, ports: list[int]) -> bool | None:
+    try:
+        config = json.loads(data)
+        if not isinstance(config, dict) or set(config) - {"TCP", "Web", "AllowFunnel"}:
+            return None
+        tcp = config.get("TCP", {})
+        web = config.get("Web", {})
+        funnel = config.get("AllowFunnel", {})
+        if not all(isinstance(value, dict) for value in (tcp, web, funnel)):
+            return None
+        if any(type(value) is not bool for value in funnel.values()):
+            return None
+        declared = set()
+        for port, handler in tcp.items():
+            if not port.isdecimal() or not isinstance(handler, dict):
+                return None
+            declared.add(int(port))
+        for address, handler in web.items():
+            port = address.rsplit(":", 1)[-1]
+            if ":" not in address or not port.isdecimal() or not isinstance(handler, dict):
+                return None
+            declared.add(int(port))
+        return declared <= set(ports) and not any(funnel.values())
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _listeners_loopback(text: str, ipv6: bool) -> bool | None:
+    rows = text.splitlines()
+    if not rows or "local_address" not in rows[0] or "uid" not in rows[0]:
+        return None
+    try:
+        offbox = False
+        for row in rows[1:]:
+            fields = row.split()
+            if len(fields) < 10 or not fields[7].isdecimal():
+                return None
+            address, port = fields[1].split(":")
+            if len(address) != (32 if ipv6 else 8):
+                return None
+            int(address, 16)
+            int(port, 16)
+            if fields[3] != "0A":
+                continue
+            loopback = (
+                address == "00000000000000000000000001000000" if ipv6 else address.endswith("7F")
+            )
+            offbox |= not loopback
+        return not offbox
+    except (ValueError, IndexError):
+        return None
+
+
+def _root_tpm(data: bytes, rows: list[list[str]]) -> bool | None:
+    try:
+        if any(len(row) != 4 for row in rows):
+            return None
+        sources = [row[1] for row in rows]
+        if len(set(sources)) != len(sources):
+            return None
+        roots: list[str | None] = []
+
+        def visit(node: Any, backing: str | None, encrypted: str | None, depth: int) -> None:
+            if depth > 64 or not isinstance(node, dict):
+                raise ValueError
+            if node.get("type") == "crypt":
+                encrypted = backing
+            mounts = node["mountpoints"]
+            if not isinstance(mounts, list):
+                raise ValueError
+            if "/" in mounts:
+                roots.append(encrypted)
+            children = node.get("children", [])
+            if not isinstance(children, list):
+                raise ValueError
+            uuid = node.get("uuid")
+            if uuid is not None and not isinstance(uuid, str):
+                raise ValueError
+            for child in children:
+                visit(child, uuid, encrypted, depth + 1)
+
+        for device in json.loads(data)["blockdevices"]:
+            visit(device, None, None, 0)
+        if not roots or any(not value for value in roots):
+            return None
+        for uuid in roots:
+            matching = [row for row in rows if row[1] == "UUID=" + str(uuid)]
+            if not matching:
+                # Other crypttab source formats need device resolution.
+                return None
+            options = matching[0][3].split(",")
+            tpm = [value for value in options if value.startswith("tpm2-device=")]
+            if len(tpm) > 1:
+                return None
+            if not tpm or tpm[0] != "tpm2-device=auto":
+                return False
+        return True
+    except (ValueError, KeyError, TypeError, RecursionError):
+        return None
 
 
 def _root_encrypted(data: bytes) -> bool | None:
@@ -1538,16 +1694,20 @@ def linux_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[di
                     for line in text.splitlines()
                     if line.strip() and not line.lstrip().startswith("#")
                 ]
-                # Config alone cannot tie the TPM entry to the mounted root.
-                if any(len(row) != 4 for row in rows):
-                    reads.append(_unknown("tpm_option"))
-                elif not any(
-                    any(option.startswith("tpm2-device=") for option in row[3].split(","))
-                    for row in rows
-                ):
-                    reads.append(_verdict("tpm_option", False, configured=False))
+                identity = probe.run_probe(
+                    linux,
+                    ("/usr/bin/lsblk", "--json", "--output", "TYPE,MOUNTPOINTS,UUID"),
+                    deadline=deadline,
+                )
+                if identity.reason or identity.returncode != 0:
+                    reads.append(_unknown("tpm_option", identity.reason or "probe_error"))
                 else:
-                    reads.append(_unknown("tpm_option", "not_checked"))
+                    matched = _root_tpm(identity.data, rows)
+                    reads.append(
+                        _unknown("tpm_option")
+                        if matched is None
+                        else _verdict("tpm_option", matched, configured=matched)
+                    )
         else:
             reads.append(_verdict("encryption_policy", False))
         reads.append(_unknown("luks2_header", "needs_root"))
@@ -1580,6 +1740,141 @@ def linux_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[di
                 reads.append(_verdict(name, value == expected, matches=value == expected))
         return reads
 
+    def tailscale_version() -> list[ReadResult]:
+        argv = (
+            ("/usr/bin/dpkg-query", "-W", "-f=${Version}", "tailscale")
+            if linux == "ubuntu"
+            else ("/usr/bin/pacman", "-Q", "tailscale")
+        )
+        package = probe.run_probe(linux, argv, deadline=deadline)
+        status = probe.run_probe(
+            linux, ("/usr/bin/tailscale", "status", "--json"), deadline=deadline
+        )
+        reads = []
+        if package.reason or package.returncode != 0:
+            reads.append(_unknown("package_version", package.reason or "probe_missing"))
+        else:
+            try:
+                value = package.data.decode().strip()
+                if linux == "omarchy":
+                    name, value = value.split()
+                    if name != "tailscale":
+                        raise ValueError
+                match = re.fullmatch(
+                    r"(?:[0-9]+:)?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-[A-Za-z0-9.+~]+)?", value
+                )
+                minimum = policy["remote_access"]["tailscale"]["min_version"]
+                if not match:
+                    raise ValueError
+                good = tuple(map(int, match.groups())) >= tuple(map(int, minimum.split(".")))
+                reads.append(_verdict("package_version", good, meets_minimum=good))
+            except (ValueError, UnicodeError):
+                reads.append(_unknown("package_version"))
+        if status.reason or status.returncode != 0:
+            reads.append(_unknown("backend_running", status.reason or "probe_error"))
+        else:
+            try:
+                value = json.loads(status.data)["BackendState"]
+                if not isinstance(value, str):
+                    raise ValueError
+                reads.append(_verdict("backend_running", value == "Running"))
+            except (ValueError, TypeError, KeyError):
+                reads.append(_unknown("backend_running"))
+        return reads
+
+    def serve() -> list[ReadResult]:
+        result = probe.run_probe(
+            linux, ("/usr/bin/tailscale", "serve", "status", "--json"), deadline=deadline
+        )
+        if result.reason or result.returncode != 0:
+            return [_unknown("serve_policy", result.reason or "probe_error")]
+        allowed = _serve_allowed(result.data, policy["remote_access"]["tailscale"]["serve_ports"])
+        return [_unknown("serve_policy") if allowed is None else _verdict("serve_policy", allowed)]
+
+    def listeners() -> list[ReadResult]:
+        reads = []
+        for name in ("tcp", "tcp6"):
+            text, error = _text(Path("/proc/net") / name, Path("/proc/net"))
+            value = None if error else _listeners_loopback(text, name == "tcp6")
+            # Off-box listeners cannot be exempted using a uid or a port alone.
+            reads.append(
+                _verdict(name, True)
+                if value is True
+                else _unknown(name, error or "ambiguous_config")
+            )
+        return reads
+
+    def screen() -> list[ReadResult]:
+        if getpass.getuser() != policy["owner"]["user"]:
+            return [_unknown("screen_lock", "other_account")]
+        if linux == "omarchy":
+            return [_unknown("screen_lock", "not_checked")]
+        reads = []
+        for key, schema in (
+            ("lock-enabled", "org.gnome.desktop.screensaver"),
+            ("idle-delay", "org.gnome.desktop.session"),
+        ):
+            result = probe.run_probe(
+                linux, ("/usr/bin/gsettings", "get", schema, key), deadline=deadline
+            )
+            if result.reason or result.returncode != 0:
+                reads.append(_unknown(key, result.reason or "probe_error"))
+                continue
+            try:
+                value = result.data.decode().strip()
+                if key == "lock-enabled":
+                    if value not in {"true", "false"}:
+                        raise ValueError
+                    good = value == "true"
+                else:
+                    match = re.fullmatch(r"uint32 ([0-9]+)", value)
+                    if not match:
+                        raise ValueError
+                    good = (
+                        0 < int(match[1]) <= policy["host"]["desktop"]["screen_lock_minutes"] * 60
+                    )
+                reads.append(_verdict(key, good))
+            except (ValueError, UnicodeError):
+                reads.append(_unknown(key))
+        return reads
+
+    def update() -> list[ReadResult]:
+        text, error = _text(Path("/var/log/pacman.log"), Path("/var/log"))
+        reads = []
+        if error:
+            reads.append(_unknown("upgrade_age", error))
+        else:
+            dates = []
+            pending = False
+            for line in text.splitlines():
+                if re.fullmatch(r"\[[^]]+\] \[PACMAN\] starting full system upgrade", line):
+                    pending = True
+                elif "[PACMAN] Running " in line:
+                    pending = False
+                elif pending:
+                    match = re.fullmatch(r"\[([^]]+)\] \[ALPM\] transaction completed", line)
+                    if match:
+                        dates.append(match[1])
+                        pending = False
+            try:
+                if not dates:
+                    raise ValueError
+                date = datetime.fromisoformat(dates[-1])
+                if date.tzinfo is None:
+                    raise ValueError
+                age = datetime.now(timezone.utc) - date
+                reads.append(
+                    _verdict(
+                        "upgrade_age",
+                        timedelta(0)
+                        <= age
+                        <= timedelta(days=policy["hardening"]["updates"]["cadence_days"]),
+                    )
+                )
+            except ValueError:
+                reads.append(_unknown("upgrade_age"))
+        return reads + [_unknown("snapshot_presence", "needs_root")]
+
     def aur() -> list[ReadResult]:
         result = probe.run_probe(linux, ("/usr/bin/pacman", "-Qm"), deadline=deadline)
         if result.reason or result.returncode != 0:
@@ -1610,15 +1905,18 @@ def linux_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[di
                 )
             ]
         else:
-            reads = (
-                disk()
-                if "disk-luks" in spec.id
-                else firewall()
-                if spec.id.endswith("firewall-default-deny")
-                else aur()
-                if spec.id.endswith("aur-reviewed")
-                else []
-            )
+            callbacks = {
+                "host.disk-luks2-tpm": disk,
+                "host.disk-luks2-tpm-arch": disk,
+                "host.screen-lock": screen,
+                "hardening.firewall-default-deny": firewall,
+                "hardening.aur-reviewed": aur,
+                "hardening.update-snapshot": update,
+                "remote_access.tailscale-version": tailscale_version,
+                "remote_access.tailscale-serve-named": serve,
+                "remote_access.offbox-listeners": listeners,
+            }
+            reads = callbacks.get(spec.id, lambda: [])()
             reads += attestation_reads(policy, spec.id, now)
         results.append(check_result(spec, reads))
     return results

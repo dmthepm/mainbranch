@@ -28,9 +28,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ## [0.6.21] - 2026-11-03
 
 ### Added
+- Machine doctor checks Ubuntu screen lock, Tailscale package version and
+  running state, named Serve ports and disabled Funnel, and recent completed
+  Omarchy upgrades. It matches TPM configuration to root by disk UUID.
+  Off-box listeners without proven process identity stay unverified, as do
+  snapshots, disk headers and Omarchy screen lock.
+
 - Machine doctor traces root disk encryption, checks configured ufw defaults
   and reviewed foreign packages on Omarchy, and reports dated BIOS and firmware
-  evidence. Disk header and TPM-to-root verification remain incomplete. Shared
+  evidence. Disk header verification remains incomplete. Shared
   tool links are accepted only inside the declared version's install directory
   with root-owned, read-only components.
 

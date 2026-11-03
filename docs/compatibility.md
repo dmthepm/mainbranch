@@ -455,7 +455,8 @@ These rows have synthetic fixture evidence only.
 With a manifest, Linux checks also trace the encrypted root device, inspect
 ufw's enabled/default-input settings and compare Omarchy foreign packages with
 the reviewed list. BIOS and firmware controls use dated owner attestations.
-The disk header and the identity match between TPM configuration and root
-remain unverified. Screen lock, Tailscale version/Serve, listener attribution
-and Omarchy upgrade/snapshot checks are still pending. This is partial Linux
-coverage, with no additional live-host compatibility claim.
+TPM configuration is matched to root's encrypted backing UUID. Disk headers,
+snapshot presence, Omarchy screen lock and off-box listener process identity
+remain unverified. Ubuntu screen lock, Tailscale package version, running state,
+Serve ports and Funnel settings, and completed Omarchy upgrade age have synthetic
+fixture evidence. No additional live-host compatibility claim is made.
