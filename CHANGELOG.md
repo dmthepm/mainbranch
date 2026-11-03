@@ -37,6 +37,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   [connect](docs/connect.md#repo-identity-and-which-folder-may-use-which-keys).
 - Main Branch asks git about a folder without the caller's `GIT_DIR`, so a git
   hook no longer changes which repo a folder is.
+### Fixed
+
+- The test suite no longer fails on machines that set `NO_COLOR`, `FORCE_COLOR=0`
+  or `TERM=dumb`; tests now clear those settings unless they set their own.
 
 ### Changed
 
