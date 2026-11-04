@@ -36,6 +36,7 @@ Then start useful work with public evidence. Do not hold the review until setup.
 | AI answers, ChatGPT, Claude, Perplexity, or `llms.txt` | Follow [references/ai-agents.md](references/ai-agents.md). |
 | A weekly review, "how is SEO doing", or pages losing clicks | Follow [references/search-review.md](references/search-review.md). |
 | Search Console or Analytics evidence | Use `mb google` if it is connected. For OpenSEO, follow "Later: Google" in [references/setup.md](references/setup.md). |
+| Setup durability, idle gaps, login expiry, or where SEO facts live | Read [references/durable-setup.md](references/durable-setup.md) for requirements and proof limits. |
 | An OpenSEO upgrade, backup, or rollback | Follow [references/upgrades-and-backups.md](references/upgrades-and-backups.md). |
 | Page or copy changes | Route to `/mb-site`. |
 | A keyword choice for an offer | Route to `/mb-think` keyword gate. |
