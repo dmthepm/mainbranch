@@ -11,6 +11,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `/mb-support` (draft): customer support that keeps its promises. Policies,
+  money rules and help articles live in the business repo under `core/support/`;
+  `state/support/cases.md` logs each case with what was promised, by when, the
+  owner's approval and proof. The owner schedules the recurring check, every
+  send is verified, and the weekly review lists overdue promises first.
+  Messaging a customer, refunds and spend always ask.
+
 ### Changed
 
 - The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New

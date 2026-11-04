@@ -1,7 +1,9 @@
 ---
 type: decision
 date: 2026-05-23
-status: accepted
+status: superseded
+superseded_by:
+  - decisions/2026-11-03-support-chat-is-a-primary-channel.md
 topic: Support chat rail and handoff boundary
 linked_issues:
   - https://github.com/dmthepm/mainbranch/issues/615
@@ -23,6 +25,11 @@ tags: [support, chat, cloudflare, ai, handoff, privacy, integrations, hermes, sh
 ---
 
 # Support Chat Rail And Handoff Boundary
+
+> Superseded by
+> [Support chat is a primary channel](2026-11-03-support-chat-is-a-primary-channel.md).
+> Chat is a primary helpdesk channel, not a narrow front door. The privacy,
+> regulated-data and validation sections below still describe sensible gates.
 
 ## Decision
 
