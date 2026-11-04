@@ -109,8 +109,10 @@ themselves. Pin a version and check that it expands the variable internally.
 
 `mb connect exec` refuses direct child arguments containing the released value
 when it has at least four characters (`exec_child_argv_secret`). It warns when a
-shell's `-c` script references the credential variable. The guard sees only
-exec's direct child arguments, not what a shell or script later does. The
+direct `sh`, `bash`, `dash` or `zsh` `-c` script has a plain `$NAME` or `${NAME}`
+reference to the credential variable. That warning is advice and misses other
+forms, such as `${NAME:-x}` or `env sh -c`. The guard sees only exec's direct
+child arguments, not what a shell or script later does. The
 environment stays readable by the same OS user.
 
 ## Raw Read: `token`
