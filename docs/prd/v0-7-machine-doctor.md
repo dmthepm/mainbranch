@@ -150,6 +150,15 @@ heavy-work lock, backup age limits, update model. The pack's two synthetic
 examples (Ubuntu, and Omarchy administered from a Mac) are the reference
 fixtures, once the deltas are applied.
 
+D5 implementation note: the schema describes structural rules. The runtime
+validator also checks size-class references, which draft 2020-12 cannot express
+for arbitrary keys in another object. Loaded sections awaiting D7–D9 checks
+are reported under `manifest.coverage` as `not_verified`, reason `not_checked`,
+so loading policy cannot imply that those controls passed. Manifest text may
+not hold control characters, since Python's `$` also matches before a final
+newline. D6 evaluates the `checks` section, so only that section is
+removed from coverage. Other sections remain not checked until D7–D9.
+
 Parsing: strict, a 256 KB cap, and every `additionalProperties: false` kept.
 An unknown key, an invalid value, an unknown check id, or a `size_class` that
 names no `size_classes` key is a manifest error (exit `2`, no checks run).
@@ -190,7 +199,10 @@ Engine-only `checks` section:
   - The registry marks individual reads `attestable`, each with its own
     expiry rule. Attesting a read that isn't attestable is a manifest error
     (exit `2`).
-  - `at` is an RFC 3339 UTC timestamp. One in the future is a manifest error.
+  - `at` is an RFC 3339 UTC timestamp. A future timestamp gives
+    `not_verified`, reason `attestation_stale`, so future-dated evidence
+    cannot establish assurance. D6 follows the approved build brief here;
+    invalid calendar dates remain manifest errors.
 - **Outcome of an attestable read:**
 
   | Manifest says | Read outcome |
@@ -289,7 +301,7 @@ applicable on that OS. `att` means an owner attestation. `NV` means always
 | `sessions.linger` | engine | [sessions-that-survive-a-reboot](../machine-setup.md#sessions-that-survive-a-reboot) | ✓ | ✓ | — | any | `/var/lib/systemd/linger/<user>` exists for each business user. |
 | `runtime.herdr-per-user` | pack | [sessions-that-survive-a-reboot](../machine-setup.md#sessions-that-survive-a-reboot) | ✓ | ✓ | — | each-business | `systemctl --user` `is-enabled` and `is-active` for `runtime.session_unit`. Its `Slice` is not `app.slice`. |
 | `sessions.started-without-login` | engine | [part-4-first-week](../machine-setup.md#part-4-first-week) | ✓ | ✓ | — | each-business | The unit's `ActiveEnterTimestamp` is before the user's first login session this boot. `warn` otherwise: the reboot test hasn't been passed. |
-| `runtime.claude-autoupdate-off` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | ✓ | ✓ | — | each-business | The session unit's `Environment` has `DISABLE_AUTOUPDATER=1`. Only that key is kept from the read. |
+| `runtime.claude-autoupdate-off` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | ✓ | ✓ | — | each-business | Not checked: a unit's `Environment` can carry credentials and cannot be read one key at a time, so doctor reports it incomplete and asks the owner to confirm `DISABLE_AUTOUPDATER=1`. |
 | `credentials.store-available` | engine | [credentials](../machine-setup.md#credentials) | ✓ | ✓ | ✓ | each-business | Reuses `mb connect`'s existing credential-store probe ([`connect.md`](../connect.md)). Fails if no store works without a desktop session. |
 
 ### Shared tools and heavy work
@@ -588,3 +600,92 @@ Omarchy boxes also have `host.screen-lock` NOT VERIFIED. macOS always exits
 4. The v0-7 target in this file name is tentative.
 
 Next: the code batch runs on #1248.
+
+### D7 partial implementation note
+
+The bounded D7 lane adds local `/etc/passwd` and `/etc/group` reads, account
+identity and home permissions, current-process umask and cross-home directory
+access, private TMPDIR, linger markers, and user-unit enablement, activity,
+slice and updater flag reads. Enablement and activity use named `systemctl
+show` properties instead of separate `is-enabled` and `is-active` invocations
+to keep the reads bounded. It does not query network account providers.
+
+Slice limits and startup-before-login comparison remain unimplemented. The
+account checks are policy-bound additions outside the static registry; full
+registry metadata validation remains required. No D7 section is removed from
+`manifest.coverage`, since this lane does not complete the section contract.
+The implementation is a partial handoff for further work, not D7 acceptance.
+
+### D7 continuation implementation limits
+
+The account checks share a lazy local passwd/group read. A skipped check does
+not load those databases or run its probes. Policy-bound specs are available
+through `registry(..., include_policy=True)` for metadata validation; baseline
+runs without a manifest keep their existing registry.
+
+Slice limits compare systemd's byte counts with binary M/G manifest sizes.
+Optional ceilings are compared only when declared. Host RAM drift above 10%
+warns. Owner and runtime sections leave `manifest.coverage` on supported Linux;
+businesses and sessions remain there conservatively.
+
+`started-without-login` reads `ActiveEnterTimestampMonotonic` and warns rather
+than passing. This differs from the planned timestamp comparison: bounded
+current logind records lose closed sessions and cannot prove the first login
+this boot. A durable boot-scoped login evidence source is still required.
+No reboot-test assurance is claimed.
+
+### D8 implementation details
+
+Pinned directories use `<tool_root>/mise/installs/<name>/<version>` when
+`shared_tools.version_manager` is `mise` (mise's data folder under the tool
+root), else `<tool_root>/installs/<name>/<version>`. The schema has no
+install-layout field, so doctor uses this fixed convention and does not
+expand a version or bin string as a path or command. Versions outside one safe
+path segment stay unverified. Tool files and directories reject symlinks; this
+conservative check does not establish a symlink-based installation's pins.
+Tarball checksums and binary contents remain unproved.
+
+The shell's first PATH entry must equal `<tool_root>/bin`. This narrows "under
+tool_root" to the bin directory promised by the schema. Other-account shell
+environments stay unverified. Heavy-lock metadata uses descriptor-pinned
+parents, checks a regular file, exact mode 0660 and the declared group. The
+wrapper's refusal behavior always stays unverified because it is never run.
+
+Restore records have a 4096-byte cap, reject symlinks and duplicate JSON keys,
+and require the opened file to be root-owned without group or other write.
+Only `date` and `result` leave the parser. Dates accept a calendar date at UTC
+midnight or a UTC timestamp; result is `pass` or `fail`. Future or malformed
+records stay unverified. Unreadable records retain that unverified read beside
+the fallback owner attestation so evidence does not hide the failed read.
+A missing `max_age_hours`, optional in the pack schema, keeps freshness
+unverified because no expiry can be established. These sections leave
+`manifest.coverage` on supported Linux because all their rows now emit reads;
+unverified, attested and skipped outcomes remain non-passing.
+
+### D9 partial implementation limits
+
+Shared bin symlinks are an explicit metadata-only exception to the blanket
+symlink refusal. Doctor reads the link through a pinned directory descriptor,
+requires an absolute target inside the declared install version, then walks
+its components without following links. Root ownership and write permissions
+are checked throughout. Neither the link nor its target is executed.
+
+The disk rows trace root's device ancestry and match crypttab UUID sources to
+root's encrypted backing UUID using an additional TYPE/MOUNTPOINTS/UUID read.
+Other crypttab source formats remain unverified because they need device
+resolution. LUKS2 headers always remain unverified without root.
+
+Ubuntu screen lock reads the owner's GNOME settings. Omarchy stays not checked
+pending the second-install proof required above; no clipboard or user config
+is read. Tailscale version comes from the package database, while fixed status
+and Serve commands read local socket state. Unknown Serve top-level fields
+remain unverified rather than ignoring a possible new exposure mechanism.
+
+Listener reads accept only loopback listeners as proved. Off-box listeners,
+including uid 0 or SSH-port listeners, remain unverified because process
+identity has not been established. The regular-file and no-symlink boundary
+can also refuse procfs reads; no boundary exception was added in this lane.
+Omarchy upgrade age requires a full-upgrade marker followed by a completed
+ALPM transaction; a start marker alone cannot prove a completed upgrade.
+Snapshot presence remains needs_root. No additional manifest sections leave
+not_checked coverage because these contracts still contain incomplete rows.

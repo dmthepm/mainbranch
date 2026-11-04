@@ -428,7 +428,35 @@ mb doctor
   runtimes remain roadmap surfaces until each has a documented adapter and
   smoke evidence. Codex support is limited to the skill surface above.
 
-`mb machine doctor [--json]` provides a read-only, current-account baseline on
-Ubuntu LTS and Omarchy. This initial subset has no manifest support and remains
-incomplete with exit 3 unless a check fails with exit 1. macOS only has partial
+`mb machine doctor [--manifest PATH] [--json]` provides a read-only, current-account baseline on
+Ubuntu LTS and Omarchy. Manifest loading validates desired state and checks the default policy file's
+root ownership and permissions. Manifest skips and dated attestations report
+separate non-passing states; expired backup evidence fails. Caller-selected policies never establish
+assurance. The check subset remains incomplete with exit 3 unless a check
+fails with exit 1; invalid manifests exit 2 before probes run. macOS only has partial
 OS detection. Fixture coverage does not establish real-host runtime support.
+
+Machine doctor with a manifest also reads local account and group databases,
+home privacy, the current business account's umask and private temporary
+directory, linger markers and user-session unit settings on Ubuntu and Omarchy.
+`--scope all` lists checks for other accounts as unverified. Slice limits are
+compared with declared size classes; host RAM drift above 10% warns. The
+startup-before-login row warns because a unit timestamp cannot prove the
+first login this boot. Sessions coverage remains incomplete. These additions have synthetic
+fixture evidence only; no new real-host assurance is claimed.
+
+Machine doctor also checks declared shared-tool files and install directories,
+the current business shell's PATH, heavy-lock mode and group, and wrapper
+metadata. It never executes shared tools or the wrapper. Backup freshness uses
+owner attestations; bounded restore records supply only their date and result.
+Unreadable records retain an unverified read alongside any owner evidence.
+These rows have synthetic fixture evidence only.
+
+With a manifest, Linux checks also trace the encrypted root device, inspect
+ufw's enabled/default-input settings and compare Omarchy foreign packages with
+the reviewed list. BIOS and firmware controls use dated owner attestations.
+TPM configuration is matched to root's encrypted backing UUID. Disk headers,
+snapshot presence, Omarchy screen lock and off-box listener process identity
+remain unverified. Ubuntu screen lock, Tailscale package version, running state,
+Serve ports and Funnel settings, and completed Omarchy upgrade age have synthetic
+fixture evidence. No additional live-host compatibility claim is made.

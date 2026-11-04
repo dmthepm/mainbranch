@@ -11,6 +11,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
+  versions, comparing their numeric major, minor, and patch components.
+
 ### Added
 
 - `/mb-support` (draft): customer support that keeps its promises. Policies,
@@ -19,6 +24,41 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   owner's approval and proof. The owner schedules the recurring check, every
   send is verified, and the weekly review lists overdue promises first.
   Messaging a customer, refunds and spend always ask.
+
+- Machine doctor checks Ubuntu screen lock, Tailscale package version and
+  running state, named Serve ports and disabled Funnel, and recent completed
+  Omarchy upgrades. It matches TPM configuration to root by disk UUID.
+  Off-box listeners without proven process identity stay unverified, as do
+  snapshots, disk headers and Omarchy screen lock.
+
+- Machine doctor traces root disk encryption, checks configured ufw defaults
+  and reviewed foreign packages on Omarchy, and reports dated BIOS and firmware
+  evidence. Disk header verification remains incomplete. Shared
+  tool links are accepted only inside the declared version's install directory
+  with root-owned, read-only components.
+
+- Machine doctor checks shared-tool ownership and pin directories, the current
+  business account's tool path and heavy-work lock, and dated backup evidence.
+  It inspects the job wrapper without running it. Restore records expose only
+  the date and result; overdue restore tests fail.
+
+- Machine doctor checks declared business accounts, private homes and temporary
+  directories, group membership, reboot persistence and session-unit settings.
+  It compares resource limits with each account's size class and warns when
+  host memory has changed. `--scope all` lists other accounts as unverified.
+  Startup-before-login remains a warning until the reboot test is proved.
+
+- Machine doctor honors manifest skips and dated owner attestations. Skipped
+  checks and owner evidence never count as passing. Expired evidence stays
+  unverified, or fails when a backup or restore test is overdue. Invalid
+  attestation identities stop the run before probes.
+
+- `mb machine doctor` reads a machine manifest: the desired state of the box,
+  from root-owned `/etc/mainbranch/machine.json` or `--manifest PATH`. An invalid
+  manifest exits 2 before any check runs. A default file that root does not own,
+  or that others can write, fails and nothing else runs. A manifest you pick
+  with `--manifest` never counts as assurance. Sections whose checks are not
+  built yet show as not checked, never as passed.
 
 ### Changed
 
