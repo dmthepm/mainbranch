@@ -11,6 +11,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
+  versions, comparing their numeric major, minor, and patch components.
+
 ### Added
 
 - `/mb-support` (draft): customer support that keeps its promises. Policies,

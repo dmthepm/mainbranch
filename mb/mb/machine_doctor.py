@@ -1787,13 +1787,18 @@ def linux_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[di
                     name, value = value.split()
                     if name != "tailscale":
                         raise ValueError
-                match = re.fullmatch(
-                    r"(?:[0-9]+:)?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-[A-Za-z0-9.+~]+)?", value
+                version_pattern = r"([0-9]+)\.([0-9]+)\.([0-9]+)(?:[-.+][0-9A-Za-z.-]+)?"
+                installed_pattern = (
+                    r"(?:[0-9]+:)?([0-9]+)\.([0-9]+)\.([0-9]+)"
+                    r"(?:-[A-Za-z0-9.+~]+|[-.+][0-9A-Za-z.-]+)?"
                 )
-                minimum = policy["remote_access"]["tailscale"]["min_version"]
-                if not match:
+                match = re.fullmatch(installed_pattern, value)
+                minimum = re.fullmatch(
+                    version_pattern, policy["remote_access"]["tailscale"]["min_version"]
+                )
+                if not match or not minimum:
                     raise ValueError
-                good = tuple(map(int, match.groups())) >= tuple(map(int, minimum.split(".")))
+                good = tuple(map(int, match.groups())) >= tuple(map(int, minimum.groups()))
                 reads.append(_verdict("package_version", good, meets_minimum=good))
             except (ValueError, UnicodeError):
                 reads.append(_unknown("package_version"))

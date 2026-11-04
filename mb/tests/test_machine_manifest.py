@@ -289,6 +289,13 @@ def test_control_characters_rejected(path: str, value: Any) -> None:
 NOW = datetime(2026, 11, 3, tzinfo=timezone.utc)
 
 
+@pytest.fixture
+def frozen_doctor_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = Mock(wraps=datetime)
+    clock.now.return_value = NOW
+    monkeypatch.setattr(doctor, "datetime", clock)
+
+
 def attested_policy(
     check_id: str, read: str, *, days: float = 0, answer: str = "yes"
 ) -> dict[str, Any]:
@@ -410,11 +417,11 @@ def test_stale_age_attestation_table_row() -> None:
     assert doctor.attestation_reads(data, "backups.fresh", NOW)[0].state == "fail"
 
 
-def test_attested_output_is_never_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_attested_output_is_never_pass(
+    monkeypatch: pytest.MonkeyPatch, frozen_doctor_clock: None
+) -> None:
     data = attested_policy("host.power-on-after-loss", "bios_power_on")
-    data["checks"]["attest"][0]["at"] = (
-        datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    )
+    data["checks"]["attest"][0]["at"] = NOW.isoformat().replace("+00:00", "Z")
     monkeypatch.setattr(doctor, "registry", lambda _: ())
     checks = doctor.policy_checks(data, "ubuntu", 0)
     check = next(c for c in checks if c["id"] == "host.power-on-after-loss")
@@ -966,7 +973,9 @@ def test_d8_wrapper_never_runs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
         (b"bad", "not_verified"),
     ],
 )
-def test_d8_restore_fields(monkeypatch: pytest.MonkeyPatch, body: bytes, state: str) -> None:
+def test_d8_restore_fields(
+    monkeypatch: pytest.MonkeyPatch, body: bytes, state: str, frozen_doctor_clock: None
+) -> None:
     data = d8_only(monkeypatch, "backups.restore-tested")
 
     def read(path: Path, *, prefix: Path, byte_cap: int, root_owned: bool) -> probe.ProbeResult:
@@ -982,7 +991,9 @@ def test_d8_restore_fields(monkeypatch: pytest.MonkeyPatch, body: bytes, state: 
 
 
 @pytest.mark.parametrize("error", ["probe_error", "probe_missing", "ambiguous_config"])
-def test_d8_restore_fallback(monkeypatch: pytest.MonkeyPatch, error: probe.ProbeReason) -> None:
+def test_d8_restore_fallback(
+    monkeypatch: pytest.MonkeyPatch, error: probe.ProbeReason, frozen_doctor_clock: None
+) -> None:
     data = d8_only(monkeypatch, "backups.restore-tested")
     data["checks"]["attest"] = [
         {
@@ -1054,7 +1065,9 @@ def test_d8_restore_unsafe_file(tmp_path: Path, kind: str) -> None:
 
 
 @pytest.mark.parametrize("missing", [True, False])
-def test_d8_backup_age_missing_limit(monkeypatch: pytest.MonkeyPatch, missing: bool) -> None:
+def test_d8_backup_age_missing_limit(
+    monkeypatch: pytest.MonkeyPatch, missing: bool, frozen_doctor_clock: None
+) -> None:
     data = d8_only(monkeypatch, "backups.fresh")
     if missing:
         del data["backups"]["max_age_hours"]
@@ -1435,6 +1448,7 @@ def test_d9b_ubuntu_tpm(monkeypatch: pytest.MonkeyPatch, case: str, expected: st
         ("remote_access.tailscale-version", "stopped", "fail"),
         ("remote_access.tailscale-version", "denied", "not_verified"),
         ("remote_access.tailscale-version", "malformed", "not_verified"),
+        ("remote_access.tailscale-version", "malformed-minimum", "not_verified"),
         ("remote_access.tailscale-serve-named", "pass", "pass"),
         ("remote_access.tailscale-serve-named", "funnel", "fail"),
         ("remote_access.tailscale-serve-named", "denied", "not_verified"),
@@ -1464,7 +1478,10 @@ def test_d9b_tailscale(
         return probe.ProbeResult(json.dumps(body).encode(), 0)
 
     monkeypatch.setattr(probe, "run_probe", run)
-    assert d9_row(example(), check)["state"] == expected
+    data = example()
+    if case == "malformed-minimum":
+        data["remote_access"]["tailscale"]["min_version"] = "1.80.0+"
+    assert d9_row(data, check)["state"] == expected
 
 
 def effective_account(monkeypatch: pytest.MonkeyPatch, name: str, uid: int = 4242) -> None:
@@ -1549,8 +1566,10 @@ def test_d9b_screen(monkeypatch: pytest.MonkeyPatch, case: str, expected: str) -
         ("malformed", "not_verified"),
     ],
 )
-def test_d9b_update(monkeypatch: pytest.MonkeyPatch, case: str, expected: str) -> None:
-    date = datetime.now(timezone.utc) - timedelta(days=90 if case == "old" else 1)
+def test_d9b_update(
+    monkeypatch: pytest.MonkeyPatch, case: str, expected: str, frozen_doctor_clock: None
+) -> None:
+    date = NOW - timedelta(days=90 if case == "old" else 1)
     text = f"[{date.isoformat()}] [PACMAN] starting full system upgrade\n"
     if case != "incomplete":
         text += f"[{date.isoformat()}] [ALPM] transaction completed\n"
@@ -1606,3 +1625,29 @@ def test_d9b_screen_refuses_other_account_and_omarchy(monkeypatch: pytest.Monkey
     data = example("omarchy")
     effective_account(monkeypatch, data["owner"]["user"])
     assert d9_row(data, "host.screen-lock", "omarchy")["reason"] == "not_checked"
+
+
+@pytest.mark.parametrize("minimum", ["1.80.0+build.1", "1.80.0-rc.1"])
+@pytest.mark.parametrize(
+    "installed,expected",
+    [
+        ("1.81.0+build.2", "pass"),
+        ("1.79.0", "fail"),
+        ("1.80.0-1~jammy", "pass"),
+        ("1.80.0-1+deb12u1", "pass"),
+    ],
+)
+def test_tailscale_suffixed_minimum(
+    monkeypatch: pytest.MonkeyPatch, minimum: str, installed: str, expected: str
+) -> None:
+    data = example()
+    data["remote_access"]["tailscale"]["min_version"] = minimum
+
+    def run(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        return probe.ProbeResult(
+            installed.encode() if argv[0].endswith("dpkg-query") else b'{"BackendState":"Running"}',
+            0,
+        )
+
+    monkeypatch.setattr(probe, "run_probe", run)
+    assert d9_row(data, "remote_access.tailscale-version")["state"] == expected
