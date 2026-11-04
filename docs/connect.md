@@ -91,6 +91,28 @@ with `exec_env_conflict`; use `--env NAME` to choose that variable.
 This is the path agents and scripts should use. What the command prints is
 still the command's business: avoid commands that echo their environment.
 
+### MCP bridges and header arguments
+
+Use a tool that expands the credential variable itself. For example, put this
+command in a small launcher script, replacing the provider, pinned version and
+URL placeholders:
+
+```bash
+#!/bin/sh
+exec mb connect exec <provider> --env EXAMPLE_TOKEN -- npx -y mcp-remote@<pin> <url> --header 'Authorization: Bearer ${EXAMPLE_TOKEN}'
+```
+
+Keep the single quotes. Point the MCP client config at the script and keep the
+placeholder out of client config: some MCP clients expand `${VAR}` in arguments
+themselves. Pin a version and check that it expands the variable internally.
+`mcp-remote` 0.16.0 was checked with a fake value.
+
+`mb connect exec` refuses direct child arguments containing the released value
+when it has at least four characters (`exec_child_argv_secret`). It warns when a
+shell's `-c` script references the credential variable. The guard sees only
+exec's direct child arguments, not what a shell or script later does. The
+environment stays readable by the same OS user.
+
 ## Raw Read: `token`
 
 `mb connect token <provider> --print` explicitly releases the raw credential

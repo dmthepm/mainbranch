@@ -2092,11 +2092,17 @@ def test_refuse_raises_named_rule() -> None:
 
 
 def _env_probe(name: str, expected: str) -> list[str]:
-    """A child that exits 0 only when ``name`` holds ``expected``, printing nothing."""
+    """A child that exits 0 only when ``name`` holds ``expected``, printing nothing.
+
+    It compares digests: exec refuses a child with the credential in its arguments.
+    """
+    digest = hashlib.sha256(expected.encode()).hexdigest()
     return [
         sys.executable,
         "-c",
-        f"import os, sys; sys.exit(0 if os.environ.get({name!r}) == {expected!r} else 3)",
+        "import hashlib, os, sys; "
+        f"value = os.environ.get({name!r}, '').encode(); "
+        f"sys.exit(0 if hashlib.sha256(value).hexdigest() == {digest!r} else 3)",
     ]
 
 

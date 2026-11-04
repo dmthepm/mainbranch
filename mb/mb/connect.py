@@ -4006,6 +4006,7 @@ def release_refusal_exit_code(exc: ValueError) -> int:
             "caller_policy_provider",
             "caller_policy_caller",
             "exec_child_env_dump",
+            "exec_child_argv_secret",
         }:
             return TOKEN_REFUSED_EXIT_CODE
     return 2
@@ -4102,7 +4103,8 @@ def release_attempt(
             refusal = isinstance(exc, ConnectRefusal)
             code = release_refusal_exit_code(exc) if isinstance(exc, ValueError) else 1
             if isinstance(exc, ConnectRefusal) and (
-                exc.rule.startswith("caller_policy_") or exc.rule == "exec_child_env_dump"
+                exc.rule.startswith("caller_policy_")
+                or exc.rule in {"exec_child_env_dump", "exec_child_argv_secret"}
             ):
                 policy = "refused"
             with suppress(ConnectRefusal):
@@ -4308,6 +4310,29 @@ def _exec_with_secret(
         outcome["repair_command"] = result["repair_command"]
         record(result="failed", reason=result["state"], exit_code=1, scope=result.get("source", ""))
         return outcome
+    token = result["token"]
+    if len(token) >= 4 and any(token in argument for argument in command):
+        _refuse(
+            "exec_child_argv_secret",
+            "exec_child_argv_secret: refusing a child with the credential in its arguments. "
+            "Use a tool that reads the credential variable itself. "
+            "See `mb connect policy` and docs/connect.md.",
+        )
+    if Path(command[0]).name in {"sh", "bash", "dash", "zsh"}:
+        for index, argument in enumerate(command[1:], start=1):
+            if argument.startswith("-") and not argument.startswith("--") and "c" in argument[1:]:
+                if index + 1 < len(command) and re.search(
+                    rf"\$(?:{re.escape(name)}(?![A-Za-z0-9_])|\{{{re.escape(name)}\}})",
+                    command[index + 1],
+                ):
+                    print(
+                        "mb connect exec: a shell expands the credential variable; "
+                        "any command it starts with that value gets it in its arguments.",
+                        file=sys.stderr,
+                    )
+                break
+            if argument == "--" or not argument.startswith("-"):
+                break
     env = {
         key: value
         for key, value in os.environ.items()
