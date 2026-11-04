@@ -305,7 +305,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   each one with a short before-and-after handoff instead of restating their steps.
   For a self-hosted copy it documents a skills-only install at a verified pin, in
   place of the blanket "do not install the plugin" rule, and adds a hardening
-  checklist for the Access guard. Still experimental.
+  checklist for the Access guard. A durability reference separates observed checks
+  from unproven authentication changes and assigns one home to each SEO fact.
+  Still experimental.
 
 ### Fixed
 
