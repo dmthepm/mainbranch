@@ -1177,9 +1177,7 @@ def test_s4_regular_tool_ancestors_must_be_root_owned(
             return d8_info(stat.S_IFMT(info.st_mode) | mode, 1234 if kind == "owner" else 0)
         if kind.startswith("file-") and info.st_ino == leaf_inode:
             mode = stat.S_IMODE(info.st_mode) | (0o022 if kind == "file-writable" else 0)
-            return d8_info(
-                stat.S_IFMT(info.st_mode) | mode, 1234 if kind == "file-owner" else 0
-            )
+            return d8_info(stat.S_IFMT(info.st_mode) | mode, 1234 if kind == "file-owner" else 0)
         return d8_info(stat.S_IFMT(info.st_mode) | 0o755)
 
     monkeypatch.setattr(os, "fstat", lambda fd: shaped(real_fstat(fd)))
@@ -1475,7 +1473,9 @@ def effective_account(monkeypatch: pytest.MonkeyPatch, name: str, uid: int = 424
     monkeypatch.setattr(
         pwd,
         "getpwuid",
-        lambda number: pwd.struct_passwd((name, "x", number, number, "", "/nonexistent", "/bin/sh")),
+        lambda number: pwd.struct_passwd(
+            (name, "x", number, number, "", "/nonexistent", "/bin/sh")
+        ),
     )
 
 
