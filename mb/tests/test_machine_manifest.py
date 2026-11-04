@@ -1,9 +1,9 @@
 """Manifest syntax, trust, and policy assurance regressions."""
 
 import copy
-import getpass
 import json
 import os
+import pwd
 import stat
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1400,6 +1400,43 @@ def test_d9b_tailscale(
     assert d9_row(example(), check)["state"] == expected
 
 
+def effective_account(monkeypatch: pytest.MonkeyPatch, name: str, uid: int = 4242) -> None:
+    """Resolve the account the way doctor must: from the effective uid, nothing else."""
+    monkeypatch.setattr(os, "geteuid", lambda: uid)
+    monkeypatch.setattr(
+        pwd,
+        "getpwuid",
+        lambda number: pwd.struct_passwd((name, "x", number, number, "", "/nonexistent", "/bin/sh")),
+    )
+
+
+@pytest.mark.parametrize("variable", ["LOGNAME", "USER", "LNAME", "USERNAME"])
+def test_s4_screen_ignores_spoofed_environment(
+    monkeypatch: pytest.MonkeyPatch, variable: str
+) -> None:
+    data = example()
+    effective_account(monkeypatch, "fixture-agent")
+    monkeypatch.setenv(variable, data["owner"]["user"])
+    probe_run = Mock(side_effect=AssertionError("owner settings must not be read"))
+    monkeypatch.setattr(probe, "run_probe", probe_run)
+    row = d9_row(data, "host.screen-lock")
+    assert row["state"] == "not_verified" and row["reason"] == "other_account"
+    probe_run.assert_not_called()
+
+
+def test_s4_screen_unresolvable_account_is_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = example()
+    monkeypatch.setenv("LOGNAME", data["owner"]["user"])
+    monkeypatch.setattr(os, "geteuid", lambda: 4242)
+
+    def missing(number: int) -> Any:
+        raise KeyError(number)
+
+    monkeypatch.setattr(pwd, "getpwuid", missing)
+    monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("no probe")))
+    assert d9_row(data, "host.screen-lock")["reason"] == "other_account"
+
+
 @pytest.mark.parametrize(
     "case,expected",
     [
@@ -1412,7 +1449,7 @@ def test_d9b_tailscale(
 )
 def test_d9b_screen(monkeypatch: pytest.MonkeyPatch, case: str, expected: str) -> None:
     data = example()
-    monkeypatch.setattr(getpass, "getuser", lambda: data["owner"]["user"])
+    effective_account(monkeypatch, data["owner"]["user"])
 
     def run(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
         assert argv[0:2] == ("/usr/bin/gsettings", "get")
@@ -1494,9 +1531,9 @@ def test_d9b_screen_refuses_other_account_and_omarchy(monkeypatch: pytest.Monkey
     monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("no session probe")))
     monkeypatch.setattr(doctor, "_text", Mock(side_effect=AssertionError("no user config read")))
     data = example()
-    monkeypatch.setattr(getpass, "getuser", lambda: "different-owner")
+    effective_account(monkeypatch, "different-owner")
     row = d9_row(data, "host.screen-lock")
     assert row["reason"] == "other_account"
     data = example("omarchy")
-    monkeypatch.setattr(getpass, "getuser", lambda: data["owner"]["user"])
+    effective_account(monkeypatch, data["owner"]["user"])
     assert d9_row(data, "host.screen-lock", "omarchy")["reason"] == "not_checked"

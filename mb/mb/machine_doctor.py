@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import configparser
-import getpass
 import json
 import os
 import platform
+import pwd
 import re
 import shlex
 import stat
@@ -187,6 +187,14 @@ def detect_platform(deadline: float) -> tuple[dict[str, Any], list[ReadResult]]:
             "pacman_package", "not_verified", {"installed": installed}, package.reason or reason
         ),
     ]
+
+
+def _current_account() -> str | None:
+    """Name of the effective-uid account; never from LOGNAME, USER or any caller-set variable."""
+    try:
+        return pwd.getpwuid(os.geteuid()).pw_name
+    except (KeyError, OSError):
+        return None
 
 
 def _unknown(name: str, reason: Reason = "ambiguous_config") -> ReadResult:
@@ -1805,7 +1813,7 @@ def linux_checks(policy: dict[str, Any], os_id: str, deadline: float) -> list[di
         return reads
 
     def screen() -> list[ReadResult]:
-        if getpass.getuser() != policy["owner"]["user"]:
+        if _current_account() != policy["owner"]["user"]:
             return [_unknown("screen_lock", "other_account")]
         if linux == "omarchy":
             return [_unknown("screen_lock", "not_checked")]
@@ -2020,7 +2028,7 @@ def doctor(manifest: Path | None = None, scope: str = "self") -> dict[str, Any]:
             "scope": scope,
             "manifest": metadata,
             "platform": {"id": "not_checked"},
-            "run_as": {"account": getpass.getuser(), "role": "unknown"},
+            "run_as": {"account": _current_account() or "unknown", "role": "unknown"},
             "summary": {state: counts[state] for state in STATES},
             "checks": checks,
             "errors": [{"code": "manifest.invalid"}] if failure == 2 else [],
@@ -2130,7 +2138,7 @@ def doctor(manifest: Path | None = None, scope: str = "self") -> dict[str, Any]:
         "ok": code == 0,
         "exit_code": code,
         "platform": detected,
-        "run_as": {"account": getpass.getuser(), "role": "unknown"},
+        "run_as": {"account": _current_account() or "unknown", "role": "unknown"},
         "scope": scope,
         "manifest": metadata,
         "summary": {state: counts[state] for state in STATES},
