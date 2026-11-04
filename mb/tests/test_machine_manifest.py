@@ -464,17 +464,16 @@ def test_d7_account_reads(monkeypatch: pytest.MonkeyPatch, good: bool) -> None:
     monkeypatch.setattr(probe, "read_file", read_file)
 
     def run_probe(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
-        if "--property=Environment" in argv:
-            body = "Environment=TOKEN=private-fixture DISABLE_AUTOUPDATER=" + ("1" if good else "0")
-        else:
-            body = (
-                "UnitFileState="
-                + ("enabled" if good else "disabled")
-                + "\nActiveState="
-                + ("active" if good else "inactive")
-                + "\nSlice="
-                + ("background.slice" if good else "app.slice")
-            )
+        # The whole unit Environment can carry credentials: it is never requested.
+        assert not any("Environment" in part for part in argv), argv
+        body = (
+            "UnitFileState="
+            + ("enabled" if good else "disabled")
+            + "\nActiveState="
+            + ("active" if good else "inactive")
+            + "\nSlice="
+            + ("background.slice" if good else "app.slice")
+        )
         return probe.ProbeResult(data=body.encode(), returncode=0)
 
     monkeypatch.setattr(probe, "run_probe", run_probe)
@@ -489,12 +488,39 @@ def test_d7_account_reads(monkeypatch: pytest.MonkeyPatch, good: bool) -> None:
         "unit_enabled",
         "unit_active",
         "unit_slice",
-        "autoupdater_disabled",
     ):
         assert reads[read]["state"] == expected, read
+    assert reads["autoupdater_disabled"]["state"] == "not_verified"
+    assert reads["autoupdater_disabled"]["reason"] == "not_checked"
     if good:
         assert reads["umask"]["state"] == "pass"
     assert "private-fixture" not in json.dumps(results)
+
+
+def test_s4_updater_never_reads_unit_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = example()
+    user = data["businesses"]["users"][0]
+    data["checks"] = {
+        "skip": [
+            {"id": s.id, "reason": "fixture"}
+            for s in doctor.ACCOUNT_SPECS
+            if s.id != "runtime.claude-autoupdate-off"
+        ]
+    }
+    monkeypatch.setattr(os, "getuid", lambda: user["uid"])
+    seen: list[tuple[str, ...]] = []
+
+    def run_probe(os_id: str, argv: tuple[str, ...], **kwargs: Any) -> probe.ProbeResult:
+        seen.append(argv)
+        body = "Environment=SYNTHETIC_API_TOKEN=not-a-secret DISABLE_AUTOUPDATER=1"
+        return probe.ProbeResult(data=body.encode(), returncode=0)
+
+    monkeypatch.setattr(probe, "run_probe", run_probe)
+    results = doctor.account_checks(data, "ubuntu", 0)
+    row = next(c for c in results if c["id"] == "runtime.claude-autoupdate-off")
+    assert row["state"] == "not_verified"
+    assert not any("Environment" in part for argv in seen for part in argv)
+    assert "not-a-secret" not in json.dumps(results) + repr(seen)
 
 
 def test_d7_denied_and_other_accounts(monkeypatch: pytest.MonkeyPatch) -> None:

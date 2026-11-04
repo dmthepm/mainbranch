@@ -301,7 +301,7 @@ applicable on that OS. `att` means an owner attestation. `NV` means always
 | `sessions.linger` | engine | [sessions-that-survive-a-reboot](../machine-setup.md#sessions-that-survive-a-reboot) | ✓ | ✓ | — | any | `/var/lib/systemd/linger/<user>` exists for each business user. |
 | `runtime.herdr-per-user` | pack | [sessions-that-survive-a-reboot](../machine-setup.md#sessions-that-survive-a-reboot) | ✓ | ✓ | — | each-business | `systemctl --user` `is-enabled` and `is-active` for `runtime.session_unit`. Its `Slice` is not `app.slice`. |
 | `sessions.started-without-login` | engine | [part-4-first-week](../machine-setup.md#part-4-first-week) | ✓ | ✓ | — | each-business | The unit's `ActiveEnterTimestamp` is before the user's first login session this boot. `warn` otherwise: the reboot test hasn't been passed. |
-| `runtime.claude-autoupdate-off` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | ✓ | ✓ | — | each-business | The session unit's `Environment` has `DISABLE_AUTOUPDATER=1`. Only that key is kept from the read. |
+| `runtime.claude-autoupdate-off` | pack | [backups-and-updates](../machine-setup.md#backups-and-updates) | ✓ | ✓ | — | each-business | Not checked: a unit's `Environment` can carry credentials and cannot be read one key at a time, so doctor reports it incomplete and asks the owner to confirm `DISABLE_AUTOUPDATER=1`. |
 | `credentials.store-available` | engine | [credentials](../machine-setup.md#credentials) | ✓ | ✓ | ✓ | each-business | Reuses `mb connect`'s existing credential-store probe ([`connect.md`](../connect.md)). Fails if no store works without a desktop session. |
 
 ### Shared tools and heavy work

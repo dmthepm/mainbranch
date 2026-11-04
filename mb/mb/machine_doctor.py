@@ -1434,21 +1434,21 @@ def account_checks(
         )
 
         def updater() -> list[ReadResult]:
-            fields, error = unit_fields(("Environment",))
-            if error:
-                return [_unknown("autoupdater_disabled", error)]
-            try:
-                values = [
-                    item.split("=", 1)[1]
-                    for item in shlex.split(fields["Environment"])
-                    if item.startswith("DISABLE_AUTOUPDATER=")
-                ]
-            except ValueError:
-                return [_unknown("autoupdater_disabled")]
-            disabled = values == ["1"]
-            return [_verdict("autoupdater_disabled", disabled, disabled=disabled)]
+            # The unit's Environment can carry credentials, and systemctl cannot return a
+            # single key. No narrow non-secret evidence source exists yet, so read nothing.
+            return [_unknown("autoupdater_disabled", "not_checked")]
 
-        emit("runtime.claude-autoupdate-off", "backups-and-updates", "each-business", name, updater)
+        emit(
+            "runtime.claude-autoupdate-off",
+            "backups-and-updates",
+            "each-business",
+            name,
+            updater,
+            limitation=(
+                "The session unit's environment can hold credentials, so doctor does not read it; "
+                "confirm DISABLE_AUTOUPDATER=1 yourself."
+            ),
+        )
     return results
 
 
