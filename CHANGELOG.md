@@ -63,7 +63,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ### Changed
 
 - Connection rebinding records an audit entry, marks noninteractive approvals,
-  and shows recent rebinds in connection status. Repo identity uses only the local
+  records applied or failed outcomes, and shows recent rebinds in connection
+  status with incomplete or unavailable history warnings. Repo identity uses only the local
   origin remote and ignores all `GIT_*` environment overrides (#1306).
 
 - The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New

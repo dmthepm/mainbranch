@@ -1410,7 +1410,9 @@ def connect_cmd(
                 result = connect_mod.status_provider(provider, repo)
             else:
                 result = connect_mod.status_all(repo, include_all=all_providers)
-                result["recent_rebinds"] = connect_mod.recent_rebinds(result["repo_id"])
+                (result["recent_rebinds"], result["recent_rebinds_state"]) = (
+                    connect_mod.recent_rebinds(result["repo_id"])
+                )
         except ValueError as exc:
             _connect_error_exit("mb connect status", exc, json_out=json_out)
         if json_out:

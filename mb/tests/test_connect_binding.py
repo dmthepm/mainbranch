@@ -473,13 +473,16 @@ def test_rebind_audits_before_allowing_and_status_shows_it(tmp_path, monkeypatch
     borrower = _borrower(tmp_path, business)
     monkeypatch.setattr(sys.stdin, "isatty", lambda: terminal)
     assert c.rebind(borrower, apply=True)["applied"]
-    entry = c.read_release_audit(limit=1)[0]
+    entries = c.read_release_audit(limit=2)
+    entry = entries[0]
+    assert entries[1]["result"] == "applied"
     assert entry["verb"] == "rebind"
     assert entry["result"] == "allowed"
     assert ("noninteractive" in entry["flags"]) is not terminal
     _no_key_in(entry)
     status = runner.invoke(app, ["connect", "status", "--repo", str(borrower), "--json"])
-    assert json.loads(status.stdout)["recent_rebinds"] == [entry]
+    assert json.loads(status.stdout)["recent_rebinds"] == entries
+    assert json.loads(status.stdout)["recent_rebinds_state"] == "ok"
     text = runner.invoke(app, ["connect", "status", "--repo", str(borrower)])
     assert "Recent rebinds" in text.stdout
 
@@ -564,14 +567,69 @@ def test_rebind_unavailable_stdin_records_noninteractive(tmp_path, monkeypatch, 
     monkeypatch.setattr(sys, "stdin", None if error is None else UnavailableStdin())
 
     assert c.rebind(borrower, apply=True)["applied"] is True
-    entry = c.read_release_audit(limit=1)[0]
+    entry = c.read_release_audit(limit=2)[0]
     assert entry["result"] == "allowed"
     assert "noninteractive" in entry["flags"]
 
 
-def test_recent_rebinds_survive_an_unreadable_audit(tmp_path, monkeypatch):
-    def unreadable(**_kwargs):
-        raise ValueError("bad audit line")
+def test_recent_rebinds_keep_valid_lines_and_report_incomplete(tmp_path):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    c.rebind(borrower, apply=True)
+    entries = c.read_release_audit()
+    with c.audit_path().open("ab") as stream:
+        stream.write(b"{broken\n\xff\n[]\n")
+    status = runner.invoke(app, ["connect", "status", "--repo", str(borrower), "--json"])
+    result = json.loads(status.stdout)
+    assert result["recent_rebinds"] == entries
+    assert result["recent_rebinds_state"] == "incomplete"
+    text = runner.invoke(app, ["connect", "status", "--repo", str(borrower)])
+    assert "history is incomplete" in text.stdout
 
-    monkeypatch.setattr(c, "read_release_audit", unreadable)
-    assert c.recent_rebinds("any-repo-id") == []
+
+def test_recent_rebinds_unavailable_and_missing(tmp_path, monkeypatch):
+    missing = tmp_path / "missing"
+    monkeypatch.setattr(c, "audit_path", lambda: missing)
+    assert c.recent_rebinds("fixture") == ([], "ok")
+    monkeypatch.setattr(c, "audit_path", lambda: tmp_path)
+    assert c.recent_rebinds("fixture") == ([], "unavailable")
+
+
+def test_failed_binding_records_outcome(tmp_path, monkeypatch):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    def fail(*args):
+        raise OSError("fixture write failure")
+
+    monkeypatch.setattr(c, "_record_repo_binding", fail)
+    with pytest.raises(OSError, match="fixture write failure"):
+        c.rebind(borrower, apply=True)
+    entries = c.read_release_audit(limit=2)
+    assert [entry["result"] for entry in entries] == ["allowed", "failed"]
+    assert entries[-1]["exit_code"] == 1
+
+
+@pytest.mark.parametrize("binding_fails", [True, False])
+def test_outcome_audit_failure_preserves_binding_result(tmp_path, monkeypatch, binding_fails):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    write = c.write_release_audit
+
+    def audit(*args, **kwargs):
+        if kwargs["result"] != "allowed":
+            raise OSError("fixture audit failure")
+        return write(*args, **kwargs)
+
+    def fail(*args):
+        raise OSError("fixture binding failure")
+
+    monkeypatch.setattr(c, "write_release_audit", audit)
+    if binding_fails:
+        monkeypatch.setattr(c, "_record_repo_binding", fail)
+        with pytest.raises(OSError, match="fixture binding failure"):
+            c.rebind(borrower, apply=True)
+    else:
+        assert c.rebind(borrower, apply=True)["applied"]
+    text = runner.invoke(app, ["connect", "status", "--repo", str(borrower)])
+    assert "unconfirmed" in text.stdout

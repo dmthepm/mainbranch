@@ -982,7 +982,21 @@ def rebind(repo: str | Path = ".", *, apply: bool = False) -> dict[str, Any]:
             "an agent asks the owner first and never adds --yes on its own."
         )
         return result
-    _record_repo_binding(claimed, identity["basis_sha256"])
+    outcome = "failed"
+    try:
+        _record_repo_binding(claimed, identity["basis_sha256"])
+        outcome = "applied"
+    finally:
+        # An outcome audit failure must not undo the binding or mask its failure.
+        with suppress(Exception):
+            write_release_audit(
+                "rebind",
+                "",
+                target,
+                result=outcome,
+                exit_code=0 if outcome == "applied" else 1,
+                flags=flags,
+            )
     result["applied"] = True
     result["message"] = f"{warning} This folder is now allowed."
     return result
@@ -4164,16 +4178,43 @@ def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str,
     ]
 
 
-def recent_rebinds(repo_id: str) -> list[dict[str, Any]]:
-    """The latest rebind audit entries for one repo id, for `mb connect status`."""
+def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
+    """Read status history line by line without hiding valid rows after corruption."""
+    from mb.feedback_scrub import scrub
 
-    with suppress(ValueError, OSError):
-        return [
-            entry
-            for entry in read_release_audit(limit=100)
-            if entry.get("verb") == "rebind" and entry.get("repo_id") == repo_id
-        ][-5:]
-    return []
+    rows: deque[dict[str, Any]] = deque(maxlen=5)
+    state = "ok"
+    try:
+        with audit_path().open("rb") as stream:
+            for line in stream:
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if not isinstance(entry, dict):
+                        raise ValueError("audit row must be an object")
+                    if entry.get("verb") != "rebind" or entry.get("repo_id") != repo_id:
+                        continue
+                    if (
+                        not isinstance(entry.get("ts"), str)
+                        or not isinstance(entry.get("result"), str)
+                        or not isinstance(entry.get("flags"), list)
+                        or not all(isinstance(flag, str) for flag in entry["flags"])
+                    ):
+                        raise ValueError("invalid rebind row")
+                    rows.append(
+                        {
+                            key: scrub(value) if isinstance(value, str) else value
+                            for key, value in entry.items()
+                        }
+                    )
+                except (ValueError, UnicodeError):
+                    state = "incomplete"
+    except FileNotFoundError:
+        return [], "ok"
+    except OSError:
+        return [], "unavailable"
+    return list(rows), state
 
 
 def exec_env_name(provider_id: str, override: str = "") -> str:

@@ -1227,11 +1227,19 @@ What it does not close: a process running as the same OS user can still edit
 `repo-bindings.json`, run `rebind --yes`, or read the secret store directly, so
 this separates repos from files in repos, not from the person's own account. A
 folder that sets the same git remote as a business has that business's id by
-definition and is treated as that business. That includes a remote set through
-git configuration, the environment (`GIT_CONFIG_*`), an include, or a `.git`
-file pointing at another repo's git folder: this protects against a copied
+definition and is treated as that business. Identity reads the local origin
+remote without expanding includes and ignores `GIT_*` environment overrides.
+A remote written directly into local git configuration, or a `.git` file
+pointing at another repo's git folder, can still claim that identity: this protects against a copied
 `.mb/connect.yaml`, not against hostile git metadata. Treat an unpacked archive
 that carries its own `.git` like any other code you did not write.
+
+Rebind audit history is a record, not tamper-proof evidence. Same-user code can
+edit the log. The `noninteractive` flag reports terminal detection; its presence
+or absence does not prove or disprove that a person approved the rebind.
+Status reports incomplete or unavailable history and preserves readable entries.
+An `allowed` entry records authorization before the binding write. A later
+`applied` or `failed` entry records its outcome; without one it is unconfirmed.
 
 ## User Scope
 
