@@ -572,6 +572,13 @@ def test_rebind_unavailable_stdin_records_noninteractive(tmp_path, monkeypatch, 
     assert "noninteractive" in entry["flags"]
 
 
+def test_recent_rebinds_survive_deeply_nested_audit_lines(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.log"
+    audit.write_text("[" * 100000 + "0" + "]" * 100000 + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    assert c.recent_rebinds("fixture-id") == ([], "incomplete")
+
+
 def test_recent_rebinds_keep_valid_lines_and_report_incomplete(tmp_path):
     business = _business(tmp_path)
     borrower = _borrower(tmp_path, business)

@@ -4208,7 +4208,7 @@ def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
                             for key, value in entry.items()
                         }
                     )
-                except (ValueError, UnicodeError):
+                except (ValueError, UnicodeError, RecursionError):
                     state = "incomplete"
     except FileNotFoundError:
         return [], "ok"
