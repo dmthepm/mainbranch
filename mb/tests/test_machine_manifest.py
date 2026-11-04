@@ -1124,6 +1124,49 @@ def test_d9_bin_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str)
     )
 
 
+@pytest.mark.parametrize("kind", ["good", "owner", "writable", "file-owner", "file-writable"])
+@pytest.mark.parametrize("target", ["bin", "root", "pin"])
+def test_s4_regular_tool_ancestors_must_be_root_owned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, target: str
+) -> None:
+    # Only the installer's root ownership is modeled; descriptors, paths and modes are real.
+    agent = tmp_path / "agent-dir"
+    root = agent / "tools"
+    pin = root / "installs" / "demo" / "1.2.3"
+    for directory in (root / "bin", pin):
+        directory.mkdir(parents=True)
+    binary = root / "bin" / "demo"
+    binary.write_text("synthetic")
+    for item in (agent, *agent.rglob("*")):
+        item.chmod(0o755)
+    paths = {"bin": binary, "root": root, "pin": pin}
+    path = paths[target]
+    agent_inode = agent.stat().st_ino
+    leaf_inode = path.stat().st_ino
+    real_fstat, real_stat = os.fstat, os.stat
+
+    def shaped(info: os.stat_result) -> os.stat_result:
+        if kind in {"owner", "writable"} and info.st_ino == agent_inode:
+            mode = stat.S_IMODE(info.st_mode) | (0o022 if kind == "writable" else 0)
+            return d8_info(stat.S_IFMT(info.st_mode) | mode, 1234 if kind == "owner" else 0)
+        if kind.startswith("file-") and info.st_ino == leaf_inode:
+            mode = stat.S_IMODE(info.st_mode) | (0o022 if kind == "file-writable" else 0)
+            return d8_info(
+                stat.S_IFMT(info.st_mode) | mode, 1234 if kind == "file-owner" else 0
+            )
+        return d8_info(stat.S_IFMT(info.st_mode) | 0o755)
+
+    monkeypatch.setattr(os, "fstat", lambda fd: shaped(real_fstat(fd)))
+    monkeypatch.setattr(os, "stat", lambda *a, **k: shaped(real_stat(*a, **k)))
+    monkeypatch.setattr(probe, "run_probe", Mock(side_effect=AssertionError("execution forbidden")))
+    tool = {"name": "demo", "version": "1.2.3"}
+    if target == "bin":
+        result = doctor._tool_bin("fixture", path, root, tool, root / "installs")
+    else:
+        result = doctor._tool_metadata("fixture", path, root, directory=target != "bin")
+    assert result.state == ("pass" if kind == "good" else "fail")
+
+
 @pytest.mark.parametrize(
     "body,expected",
     [

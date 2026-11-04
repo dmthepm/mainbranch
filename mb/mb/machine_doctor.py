@@ -718,19 +718,36 @@ TOOL_SPECS = tuple(
 )
 
 
-def _metadata(path: Path, prefix: Path) -> tuple[os.stat_result | None, Reason | None]:
-    """Inspect metadata through pinned parents, rejecting every symlink."""
+def _metadata(
+    path: Path, prefix: Path, trusted_ancestors: bool = False
+) -> tuple[os.stat_result | None, Reason | None]:
+    """Inspect metadata through pinned parents, rejecting every symlink.
+
+    With ``trusted_ancestors``, every directory from ``/`` down to the parent must be
+    root-owned and not group- or world-writable, else ``untrusted_executable``.
+    """
     if not path.is_absolute() or ".." in path.parts or not path.is_relative_to(prefix):
         return None, "ambiguous_config"
     descriptor = None
+
+    def untrusted() -> bool:
+        if not trusted_ancestors:
+            return False
+        parent = os.fstat(descriptor)  # type: ignore[arg-type]
+        return parent.st_uid != 0 or bool(parent.st_mode & 0o022)
+
     try:
         descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
         for component in path.parts[1:-1]:
+            if untrusted():
+                return None, "untrusted_executable"
             child = os.open(
                 component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor
             )
             os.close(descriptor)
             descriptor = child
+        if untrusted():
+            return None, "untrusted_executable"
         info = os.stat(path.name, dir_fd=descriptor, follow_symlinks=False)
         if stat.S_ISLNK(info.st_mode):
             return None, "ambiguous_config"
@@ -745,7 +762,9 @@ def _metadata(path: Path, prefix: Path) -> tuple[os.stat_result | None, Reason |
 
 
 def _tool_metadata(name: str, path: Path, root: Path, directory: bool = False) -> ReadResult:
-    info, error = _metadata(path, root)
+    info, error = _metadata(path, root, True)
+    if error == "untrusted_executable":
+        return _verdict(name, False, ancestors_trusted=False)
     if error or info is None:
         return _unknown(name, error or "probe_error")
     correct_type = stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
