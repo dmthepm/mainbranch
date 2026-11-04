@@ -65,6 +65,11 @@ def render_status(result: dict[str, Any]) -> None:
     if summary.get("not_checked"):
         line += f"  not checked: {summary['not_checked']}"
     print(line)
+    if result.get("recent_rebinds"):
+        print("Recent rebinds:")
+        for entry in result["recent_rebinds"]:
+            flags = ", ".join(entry.get("flags", []))
+            print(f"  {entry['ts']}  {entry['result']}  {flags}")
     github = result.get("github") or {}
     if github:
         state = "ok" if github.get("ok") else "warn"

@@ -1071,7 +1071,9 @@ record it, and `mb connect test <provider>` (any provider) reports
 exits 1. When git cannot answer (it is missing, times out, or refuses the
 repo, for example over `safe.directory` ownership) and the repo is inside a
 git checkout, the file is treated as tracked. `GIT_DIR`, `GIT_WORK_TREE` and
-`GIT_INDEX_FILE` from the environment are ignored for this check. Commands a
+`GIT_INDEX_FILE` from the environment are ignored for this check. Repo identity
+reads the local origin remote and ignores every `GIT_*` environment variable,
+including injected Git configuration. Linked worktrees use their shared Git directory. Commands a
 person runs to change the connection (`mb connect google --oauth`,
 `--metadata`, `mb connect rotate`) still write it, and their own check is
 recorded with it.
@@ -1375,3 +1377,8 @@ save is running; Main Branch needs file locking on the disk under
 the lock. The lock stops those commands from racing each other; it does not
 stop any other `mb` command, another program, or you from editing the same
 credential in the store.
+
+Every `mb connect rebind` writes a secret-free entry to the existing connection
+audit log before allowing access. Owner-approved `--yes` works without a terminal;
+those entries carry a `noninteractive` flag. If the audit cannot be written, the
+command refuses to change the binding. `mb connect status` shows recent rebinds.

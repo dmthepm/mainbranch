@@ -140,7 +140,7 @@ def test_user_scope_restore_keeps_record_from_another_workspace(tmp_path, monkey
         "_git_output",
         lambda _repo, args: (
             "git@github.com:acme/business.git"
-            if args == ["config", "--get", "remote.origin.url"]
+            if args == ["config", "--local", "--get", "remote.origin.url"]
             else ""
         ),
     )
