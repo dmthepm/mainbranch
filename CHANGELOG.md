@@ -20,14 +20,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   send is verified, and the weekly review lists overdue promises first.
   Messaging a customer, refunds and spend always ask.
 
-### Changed
-
-- The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New
-  installs get that release, and owners move only when a new release is pinned.
-
-## [0.6.21] - 2026-11-03
-
-### Added
 - Machine doctor checks Ubuntu screen lock, Tailscale package version and
   running state, named Serve ports and disabled Funnel, and recent completed
   Omarchy upgrades. It matches TPM configuration to root by disk UUID.
@@ -62,6 +54,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   or that others can write, fails and nothing else runs. A manifest you pick
   with `--manifest` never counts as assurance. Sections whose checks are not
   built yet show as not checked, never as passed.
+
+### Changed
+
+- The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New
+  installs get that release, and owners move only when a new release is pinned.
+
+## [0.6.21] - 2026-11-03
+
+### Added
+
 - The Claude Code role hook also runs on `fork` (a session forked from another),
   matching the documented SessionStart sources. Not yet run live.
 - Role cards in Codex. `mb role codex-hook` previews, and with `--apply` installs,
