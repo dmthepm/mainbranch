@@ -11,6 +11,7 @@ import json
 import os
 import stat
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Any
@@ -400,12 +401,15 @@ def test_concurrent_saves_keep_the_record_whole(tmp_path: Path) -> None:
     assert c._load_repo_bindings() == {repo_id: [f"{repo_id}-folder"] for repo_id in ids}
 
 
-def test_concurrent_processes_keep_the_record_whole(tmp_path: Path) -> None:
+def test_concurrent_processes_keep_the_record_whole(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("PATH", str(tmp_path))
     code = (
         "import sys; from mb import connect as c; c._record_repo_binding('shared-id', sys.argv[1])"
     )
-    env = {**os.environ, "PYTHONPATH": os.pathsep.join(__import__("sys").path)}
-    procs = [subprocess.Popen(["python", "-c", code, f"folder-{n}"], env=env) for n in range(6)]
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
+    procs = [
+        subprocess.Popen([sys.executable, "-c", code, f"folder-{n}"], env=env) for n in range(6)
+    ]
     assert [proc.wait(timeout=60) for proc in procs] == [0] * 6
 
     assert sorted(c._load_repo_bindings()["shared-id"]) == [f"folder-{n}" for n in range(6)]
@@ -461,3 +465,178 @@ def test_rebind_text_says_only_the_owner_approves(tmp_path: Path) -> None:
     assert "only the owner may approve" in str(refusal)
     preview = c.rebind(borrower)
     assert "never adds --yes on its own" in preview["message"]
+
+
+@pytest.mark.parametrize("terminal", [True, False])
+def test_rebind_audits_before_allowing_and_status_shows_it(tmp_path, monkeypatch, terminal):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: terminal)
+    assert c.rebind(borrower, apply=True)["applied"]
+    entries = c.read_release_audit(limit=2)
+    entry = entries[0]
+    assert entries[1]["result"] == "applied"
+    assert entry["verb"] == "rebind"
+    assert entry["result"] == "allowed"
+    assert ("noninteractive" in entry["flags"]) is not terminal
+    _no_key_in(entry)
+    status = runner.invoke(app, ["connect", "status", "--repo", str(borrower), "--json"])
+    assert json.loads(status.stdout)["recent_rebinds"] == entries
+    assert json.loads(status.stdout)["recent_rebinds_state"] == "ok"
+    text = runner.invoke(app, ["connect", "status", "--repo", str(borrower)])
+    assert "Recent rebinds" in text.stdout
+
+
+def test_rebind_audit_failure_does_not_allow_folder(tmp_path, monkeypatch):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    def fail(*args, **kwargs):
+        raise c.ConnectRefusal("audit_unavailable", "audit_unavailable")
+
+    monkeypatch.setattr(c, "write_release_audit", fail)
+    with pytest.raises(c.ConnectRefusal, match="audit_unavailable"):
+        c.rebind(borrower, apply=True)
+    _refused(c.read_token, "stripe", borrower)
+
+
+def test_identity_ignores_git_environment_and_global_remote(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    global_config = tmp_path / "global-config"
+    global_config.write_text('[remote "origin"]\nurl = https://example.com/foreign.git\n')
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / ".gitconfig").write_text(global_config.read_text())
+    before = c._repo_identity(repo)
+    assert before["source"] == "git_common_dir"
+    _git(repo, "remote", "add", "origin", REMOTE)
+    expected = c._repo_identity(repo)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "remote.origin.url")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "https://example.com/injected.git")
+    monkeypatch.setenv(
+        "GIT_CONFIG_PARAMETERS", "'remote.origin.url=https://example.com/override.git'"
+    )
+    assert c._repo_identity(repo) == expected
+
+
+def test_identity_resolves_linked_worktree(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(
+        repo,
+        "-c",
+        "user.name=Example",
+        "-c",
+        "user.email=example@example.com",
+        "commit",
+        "--allow-empty",
+        "-qm",
+        "initial",
+    )
+    linked = tmp_path / "linked"
+    _git(repo, "worktree", "add", "-qb", "linked", str(linked))
+    expected = c._repo_identity(repo)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "remote.origin.url")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "https://example.com/injected.git")
+    assert c._repo_identity(linked) == expected
+
+
+def test_rebind_already_allowed_records_preview(tmp_path):
+    business = _business(tmp_path)
+
+    result = c.rebind(business, apply=True)
+
+    assert result["applied"] is False
+    assert result["needed"] is False
+    assert c.read_release_audit(limit=1)[0]["result"] == "preview"
+
+
+@pytest.mark.parametrize("error", [None, OSError, ValueError])
+def test_rebind_unavailable_stdin_records_noninteractive(tmp_path, monkeypatch, error):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    class UnavailableStdin:
+        def isatty(self):
+            raise error("stdin unavailable")
+
+    monkeypatch.setattr(sys, "stdin", None if error is None else UnavailableStdin())
+
+    assert c.rebind(borrower, apply=True)["applied"] is True
+    entry = c.read_release_audit(limit=2)[0]
+    assert entry["result"] == "allowed"
+    assert "noninteractive" in entry["flags"]
+
+
+def test_recent_rebinds_survive_deeply_nested_audit_lines(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.log"
+    audit.write_text("[" * 100000 + "0" + "]" * 100000 + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    assert c.recent_rebinds("fixture-id") == ([], "incomplete")
+
+
+def test_recent_rebinds_keep_valid_lines_and_report_incomplete(tmp_path):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    c.rebind(borrower, apply=True)
+    entries = c.read_release_audit()
+    with c.audit_path().open("ab") as stream:
+        stream.write(b"{broken\n\xff\n[]\n")
+    status = runner.invoke(app, ["connect", "status", "--repo", str(borrower), "--json"])
+    result = json.loads(status.stdout)
+    assert result["recent_rebinds"] == entries
+    assert result["recent_rebinds_state"] == "incomplete"
+    text = runner.invoke(app, ["connect", "status", "--repo", str(borrower)])
+    assert "history is incomplete" in text.stdout
+
+
+def test_recent_rebinds_unavailable_and_missing(tmp_path, monkeypatch):
+    missing = tmp_path / "missing"
+    monkeypatch.setattr(c, "audit_path", lambda: missing)
+    assert c.recent_rebinds("fixture") == ([], "ok")
+    monkeypatch.setattr(c, "audit_path", lambda: tmp_path)
+    assert c.recent_rebinds("fixture") == ([], "unavailable")
+
+
+def test_failed_binding_records_outcome(tmp_path, monkeypatch):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+
+    def fail(*args):
+        raise OSError("fixture write failure")
+
+    monkeypatch.setattr(c, "_record_repo_binding", fail)
+    with pytest.raises(OSError, match="fixture write failure"):
+        c.rebind(borrower, apply=True)
+    entries = c.read_release_audit(limit=2)
+    assert [entry["result"] for entry in entries] == ["allowed", "failed"]
+    assert entries[-1]["exit_code"] == 1
+
+
+@pytest.mark.parametrize("binding_fails", [True, False])
+def test_outcome_audit_failure_preserves_binding_result(tmp_path, monkeypatch, binding_fails):
+    business = _business(tmp_path)
+    borrower = _borrower(tmp_path, business)
+    write = c.write_release_audit
+
+    def audit(*args, **kwargs):
+        if kwargs["result"] != "allowed":
+            raise OSError("fixture audit failure")
+        return write(*args, **kwargs)
+
+    def fail(*args):
+        raise OSError("fixture binding failure")
+
+    monkeypatch.setattr(c, "write_release_audit", audit)
+    if binding_fails:
+        monkeypatch.setattr(c, "_record_repo_binding", fail)
+        with pytest.raises(OSError, match="fixture binding failure"):
+            c.rebind(borrower, apply=True)
+    else:
+        assert c.rebind(borrower, apply=True)["applied"]
+    text = runner.invoke(app, ["connect", "status", "--repo", str(borrower)])
+    assert "unconfirmed" in text.stdout

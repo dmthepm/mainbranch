@@ -114,7 +114,7 @@ def _store_user_scope_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     disposable.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         return ""
 

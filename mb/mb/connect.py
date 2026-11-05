@@ -684,13 +684,10 @@ def _read_config(repo: Path) -> dict[str, Any]:
     }
 
 
-_GIT_LOCATION_ENV = frozenset({"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"})
-
-
 def _git_output(repo: Path, args: list[str]) -> str:
     # The folder's own git answers, not whatever a hook or shell pointed GIT_DIR at,
     # so a folder's identity does not change with the caller's environment.
-    env = {key: value for key, value in os.environ.items() if key not in _GIT_LOCATION_ENV}
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     try:
         proc = subprocess.run(
             ["git", *args],
@@ -735,7 +732,7 @@ def _github_repo_full_name(remote: str) -> str:
 
 
 def _repo_identity(repo: Path) -> dict[str, str]:
-    remote = _git_output(repo, ["config", "--get", "remote.origin.url"])
+    remote = _git_output(repo, ["config", "--local", "--get", "remote.origin.url"])
     if remote:
         source = "git_remote"
         basis = _normalized_remote(remote)
@@ -941,6 +938,21 @@ def rebind(repo: str | Path = ".", *, apply: bool = False) -> dict[str, Any]:
     config = _read_config(target)
     identity = _repo_identity(target)
     claimed = str(config.get("repo_id") or "").strip()
+    _repo_id, refusal = _repo_binding(target, config)
+    flags = ["--yes"] if apply else []
+    try:
+        interactive = sys.stdin is not None and sys.stdin.isatty()
+    except Exception:
+        interactive = False
+    if not interactive:
+        flags.append("noninteractive")
+    write_release_audit(
+        "rebind",
+        "",
+        target,
+        result="allowed" if apply and claimed and refusal is not None else "preview",
+        flags=flags,
+    )
     if not claimed:
         return {
             "ok": True,
@@ -949,7 +961,6 @@ def rebind(repo: str | Path = ".", *, apply: bool = False) -> dict[str, Any]:
             "repo": str(target),
             "message": "This folder has no saved repo id, so there is nothing to rebind.",
         }
-    _repo_id, refusal = _repo_binding(target, config)
     result: dict[str, Any] = {
         "ok": True,
         "applied": False,
@@ -971,7 +982,21 @@ def rebind(repo: str | Path = ".", *, apply: bool = False) -> dict[str, Any]:
             "an agent asks the owner first and never adds --yes on its own."
         )
         return result
-    _record_repo_binding(claimed, identity["basis_sha256"])
+    outcome = "failed"
+    try:
+        _record_repo_binding(claimed, identity["basis_sha256"])
+        outcome = "applied"
+    finally:
+        # An outcome audit failure must not undo the binding or mask its failure.
+        with suppress(Exception):
+            write_release_audit(
+                "rebind",
+                "",
+                target,
+                result=outcome,
+                exit_code=0 if outcome == "applied" else 1,
+                flags=flags,
+            )
     result["applied"] = True
     result["message"] = f"{warning} This folder is now allowed."
     return result
@@ -4009,7 +4034,7 @@ def write_release_audit(
     repo_id = ""
     with suppress(ValueError, OSError):
         repo_id = str(_read_config(Path(repo).resolve()).get("repo_id") or "")
-    audit_provider = "invalid-provider"
+    audit_provider = "" if verb == "rebind" else "invalid-provider"
     with suppress(ValueError, OSError):
         audit_provider = resolve_provider(provider, repo).id
     entry: dict[str, Any] = {
@@ -4151,6 +4176,45 @@ def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str,
         {key: scrub(value) if isinstance(value, str) else value for key, value in row.items()}
         for row in rows
     ]
+
+
+def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
+    """Read status history line by line without hiding valid rows after corruption."""
+    from mb.feedback_scrub import scrub
+
+    rows: deque[dict[str, Any]] = deque(maxlen=5)
+    state = "ok"
+    try:
+        with audit_path().open("rb") as stream:
+            for line in stream:
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if not isinstance(entry, dict):
+                        raise ValueError("audit row must be an object")
+                    if entry.get("verb") != "rebind" or entry.get("repo_id") != repo_id:
+                        continue
+                    if (
+                        not isinstance(entry.get("ts"), str)
+                        or not isinstance(entry.get("result"), str)
+                        or not isinstance(entry.get("flags"), list)
+                        or not all(isinstance(flag, str) for flag in entry["flags"])
+                    ):
+                        raise ValueError("invalid rebind row")
+                    rows.append(
+                        {
+                            key: scrub(value) if isinstance(value, str) else value
+                            for key, value in entry.items()
+                        }
+                    )
+                except (ValueError, UnicodeError, RecursionError):
+                    state = "incomplete"
+    except FileNotFoundError:
+        return [], "ok"
+    except OSError:
+        return [], "unavailable"
+    return list(rows), state
 
 
 def exec_env_name(provider_id: str, override: str = "") -> str:

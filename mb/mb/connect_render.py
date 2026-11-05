@@ -65,6 +65,19 @@ def render_status(result: dict[str, Any]) -> None:
     if summary.get("not_checked"):
         line += f"  not checked: {summary['not_checked']}"
     print(line)
+    history_state = result.get("recent_rebinds_state", "ok")
+    if history_state != "ok":
+        print(f"Rebind history is {history_state}.")
+    if result.get("recent_rebinds"):
+        print("Recent rebinds:")
+        for entry in result["recent_rebinds"]:
+            flags = ", ".join(entry.get("flags", []))
+            outcome = (
+                "allowed (unconfirmed until an applied or failed entry)"
+                if entry["result"] == "allowed"
+                else entry["result"]
+            )
+            print(f"  {entry['ts']}  {outcome}  {flags}")
     github = result.get("github") or {}
     if github:
         state = "ok" if github.get("ok") else "warn"

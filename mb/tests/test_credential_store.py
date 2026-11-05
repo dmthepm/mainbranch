@@ -442,7 +442,7 @@ def test_tokenless_reconnect_preserves_matching_user_scope_ref_and_backend(
     fresh.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         return ""
 
@@ -489,7 +489,7 @@ def test_tokenless_reconnect_rejects_incompatible_matching_user_scope_backend(
     fresh.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         return ""
 

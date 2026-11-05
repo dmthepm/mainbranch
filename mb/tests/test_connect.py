@@ -593,7 +593,7 @@ def test_connect_repo_identity_is_stable_across_worktrees(tmp_path: Path, monkey
     second.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         return ""
 
@@ -620,7 +620,7 @@ def test_connect_user_scope_hydrates_disposable_checkout(tmp_path: Path, monkeyp
     disposable.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         return ""
 
@@ -686,7 +686,7 @@ def test_connect_user_scope_keeps_different_repos_isolated(tmp_path: Path, monke
     second.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             slug = "first" if repo == first else "second"
             return f"git@github.com:acme/{slug}.git"
         return ""
@@ -723,7 +723,7 @@ def test_connect_user_scope_validation_updates_hydration_source(
     disposable.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         return ""
 
@@ -760,7 +760,7 @@ def test_connect_hydrate_cli_materializes_user_scope_metadata(tmp_path: Path, mo
     disposable.mkdir()
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         if args == ["rev-parse", "--is-inside-work-tree"]:
             return "true"
@@ -2625,7 +2625,7 @@ def test_connect_user_scope_custom_provider_hydrates_and_reads(tmp_path: Path, m
     secret = "mercury-fixture-token"
 
     def fake_git(repo: Path, args: list[str]) -> str:
-        if args == ["config", "--get", "remote.origin.url"]:
+        if args == ["config", "--local", "--get", "remote.origin.url"]:
             return "git@github.com:acme/business.git"
         return ""
 
