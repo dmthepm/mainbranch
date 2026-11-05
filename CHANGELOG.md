@@ -15,6 +15,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
   versions, comparing their numeric major, minor, and patch components.
+### Security
+
+- `mb connect exec` refuses direct child arguments containing the released
+  credential and warns when a shell script references its credential variable.
+  See the MCP launcher guidance in [connect](docs/connect.md#mcp-bridges-and-header-arguments).
 
 ### Added
 

@@ -126,7 +126,8 @@ def _status(repo: Path) -> tuple[int, dict[str, Any]]:
 
 CHILD = """
 import json, os, sys
-secrets = json.loads(sys.argv[2])
+with open(sys.argv[2], encoding="utf-8") as stream:
+    secrets = json.load(stream)
 report = {
     "names_holding_minted": sorted(k for k, v in os.environ.items() if v == secrets["minted"]),
     "names_holding_grant": sorted(
@@ -142,8 +143,12 @@ sys.exit(int(os.environ.get("CHILD_EXIT", "0")))
 
 
 def _exec(repo: Path, report: Path, *extra: str) -> Any:
-    secrets = json.dumps({"minted": MINTED, "grant": list(GRANT_SENTINELS)})
-    command = [sys.executable, "-c", CHILD, str(report), secrets, *extra]
+    # In a file: exec refuses a child with the credential in its arguments.
+    secrets = report.with_name(f"{report.name}.secrets")
+    secrets.write_text(
+        json.dumps({"minted": MINTED, "grant": list(GRANT_SENTINELS)}), encoding="utf-8"
+    )
+    command = [sys.executable, "-c", CHILD, str(report), str(secrets), *extra]
     return runner.invoke(
         app,
         [
