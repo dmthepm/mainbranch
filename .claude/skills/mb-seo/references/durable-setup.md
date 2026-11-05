@@ -106,6 +106,19 @@ received an invalid-redirect response. `localhost` and `127.0.0.1` differ.
 App-wide localhost permission does not extend an existing client's registration
 to other callback hosts. Compare the exact host, port and path before changing it.
 
+OBSERVED: on one setup, an agent later completed the MCP approval and the MCP
+connection worked. This shows the current Access-mode path can work end to end.
+It does not prove another business's setup, or any behavior after an idle gap.
+
+OBSERVED: an "Invalid redirect URL" in that approval came from the agent, not from
+Access. Opening the consent URL through Chrome's `/json/new` endpoint changed the
+query encoding. Navigating to the exact URL with CDP `Page.navigate` worked three
+times out of three. Access settings were correct throughout.
+
+REQUIRED: an agent that approves MCP in a browser navigates directly to the exact
+URL. Before changing Access settings or clearing a client for this error, rule out
+the tool that opened the URL.
+
 REQUIRED: inspect dynamic registration settings and per-client callback behavior.
 An "OAuth enabled" check alone proves neither dynamic registration nor callbacks.
 Discovery advertising registration does not prove a registration succeeds.
