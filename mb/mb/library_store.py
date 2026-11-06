@@ -197,6 +197,7 @@ class Library:
             not isinstance(records, str)
             or Path(records).is_absolute()
             or ".." in Path(records).parts
+            or "\0" in records
         ):
             raise LibraryError("records_dir must stay inside the business folder")
         try:
@@ -611,11 +612,13 @@ def _load_yaml(raw: bytes, label: str) -> Any:
         raise LibraryError(f"{label} is too large ({len(raw)} bytes; limit {MAX_YAML_BYTES})")
     _refuse_aliases(raw, label)
     try:
-        data = yaml.safe_load(raw) or {}
-    except yaml.YAMLError as exc:
+        data = yaml.safe_load(raw)
+    except (yaml.YAMLError, ValueError, OverflowError) as exc:
         raise LibraryError(f"{label} is not valid YAML: {exc}") from exc
     except RecursionError:
         raise LibraryError(f"{label} is nested too deeply to read") from None
+    if data is None:
+        data = {}
     pending: list[tuple[Any, int]] = [(data, 1)]
     seen = 0
     while pending:

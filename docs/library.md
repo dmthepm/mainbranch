@@ -99,6 +99,11 @@ keeps saying so.
   `false`), up to 1 MiB and 12 levels deep; anything else is refused by name.
   Only a missing or empty (null) field takes its default; `tags: false`,
   `creator: 0`, `deals: false` or `sources: false` are refused, not read as empty.
+  The same goes for the whole file: an empty or null file reads as an empty
+  mapping, but a file that is only `false`, `0`, `[]` or `''` is refused as not
+  a mapping. A value the YAML reader cannot build (an impossible date, a number
+  of thousands of digits) is refused by name, and a `records_dir` with a NUL
+  character is refused.
   A file over 1 MiB is refused without reading past the limit. YAML aliases
   (`*name`) and merge keys (`<<:`) are refused before anything is built, because
   a few hundred bytes of them can expand past the memory the process has. A

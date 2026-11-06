@@ -335,6 +335,79 @@ def test_config_records_dir_of_the_wrong_type_is_refused(biz: Path) -> None:
         library(biz)
 
 
+FALSEY_ROOTS = ["false\n", "0\n", "[]\n", "''\n", '""\n']
+
+
+@pytest.mark.parametrize("text", FALSEY_ROOTS)
+def test_a_falsey_config_root_is_refused_by_name(text: str, biz: Path) -> None:
+    library(biz, init=True)
+    (biz / ".mb/private/library/config.yaml").write_text(text)
+    with pytest.raises(files.LibraryError, match="config.yaml must be a mapping"):
+        library(biz)
+
+
+@pytest.mark.parametrize("text", FALSEY_ROOTS)
+def test_a_falsey_record_root_is_refused_by_name(
+    text: str, biz: Path, tree: Callable[[dict[str, bytes]], Path]
+) -> None:
+    lib = library(biz, init=True)
+    lib.add_source("studio", tree({"clip.jpg": b"clip bytes"}))
+    lib.scan()
+    asset = sha(b"clip bytes")
+    record = biz / "library" / "records" / f"{asset}.yaml"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(text)
+    record.chmod(0o600)
+    with pytest.raises(files.LibraryError, match="must be a mapping"):
+        lib.show(asset)
+
+
+@pytest.mark.parametrize("text", ["", "\n", "# only a comment\n", "null\n", "~\n", "---\n"])
+def test_a_null_or_empty_document_still_takes_the_default(text: str, biz: Path) -> None:
+    library(biz, init=True)
+    (biz / ".mb/private/library/config.yaml").write_text(text)
+    lib = library(biz)
+    assert (lib.sources, lib.timezone) == ({}, "UTC")
+
+
+# --- constructors that fail are a named refusal, not a traceback --------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "extra: !!timestamp 2026-99-99",
+        "extra: " + "9" * 5000,
+        "extra: !!float not-a-number",
+    ],
+    ids=["timestamp", "huge-int", "float"],
+)
+def test_a_value_the_parser_cannot_build_is_a_named_refusal(line: str, biz: Path) -> None:
+    library(biz, init=True)
+    (biz / ".mb/private/library/config.yaml").write_text(f"sources: {{}}\n{line}\n")
+    with pytest.raises(files.LibraryError, match="config.yaml is not valid YAML"):
+        library(biz)
+
+
+def test_a_value_the_parser_cannot_build_exits_2_from_the_command(
+    biz: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library(biz, init=True)
+    (biz / ".mb/private/library/config.yaml").write_text("extra: !!timestamp 2026-99-99\n")
+    monkeypatch.chdir(biz)
+    out = runner.invoke(app, ["library", "find", "candle"])
+    assert out.exit_code == 2, out.output
+    assert "config.yaml is not valid YAML" in out.output
+    assert "Traceback" not in out.output
+
+
+def test_records_dir_with_a_nul_is_refused_by_name(biz: Path) -> None:
+    library(biz, init=True)
+    (biz / ".mb/private/library/config.yaml").write_text('records_dir: "lib\\0rary"\n')
+    with pytest.raises(files.LibraryError, match="records_dir"):
+        library(biz)
+
+
 def test_config_with_null_or_missing_sources_still_opens(biz: Path) -> None:
     library(biz, init=True)
     config = biz / ".mb/private/library/config.yaml"
