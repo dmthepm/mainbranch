@@ -241,12 +241,13 @@ def _deal_reasons(
 
 
 def _platform_code_reasons(deal: Deal, provenance: str, use: Use, end: date) -> list[str]:
+    """A code speaks only for its own platform; licensed paid ads must have theirs."""
+    needs = provenance == "licensed" and use.kind == "paid-ad"
     if deal.platform_code is None:
-        needs = provenance == "licensed" and use.kind == "paid-ad"
         return ["platform-code-missing"] if needs else []
     platform, expires = deal.platform_code
     if platform != use.platform:
-        return ["platform-code-other-platform"]
+        return ["platform-code-other-platform"] if needs else []
     if expires < end:
         return ["platform-code-expires"]
     return []

@@ -169,6 +169,35 @@ def test_platform_code_expiring_on_the_last_window_day_is_fine():
     assert judge([licensed], provenance="licensed").cleared is True
 
 
+def test_a_code_for_one_platform_does_not_block_the_deal_s_other_platforms_for_own_media():
+    both = deal(platforms=("meta", "tiktok"), platform_code=("tiktok", date(2027, 6, 1)))
+    assert judge([both], use=PAID_META).cleared is True
+    tiktok = rights.Use("paid-ad", "tiktok")
+    assert judge([both], use=tiktok).cleared is True
+    expiring = deal(platforms=("meta", "tiktok"), platform_code=("tiktok", date(2026, 12, 15)))
+    assert judge([expiring], use=PAID_META).cleared is True  # not tiktok's code to expire
+    assert judge([expiring], use=tiktok).reasons == ("platform-code-expires",)
+
+
+def test_licensed_paid_ads_need_the_code_of_the_platform_they_run_on():
+    both = deal(platforms=("meta", "tiktok"), platform_code=("tiktok", date(2027, 6, 1)))
+    tiktok = rights.Use("paid-ad", "tiktok")
+    assert judge([both], provenance="licensed", use=tiktok).cleared is True
+    meta = judge([both], provenance="licensed", use=PAID_META)
+    assert meta.reasons == ("platform-code-other-platform",)
+
+
+@pytest.mark.parametrize("provenance", ["own", "licensed"])
+def test_a_use_that_needs_no_platform_ignores_the_platform_code(provenance):
+    site = deal(
+        uses=("website",),
+        platforms=(),
+        platform_code=("tiktok", date(2026, 12, 15)),
+    )
+    result = judge([site], provenance=provenance, use=rights.Use("website", None))
+    assert result.cleared is True
+
+
 def test_licensed_paid_ad_without_platform_code():
     assert judge([deal()], provenance="licensed").reasons == ("platform-code-missing",)
 
