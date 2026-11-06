@@ -124,7 +124,8 @@ def check_file(dir_fd: int, name: str) -> bool:
     return True
 
 
-def read_file(dir_fd: int, name: str) -> bytes | None:
+def read_file(dir_fd: int, name: str, *, limit: int | None = None) -> bytes | None:
+    """The file's bytes, or None if absent. With `limit`, a bigger file is refused."""
     if not check_file(dir_fd, name):
         return None
     try:
@@ -132,7 +133,12 @@ def read_file(dir_fd: int, name: str) -> bytes | None:
     except OSError as exc:
         raise LibraryError(f"cannot read {name}: {exc.strerror}") from exc
     with os.fdopen(fd, "rb") as handle:
-        return handle.read()
+        if limit is None:
+            return handle.read()
+        data = handle.read(limit + 1)
+    if len(data) > limit:
+        raise LibraryError(f"{name} is too large (limit {limit} bytes)")
+    return data
 
 
 def write_file(dir_fd: int, name: str, data: bytes) -> None:

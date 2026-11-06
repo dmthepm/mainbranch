@@ -50,6 +50,7 @@ _KINDS = {
     "audio": {"mp3", "wav", "m4a", "aac", "flac", "ogg"},
     "document": {"pdf"},
 }
+_MERGE_TAG = "tag:yaml.org,2002:merge"
 LOCK_NAME = "index.lock"
 
 
@@ -154,7 +155,7 @@ class Library:
         )
         try:
             with self._dir(CONFIG_REL, create=init) as fd:
-                raw = read_file(fd, "config.yaml")
+                raw = read_file(fd, "config.yaml", limit=MAX_YAML_BYTES)
         except MissingFolder:
             raise no_library from None
         if raw is None and not init:
@@ -328,7 +329,7 @@ class Library:
         return self._dir(self.records_rel, create=create)
 
     def _read_record(self, fd: int, asset: str) -> Record | None:
-        raw = read_file(fd, f"{asset}.yaml")
+        raw = read_file(fd, f"{asset}.yaml", limit=MAX_YAML_BYTES)
         if raw is None:
             return None
         label = f"record {asset[:12]}"
@@ -608,6 +609,7 @@ def _load_yaml(raw: bytes, label: str) -> Any:
     """Parse a small YAML file, refusing big or deeply nested input by name."""
     if len(raw) > MAX_YAML_BYTES:
         raise LibraryError(f"{label} is too large ({len(raw)} bytes; limit {MAX_YAML_BYTES})")
+    _refuse_aliases(raw, label)
     try:
         data = yaml.safe_load(raw) or {}
     except yaml.YAMLError as exc:
@@ -628,6 +630,23 @@ def _load_yaml(raw: bytes, label: str) -> Any:
         elif isinstance(value, list):
             pending.extend((item, depth + 1) for item in value)
     return data
+
+
+def _refuse_aliases(raw: bytes, label: str) -> None:
+    """Refuse aliases and merge keys from the parser's events, before anything is built.
+
+    Records and config never need them, and building a document that uses them
+    can expand a few hundred bytes into more memory than the process has.
+    """
+    try:
+        for event in yaml.parse(raw, Loader=yaml.SafeLoader):
+            merge = isinstance(event, yaml.ScalarEvent) and (
+                (event.value == "<<" and event.implicit[0]) or event.tag == _MERGE_TAG
+            )
+            if isinstance(event, yaml.AliasEvent) or merge:
+                raise LibraryError(f"{label} uses a YAML alias or merge key, which is not allowed")
+    except yaml.YAMLError as exc:
+        raise LibraryError(f"{label} is not valid YAML: {exc}") from exc
 
 
 def _flat(text: str) -> str:

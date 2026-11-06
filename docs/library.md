@@ -90,6 +90,9 @@ keeps saying so.
   read, and a record or index row that fails is refused.
 - Records and config are read with exact types (a quoted `"false"` is not
   `false`), up to 1 MiB and 12 levels deep; anything else is refused by name.
+  A file over 1 MiB is refused without reading past the limit. YAML aliases
+  (`*name`) and merge keys (`<<:`) are refused before anything is built, because
+  a few hundred bytes of them can expand past the memory the process has.
 
 ## Limits
 
