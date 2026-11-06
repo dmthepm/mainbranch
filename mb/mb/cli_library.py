@@ -119,11 +119,15 @@ def library_find_cmd(
     to: str = typer.Option("", "--to", help="Window end, YYYY-MM-DD."),
     any_word: bool = typer.Option(False, "--any", help="Match any word, not all."),
 ) -> None:
-    """Find assets by words. With --for, list only assets with a cleared sighting."""
+    """Find assets by words. With --for, list only assets with a cleared sighting.
+
+    With --for, a last line counts the matches that are not cleared. --any means
+    match any word, not show uncleared assets.
+    """
     window = _window(from_, to)
     lib = _open()
     try:
-        hits = lib.find(
+        report = lib.find_report(
             query,
             kind=kind or None,
             use=rights.Use(use, platform or None) if use else None,
@@ -132,13 +136,15 @@ def library_find_cmd(
         )
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    for hit in hits:
+    for hit in report.hits:
         typer.echo(f"{hit.asset}  {hit.kind}  {hit.size} bytes")
         for sighting in hit.sightings:
             typer.echo(f"  {sighting}")
         if hit.cleared is not None:
             typer.echo(f"  usable at: {', '.join(hit.cleared)}")
-    typer.echo(f"{len(hits)} asset(s).")
+    typer.echo(f"{len(report.hits)} asset(s).")
+    if report.not_cleared:
+        typer.echo(f"{report.not_cleared} more match but are not cleared.")
 
 
 def library_show_cmd(asset: str = typer.Argument(..., help="Full asset id.")) -> None:

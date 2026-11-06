@@ -453,6 +453,24 @@ def test_the_path_from_proposal_to_cleared(studio):
 
 
 @needs_nonroot
+def test_find_for_a_use_counts_the_matches_that_are_not_cleared(studio):
+    biz, _, lib = studio
+    lib.scan()
+    use = rights.Use("paid-ad", "meta")
+    none_cleared = lib.find_report("", use=use, window=WINDOW)
+    assert (none_cleared.hits, none_cleared.not_cleared) == ([], 3)
+    deal = propose(lib, POUR_ID)
+    own(biz, POUR_ID)
+    lib.approve_deal(deal.id, deal.id, has_terminal=True, approver="Rowan Vale")
+    report = lib.find_report("", use=use, window=WINDOW)
+    assert [h.asset for h in report.hits] == [POUR_ID]
+    assert report.not_cleared == 2  # the reel and the readme match but are not cleared
+    narrowed = lib.find_report("candle", use=use, window=WINDOW)
+    assert (len(narrowed.hits), narrowed.not_cleared) == (1, 0)
+    assert lib.find_report("").not_cleared == 0  # no use asked, nothing to be cleared for
+
+
+@needs_nonroot
 def test_editing_a_deal_in_the_record_loses_its_approval(studio):
     biz, _, lib = studio
     lib.scan()

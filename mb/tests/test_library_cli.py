@@ -152,6 +152,10 @@ def test_a_whole_session_from_source_to_cleared(shop):
               "--to", "2026-12-20")  # fmt: skip
     assert POUR_ID in out.output and f"usable at: {SIGHTING}" in out.output
     assert "wick" not in out.output
+    assert "1 more match but are not cleared." in out.output
+
+    out = run("find", "candle")  # no --for: nothing to be cleared for, so no count
+    assert "not cleared" not in out.output
 
     out = run("deal", "revoke", deal_id, "--reason", "creator withdrew")
     assert out.exit_code == 0

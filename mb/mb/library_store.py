@@ -93,6 +93,12 @@ class Hit:
 
 
 @dataclass(frozen=True)
+class FindReport:
+    hits: list[Hit]
+    not_cleared: int = 0
+
+
+@dataclass(frozen=True)
 class SightingVerdict:
     sighting: str
     verdict: rights.Verdict
@@ -450,6 +456,20 @@ class Library:
         window: tuple[date, date] | None = None,
         any_word: bool = False,
     ) -> list[Hit]:
+        return self.find_report(
+            query, kind=kind, use=use, window=window, any_word=any_word
+        ).hits
+
+    def find_report(
+        self,
+        query: str = "",
+        *,
+        kind: str | None = None,
+        use: rights.Use | None = None,
+        window: tuple[date, date] | None = None,
+        any_word: bool = False,
+    ) -> FindReport:
+        """Matches for the words; with a use, only cleared ones, and a count of the rest."""
         if use is not None:
             self._check_use(use)
         span = self._window(window)
@@ -463,6 +483,7 @@ class Library:
                 grouped[asset].append((f"{source}:{path}", size, row_kind))
         records = self._all_records() if (words or use is not None) else {}
         hits: list[Hit] = []
+        not_cleared = 0
         for asset, sightings in grouped.items():
             if kind and sightings[0][2] != kind:
                 continue
@@ -484,10 +505,11 @@ class Library:
                     if rights.verdict(rec.deals, s, rec.provenance, use, span).cleared
                 ]
                 if not cleared:
+                    not_cleared += 1
                     continue
             names = [s for s, _, _ in sightings]
             hits.append(Hit(asset, sightings[0][2], sightings[0][1], names, cleared))
-        return hits
+        return FindReport(hits, not_cleared)
 
     def show(self, asset: str) -> AssetView:
         asset = self._asset_id(asset)

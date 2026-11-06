@@ -24,7 +24,9 @@ mb library deal revoke <deal id> --reason "creator withdrew"
 
 `check` prints one line per sighting (a file at one place) and exits 1 unless
 every sighting is cleared. `find --for` lists only assets with a cleared
-sighting and says which.
+sighting and says which, then prints how many more matched but are not
+cleared; run `check` on those to see why. `--any` only widens the word match
+(any word instead of all); it never shows uncleared assets.
 
 ## What is stored where
 
