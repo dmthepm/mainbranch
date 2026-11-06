@@ -206,9 +206,7 @@ def _texts(raw: dict[str, Any], key: str, *, default: Any = _MISSING) -> tuple[s
 def _flag(raw: dict[str, Any], key: str) -> bool:
     value = raw.get(key, False)
     if not isinstance(value, bool):
-        raise ValueError(
-            f"deal field {key} must be true or false without quotes, not {value!r}"
-        )
+        raise ValueError(f"deal field {key} must be true or false without quotes, not {value!r}")
     return value
 
 
