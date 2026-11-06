@@ -43,13 +43,18 @@ and provider state as the technical memory layer underneath the business loop.
 
 ## Engine vs Business Repo
 
-When a user is operating Main Branch, they should be in their business repo:
+When a user is doing business work in Main Branch, they should be in their
+business repo:
 
 ```bash
 cd path/to/my-business
 mb status
 mb start --launch
 ```
+
+The machine skills (`/mb-homelab-machine` and the tailnet audit and policy
+review skills) are the exception: they inspect the computer, not a business, and
+run outside any business repo. See [docs/homelab-skills.md](docs/homelab-skills.md).
 
 When contributing to the engine, work in this repository and keep changes
 scoped to the assigned issue or PR.
