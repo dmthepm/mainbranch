@@ -1,7 +1,7 @@
 # Weekly review
 
 Read the week's log entries and the number's source. Write one entry under
-`## Week of <date>` in `state/growth/log.md`, then send the owner the summary.
+`## Week of <date>` in `log.md`, then send the owner the summary.
 
 ## The entry
 

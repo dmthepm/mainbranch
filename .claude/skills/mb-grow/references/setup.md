@@ -2,6 +2,9 @@
 
 Do this once with the owner, in one sitting. Save nothing without approval.
 
+First settle the home (see "The files" in SKILL.md): the owner's hub if this
+agent can commit there, otherwise the agent's private `growth/` folder.
+
 ## goal.md
 
 Ask, in order, and stop when each has a real answer:

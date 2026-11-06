@@ -17,18 +17,33 @@ calling it supported.
 the loop. Run `mb connect doctor --json` before any provider read. Do not invent
 an `mb grow` command; none exists.
 
-## The two files
+## The files
 
-The loop needs both. If either is missing, set it up with the owner first (see
-[references/setup.md](references/setup.md)) and do nothing else that day.
+The loop needs the first two. If either is missing, set it up with the owner first
+(see [references/setup.md](references/setup.md)) and do nothing else that day.
 
-- `core/growth/goal.md`: the one number, how it is counted, where it is read,
-  the baseline with its date, the target with its date, and the weekly review day.
-- `core/growth/autonomy.md`: what this agent may do without asking, with a limit
-  for each, and who it may talk to. The always-ask list below can only be made
-  stricter there, never looser.
+- `goal.md`: the one number, how it is counted, where it is read, the baseline
+  with its date, the target with its date, and the weekly review day.
+- `autonomy.md`: what this agent may do without asking, with a limit for each,
+  and who it may talk to. The always-ask list below can only be made stricter
+  there, never looser.
+- `log.md`: the loop's own daily log (format below). This is not a readout; the
+  hub rule against readouts in `log/` does not apply to it.
 
-Both live in the business repo. The owner approves every change to them.
+Where they live:
+
+- **Owner's hub** (the agent can commit to it): `core/growth/goal.md`,
+  `core/growth/autonomy.md` and `log/growth.md`. The owner approves every change
+  to the first two.
+- **Not the owner's hub** (the agent cannot commit there): the same three files
+  in a `growth/` folder in the agent's own private state, outside the repo.
+  Nothing in `autonomy.md` counts until the owner's yes is written in the first
+  log entry with its date. To adopt the loop, the owner takes the folder in one
+  reviewed change: `goal.md` and `autonomy.md` into `core/growth/`, `log.md` as
+  `log/growth.md`. The agent then reads the repo copies, stops using the private
+  ones, and says so in the log.
+
+Use one home at a time, never both.
 
 ## Always ask
 
@@ -55,18 +70,24 @@ them, then wait.
    latest final day and say which day it is.
 2. **Check yesterday's move.** Find its expected signal in the log. Record what
    happened, or "too early" with the date it can be read.
-3. **Pick one move.** Score the candidates in
+3. **Read the owner's latest.** Before drafting, read the newest entries in
+   `log/` and `decisions/`, open bets, and anything the owner told this agent
+   since the last log entry. List the calls already made. Do not draft a move
+   that repeats or reopens one; if the evidence says a call was wrong, bring it
+   to the owner as a question and do not act on it.
+4. **Pick one move.** Score the candidates in
    [references/moves.md](references/moves.md): likely effect on the number,
    time to see a signal, cost, and how easy it is to undo. Prefer a move whose
    effect you can measure on its own. Do not repeat a move that showed no effect
    unless something changed, and say what.
-4. **Act inside the limits.** If the move is inside `autonomy.md`, do it through
+5. **Act inside the limits.** If the move is inside `autonomy.md`, do it through
    the owning skill: `/mb-seo` for search, `/mb-site` for pages, `/mb-ads` for
    paid, `/mb-organic` for content, `/mb-think` for research and keywords,
    `/mb-books` for revenue facts. If it is outside, prepare it fully and ask
    once.
-5. **Log it.** One entry in `state/growth/log.md` (format below). Commit it with
-   the checkpoint flow the repo already uses.
+6. **Log it.** One entry in `log.md` (format below), in whichever home is in use.
+   In the owner's hub, commit it with the checkpoint flow the repo already uses;
+   the owner's approval of `autonomy.md` covers these entries.
 
 Record each step's outcome as you go. A run that stops partway says which step
 it stopped at, never "done". Before acting, read today's entry: if a step
@@ -122,7 +143,7 @@ what to do next week; say what you will do.
 
 When a read or action needs a connection the business lacks (Search Console,
 GA4, OpenSEO's Google link, a store or booking read key), log it under
-`## Gaps` in `state/growth/log.md` with what it blocks. Tell the owner once per
+`## Gaps` in `log.md` with what it blocks. Tell the owner once per
 gap, in the weekly review, and do not ask again until something changes.
 
 ## Hard rules

@@ -87,6 +87,7 @@ _CLI_FIRST_REQUIRED_COMMANDS = {
     "mb-bet": ("mb status --json --peek", "mb validate --cross-refs"),
     "mb-end": ("mb status --json --peek", "mb checkpoint --plan --json"),
     "mb-help": ("mb status --json --peek", "mb doctor"),
+    "mb-grow": ("mb status --json --peek", "mb connect doctor --json"),
     "mb-organic": ("mb status --json --peek",),
     "mb-seo": ("mb status --json --peek", "mb connect doctor --json"),
     "mb-support": ("mb status --json --peek", "mb connect doctor --json"),
