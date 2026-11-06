@@ -227,6 +227,90 @@ def test_restore_is_verified_not_assumed(repo: Path, monkeypatch: pytest.MonkeyP
     assert not stored(ref)
 
 
+def _write_then_raise_once(monkeypatch: pytest.MonkeyPatch, *, restore_fails: bool) -> None:
+    """The first config write lands and still raises; a later one works or is lost."""
+    real_write = c._write_config
+    calls: list[int] = []
+
+    def write(repo: Path, config: dict[str, Any]) -> Path:
+        calls.append(1)
+        if len(calls) == 1:
+            real_write(repo, config)
+            raise OSError("acknowledgement lost")
+        if restore_fails:
+            raise OSError("disk full")
+        return real_write(repo, config)
+
+    monkeypatch.setattr(c, "_write_config", write)
+
+
+def test_metadata_write_that_landed_then_raised_is_put_back(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = connect(repo)
+    before = c._read_config(repo)["providers"]["cloudflare"]
+    _write_then_raise_once(monkeypatch, restore_fails=False)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert result.exit_code == 1
+    assert "Everything was put back" in result.stderr
+    assert c._read_config(repo)["providers"]["cloudflare"] == before
+    assert stored(ref)
+
+
+def test_metadata_restore_that_fails_makes_no_whole_state_claim(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = connect(repo)
+    _write_then_raise_once(monkeypatch, restore_fails=True)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert result.exit_code == 1
+    assert "Everything was put back" not in result.stderr
+    assert "could not be put back" in result.stderr
+    assert "cloudflare" not in c._read_config(repo)["providers"]
+    assert stored(ref)
+
+
+def _user_scope_removal_that_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_remove = c._remove_user_scope_provider
+
+    def remove_then_raise(repo_id: str, provider_id: str) -> None:
+        real_remove(repo_id, provider_id)
+        raise OSError("acknowledgement lost")
+
+    monkeypatch.setattr(c, "_remove_user_scope_provider", remove_then_raise)
+
+
+def test_user_scope_restore_is_read_back(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ref = connect(repo, "user")
+    repo_id = c._read_config(repo)["repo_id"]
+    before = c._user_scope_provider_entry(repo_id, "cloudflare")
+    _user_scope_removal_that_raises(monkeypatch)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert "Everything was put back" in result.stderr
+    assert c._user_scope_provider_entry(repo_id, "cloudflare") == before
+    assert stored(ref)
+
+
+def test_user_scope_restore_that_does_not_stick_makes_no_whole_state_claim(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connect(repo, "user")
+    _user_scope_removal_that_raises(monkeypatch)
+    monkeypatch.setattr(c, "_write_user_scope_provider", lambda *a, **k: None)
+    result = remove(repo, "--yes")
+    assert "Everything was put back" not in result.stderr
+    assert "could not be put back" in result.stderr
+
+
 def test_metadata_failure_puts_the_credential_back(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -2437,6 +2437,30 @@ def _restore_credential(store: SecretStore, ref: str, value: str) -> None:
         raise CredentialStoreError("keychain_unavailable")
 
 
+def _restore_repo_entry(repo: Path, provider_id: str, entry: dict[str, Any]) -> None:
+    """Write the repo metadata entry back and read it back; raise unless it is there."""
+
+    config = _read_config(repo)
+    if config["providers"].get(provider_id) == entry:
+        return  # the removal write never landed
+    config["providers"][provider_id] = entry
+    _write_config(repo, config)
+    if _read_config(repo)["providers"].get(provider_id) != entry:
+        raise OSError("repo metadata was not restored")
+
+
+def _restore_user_scope_entry(
+    repo_id: str, repo_identity: dict[str, Any], provider_id: str, entry: dict[str, Any]
+) -> None:
+    """Write the user-scope entry back and read it back; raise unless it is there."""
+
+    _write_user_scope_provider(
+        repo_id, repo_identity=repo_identity, provider_id=provider_id, entry=entry
+    )
+    if _user_scope_provider_entry(repo_id, provider_id) != entry:
+        raise OSError("user-scope metadata was not restored")
+
+
 def _undo_removal(undo: list[Callable[[], object]]) -> bool:
     """Run every undo step, newest first; True only when all of them worked."""
 
@@ -2525,15 +2549,18 @@ def remove_provider(
                 forget_stored(store.backend, ref)
             if isinstance(user_entry, dict):
                 undo.append(
-                    lambda: _write_user_scope_provider(
+                    functools.partial(
+                        _restore_user_scope_entry,
                         repo_id,
-                        repo_identity=config.get("repo_identity") or {},
-                        provider_id=provider.id,
-                        entry=user_entry,
+                        config.get("repo_identity") or {},
+                        provider.id,
+                        user_entry,
                     )
                 )
                 _remove_user_scope_provider(repo_id, provider.id)
             if isinstance(repo_entry, dict):
+                # Registered before the write: it can land and still raise.
+                undo.append(functools.partial(_restore_repo_entry, target, provider.id, repo_entry))
                 del config["providers"][provider.id]
                 _write_config(target, config)
         except (CredentialStoreError, OSError, ConfigCorruptError) as exc:
