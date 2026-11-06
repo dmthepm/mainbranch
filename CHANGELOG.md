@@ -27,12 +27,29 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   index, find assets, and check whether a use is cleared against owner-approved
   deals. Same-user accident prevention only; see [library](docs/library.md).
 
+- `mb connect remove <provider>`: confirm, then delete the repo metadata, the
+  user-scope record and the stored credentials, and report what was removed.
+  It stops with nothing removed when the credential store can't be reached.
+
 ### Fixed
+
+- `mb connect` metadata checks refuse a password inside a URL
+  (`https://user:pw@host/`), however short it is, including a URL the parser
+  rejects (`https://user:pw@[bad]/`), where the userinfo is read by hand.
 
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
   versions, comparing their numeric major, minor, and patch components.
+- `mb connect exec` prints the names of the environment variables it drops from
+  the child, never their values, and points at `--keep-env`. A name that looks
+  like a credential, or contains the released one, is counted ("N more not
+  listed") instead of printed. The check is a shape check: a short password used
+  as a variable name can still pass it.
+
 ### Security
 
+- The `mb connect exec` environment-dump guard looks through common wrappers
+  (`nohup`, `timeout`, `nice`, `command` and similar), and the `--token` help
+  says the token also lands in shell history.
 - `mb connect exec` refuses direct child arguments containing the released
   credential and warns when a shell script references its credential variable.
   See the MCP launcher guidance in [connect](docs/connect.md#mcp-bridges-and-header-arguments).

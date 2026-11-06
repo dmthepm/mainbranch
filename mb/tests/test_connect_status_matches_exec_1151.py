@@ -273,6 +273,36 @@ def test_status_and_exec_give_the_same_answer_for_the_same_item(
     assert token["ok"] is (mode == "ready")
 
 
+@pytest.mark.parametrize(
+    ("mode", "says_missing", "repair_has"),
+    [
+        ("missing", True, "mb connect cloudflare"),
+        ("prompt-pending", False, "mb connect repair --keychain"),
+        ("locked", False, "security unlock-keychain"),
+        ("auth-failed", False, "Keychain Access"),
+    ],
+)
+def test_exec_status_and_doctor_agree_on_gone_versus_unreadable(
+    world: Any, mode: str, says_missing: bool, repair_has: str
+) -> None:
+    """One answer per item across exec, status and doctor, each with its exact repair (#1150)."""
+
+    repo, refs, keychain = world(["cloudflare"], cost=0.2)
+    keychain.modes[refs["cloudflare"]] = mode
+
+    token = connect_mod.read_token("cloudflare", repo)
+    status = connect_mod.status_provider("cloudflare", repo)
+    check = connect_mod.doctor_check(repo, status=connect_mod.status_all(repo))
+
+    assert token["state"] == status["state"]
+    assert ("missing" in token["error"].lower()) is says_missing
+    assert ("missing" in status["repair"].lower()) is says_missing
+    assert ("missing" in (check["detail"] + check["repair"]).lower()) is says_missing
+    assert token["repair_command"] == status["repair_command"] == check["repair_command"]
+    assert repair_has in token["repair_command"]
+    assert "fixture-cloudflare-1151" not in json.dumps([token, status, check])
+
+
 def test_exec_tells_a_missing_item_from_one_that_exists_but_cannot_be_read(world: Any) -> None:
     repo, refs, keychain = world(["cloudflare"], cost=0.2)
     keychain.modes[refs["cloudflare"]] = "missing"

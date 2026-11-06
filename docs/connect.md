@@ -88,6 +88,12 @@ Use repeatable `--keep-env NAME` to retain other named variables, or
 `--keep-env` accepts shell variable names and refuses the provider variable
 with `exec_env_conflict`; use `--env NAME` to choose that variable.
 
+On stderr, `exec` lists the names (never values) of the variables it dropped, so
+you know what to pass to `--keep-env`. A name that looks like a credential, or
+contains the released one, is counted as "N more not listed" instead. This is a
+shape check, not a guarantee: a short password that someone used as a variable
+name can look ordinary and be printed.
+
 This is the path agents and scripts should use. What the command prints is
 still the command's business: avoid commands that echo their environment.
 
@@ -192,6 +198,10 @@ assignments alone do not supply a command: `env -i` and `env FOO=1` refuse.
 Option arguments are read the way `env` reads them, including clustered short
 options (`env -iu NAME`) and abbreviated long options. Any `-S`
 (`--split-string`) form refuses; pass the command as separate words instead.
+The rule looks through `command`, `exec`, `nice`, `nohup`, `setsid`, `stdbuf`,
+`time` and `timeout`. It is a guard against the plain dump, not a boundary:
+any program can read its own environment, including a shell or interpreter you
+start, so only run commands you trust with the credential.
 `env FOO=1 true` and `/usr/bin/env true` run normally. Other child commands
 are not inspected. This guards against obvious mistakes; it is not a sandbox.
 
@@ -789,6 +799,23 @@ label and other keys. A first connect records exactly what it is given. A kept `
 Stripe test key; pass `--metadata mode=test` with it. Kept metadata can disagree with a new
 key (for example a kept Cloudflare `token_type` after you store a different kind of token);
 `--metadata key=` clears a kept key.
+
+### Remove a connection
+
+```bash
+mb connect remove cloudflare
+```
+
+This asks first (`--yes` skips the question; without a terminal it needs
+`--yes`). It deletes the repo metadata, the user-scope record and every stored
+credential the connection points at, and lists what it removed. It reads the
+credential store before it changes anything: if a recorded reference belongs to
+another connection, or an item can't be reached, it stops with nothing removed.
+If a step fails part way, it tries to put back what it had removed and reads each
+credential back to check. If that also fails, the error says so: the credential
+may be gone while the connection record remains, so run `mb connect status` and
+reconnect. It does not revoke the key at the provider; do that in the
+provider's own settings.
 
 ### Rotate from a recorded source
 

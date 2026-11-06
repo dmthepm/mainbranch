@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import errno
+import functools
 import hashlib
 import hmac
 import json
@@ -1840,6 +1841,26 @@ def _url_parts(reference: str, depth: int = 0) -> list[str]:
     return parts
 
 
+def _url_has_password(word: str, depth: int = 0) -> bool:
+    """True when a URL, or a URL nested in its query or path, carries a password."""
+    url = _METADATA_URL_START_RE.search(word)
+    if not url:
+        return False
+    text = word[url.start() :]
+    try:
+        parsed = urllib.parse.urlsplit(text)
+        if parsed.password:
+            return True
+        rest = _fully_unquote(f"{parsed.path}?{parsed.query}#{parsed.fragment}")
+    except ValueError:
+        # The parser rejected the URL (a bad host, say), so read the userinfo
+        # by hand: a ":" before the last "@" in the authority is a password.
+        authority = re.split(r"[/?#]", text[url.end() - url.start() :], maxsplit=1)[0]
+        userinfo, at, _host = authority.rpartition("@")
+        return bool(at and ":" in userinfo)
+    return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
+
+
 def metadata_value_rule(value: str) -> str:
     """Name the secret-shape rule a metadata value trips, or "" when it is safe.
 
@@ -1864,7 +1885,7 @@ def metadata_value_rule(value: str) -> str:
         rule = _word_secret_rule(word)
         if rule:
             return rule
-    return ""
+    return "url_password" if any(_url_has_password(word) for word in words) else ""
 
 
 # Operator input an error may quote back: short names, ids and command paths.
@@ -2391,6 +2412,148 @@ def _connect_provider(
     if prior_entry is not None:
         result["reconnect"] = _reconnect_changes(prior_entry, recorded_label, metadata)
     return result
+
+
+def _remove_user_scope_provider(repo_id: str, provider_id: str) -> None:
+    data = _read_user_scope()
+    repo_entry = data["repos"].get(repo_id)
+    providers = repo_entry.get("providers") if isinstance(repo_entry, dict) else None
+    if isinstance(providers, dict) and providers.pop(provider_id, None) is not None:
+        _write_user_scope(data)
+
+
+def _restore_credential(store: SecretStore, ref: str, value: str) -> None:
+    """Store ``value`` again and read it back; raise unless it is really there."""
+
+    store.set(ref, value, deadline=new_credential_deadline())
+    forget_stored(store.backend, ref)
+    check = store.probe(ref, deadline=new_credential_deadline())
+    if not (check.present and hmac.compare_digest(check.value.encode(), value.encode())):
+        raise CredentialStoreError("keychain_unavailable")
+
+
+def _undo_removal(undo: list[Callable[[], object]]) -> bool:
+    """Run every undo step, newest first; True only when all of them worked."""
+
+    clean = True
+    for step in reversed(undo):
+        try:
+            step()
+        except Exception:
+            clean = False
+    return clean
+
+
+def remove_provider(
+    provider_id: str, repo: str | Path = ".", *, apply: bool = False
+) -> dict[str, Any]:
+    """Plan, or with ``apply`` carry out, forgetting one provider connection.
+
+    Removes the repo metadata, the user-scope record and every stored
+    credential the entry points at. Every recorded reference is checked against
+    this connection and the credential store is read first: a foreign reference
+    or an unreachable item touches nothing. A failure part way tries to put back
+    what was removed, reading each credential back to check; if that fails the
+    error says so, because the state is then unknown rather than whole.
+    """
+
+    provider = resolve_provider(provider_id, repo)
+    target = Path(repo).resolve()
+    with ExitStack() as locks:
+        locks.enter_context(_save_lock(target))
+        config = _read_config(target)
+        repo_id = _bound_repo_id(target, config)
+        repo_entry = config["providers"].get(provider.id)
+        user_entry = _user_scope_provider_entry(repo_id, provider.id)
+        entries = [entry for entry in (repo_entry, user_entry) if isinstance(entry, dict)]
+        slots: dict[str, tuple[str, str]] = {}
+        for entry in entries:
+            # A stale or edited entry must not point removal at another
+            # business's credential: refuse before anything is probed.
+            _check_entry_refs(provider, entry, repo_id)
+            raw_secrets = entry.get("secrets")
+            for field, raw in (raw_secrets if isinstance(raw_secrets, dict) else {}).items():
+                if isinstance(raw, dict) and raw.get("ref"):
+                    slots[str(raw["ref"])] = (
+                        str(field),
+                        str(raw.get("backend") or "local-file"),
+                    )
+        result: dict[str, Any] = {
+            "ok": bool(entries),
+            "applied": False,
+            "provider": provider.id,
+            "state": "ready" if entries else "not_connected",
+            "repo_metadata": isinstance(repo_entry, dict),
+            "user_scope_metadata": isinstance(user_entry, dict),
+            "credentials": [
+                {"field": field, "backend": backend} for field, backend in slots.values()
+            ],
+        }
+        if not entries:
+            result["message"] = f"{provider.name} is not connected here; nothing to remove."
+            return result
+        if not apply:
+            return result
+        if isinstance(user_entry, dict):
+            _ensure_user_scope_writable()
+        locks.enter_context(credential_lock(_home(), list(slots), provider.name))
+        held: list[tuple[SecretStore, str, SecretProbe]] = []
+        for ref, (_field, backend) in slots.items():
+            store = SecretStore(backend)
+            probe = store.probe(ref, deadline=new_credential_deadline())
+            if not probe.backend_ok or probe.not_checked:
+                reason = probe.reason if not probe.backend_ok else "credential_store_timeout"
+                detail = _backend_repair(reason)
+                raise KeychainError(
+                    reason,
+                    f"{detail['summary']} Nothing was removed. {detail['repair']}",
+                )
+            held.append((store, ref, probe))
+        undo: list[Callable[[], object]] = []
+        try:
+            for store, ref, probe in held:
+                # Registered first: a delete can succeed and still raise when
+                # its acknowledgement is lost, so the item may already be gone.
+                if probe.present:
+                    undo.append(functools.partial(_restore_credential, store, ref, probe.value))
+                store.delete(ref)
+                forget_stored(store.backend, ref)
+            if isinstance(user_entry, dict):
+                undo.append(
+                    lambda: _write_user_scope_provider(
+                        repo_id,
+                        repo_identity=config.get("repo_identity") or {},
+                        provider_id=provider.id,
+                        entry=user_entry,
+                    )
+                )
+                _remove_user_scope_provider(repo_id, provider.id)
+            if isinstance(repo_entry, dict):
+                del config["providers"][provider.id]
+                _write_config(target, config)
+        except (CredentialStoreError, OSError, ConfigCorruptError) as exc:
+            restored = _undo_removal(undo)
+            kept = (
+                "Everything was put back and read back to check."
+                if restored
+                else (
+                    "Some of it could not be put back, so the stored credential may be gone "
+                    "while the connection record remains. Check `mb connect status`, then "
+                    f"reconnect with `mb connect {provider.id}` if it says the credential "
+                    "is missing."
+                )
+            )
+            reason = exc.reason if isinstance(exc, CredentialStoreError) else "metadata"
+            raise MetadataWriteError(
+                f"Removing the {provider.name} connection failed ({reason}). {kept}"
+            ) from None
+        result.update(
+            ok=True,
+            applied=True,
+            state="removed",
+            message=f"Removed the {provider.name} connection.",
+        )
+        return result
 
 
 def _reconnect_changes(
@@ -3983,7 +4146,29 @@ def _env_has_command(args: list[str]) -> bool:
     return False
 
 
+# Programs that only start another program. Best effort: any program can read
+# its own environment, so this catches the plain dump, not a determined one.
+_EXEC_WRAPPERS = frozenset(
+    {"command", "exec", "nice", "nohup", "setsid", "stdbuf", "time", "timeout"}
+)
+
+
+def _unwrapped(command: list[str]) -> list[str]:
+    """``command`` without leading wrapper programs, their options and operands."""
+
+    rest = list(command)
+    while rest and Path(rest[0]).name in _EXEC_WRAPPERS:
+        wrapper = Path(rest.pop(0)).name
+        while rest and rest[0].startswith("-"):
+            rest.pop(0)
+        # `timeout 5 env` and `nice -n 5 env`: a bare number is the wrapper's own.
+        if rest and wrapper in {"nice", "timeout"} and re.fullmatch(r"[0-9.]+[smhd]?", rest[0]):
+            rest.pop(0)
+    return rest
+
+
 def _check_exec_child(command: list[str]) -> None:
+    command = _unwrapped(command)
     if not command:
         return
     name = Path(command[0]).name
@@ -4341,6 +4526,28 @@ def _exec_with_secret(
         or key.startswith("LC_")
         or key in (keep_env or [])
     }
+    # Names only, never values. A name can itself be a credential, so it is
+    # listed only when it passes the same display check as any echoed input and
+    # does not contain the released token; the rest are counted.
+    dropped = sorted(key for key in os.environ if key not in env and key != name)
+    listed = [
+        key
+        for key in dropped
+        if ENV_NAME_RE.fullmatch(key)
+        and echoable_input(key)
+        and result["token"] not in key
+        and key not in result["token"]
+    ]
+    if dropped:
+        unlisted = len(dropped) - len(listed)
+        names = ", ".join(listed)
+        if unlisted:
+            names += f"{', ' if names else ''}{unlisted} more not listed"
+        print(
+            f"mb connect exec: dropped from the child environment: {names}. "
+            "Name any it needs with --keep-env.",
+            file=sys.stderr,
+        )
     env[name] = result["token"]
     shown = echoable_input(command[0]) or HIDDEN_INPUT
     record(result="released", scope=result.get("source", ""))

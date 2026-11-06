@@ -89,6 +89,60 @@ def test_exec_environment_cli(
     assert entries()[0]["flags"] == flags
 
 
+def test_exec_names_dropped_variables_on_stderr(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ACME_ACCOUNT_ID", "value-that-must-not-print")
+    monkeypatch.setenv("ACME_KEPT_SETTING", "kept-value-must-not-print")
+    monkeypatch.setenv("ACME_TELEMETRY_OPT_OUT", "1")
+    result = invoke(
+        repo, "exec", "--keep-env", "ACME_KEPT_SETTING", "--", sys.executable, "-c", "pass"
+    )
+    assert result.exit_code == 0, result.output
+    assert "dropped from the child environment" in result.stderr
+    assert "ACME_ACCOUNT_ID" in result.stderr
+    assert "ACME_TELEMETRY_OPT_OUT" in result.stderr
+    assert "ACME_KEPT_SETTING" not in result.stderr
+    assert "--keep-env" in result.stderr
+    for value in ("value-that-must-not-print", "kept-value-must-not-print", SECRET):
+        assert value not in result.output
+
+
+def test_exec_does_not_print_a_dropped_name_that_looks_like_a_credential(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret_shaped = "sk_test_SyntheticAlphabeticCredential"
+    monkeypatch.setenv(secret_shaped, "1")
+    monkeypatch.setenv("ACME_ACCOUNT_ID", "1")
+    result = invoke(repo, "exec", "--", sys.executable, "-c", "pass")
+    assert result.exit_code == 0, result.output
+    assert secret_shaped not in result.output
+    assert "ACME_ACCOUNT_ID" in result.stderr
+    assert re.search(r"\d+ more not listed", result.stderr)
+
+
+def test_exec_does_not_print_a_dropped_name_that_holds_the_released_credential(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = "rowanvaleplaintoken1"
+    target = tmp_path / "repo"
+    target.mkdir()
+    connect.connect_provider("cloudflare", repo=target, token=token)
+    monkeypatch.setenv(token, "1")
+    result = invoke(target, "exec", "--", sys.executable, "-c", "pass")
+    assert result.exit_code == 0, result.output
+    assert token not in result.output
+    assert re.search(r"\d+ more not listed", result.stderr)
+
+
+def test_exec_says_nothing_when_nothing_is_dropped(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = invoke(repo, "exec", "--inherit-env", "--", sys.executable, "-c", "pass")
+    assert result.exit_code == 0, result.output
+    assert "dropped" not in result.stderr
+
+
 @pytest.mark.parametrize(
     "extra,reason",
     [
@@ -127,14 +181,18 @@ def test_token_refuses_all_stdout_destinations(repo: Path, kind: str) -> None:
     argv = [sys.executable, "-m", "mb", "connect", "token", "cloudflare", "--repo", str(repo)]
     if kind == "file":
         with (repo / "stdout").open("w") as stream:
-            result = subprocess.run(argv, stdout=stream, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(
+                argv, stdout=stream, stderr=subprocess.PIPE, text=True, cwd=repo
+            )
         stdout = (repo / "stdout").read_text()
     elif kind == "terminal":
         import pty
 
         leader, follower = pty.openpty()
         try:
-            result = subprocess.run(argv, stdout=follower, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(
+                argv, stdout=follower, stderr=subprocess.PIPE, text=True, cwd=repo
+            )
             os.close(follower)
             follower = -1
             try:
@@ -146,7 +204,7 @@ def test_token_refuses_all_stdout_destinations(repo: Path, kind: str) -> None:
             if follower != -1:
                 os.close(follower)
     else:
-        result = subprocess.run(argv, capture_output=True, text=True)
+        result = subprocess.run(argv, capture_output=True, text=True, cwd=repo)
         stdout = result.stdout
     assert result.returncode == 3
     assert stdout == ""
@@ -422,7 +480,7 @@ def test_token_help_explains_deprecated_argument() -> None:
     assert result.exit_code == 0
     text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.stdout).split())
     assert "Deprecated" in text
-    assert "process arguments" in text
+    assert "process listings" in text
     assert "--token-stdin" in text
 
 

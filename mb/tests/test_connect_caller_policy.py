@@ -231,6 +231,12 @@ def test_invalid_policy(
         ["env", "-S#comment"],
         ["env", "--split=# comment"],
         ["env", "-S", "FOO=1 # true"],
+        ["nohup", "env"],
+        ["command", "printenv"],
+        ["timeout", "5", "env"],
+        ["nice", "-n", "5", "env"],
+        ["nohup", "nice", "env", "-i"],
+        ["time", "-p", "printenv", "HOME"],
     ],
 )
 def test_child_dump_refusal(
