@@ -2417,6 +2417,16 @@ def _remove_user_scope_provider(repo_id: str, provider_id: str) -> None:
         _write_user_scope(data)
 
 
+def _restore_credential(store: SecretStore, ref: str, value: str) -> None:
+    """Store ``value`` again and read it back; raise unless it is really there."""
+
+    store.set(ref, value, deadline=new_credential_deadline())
+    forget_stored(store.backend, ref)
+    check = store.probe(ref, deadline=new_credential_deadline())
+    if not (check.present and hmac.compare_digest(check.value.encode(), value.encode())):
+        raise CredentialStoreError("keychain_unavailable")
+
+
 def _undo_removal(undo: list[Callable[[], object]]) -> bool:
     """Run every undo step, newest first; True only when all of them worked."""
 
@@ -2435,9 +2445,11 @@ def remove_provider(
     """Plan, or with ``apply`` carry out, forgetting one provider connection.
 
     Removes the repo metadata, the user-scope record and every stored
-    credential the entry points at. The credential store is read first: if any
-    item cannot be reached, nothing is touched. A failure part way puts back
-    what was already removed, so a connection is either whole or gone.
+    credential the entry points at. Every recorded reference is checked against
+    this connection and the credential store is read first: a foreign reference
+    or an unreachable item touches nothing. A failure part way tries to put back
+    what was removed, reading each credential back to check; if that fails the
+    error says so, because the state is then unknown rather than whole.
     """
 
     provider = resolve_provider(provider_id, repo)
@@ -2495,12 +2507,13 @@ def remove_provider(
         undo: list[Callable[[], object]] = []
         try:
             for store, ref, probe in held:
+                # Registered first: a delete can succeed and still raise when
+                # its acknowledgement is lost, so the item may already be gone.
+                if probe.present:
+                    undo.append(functools.partial(_restore_credential, store, ref, probe.value))
                 store.delete(ref)
                 forget_stored(store.backend, ref)
-                if probe.present:
-                    undo.append(functools.partial(store.set, ref, probe.value))
             if isinstance(user_entry, dict):
-                _remove_user_scope_provider(repo_id, provider.id)
                 undo.append(
                     lambda: _write_user_scope_provider(
                         repo_id,
@@ -2509,15 +2522,21 @@ def remove_provider(
                         entry=user_entry,
                     )
                 )
+                _remove_user_scope_provider(repo_id, provider.id)
             if isinstance(repo_entry, dict):
                 del config["providers"][provider.id]
                 _write_config(target, config)
         except (CredentialStoreError, OSError, ConfigCorruptError) as exc:
             restored = _undo_removal(undo)
             kept = (
-                "Everything was put back."
+                "Everything was put back and read back to check."
                 if restored
-                else ("Some of it could not be put back; check `mb connect status`.")
+                else (
+                    "Some of it could not be put back, so the stored credential may be gone "
+                    "while the connection record remains. Check `mb connect status`, then "
+                    f"reconnect with `mb connect {provider.id}` if it says the credential "
+                    "is missing."
+                )
             )
             reason = exc.reason if isinstance(exc, CredentialStoreError) else "metadata"
             raise MetadataWriteError(

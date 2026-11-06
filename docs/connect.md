@@ -803,9 +803,12 @@ mb connect remove cloudflare
 This asks first (`--yes` skips the question; without a terminal it needs
 `--yes`). It deletes the repo metadata, the user-scope record and every stored
 credential the connection points at, and lists what it removed. It reads the
-credential store before it changes anything: if an item can't be reached, it
-stops with nothing removed. If a step fails part way, it puts back what it had
-already removed. It does not revoke the key at the provider; do that in the
+credential store before it changes anything: if a recorded reference belongs to
+another connection, or an item can't be reached, it stops with nothing removed.
+If a step fails part way, it tries to put back what it had removed and reads each
+credential back to check. If that also fails, the error says so: the credential
+may be gone while the connection record remains, so run `mb connect status` and
+reconnect. It does not revoke the key at the provider; do that in the
 provider's own settings.
 
 ### Rotate from a recorded source

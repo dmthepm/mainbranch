@@ -163,6 +163,70 @@ def test_remove_refuses_a_foreign_ref_in_the_user_entry_beside_a_good_repo_entry
     assert "cloudflare" in c._read_config(repo)["providers"]
 
 
+def _delete_then_lose_ack(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_delete = SecretStore.delete
+
+    def delete_then_raise(self: SecretStore, target: str, *args: Any, **kwargs: Any) -> None:
+        real_delete(self, target, *args, **kwargs)
+        raise c.CredentialStoreError("credential_store_timeout")
+
+    monkeypatch.setattr(SecretStore, "delete", delete_then_raise)
+
+
+def test_delete_that_raised_after_deleting_is_restored(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = connect(repo)
+    _delete_then_lose_ack(monkeypatch)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert result.exit_code == 1
+    assert "Everything was put back" in result.stderr
+    assert stored(ref)
+    assert SECRET not in result.output
+    assert "cloudflare" in c._read_config(repo)["providers"]
+
+
+def test_restore_that_fails_says_what_state_remains(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = connect(repo)
+    _delete_then_lose_ack(monkeypatch)
+
+    def refuse_set(self: SecretStore, *args: Any, **kwargs: Any) -> None:
+        raise c.CredentialStoreError("credential_store_timeout")
+
+    monkeypatch.setattr(SecretStore, "set", refuse_set)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert result.exit_code == 1
+    assert "Everything was put back" not in result.stderr
+    assert "could not be put back" in result.stderr
+    assert not stored(ref)
+    assert "cloudflare" in c._read_config(repo)["providers"]
+    assert SECRET not in result.output
+
+
+def test_restore_is_verified_not_assumed(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ref = connect(repo)
+    _delete_then_lose_ack(monkeypatch)
+
+    def set_that_does_not_stick(self: SecretStore, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(SecretStore, "set", set_that_does_not_stick)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert "Everything was put back" not in result.stderr
+    assert not stored(ref)
+
+
 def test_metadata_failure_puts_the_credential_back(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
