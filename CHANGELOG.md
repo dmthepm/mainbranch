@@ -21,6 +21,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
   versions, comparing their numeric major, minor, and patch components.
+- `mb connect exec` prints the names of the environment variables it drops from
+  the child, never their values, and points at `--keep-env`.
+
 ### Security
 
 - `mb connect exec` refuses direct child arguments containing the released

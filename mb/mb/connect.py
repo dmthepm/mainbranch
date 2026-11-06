@@ -4341,6 +4341,17 @@ def _exec_with_secret(
         or key.startswith("LC_")
         or key in (keep_env or [])
     }
+    # Names only, and only plain variable names: a value, or an oddly shaped
+    # name, could itself be sensitive.
+    dropped = sorted(
+        key for key in os.environ if key not in env and key != name and ENV_NAME_RE.fullmatch(key)
+    )
+    if dropped:
+        print(
+            f"mb connect exec: dropped from the child environment: {', '.join(dropped)}. "
+            "Name any it needs with --keep-env.",
+            file=sys.stderr,
+        )
     env[name] = result["token"]
     shown = echoable_input(command[0]) or HIDDEN_INPUT
     record(result="released", scope=result.get("source", ""))
