@@ -112,6 +112,57 @@ def test_unreachable_backend_fails_closed(repo: Path, monkeypatch: pytest.Monkey
     assert "cloudflare" in c._read_config(repo)["providers"]
 
 
+def _foreign_ref(value: str = "rowan-vale-other-business-credential") -> str:
+    ref = c._secret_ref("other-business-repo-id", "cloudflare", "api_token")
+    SecretStore("local-file").set(ref, value)
+    return ref
+
+
+@pytest.mark.parametrize("where", ["repo", "user"])
+def test_remove_refuses_a_foreign_credential_ref(repo: Path, where: str) -> None:
+    own = connect(repo, where)
+    foreign = _foreign_ref()
+    config = c._read_config(repo)
+    if where == "repo":
+        config["providers"]["cloudflare"]["secrets"]["api_token"]["ref"] = foreign
+        c._write_config(repo, config)
+    else:
+        entry = c._user_scope_provider_entry(config["repo_id"], "cloudflare")
+        assert entry is not None
+        entry["secrets"]["api_token"]["ref"] = foreign
+        c._write_user_scope_provider(
+            config["repo_id"],
+            repo_identity=config.get("repo_identity") or {},
+            provider_id="cloudflare",
+            entry=entry,
+        )
+    with pytest.raises(c.ConnectRefusal) as caught:
+        c.remove_provider("cloudflare", repo, apply=True)
+    assert caught.value.rule == c.REF_MISMATCH_STATE
+    assert stored(foreign)
+    assert stored(own)
+
+
+def test_remove_refuses_a_foreign_ref_in_the_user_entry_beside_a_good_repo_entry(
+    repo: Path,
+) -> None:
+    own = connect(repo)
+    foreign = _foreign_ref()
+    config = c._read_config(repo)
+    entry = {"secrets": {"api_token": {"ref": foreign, "backend": "local-file"}}}
+    c._write_user_scope_provider(
+        config["repo_id"],
+        repo_identity=config.get("repo_identity") or {},
+        provider_id="cloudflare",
+        entry=entry,
+    )
+    with pytest.raises(c.ConnectRefusal):
+        c.remove_provider("cloudflare", repo, apply=True)
+    assert stored(foreign)
+    assert stored(own)
+    assert "cloudflare" in c._read_config(repo)["providers"]
+
+
 def test_metadata_failure_puts_the_credential_back(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

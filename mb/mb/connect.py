@@ -2451,6 +2451,9 @@ def remove_provider(
         entries = [entry for entry in (repo_entry, user_entry) if isinstance(entry, dict)]
         slots: dict[str, tuple[str, str]] = {}
         for entry in entries:
+            # A stale or edited entry must not point removal at another
+            # business's credential: refuse before anything is probed.
+            _check_entry_refs(provider, entry, repo_id)
             raw_secrets = entry.get("secrets")
             for field, raw in (raw_secrets if isinstance(raw_secrets, dict) else {}).items():
                 if isinstance(raw, dict) and raw.get("ref"):
