@@ -282,6 +282,11 @@ def _platform_code(code: Any) -> tuple[str, date] | None:
         return None
     if not isinstance(code, dict) or not isinstance(code.get("platform"), str):
         raise ValueError("deal field platform_code must be a mapping with a text platform")
+    for key in code:
+        if key not in ("platform", "expires"):
+            raise ValueError(
+                f"deal platform_code has unknown field {key!r}; put business-only facts in tags"
+            )
     return (code["platform"], _to_date(code["expires"]))
 
 

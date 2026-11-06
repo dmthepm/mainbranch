@@ -87,6 +87,10 @@ class Shop:
     def stray_in_deal(self) -> bytes:
         return self.edit(self.record, lambda d: d["deals"][0].__setitem__(FIELD, "x"))
 
+    def stray_in_platform_code(self) -> bytes:
+        code = {"platform": "meta", "expires": "2027-01-31", FIELD: "x"}
+        return self.edit(self.record, lambda d: d["deals"][0].__setitem__("platform_code", code))
+
     def stray_in_config(self) -> bytes:
         return self.edit(self.config, lambda d: d.__setitem__(FIELD, "x"))
 
@@ -207,3 +211,12 @@ def test_an_alias_still_wins_over_the_stray_field_check(shop: Shop) -> None:
     out = lib_run("show", ASSET)
     assert out.exit_code == 2, out.output
     assert "alias" in out.output or "merge" in out.output
+
+
+@needs_nonroot
+def test_a_stray_key_inside_platform_code_is_refused_and_kept(shop: Shop) -> None:
+    before = shop.stray_in_platform_code()
+    out = lib_run(*PROPOSE)
+    assert out.exit_code == 2, out.output
+    assert FIELD in out.output
+    assert shop.record.read_bytes() == before
