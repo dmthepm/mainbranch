@@ -1841,6 +1841,21 @@ def _url_parts(reference: str, depth: int = 0) -> list[str]:
     return parts
 
 
+def _url_has_password(word: str, depth: int = 0) -> bool:
+    """True when a URL, or a URL nested in its query or path, carries a password."""
+    url = _METADATA_URL_START_RE.search(word)
+    if not url:
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(word[url.start() :])
+        if parsed.password:
+            return True
+        rest = _fully_unquote(f"{parsed.path}?{parsed.query}#{parsed.fragment}")
+    except ValueError:
+        return False
+    return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
+
+
 def metadata_value_rule(value: str) -> str:
     """Name the secret-shape rule a metadata value trips, or "" when it is safe.
 
@@ -1865,7 +1880,7 @@ def metadata_value_rule(value: str) -> str:
         rule = _word_secret_rule(word)
         if rule:
             return rule
-    return ""
+    return "url_password" if any(_url_has_password(word) for word in words) else ""
 
 
 # Operator input an error may quote back: short names, ids and command paths.

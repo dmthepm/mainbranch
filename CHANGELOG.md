@@ -23,6 +23,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb connect` metadata checks refuse a password inside a URL
+  (`https://user:pw@host/`), however short it is.
+
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
   versions, comparing their numeric major, minor, and patch components.
 - `mb connect exec` prints the names of the environment variables it drops from

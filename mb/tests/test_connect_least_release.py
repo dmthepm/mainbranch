@@ -154,14 +154,18 @@ def test_token_refuses_all_stdout_destinations(repo: Path, kind: str) -> None:
     argv = [sys.executable, "-m", "mb", "connect", "token", "cloudflare", "--repo", str(repo)]
     if kind == "file":
         with (repo / "stdout").open("w") as stream:
-            result = subprocess.run(argv, stdout=stream, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(
+                argv, stdout=stream, stderr=subprocess.PIPE, text=True, cwd=repo
+            )
         stdout = (repo / "stdout").read_text()
     elif kind == "terminal":
         import pty
 
         leader, follower = pty.openpty()
         try:
-            result = subprocess.run(argv, stdout=follower, stderr=subprocess.PIPE, text=True)
+            result = subprocess.run(
+                argv, stdout=follower, stderr=subprocess.PIPE, text=True, cwd=repo
+            )
             os.close(follower)
             follower = -1
             try:
@@ -173,7 +177,7 @@ def test_token_refuses_all_stdout_destinations(repo: Path, kind: str) -> None:
             if follower != -1:
                 os.close(follower)
     else:
-        result = subprocess.run(argv, capture_output=True, text=True)
+        result = subprocess.run(argv, capture_output=True, text=True, cwd=repo)
         stdout = result.stdout
     assert result.returncode == 3
     assert stdout == ""
@@ -449,7 +453,7 @@ def test_token_help_explains_deprecated_argument() -> None:
     assert result.exit_code == 0
     text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.stdout).split())
     assert "Deprecated" in text
-    assert "process arguments" in text
+    assert "process listings" in text
     assert "--token-stdin" in text
 
 
