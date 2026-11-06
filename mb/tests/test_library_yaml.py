@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from mb import library_files as files
@@ -266,3 +267,78 @@ def test_a_config_that_would_be_unreadable_is_not_written(
         lib.add_source("other", tree({"clip.jpg": b"y"}))
     assert config.read_bytes() == before
     assert "studio" in library(biz).sources
+
+
+# --- D: only missing or null values take a default; the rest is type-checked --
+
+
+@needs_nonroot
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("tags", False),
+        ("tags", 0),
+        ("tags", ""),
+        ("creator", 0),
+        ("creator", False),
+        ("creator", []),
+        ("deals", False),
+        ("deals", 0),
+        ("deals", ""),
+    ],
+)
+def test_a_falsey_record_field_of_the_wrong_type_is_refused_by_name(
+    field: str, value: object, biz: Path, tree: Callable[[dict[str, bytes]], Path]
+) -> None:
+    lib = library(biz, init=True)
+    lib.add_source("studio", tree({"clip.jpg": b"clip bytes"}))
+    lib.scan()
+    asset = sha(b"clip bytes")
+    record = biz / "library" / "records" / f"{asset}.yaml"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(yaml.safe_dump({"asset": asset, field: value}))
+    record.chmod(0o600)
+    with pytest.raises(files.LibraryError, match=field):
+        lib.show(asset)
+
+
+@needs_nonroot
+def test_a_record_with_null_or_missing_fields_still_reads(
+    biz: Path, tree: Callable[[dict[str, bytes]], Path]
+) -> None:
+    lib = library(biz, init=True)
+    lib.add_source("studio", tree({"clip.jpg": b"clip bytes"}))
+    lib.scan()
+    asset = sha(b"clip bytes")
+    record = biz / "library" / "records" / f"{asset}.yaml"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(yaml.safe_dump({"asset": asset, "tags": None, "creator": None}))
+    record.chmod(0o600)
+    view = lib.show(asset)
+    assert (view.tags, view.creator, view.deals) == ([], "", [])
+
+
+@pytest.mark.parametrize("value", [False, 0, "", [], ["studio"], 3])
+def test_config_sources_of_the_wrong_type_are_refused_by_name(value: object, biz: Path) -> None:
+    library(biz, init=True)
+    config = biz / ".mb/private/library/config.yaml"
+    config.write_text(yaml.safe_dump({"sources": value}))
+    with pytest.raises(files.LibraryError, match="sources"):
+        library(biz)
+
+
+def test_config_records_dir_of_the_wrong_type_is_refused(biz: Path) -> None:
+    library(biz, init=True)
+    config = biz / ".mb/private/library/config.yaml"
+    config.write_text(yaml.safe_dump({"sources": {}, "records_dir": 0}))
+    with pytest.raises(files.LibraryError, match="records_dir"):
+        library(biz)
+
+
+def test_config_with_null_or_missing_sources_still_opens(biz: Path) -> None:
+    library(biz, init=True)
+    config = biz / ".mb/private/library/config.yaml"
+    config.write_text("sources:\n")
+    assert library(biz).sources == {}
+    config.write_text("timezone: UTC\n")
+    assert library(biz).sources == {}

@@ -183,9 +183,9 @@ class Library:
         data = _load_yaml(raw or b"", "config.yaml")
         if not isinstance(data, dict):
             raise LibraryError("config.yaml must be a mapping")
-        sources = data.get("sources") or {}
-        records = data.get("records_dir", DEFAULT_RECORDS)
-        zone = data.get("timezone", "UTC")
+        sources = _default(data.get("sources"), {})
+        records = _default(data.get("records_dir"), DEFAULT_RECORDS)
+        zone = _default(data.get("timezone"), "UTC")
         if not isinstance(zone, str):
             raise LibraryError("config.yaml timezone must be text such as UTC")
         if not isinstance(sources, dict) or not all(
@@ -346,13 +346,13 @@ class Library:
             raise LibraryError(
                 f"{label}: provenance {provenance!r} must be one of {', '.join(rights.PROVENANCE)}"
             )
-        tags = data.get("tags") or []
+        tags = _default(data.get("tags"), [])
         if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
             raise LibraryError(f"{label}: tags must be a list of text")
-        creator = data.get("creator") or ""
+        creator = _default(data.get("creator"), "")
         if not isinstance(creator, str):
             raise LibraryError(f"{label}: creator must be text")
-        raw_deals = data.get("deals") or []
+        raw_deals = _default(data.get("deals"), [])
         if not isinstance(raw_deals, list):
             raise LibraryError(f"{label}: deals must be a list")
         try:
@@ -630,6 +630,11 @@ def _load_yaml(raw: bytes, label: str) -> Any:
         elif isinstance(value, list):
             pending.extend((item, depth + 1) for item in value)
     return data
+
+
+def _default(value: Any, default: Any) -> Any:
+    """`default` for a missing or null value only; `false`, `0` and `[]` stay to be type-checked."""
+    return default if value is None else value
 
 
 def _readable(text: str, label: str) -> bytes:
