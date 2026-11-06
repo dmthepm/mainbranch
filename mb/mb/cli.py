@@ -2417,7 +2417,7 @@ def machine_update_cmd(
     json_out: bool = typer.Option(False, "--json"),
     apply: bool = typer.Option(False, "--apply", help="Not built yet; refused."),
 ) -> None:
-    """Plan updating this machine. Reads only; nothing is changed."""
+    """Plan updating this machine. Runs only root-owned system tools; changes no packages."""
     if apply:
         message = "The owner-run apply is coming; this release only shows the plan."
         if json_out:

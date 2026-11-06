@@ -1,8 +1,12 @@
-"""mb machine update: a read-only plan of what updating this one machine would change.
+"""mb machine update: a plan of what updating this one machine would change.
 
-Nothing here installs, upgrades, attaches or runs as root. Every read is a fixed
-argv chosen in this file, run without a shell and with a clean environment. A read
-that failed, timed out or came back malformed is never reported as "no updates".
+mb runs only root-owned system tools from a fixed list (apt, pro, softwareupdate).
+Those tools may write their own caches. mb installs, upgrades and attaches nothing,
+changes no settings and runs nothing as root. Owner-controlled tools (mise, brew)
+are found by file and never run, because they evaluate the owner's config. Every
+read is a fixed argv chosen in this file, run without a shell and with a clean
+environment. A read that failed, timed out or came back malformed is never
+reported as "no updates".
 """
 
 from __future__ import annotations
@@ -16,7 +20,6 @@ import re
 import selectors
 import shlex
 import signal
-import stat
 import subprocess
 import time
 from collections.abc import Callable
@@ -38,6 +41,7 @@ APT = ("/usr/bin/apt", "list", "--upgradable")
 PRO = ("/usr/bin/pro", "status", "--format", "json")
 SOFTWAREUPDATE = ("/usr/sbin/softwareupdate", "-l")
 SYSTEM_EXECUTABLES = frozenset({APT[0], PRO[0], SOFTWAREUPDATE[0]})
+# Looked for by file only. These are never executed: they evaluate the owner's config.
 OWNER_CANDIDATES: dict[str, tuple[str, ...]] = {
     "mise": ("~/.local/bin/mise", "/usr/local/bin/mise", "/usr/bin/mise", "/opt/homebrew/bin/mise"),
     "brew": (
@@ -46,12 +50,17 @@ OWNER_CANDIDATES: dict[str, tuple[str, ...]] = {
         "/home/linuxbrew/.linuxbrew/bin/brew",
     ),
 }
+OWNER_NOTE = (
+    "Not checked: mb did not run `{cmd}`. You can run it yourself. mb does not, because "
+    "{tool} evaluates your own config, so running it cannot be promised read-only."
+)
 
 # Rank of a read state, worst last. not_present is neutral: the tool is simply not here.
+# not_run is a gap in what was checked, not a failure: it never holds the exit code at 3.
 READ_RANK = {
     s: i
     for i, s in enumerate(
-        ("not_present", "ok", "not_verified", "unreachable", "incomplete", "failed")
+        ("not_present", "ok", "not_run", "not_verified", "unreachable", "incomplete", "failed")
     )
 }
 NETWORK = re.compile(
@@ -60,8 +69,6 @@ NETWORK = re.compile(
     re.IGNORECASE,
 )
 VERSION = r"[A-Za-z0-9.+~:_\-]{1,64}"
-_VERSION = re.compile(VERSION + r"\Z")
-_TOOL = re.compile(r"[A-Za-z0-9._:/@\-]{1,100}\Z")
 _APT_LINE = re.compile(
     r"(?P<name>[a-z0-9][a-z0-9+.\-]{0,99})/[A-Za-z0-9.,_\-]+ (?P<new>" + VERSION + r") "
     r"[a-z0-9_\-]+ \[upgradable from: (?P<old>" + VERSION + r")\]\Z"
@@ -69,6 +76,9 @@ _APT_LINE = re.compile(
 _SWU_TITLE = re.compile(
     r"\s*Title: (?P<title>[^,]{1,100}), Version: (?P<ver>[^,]{1,40}), Size: [^,]+,(?P<rest>.*)\Z"
 )
+_SWU_HEAD = ["Software Update Tool", "", "Finding available software"]
+_SWU_NONE = "No new software available."
+_SWU_FOUND = "Software Update found the following new or updated software:"
 REBOOT_PREFIXES = ("linux-image", "linux-generic", "linux-hwe", "linux-modules")
 REBOOT_NAMES = frozenset({"libc6", "systemd", "dbus"})
 
@@ -151,30 +161,12 @@ def run_read(
     return Out(bytes(buffers["out"]), bytes(buffers["err"]), code)
 
 
-def owner_executable_ok(path: Path | str) -> bool:
-    """An owner-run tool is ours (or root's) and nobody else can swap it."""
-    try:
-        path = Path(path)
-        real = path.resolve(strict=True)
-        owners = {0, os.geteuid()}
-        if not stat.S_ISREG(real.stat().st_mode) or not os.access(real, os.X_OK):
-            return False
-        for candidate in (real, *real.parents, *path.parents):
-            info = candidate.stat()
-            sticky_dir = stat.S_ISDIR(info.st_mode) and info.st_mode & stat.S_ISVTX
-            if info.st_uid not in owners or (info.st_mode & 0o022 and not sticky_dir):
-                return False
-        return True
-    except OSError:
-        return False
-
-
 def _home() -> str:
     return pwd.getpwuid(os.geteuid()).pw_dir
 
 
 def find_owner_tool(name: str) -> str | None:
-    """First existing fixed candidate for an owner's tool. PATH is never searched."""
+    """Whether an owner's tool is present: a file check on fixed candidates, never a run."""
     for candidate in OWNER_CANDIDATES[name]:
         path = candidate.replace("~", _home(), 1) if candidate.startswith("~") else candidate
         if os.path.lexists(path):
@@ -183,19 +175,10 @@ def find_owner_tool(name: str) -> str | None:
 
 
 def local_run(argv: tuple[str, ...], *, timeout: float, merge_stderr: bool = False) -> Out:
-    """The real runner: trust the executable first, then run it read-only."""
-    system = argv[0] in SYSTEM_EXECUTABLES
-    if not (probe._trusted_executable(Path(argv[0])) if system else owner_executable_ok(argv[0])):  # noqa: SLF001
+    """The real runner: only a root-owned system tool from the fixed list is ever run."""
+    if argv[0] not in SYSTEM_EXECUTABLES or not probe._trusted_executable(Path(argv[0])):  # noqa: SLF001
         return Out(reason="untrusted")
-    env = dict(BASE_ENV)
-    cwd = "/"
-    if not system:
-        env["HOME"] = cwd = _home()
-        if Path(argv[0]).name == "brew":
-            env.update(
-                HOMEBREW_NO_AUTO_UPDATE="1", HOMEBREW_NO_ANALYTICS="1", HOMEBREW_NO_ENV_HINTS="1"
-            )
-    return run_read(argv, timeout=timeout, merge_stderr=merge_stderr, env=env, cwd=cwd)
+    return run_read(argv, timeout=timeout, merge_stderr=merge_stderr, cwd="/")
 
 
 @dataclass
@@ -307,90 +290,21 @@ def parse_apt(data: bytes) -> list[dict[str, Any]] | None:
     return steps
 
 
-def parse_mise(data: bytes) -> list[dict[str, Any]] | None:
-    try:
-        value = json.loads(data)
-    except ValueError:
-        return None
-    if not isinstance(value, dict):
-        return None
-    steps = []
-    for name, entry in value.items():
-        if not (isinstance(name, str) and _TOOL.match(name) and isinstance(entry, dict)):
-            return None
-        current, latest = entry.get("current"), entry.get("latest")
-        if not (
-            isinstance(current, str)
-            and isinstance(latest, str)
-            and _VERSION.match(current)
-            and _VERSION.match(latest)
-        ):
-            return None
-        steps.append(
-            _step(
-                "tools",
-                "mise",
-                name,
-                current,
-                latest,
-                f"upgrade {name} {current} -> {latest}",
-                "no",
-            )
-        )
-    return steps
-
-
-def parse_brew(data: bytes) -> list[dict[str, Any]] | None:
-    try:
-        value = json.loads(data)
-    except ValueError:
-        return None
-    if not isinstance(value, dict):
-        return None
-    steps = []
-    for kind in ("formulae", "casks"):
-        entries = value.get(kind)
-        if not isinstance(entries, list):
-            return None
-        for entry in entries:
-            if not isinstance(entry, dict):
-                return None
-            name, new, old = (
-                entry.get("name"),
-                entry.get("current_version"),
-                entry.get("installed_versions"),
-            )
-            olds = [old] if isinstance(old, str) else old
-            if not (
-                isinstance(name, str)
-                and _TOOL.match(name)
-                and isinstance(new, str)
-                and _VERSION.match(new)
-                and isinstance(olds, list)
-                and all(isinstance(v, str) and _VERSION.match(v) for v in olds)
-            ):
-                return None
-            first = olds[0] if olds else None
-            steps.append(
-                _step("host", "brew", name, first, new, f"upgrade {name} {first} -> {new}", "no")
-            )
-    return steps
-
-
 def parse_softwareupdate(data: bytes) -> list[dict[str, Any]] | None:
+    """The whole output must be one of the two documented forms; any other line is None."""
     lines = _lines(data)
     if lines is None:
         return None
-    labels = [i for i, line in enumerate(lines) if line.startswith("* Label: ")]
-    if any("No new software available" in line for line in lines):
-        return [] if not labels else None
-    if not any("found the following" in line for line in lines) or not labels:
+    if lines == [*_SWU_HEAD, _SWU_NONE]:
+        return []
+    body = lines[len(_SWU_HEAD) + 1 :]
+    if lines[: len(_SWU_HEAD) + 1] != [*_SWU_HEAD, _SWU_FOUND] or not body or len(body) % 2:
         return None
     steps = []
-    for index in labels:
-        label = lines[index][len("* Label: ") :].strip()
-        title = _SWU_TITLE.match(lines[index + 1]) if index + 1 < len(lines) else None
-        if not title or not 0 < len(label) <= 120:
+    for label_line, title_line in zip(body[::2], body[1::2], strict=True):
+        label = label_line[len("* Label: ") :].strip()
+        title = _SWU_TITLE.match(title_line)
+        if not label_line.startswith("* Label: ") or not title or not 0 < len(label) <= 120:
             return None
         restart = "Action: restart" in title["rest"]
         steps.append(
@@ -407,10 +321,17 @@ def parse_softwareupdate(data: bytes) -> list[dict[str, Any]] | None:
     return steps
 
 
+def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    keys = [key for key, _ in pairs]
+    if len(set(keys)) != len(keys):
+        raise ValueError("duplicate key")
+    return dict(pairs)
+
+
 def parse_pro(data: bytes) -> dict[str, Any] | None:
     try:
-        value = json.loads(data)
-    except ValueError:
+        value = json.loads(data, object_pairs_hook=_no_duplicate_keys)
+    except (ValueError, RecursionError):
         return None
     if not isinstance(value, dict) or not isinstance(value.get("attached"), bool):
         return None
@@ -498,6 +419,18 @@ def _absent(read_id: str, source: str) -> dict[str, Any]:
         "reason": "executable_missing",
         "returncode": None,
         "facts": {},
+    }
+
+
+def _not_run(read_id: str, source: str, command: str) -> dict[str, Any]:
+    """An owner tool that is present but deliberately not executed."""
+    return {
+        "id": read_id,
+        "source": source,
+        "state": "not_run",
+        "reason": "owner_tool",
+        "returncode": None,
+        "facts": {"owner_command": command},
     }
 
 
@@ -639,20 +572,9 @@ def plan(host: Host) -> dict[str, Any]:
         )
         host_reads.append(record)
         host_steps += steps or []
-        brew = host.find_owner_tool("brew")
-        if brew:
-            record, steps = _read(
-                host,
-                deadline,
-                "brew.outdated",
-                (brew, "outdated", "--json=v2"),
-                parse_brew,
-                timeout=60,
-                optional=True,
-            )
-            record["facts"]["index"] = "local only; brew was not asked to update itself"
-            host_reads.append(record)
-            host_steps += steps or []
+        if host.find_owner_tool("brew"):
+            host_reads.append(_not_run("brew.outdated", "brew", "brew outdated"))
+            host_notes.append(OWNER_NOTE.format(cmd="brew outdated", tool="brew"))
     elif os_id == "omarchy":
         host_reads.append(
             {
@@ -686,19 +608,9 @@ def plan(host: Host) -> dict[str, Any]:
         )
 
     if known:
-        mise = host.find_owner_tool("mise")
-        if mise:
-            record, steps = _read(
-                host,
-                deadline,
-                "mise.outdated",
-                (mise, "outdated", "--json"),
-                parse_mise,
-                timeout=60,
-                optional=True,
-            )
-            tools_reads.append(record)
-            tools_steps += steps or []
+        if host.find_owner_tool("mise"):
+            tools_reads.append(_not_run("mise.outdated", "mise", "mise outdated"))
+            tools_notes.append(OWNER_NOTE.format(cmd="mise outdated", tool="mise"))
             if host.nvm_present:
                 tools_notes.append(
                     "nvm is installed beside mise: two updaters for Node. Pick one per layer."
@@ -758,7 +670,7 @@ def plan(host: Host) -> dict[str, Any]:
 def human_report(report: dict[str, Any]) -> str:
     lines = [
         f"Machine update: {report['machine']['name']} ({report['os']['id']}). "
-        "Plan only; nothing was changed."
+        "Plan only; no packages or settings were changed."
     ]
     if report["reboot_pending"]:
         lines.append("A reboot is already pending on this machine.")
@@ -770,7 +682,9 @@ def human_report(report: dict[str, Any]) -> str:
     for phase in report["phases"]:
         lines.append(f"{phase['id'].capitalize()}: {phase['state'].replace('_', ' ')}")
         for item in phase["reads"]:
-            label = "NOT VERIFIED" if item["state"] == "not_verified" else item["state"]
+            label = {"not_verified": "NOT VERIFIED", "not_run": "NOT RUN"}.get(
+                item["state"], item["state"]
+            )
             why = f" ({item['reason']})" if item["reason"] else ""
             lines.append(f"  {item['id']}: {label}{why}")
         for step in phase["steps"][:25]:
@@ -778,5 +692,8 @@ def human_report(report: dict[str, Any]) -> str:
         if len(phase["steps"]) > 25:
             lines.append(f"  ... and {len(phase['steps']) - 25} more; see --json")
         lines += [f"  Note: {note}" for note in phase["notes"]]
-    lines.append("The owner-run apply is not built yet. This command never changes the machine.")
+    lines.append(
+        "The owner-run apply is not built yet. This command runs only root-owned system "
+        "tools, which may touch their own caches, and changes no packages or settings."
+    )
     return "\n".join(lines)

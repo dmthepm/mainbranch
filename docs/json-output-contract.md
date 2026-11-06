@@ -665,7 +665,11 @@ loaded, `manifest.source` is `none`, and a passing platform check still exits
 plan only (`mode: plan`). `machine` and `os` name the host so plans from several
 machines can be collected later. `phases` holds `host`, `tools` and `agents`;
 each has `reads`, `steps` and `notes`. A read state is `ok`, `not_present`,
-`not_verified`, `unreachable`, `incomplete` or `failed`, with a coded `reason`.
+`not_run`, `not_verified`, `unreachable`, `incomplete` or `failed`, with a coded
+`reason`. `not_run` with reason `owner_tool` means an owner-controlled tool
+(`mise`, `brew`) is present but mb did not run it; `facts.owner_command` names
+what the owner can run, and the result is never "no updates". It does not
+raise the exit code.
 A step carries `source`, `from`, `to`, `what` and `reboot`
 (`yes`, `likely`, `unknown` or `no`); `argv` is always null. Exit precedence is
 2, then 1 (any failed read), then 3 (any not verified, incomplete or

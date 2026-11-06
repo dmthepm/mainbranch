@@ -22,9 +22,6 @@ APT_OK = (
     b"[upgradable from: 8.5.0-2ubuntu10.5]\n"
     b"linux-image-generic/noble-updates 6.8.0.50.52 amd64 [upgradable from: 6.8.0.49.51]\n"
 )
-MISE_OK = json.dumps(
-    {"node": {"name": "node", "requested": "26", "current": "26.12.1", "latest": "26.13.0"}}
-).encode()
 PRO_OK = json.dumps({"attached": False, "services": []}).encode()
 SWU_OK = (
     b"Software Update Tool\n\nFinding available software\n"
@@ -36,14 +33,6 @@ SWU_OK = (
     b"\tTitle: Safari, Version: 17.6, Size: 100K, Recommended: YES,\n"
 )
 SWU_NONE = b"Software Update Tool\n\nFinding available software\nNo new software available.\n"
-BREW_OK = json.dumps(
-    {
-        "formulae": [
-            {"name": "jq", "installed_versions": ["1.7"], "current_version": "1.7.1"},
-        ],
-        "casks": [],
-    }
-).encode()
 
 APT = ("/usr/bin/apt", "list", "--upgradable")
 PRO = ("/usr/bin/pro", "status", "--format", "json")
@@ -114,14 +103,14 @@ def read(report: Any, read_id: Any) -> Any:
 
 
 def ubuntu(replies: Any = None) -> Any:
-    return Fake(replies={APT: APT_OK, PRO: PRO_OK, MISE: b"{}", **(replies or {})})
+    return Fake(replies={APT: APT_OK, PRO: PRO_OK, **(replies or {})})
 
 
 # --- the plan shape ---------------------------------------------------------
 
 
 def test_ubuntu_plan_has_one_shape_and_changes_nothing():
-    fake = ubuntu({MISE: MISE_OK})
+    fake = ubuntu()
     report = plan(fake)
     assert report["schema"] == "mb.machine.update" and report["schema_version"] == 1
     assert report["mode"] == "plan"
@@ -135,14 +124,7 @@ def test_ubuntu_plan_has_one_shape_and_changes_nothing():
     assert curl["reboot"] == "unknown"
     kernel = next(s for s in host_steps if s["name"] == "linux-image-generic")
     assert kernel["reboot"] == "likely"
-    tool = phase(report, "tools")["steps"][0]
-    assert (tool["source"], tool["name"], tool["from"], tool["to"]) == (
-        "mise",
-        "node",
-        "26.12.1",
-        "26.13.0",
-    )
-    assert tool["reboot"] == "no"
+    assert phase(report, "tools")["steps"] == []
     assert report["exit_code"] == 0 and report["ok"] is True
     for step in host_steps:
         assert step["run_as"] == "owner" and step["argv"] is None  # display only
@@ -159,7 +141,7 @@ def test_agents_phase_says_not_available_and_does_not_hold_exit_code_at_3():
 def test_every_argv_is_fixed_absolute_and_read_only():
     fake = ubuntu()
     plan(fake)
-    allowed = {APT, PRO, MISE}
+    allowed = {APT, PRO}
     assert set(fake.argvs) <= allowed
     for argv in fake.argvs:
         assert os.path.isabs(argv[0])
@@ -210,13 +192,13 @@ def test_timeout_and_cap_are_incomplete_not_failed_and_exit_3():
 
 def test_network_error_is_unreachable_not_failed():
     out = mu.Out(returncode=1, err=b"Could not resolve host: registry.example")
-    report = plan(ubuntu({MISE: out}))
-    assert read(report, "mise.outdated")["state"] == "unreachable"
+    report = plan(ubuntu({PRO: out}))
+    assert read(report, "pro.status")["state"] == "unreachable"
     assert report["exit_code"] == 3
 
 
 def test_failed_beats_incomplete_in_exit_code():
-    report = plan(ubuntu({APT: mu.Out(returncode=100), MISE: mu.Out(reason="timeout")}))
+    report = plan(ubuntu({APT: mu.Out(returncode=100), PRO: mu.Out(reason="timeout")}))
     assert report["exit_code"] == 1
 
 
@@ -233,8 +215,8 @@ def test_missing_required_executable_is_failed_missing_optional_is_not_present()
 
 
 def test_untrusted_executable_is_not_run_result_is_not_verified():
-    report = plan(ubuntu({MISE: mu.Out(reason="untrusted")}))
-    assert read(report, "mise.outdated")["state"] == "not_verified"
+    report = plan(ubuntu({PRO: mu.Out(reason="untrusted")}))
+    assert read(report, "pro.status")["state"] == "not_verified"
     assert report["exit_code"] == 3
 
 
@@ -264,42 +246,64 @@ def test_pro_status_is_a_fact_attach_is_never_ours():
     assert read(plan(ubuntu({PRO: unattached})), "pro.status")["state"] == "ok"
     text = json.dumps(detached) + mu.human_report(detached)
     assert "attach" in text.lower() and "owner" in text.lower()
-    for bad in (b"[]", b'{"attached": "yes"}', b"not json"):
+    for bad in (
+        b"[]",
+        b'{"attached": "yes"}',
+        b"not json",
+        b'{"attached": true, "attached": false}',  # duplicate key
+        b"[" * 100000,  # nesting deep enough to overflow the parser
+    ):
         failed = plan(ubuntu({PRO: bad}))
         assert read(failed, "pro.status")["state"] == "failed"
 
 
-# --- mise --------------------------------------------------------------------
+# --- owner tools are never run ------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "bad",
-    [
-        b'{"error": {"message": "x"}}',
-        b'{"node": "26"}',
-        b'{"node": {"current": "1", "latest": 3}}',
-        b"[]",
-        b"",
-        json.dumps(
-            {"gh": {"current": "1.0", "latest": "1.1"}, "bad": {"current": "x y", "latest": "2"}}
-        ).encode(),
-    ],
-)
-def test_mise_malformed_read_fails_the_whole_read(bad):
-    report = plan(ubuntu({MISE: bad}))
-    assert read(report, "mise.outdated")["state"] == "failed"
-    assert phase(report, "tools")["steps"] == []
-    assert report["exit_code"] == 1
+def test_mise_is_found_by_file_but_never_run_and_is_reported_not_run():
+    fake = ubuntu()
+    report = plan(fake)
+    assert MISE not in fake.argvs and all("mise" not in a[0] for a in fake.argvs)
+    tools = phase(report, "tools")
+    assert tools["state"] == "not_run" and tools["steps"] == []
+    item = read(report, "mise.outdated")
+    assert (item["state"], item["reason"]) == ("not_run", "owner_tool")
+    assert item["facts"]["owner_command"] == "mise outdated"
+    note = " ".join(tools["notes"])
+    assert "mise outdated" in note and "config" in note and "not checked" in note.lower()
+    assert report["exit_code"] == 0  # like the agents phase, not_run does not hold it at 3
 
 
-def test_mise_uses_only_the_owners_tools_and_never_bumps():
-    fake = ubuntu({MISE: MISE_OK})
-    plan(fake)
-    assert MISE in fake.argvs and "--bump" not in MISE
+def test_not_run_is_never_worded_as_no_updates():
+    report = plan(ubuntu())
+    text = (json.dumps(report) + mu.human_report(report)).lower()
+    assert "no updates" not in text
+    assert "NOT RUN" in mu.human_report(report)
+
+
+def test_brew_is_found_by_file_but_never_run():
+    fake = Fake(
+        os_release=None,
+        system="Darwin",
+        replies={SWU: SWU_NONE},
+        owner={"brew": "/fake/owner/brew"},
+    )
+    report = plan(fake)
+    assert BREW not in fake.argvs and all("brew" not in a[0] for a in fake.argvs)
+    item = read(report, "brew.outdated")
+    assert (item["state"], item["reason"]) == ("not_run", "owner_tool")
+    assert item["facts"]["owner_command"] == "brew outdated"
+    assert "brew outdated" in " ".join(phase(report, "host")["notes"])
+    assert report["exit_code"] == 0
+
+
+def test_local_run_refuses_anything_outside_the_system_list():
+    assert mu.local_run(MISE, timeout=1).reason == "untrusted"
+    assert mu.local_run(BREW, timeout=1).reason == "untrusted"
 
 
 def test_nvm_beside_mise_is_named_as_a_duplicate_updater():
-    report = plan(Fake(replies={APT: APT_OK, MISE: MISE_OK}, nvm_present=True))
+    report = plan(Fake(replies={APT: APT_OK}, nvm_present=True))
     assert any("nvm" in d for d in phase(report, "tools")["notes"])
 
 
@@ -316,7 +320,7 @@ def mac(replies: Any = None) -> Any:
 
 
 def test_macos_plan_from_fake_softwareupdate():
-    report = plan(mac({MISE: b"{}"}))
+    report = plan(mac())
     assert report["os"]["id"] == "macos"
     steps = phase(report, "host")["steps"]
     assert [s["source"] for s in steps] == ["softwareupdate", "softwareupdate"]
@@ -341,36 +345,38 @@ def test_macos_softwareupdate_merges_stderr():
 
 def test_macos_none_pending_and_malformed():
     assert phase(plan(mac({SWU: SWU_NONE})), "host")["steps"] == []
-    for bad in (b"", b"Software Update Tool\n", SWU_OK.replace(b"\tTitle:", b"\tName:")):
+    for bad in (
+        b"",
+        b"Software Update Tool\n",
+        SWU_OK.replace(b"\tTitle:", b"\tName:"),
+        # the reviewer's examples: the phrase must not excuse the rest of the output
+        SWU_NONE + b"ERROR: catalog response incomplete\n",
+        SWU_OK.replace(b"* Label:", b"* Lable:") + b"No new software available.\n",
+        # the same completeness check on the update form
+        SWU_OK + b"ERROR: catalog response incomplete\n",
+        SWU_OK.replace(b"restart,\n* Label", b"restart,\nstray\n* Label"),
+        SWU_NONE.replace(b"Finding available software\n", b""),
+        SWU_NONE.replace(b"available.", b"available. Really."),
+    ):
         report = plan(mac({SWU: bad}))
-        assert read(report, "softwareupdate.list")["state"] == "failed"
+        assert read(report, "softwareupdate.list")["state"] == "failed", bad
         assert report["exit_code"] == 1
 
 
-def test_brew_only_where_present():
+def test_macos_brew_is_absent_without_a_brew_file():
     fake = mac()
     plan(fake)
     assert not any("brew" in a[0] for a in fake.argvs)
-    with_brew = Fake(
-        os_release=None,
-        system="Darwin",
-        replies={SWU: SWU_NONE, BREW: BREW_OK},
-        owner={"brew": "/fake/owner/brew"},
-    )
-    report = plan(with_brew)
-    step = phase(report, "host")["steps"][0]
-    assert (step["source"], step["name"], step["to"]) == ("brew", "jq", "1.7.1")
-    for bad in (b'{"formulae": [{"name": 1}], "casks": []}', b"{}", b"x"):
-        with_brew.replies[BREW] = bad
-        assert read(plan(with_brew), "brew.outdated")["state"] == "failed"
+    assert not any(r["id"] == "brew.outdated" for r in plan(mac())["phases"][0]["reads"])
 
 
 # --- Omarchy, Arch, unknown ---------------------------------------------------
 
 
 def test_omarchy_names_omarchy_update_never_pacman_and_says_mise_is_ungated():
-    fake = Fake(os_release=b"ID=omarchy\nNAME=Omarchy\n", replies={MISE: MISE_OK})
+    fake = Fake(os_release=b"ID=omarchy\nNAME=Omarchy\n")
     report = plan(fake)
+    assert fake.argvs == []
     assert report["os"]["id"] == "omarchy"
     step = phase(report, "host")["steps"][0]
     assert step["source"] == "omarchy" and "omarchy update" in step["what"]
@@ -395,7 +401,7 @@ def test_omarchy_names_omarchy_update_never_pacman_and_says_mise_is_ungated():
     ],
 )
 def test_arch_and_unknown_os_are_not_verified_and_change_and_read_nothing(os_release):
-    fake = Fake(os_release=os_release, replies={APT: APT_OK, MISE: MISE_OK})
+    fake = Fake(os_release=os_release, replies={APT: APT_OK})
     report = plan(fake)
     assert fake.argvs == []
     assert report["exit_code"] == 3 and report["ok"] is False
@@ -468,11 +474,12 @@ def test_cli_json_matches_doctor_style_and_exit_codes(monkeypatch):
 
 def test_cli_human_output_and_no_business_repo_needed(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    patch_host(monkeypatch, ubuntu({MISE: MISE_OK}))
+    patch_host(monkeypatch, ubuntu())
     result = CliRunner().invoke(app, ["machine", "update"])
     assert result.exit_code == 0
-    assert "curl" in result.stdout and "node" in result.stdout
+    assert "curl" in result.stdout and "NOT RUN" in result.stdout
     assert "plan only" in result.stdout.lower()
+    assert "never changes the machine" not in result.stdout
 
 
 def test_cli_internal_error_is_exit_2(monkeypatch):
@@ -537,20 +544,6 @@ def test_run_read_uses_a_clean_environment_and_no_shell(tmp_path, monkeypatch):
     assert odd.data == b"a;touch pwned\n" and not (tmp_path / "pwned").exists()
 
 
-def test_owner_tool_must_be_ours_and_not_writable_by_others(tmp_path, monkeypatch):
-    good = Path(script(tmp_path, "exit 0"))
-    assert mu.owner_executable_ok(good)
-    good.chmod(0o770)
-    assert not mu.owner_executable_ok(good)
-    good.chmod(0o700)
-    link = tmp_path / "link"
-    link.symlink_to(good)
-    assert mu.owner_executable_ok(link) in (True, False)  # symlink is resolved, then checked
-    assert not mu.owner_executable_ok(tmp_path / "nope")
-    monkeypatch.setattr(os, "geteuid", lambda: good.stat().st_uid + 1)
-    assert not mu.owner_executable_ok(good)
-
-
 def test_find_owner_tool_takes_only_fixed_candidates(tmp_path, monkeypatch):
     planted = tmp_path / "mise"
     planted.write_text("#!/bin/sh\n")
@@ -594,4 +587,5 @@ def test_module_has_no_shell_sudo_or_config_driven_command():
     assert "shell=True" not in source and "os.system" not in source
     assert not re.search(r"""["']sudo["']""", source)
     assert "os.environ" not in source  # nothing from the caller's environment selects a command
+    assert "owner_executable_ok" not in source and '"outdated"' not in source
     assert stat.S_ISREG(Path(sys.executable).stat().st_mode)
