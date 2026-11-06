@@ -83,20 +83,36 @@ keeps saying so.
   lock; a second scan is refused while it runs. Records, index and config inside
   a source are refused. The folders above the business folder are resolved once,
   when the command starts.
-- Every line `mb library` prints goes through one function that writes out
-  control characters and line breaks (`\x0a`) in the whole line, so no name,
-  creator, id, date, label or error can fake a line of output. Escapes are fixed
-  width (`\x0a`, ` `, `\U000e0001`), so two different names never print
-  alike. Source names,
+- Every line the `mb library` commands print themselves (results, listings, the
+  approval prompt and their own errors) goes through one function that writes
+  out control characters and line breaks (`\x0a`) in the whole line, so no name,
+  creator, id, date, label or error taken from a record can fake a line of
+  output. Escapes are fixed width (`\x0a`; the line separator U+2028 as a
+  backslash, `u` and 2028; `\U000e0001`), so two different names never print
+  alike. Usage errors for a mistyped option or an
+  extra argument, and `--help`, are written by the command framework (Typer), not
+  by this function; they can echo back what was typed on the command line.
+  Source names,
   asset ids, kinds, deal ids and approval times are also checked where they are
   read, and a record or index row that fails is refused.
 - Records and config are read with exact types (a quoted `"false"` is not
   `false`), up to 1 MiB and 12 levels deep; anything else is refused by name.
   Only a missing or empty (null) field takes its default; `tags: false`,
   `creator: 0`, `deals: false` or `sources: false` are refused, not read as empty.
+  The same goes for the whole file: an empty or null file reads as an empty
+  mapping, but a file that is only `false`, `0`, `[]` or `''` is refused as not
+  a mapping. A value the YAML reader cannot build (an impossible date, a number
+  of thousands of digits) is refused by name, and a `records_dir` with a NUL
+  character is refused.
   A file over 1 MiB is refused without reading past the limit. YAML aliases
   (`*name`) and merge keys (`<<:`) are refused before anything is built, because
-  a few hundred bytes of them can expand past the memory the process has. A
+  a few hundred bytes of them can expand past the memory the process has. Depth
+  (12 levels) and size (50,000 values and keys) are counted as the parser
+  produces them, and the parse stops at the first one past the limit, before
+  anything is built. These bounds cap what is built and how far a deep or long
+  document is parsed. They do not cap the time to scan a file up to 1 MiB, and
+  they give no named refusal if the process is already out of memory: that
+  failure is not caught. A
   record or config is checked against these same limits before it is saved; one
   that would be refused on reading is not written, and the earlier version stays.
 

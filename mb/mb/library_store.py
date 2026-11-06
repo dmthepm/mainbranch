@@ -197,6 +197,7 @@ class Library:
             not isinstance(records, str)
             or Path(records).is_absolute()
             or ".." in Path(records).parts
+            or "\0" in records
         ):
             raise LibraryError("records_dir must stay inside the business folder")
         try:
@@ -609,27 +610,14 @@ def _load_yaml(raw: bytes, label: str) -> Any:
     """Parse a small YAML file, refusing big or deeply nested input by name."""
     if len(raw) > MAX_YAML_BYTES:
         raise LibraryError(f"{label} is too large ({len(raw)} bytes; limit {MAX_YAML_BYTES})")
-    _refuse_aliases(raw, label)
+    _check_events(raw, label)
     try:
-        data = yaml.safe_load(raw) or {}
-    except yaml.YAMLError as exc:
+        data = yaml.safe_load(raw)
+    except (yaml.YAMLError, ValueError, OverflowError) as exc:
         raise LibraryError(f"{label} is not valid YAML: {exc}") from exc
     except RecursionError:
         raise LibraryError(f"{label} is nested too deeply to read") from None
-    pending: list[tuple[Any, int]] = [(data, 1)]
-    seen = 0
-    while pending:
-        value, depth = pending.pop()
-        seen += 1
-        if depth > MAX_YAML_DEPTH:
-            raise LibraryError(f"{label} is nested too deeply (limit {MAX_YAML_DEPTH} levels)")
-        if seen > MAX_YAML_NODES:
-            raise LibraryError(f"{label} has too many entries (limit {MAX_YAML_NODES})")
-        if isinstance(value, dict):
-            pending.extend((item, depth + 1) for item in [*value.keys(), *value.values()])
-        elif isinstance(value, list):
-            pending.extend((item, depth + 1) for item in value)
-    return data
+    return {} if data is None else data
 
 
 def _default(value: Any, default: Any) -> Any:
@@ -647,12 +635,16 @@ def _readable(text: str, label: str) -> bytes:
     return data
 
 
-def _refuse_aliases(raw: bytes, label: str) -> None:
-    """Refuse aliases and merge keys from the parser's events, before anything is built.
+def _check_events(raw: bytes, label: str) -> None:
+    """Refuse aliases, merge keys, deep nesting and too many nodes, before anything is built.
 
-    Records and config never need them, and building a document that uses them
-    can expand a few hundred bytes into more memory than the process has.
+    Records and config never need aliases, and building a document that uses them
+    can expand a few hundred bytes into more memory than the process has. Depth
+    and count are read off the parser's events, which are produced one at a time,
+    so a refusal stops the parse where the limit is crossed.
     """
+    depth = 0
+    seen = 0
     try:
         for event in yaml.parse(raw, Loader=yaml.SafeLoader):
             merge = isinstance(event, yaml.ScalarEvent) and (
@@ -660,6 +652,18 @@ def _refuse_aliases(raw: bytes, label: str) -> None:
             )
             if isinstance(event, yaml.AliasEvent) or merge:
                 raise LibraryError(f"{label} uses a YAML alias or merge key, which is not allowed")
+            if isinstance(event, (yaml.ScalarEvent, yaml.CollectionStartEvent)):
+                seen += 1
+                if depth + 1 > MAX_YAML_DEPTH:
+                    raise LibraryError(
+                        f"{label} is nested too deeply (limit {MAX_YAML_DEPTH} levels)"
+                    )
+                if seen > MAX_YAML_NODES:
+                    raise LibraryError(f"{label} has too many entries (limit {MAX_YAML_NODES})")
+            if isinstance(event, yaml.CollectionStartEvent):
+                depth += 1
+            elif isinstance(event, yaml.CollectionEndEvent):
+                depth -= 1
     except yaml.YAMLError as exc:
         raise LibraryError(f"{label} is not valid YAML: {exc}") from exc
 
