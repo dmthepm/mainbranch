@@ -70,8 +70,8 @@ These commands work offline. They cover repo shape, schema, link mirrors,
 migration drift, status facts, and ranked next actions.
 
 `mb doctor repair --plan` plans `mechanical` repairs without applying them.
-`mb doctor repair --yes` applies them. `operator_decision` items are never
-auto-applied.
+`mb doctor repair --apply` applies them once the plan has been reviewed.
+`operator_decision` items are never auto-applied.
 
 ### Agent Review
 
@@ -82,8 +82,8 @@ They:
 - group findings by `audience` so the operator sees `mechanical` items as
   "safe to apply", `operator_decision` items as "needs a call", and
   `informational` items as context;
-- offer to invoke `mb doctor repair --yes` for `mechanical` items after
-  showing the plan;
+- show `mb doctor repair --plan` for `mechanical` items, then offer
+  `mb doctor repair --apply`;
 - never silently mutate the repo on `operator_decision` items.
 
 Agents are the user-facing translator. They are not a second rule engine.

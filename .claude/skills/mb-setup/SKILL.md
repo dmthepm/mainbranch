@@ -243,16 +243,15 @@ touch core/product-ladder.md
 
 The full single-offer and multi-offer folder trees are in [references/repo-scaffolding.md](references/repo-scaffolding.md) (Folder Structure).
 
-### 4a. API Key Environment, Config, and .gitignore
+### 4a. Config and .gitignore
 
 See **[references/repo-scaffolding.md](references/repo-scaffolding.md)** for:
-- API key environment setup (`~/.config/vip/env.sh`)
+- Tool credentials (routed through `mb connect`; no shell key file is created)
 - Legacy `.vip` cleanup guidance
 - `.gitignore` creation
 
-Run these steps in order: create env.sh when needed, add shell source line when
-approved, and create `.gitignore`. Do not create `.vip/config.yaml` for new
-repos.
+Create `.gitignore`, and offer `mb connect plan` if the operator wants optional
+tools. Do not create `.vip/config.yaml` for new repos.
 
 ### 5. Sort Content into Files
 

@@ -86,7 +86,7 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 ## Product plans
 
 - [`prd/`](prd/) — versioned PRDs (`v0-*.md`).
-- [`prd/v0-7-machine-doctor.md`](prd/v0-7-machine-doctor.md) — design for `mb machine doctor`: manifest, check registry, JSON and exit codes. The first release (no manifest yet) is on main, unreleased.
+- [`prd/v0-7-machine-doctor.md`](prd/v0-7-machine-doctor.md) — design for `mb machine doctor`: manifest, check registry, JSON and exit codes. `mb machine doctor` reads a manifest (`--manifest`, or `/etc/mainbranch/machine.json`) but still reports incomplete verification.
 - [`prd/v0-8-budget-view.md`](prd/v0-8-budget-view.md) — design for the read-only agent usage view; `mb usage` now ships it.
 - Earlier PRDs: [`v0-2-agent-workflow-and-evals`](prd/v0-2-agent-workflow-and-evals.md) and [`v0-2-first-run-daily-briefing`](prd/v0-2-first-run-daily-briefing.md).
 
