@@ -1116,6 +1116,11 @@ CODEX_WORKFLOW_INVENTORY: tuple[dict[str, Any], ...] = (
         "source_status": "intentionally_unsupported",
         "codex_surface": "Boundary explainer only; no Codex execution route",
         "codex_entrypoints": ("main-branch mb-support",),
+        "commands": (),
+        "status_reason": "Draft Claude Code skill with no Codex runtime proof.",
+        "notes": "Claude Code only until two businesses run it for two weeks.",
+    },
+    {
         "id": "grow",
         "label": "Daily growth loop",
         "surface_type": "skill",
