@@ -83,11 +83,16 @@ keeps saying so.
   lock; a second scan is refused while it runs. Records, index and config inside
   a source are refused. The folders above the business folder are resolved once,
   when the command starts.
-- Every line `mb library` prints goes through one function that writes out
-  control characters and line breaks (`\x0a`) in the whole line, so no name,
-  creator, id, date, label or error can fake a line of output. Escapes are fixed
-  width (`\x0a`, ` `, `\U000e0001`), so two different names never print
-  alike. Source names,
+- Every line the `mb library` commands print themselves (results, listings, the
+  approval prompt and their own errors) goes through one function that writes
+  out control characters and line breaks (`\x0a`) in the whole line, so no name,
+  creator, id, date, label or error taken from a record can fake a line of
+  output. Escapes are fixed width (`\x0a`; the line separator U+2028 as a
+  backslash, `u` and 2028; `\U000e0001`), so two different names never print
+  alike. Usage errors for a mistyped option or an
+  extra argument, and `--help`, are written by the command framework (Typer), not
+  by this function; they can echo back what was typed on the command line.
+  Source names,
   asset ids, kinds, deal ids and approval times are also checked where they are
   read, and a record or index row that fails is refused.
 - Records and config are read with exact types (a quoted `"false"` is not
