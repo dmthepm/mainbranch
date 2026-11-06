@@ -1846,13 +1846,18 @@ def _url_has_password(word: str, depth: int = 0) -> bool:
     url = _METADATA_URL_START_RE.search(word)
     if not url:
         return False
+    text = word[url.start() :]
     try:
-        parsed = urllib.parse.urlsplit(word[url.start() :])
+        parsed = urllib.parse.urlsplit(text)
         if parsed.password:
             return True
         rest = _fully_unquote(f"{parsed.path}?{parsed.query}#{parsed.fragment}")
     except ValueError:
-        return False
+        # The parser rejected the URL (a bad host, say), so read the userinfo
+        # by hand: a ":" before the last "@" in the authority is a password.
+        authority = re.split(r"[/?#]", text[url.end() - url.start() :], maxsplit=1)[0]
+        userinfo, at, _host = authority.rpartition("@")
+        return bool(at and ":" in userinfo)
     return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
 
 
