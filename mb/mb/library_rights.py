@@ -92,28 +92,36 @@ class Deal:
         if not self.said_by.strip():
             raise ValueError("deal needs said-by: who said yes, and how")
 
-    def fields_hash(self) -> str:
-        """Hash of the terms. State and approval fields are not terms."""
+    def fields_hash(self, asset: str = "", provenance: str = "") -> str:
+        """Hash of the terms, plus the asset and provenance they were approved for.
+
+        State and approval fields are not terms. This catches an accidental edit of
+        the terms or a record reused for other bytes; it is not a seal over every
+        field of the record file.
+        """
         terms = {k: v for k, v in self.to_mapping().items() if k not in _UNAPPROVED_FIELDS}
+        terms["_asset"] = asset
+        terms["_provenance"] = provenance
         blob = json.dumps(terms, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode()).hexdigest()
 
-    def approve(self, by: str, at: str) -> Deal:
+    def approve(self, by: str, at: str, *, asset: str, provenance: str) -> Deal:
         return dataclasses.replace(
             self,
             state="approved",
             approved_by=by,
             approved_at=at,
-            approval_hash=self.fields_hash(),
+            approval_hash=self.fields_hash(asset, provenance),
         )
 
     def revoke(self, reason: str, at: str) -> Deal:
         return dataclasses.replace(self, state="revoked", revoked_reason=reason, revoked_at=at)
 
-    @property
-    def is_active(self) -> bool:
-        """Approved, and the terms are still the ones that were approved."""
-        return self.state == "approved" and self.approval_hash == self.fields_hash()
+    def is_active_for(self, asset: str, provenance: str) -> bool:
+        """Approved, for this asset and provenance, with the terms that were approved."""
+        return self.state == "approved" and self.approval_hash == self.fields_hash(
+            asset, provenance
+        )
 
     def to_mapping(self) -> dict[str, Any]:
         code = None
@@ -200,6 +208,8 @@ def verdict(
     provenance: str,
     use: Use,
     window: tuple[date, date],
+    *,
+    asset: str,
 ) -> Verdict:
     """Cleared only when one approved deal covers sighting, use, platform and the whole window."""
     start, end = window
@@ -211,7 +221,7 @@ def verdict(
         return Verdict(False, reasons=("no-deal",))
     failures: set[str] = set()
     for deal in deals:
-        reasons = _deal_reasons(deal, sighting, provenance, use, start, end)
+        reasons = _deal_reasons(deal, asset, sighting, provenance, use, start, end)
         if not reasons:
             return Verdict(True, deal_id=deal.id)
         failures.update(reasons)
@@ -219,11 +229,11 @@ def verdict(
 
 
 def _deal_reasons(
-    deal: Deal, sighting: str, provenance: str, use: Use, start: date, end: date
+    deal: Deal, asset: str, sighting: str, provenance: str, use: Use, start: date, end: date
 ) -> list[str]:
     if deal.state == "revoked":
         return ["revoked"]
-    if not deal.is_active:
+    if not deal.is_active_for(asset, provenance):
         return ["not-approved"]
     reasons: list[str] = []
     if sighting not in deal.sightings:

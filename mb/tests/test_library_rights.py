@@ -14,6 +14,7 @@ import pytest
 
 from mb import library_rights as rights
 
+ASSET = "a" * 64
 SIGHTING = "studio:candle-pour-01.jpg"
 OTHER_SIGHTING = "site-repo:img/pour.jpg"
 WINDOW = (date(2026, 12, 10), date(2026, 12, 20))
@@ -35,8 +36,11 @@ def deal(**over: Any) -> rights.Deal:
         evidence_hash="",
         sightings=(SIGHTING,),
     )
+    provenance = over.pop("approved_for", "own")
     base = dataclasses.replace(base, **over) if over else base
-    return base.approve(by="Rowan Vale", at="2026-11-03T10:00:00+00:00")
+    return base.approve(
+        by="Rowan Vale", at="2026-11-03T10:00:00+00:00", asset=ASSET, provenance=provenance
+    )
 
 
 def judge(
@@ -47,7 +51,7 @@ def judge(
     use: rights.Use = PAID_META,
     window: tuple[date, date] = WINDOW,
 ) -> rights.Verdict:
-    return rights.verdict(deals, sighting, provenance, use, window)
+    return rights.verdict(deals, sighting, provenance, use, window, asset=ASSET)
 
 
 def test_approved_deal_covering_everything_clears():
@@ -58,8 +62,9 @@ def test_approved_deal_covering_everything_clears():
 
 
 def test_licensed_provenance_clears_too():
-    assert judge([deal()], provenance="licensed").cleared is False  # needs a platform code
-    coded = deal(platform_code=("meta", date(2027, 1, 31)))
+    uncoded = deal(approved_for="licensed")
+    assert judge([uncoded], provenance="licensed").cleared is False  # needs a platform code
+    coded = deal(platform_code=("meta", date(2027, 1, 31)), approved_for="licensed")
     assert judge([coded], provenance="licensed").cleared is True
 
 
@@ -162,18 +167,18 @@ def test_music_unknown_is_not_cleared():
 
 
 def test_platform_code_for_another_platform():
-    licensed = deal(platform_code=("tiktok", date(2027, 6, 1)))
+    licensed = deal(platform_code=("tiktok", date(2027, 6, 1)), approved_for="licensed")
     result = judge([licensed], provenance="licensed")
     assert result.reasons == ("platform-code-other-platform",)
 
 
 def test_platform_code_expiring_inside_the_window():
-    licensed = deal(platform_code=("meta", date(2026, 12, 15)))
+    licensed = deal(platform_code=("meta", date(2026, 12, 15)), approved_for="licensed")
     assert judge([licensed], provenance="licensed").reasons == ("platform-code-expires",)
 
 
 def test_platform_code_expiring_on_the_last_window_day_is_fine():
-    licensed = deal(platform_code=("meta", date(2026, 12, 20)))
+    licensed = deal(platform_code=("meta", date(2026, 12, 20)), approved_for="licensed")
     assert judge([licensed], provenance="licensed").cleared is True
 
 
@@ -188,7 +193,11 @@ def test_a_code_for_one_platform_does_not_block_the_deal_s_other_platforms_for_o
 
 
 def test_licensed_paid_ads_need_the_code_of_the_platform_they_run_on():
-    both = deal(platforms=("meta", "tiktok"), platform_code=("tiktok", date(2027, 6, 1)))
+    both = deal(
+        platforms=("meta", "tiktok"),
+        platform_code=("tiktok", date(2027, 6, 1)),
+        approved_for="licensed",
+    )
     tiktok = rights.Use("paid-ad", "tiktok")
     assert judge([both], provenance="licensed", use=tiktok).cleared is True
     meta = judge([both], provenance="licensed", use=PAID_META)
@@ -201,13 +210,15 @@ def test_a_use_that_needs_no_platform_ignores_the_platform_code(provenance):
         uses=("website",),
         platforms=(),
         platform_code=("tiktok", date(2026, 12, 15)),
+        approved_for=provenance,
     )
     result = judge([site], provenance=provenance, use=rights.Use("website", None))
     assert result.cleared is True
 
 
 def test_licensed_paid_ad_without_platform_code():
-    assert judge([deal()], provenance="licensed").reasons == ("platform-code-missing",)
+    uncoded = deal(approved_for="licensed")
+    assert judge([uncoded], provenance="licensed").reasons == ("platform-code-missing",)
 
 
 def test_sighting_not_covered():

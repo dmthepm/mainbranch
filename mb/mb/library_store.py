@@ -29,6 +29,7 @@ from mb.library_files import (
     LibraryError,
     MissingFolder,
     check_file,
+    display,
     open_dir,
     read_file,
     refuse_overlap,
@@ -132,8 +133,8 @@ class Record:
     deals: list[rights.Deal] = field(default_factory=list)
 
 
-def deal_status(deal: rights.Deal) -> str:
-    if deal.state == "approved" and not deal.is_active:
+def deal_status(deal: rights.Deal, asset: str, provenance: str) -> str:
+    if deal.state == "approved" and not deal.is_active_for(asset, provenance):
         return "edited since approval: not active"
     return deal.state
 
@@ -365,6 +366,11 @@ class Library:
             raise LibraryError(f"{label} is not valid YAML: {exc}") from exc
         if not isinstance(data, dict):
             raise LibraryError(f"{label} must be a mapping")
+        if data.get("asset") != asset:
+            raise LibraryError(
+                f"{label}: its asset field {display(str(data.get('asset')))!r} does not match "
+                "the file name; a record belongs to the bytes it was written for"
+            )
         provenance = data.get("provenance", "unknown")
         if provenance not in rights.PROVENANCE:
             raise LibraryError(
@@ -500,7 +506,7 @@ class Library:
                 cleared = [
                     s
                     for s, _, _ in sightings
-                    if rights.verdict(rec.deals, s, rec.provenance, use, span).cleared
+                    if rights.verdict(rec.deals, s, rec.provenance, use, span, asset=asset).cleared
                 ]
                 if not cleared:
                     not_cleared += 1
@@ -522,7 +528,7 @@ class Library:
             provenance=rec.provenance,
             tags=rec.tags,
             creator=rec.creator,
-            deals=[DealView(d.id, deal_status(d), d) for d in rec.deals],
+            deals=[DealView(d.id, deal_status(d, asset, rec.provenance), d) for d in rec.deals],
         )
 
     def check(
@@ -535,7 +541,7 @@ class Library:
             sightings = self._sightings_of(db, asset)
         rec = self._record_or_default(asset)
         return [
-            SightingVerdict(s, rights.verdict(rec.deals, s, rec.provenance, use, span))
+            SightingVerdict(s, rights.verdict(rec.deals, s, rec.provenance, use, span, asset=asset))
             for s, _, _ in sightings
         ]
 
@@ -612,7 +618,12 @@ class Library:
             raise LibraryError(f"to approve, type the deal id exactly: {deal.id}")
         if deal.state == "revoked":
             raise LibraryError(f"deal {deal.id} is revoked; propose a new deal")
-        approved = deal.approve(by=approver, at=self._now().isoformat())
+        approved = deal.approve(
+            by=approver,
+            at=self._now().isoformat(),
+            asset=record.asset,
+            provenance=record.provenance,
+        )
         self._replace_deal(record, index, approved)
         return approved
 
