@@ -2629,10 +2629,8 @@ def test_legacy_repair_section_matches_released_template_bytes(tag: str) -> None
 def _legacy_claude_case(repo: Path, tag: str, newline: str) -> tuple[Path, bytes, bytes]:
     source = (_LEGACY_CLAUDE_FIXTURES / f"{tag}-CLAUDE.md").read_bytes()
     original = source.replace(b"\n", newline.encode())
-    baseline = (
-        _LEGACY_CLAUDE_FIXTURES
-        / f"{tag}-{'crlf' if newline == chr(13) + chr(10) else 'lf'}-base-CLAUDE.md"
-    ).read_bytes()
+    baseline = (_LEGACY_CLAUDE_FIXTURES / f"{tag}-lf-base-CLAUDE.md").read_bytes()
+    baseline = baseline.replace(b"\n", newline.encode())
     path = repo / "CLAUDE.md"
     path.write_bytes(original)
     _commit_all(repo, "Released Claude guidance")
