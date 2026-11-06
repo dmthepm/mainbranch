@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 from mb import cli
 from mb import connect as c
 from mb.cli import app
-from mb.credential_store import SecretProbe, SecretStore
+from mb.credential_store import CredentialStoreError, SecretProbe, SecretStore
 
 runner = CliRunner()
 SECRET = "acme-candles-fixture-credential"
@@ -168,7 +168,7 @@ def _delete_then_lose_ack(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def delete_then_raise(self: SecretStore, target: str, *args: Any, **kwargs: Any) -> None:
         real_delete(self, target, *args, **kwargs)
-        raise c.CredentialStoreError("credential_store_timeout")
+        raise CredentialStoreError("credential_store_timeout")
 
     monkeypatch.setattr(SecretStore, "delete", delete_then_raise)
 
@@ -196,7 +196,7 @@ def test_restore_that_fails_says_what_state_remains(
     _delete_then_lose_ack(monkeypatch)
 
     def refuse_set(self: SecretStore, *args: Any, **kwargs: Any) -> None:
-        raise c.CredentialStoreError("credential_store_timeout")
+        raise CredentialStoreError("credential_store_timeout")
 
     monkeypatch.setattr(SecretStore, "set", refuse_set)
     result = remove(repo, "--yes")
