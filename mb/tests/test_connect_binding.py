@@ -602,6 +602,54 @@ def test_recent_rebinds_unavailable_and_missing(tmp_path, monkeypatch):
     assert c.recent_rebinds("fixture") == ([], "unavailable")
 
 
+def test_status_finishes_when_the_audit_path_is_a_named_pipe(tmp_path, monkeypatch):
+    business = _business(tmp_path)
+    audit = tmp_path / "audit.fifo"
+    os.mkfifo(audit)
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    outcome: list[Any] = []
+
+    def run() -> None:
+        outcome.append(runner.invoke(app, ["connect", "status", "--repo", str(business), "--json"]))
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(timeout=10)
+    if worker.is_alive():  # unblock the stuck open so the thread can end
+        fd = os.open(audit, os.O_WRONLY | os.O_NONBLOCK)
+        os.close(fd)
+        worker.join(timeout=5)
+        pytest.fail("mb connect status hung on a named pipe at the audit path")
+    assert json.loads(outcome[0].stdout)["recent_rebinds_state"] == "unavailable"
+    with pytest.raises(OSError):
+        c.read_release_audit()
+
+
+def test_audit_symlink_is_unavailable(tmp_path, monkeypatch):
+    target = tmp_path / "real.jsonl"
+    target.write_text("")
+    link = tmp_path / "audit.jsonl"
+    link.symlink_to(target)
+    monkeypatch.setattr(c, "audit_path", lambda: link)
+    assert c.recent_rebinds("fixture") == ([], "unavailable")
+    with pytest.raises(OSError):
+        c.read_release_audit()
+
+
+def test_audit_readers_read_only_the_tail_and_skip_the_cut_line(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    old = (json.dumps({**row, "result": "old"}) + "\n") * 3
+    audit.write_text(old + json.dumps(row) + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    # A window that starts inside the old rows cuts one line in half.
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", len(json.dumps(row)) + 20)
+    rows, state = c.recent_rebinds("r")
+    assert state == "ok"
+    assert [entry["result"] for entry in rows] == ["applied"]
+    assert [entry["result"] for entry in c.read_release_audit()] == ["applied"]
+
+
 def test_failed_binding_records_outcome(tmp_path, monkeypatch):
     business = _business(tmp_path)
     borrower = _borrower(tmp_path, business)
