@@ -33,7 +33,8 @@ def connect(repo: Path, scope: str = "repo") -> str:
         c._read_config(repo)["repo_id"], "cloudflare"
     )
     assert result["ok"]
-    return entry["secrets"]["api_token"]["ref"]
+    assert entry is not None
+    return str(entry["secrets"]["api_token"]["ref"])
 
 
 def stored(ref: str) -> bool:
