@@ -33,7 +33,7 @@ cleared; run `check` on those to see why. `--any` only widens the word match
 | What | Where | In git |
 |---|---|---|
 | Source paths, timezone | `.mb/private/library/config.yaml` | no |
-| Index of sightings | `.mb/private/library/index.db` | no |
+| Index of sightings | `.mb/private/library/index.json` (and `index.lock`) | no |
 | Provenance, tags, creator, deals | `library/records/<asset id>.yaml` | yes |
 
 The asset id is the SHA-256 of the file's bytes, so the same photo in two
@@ -57,7 +57,10 @@ A sighting is cleared only when all of these hold:
   inside the window (record the platform and expiry, never the code itself).
 
 Tags and creator never change the answer. A proposed deal clears nothing. Editing
-an approved deal removes its approval. A deal with no end date must say
+an approved deal's terms removes its approval, and so does changing the asset
+or the `provenance` it was approved under; approve again after such a change.
+A record's `asset` must match its file name. This catches accidents; a person
+who can edit the file can still rewrite every field. A deal with no end date must say
 `--perpetual`. A revoked deal stays revoked for as long as its record file
 keeps saying so.
 
@@ -68,11 +71,23 @@ keeps saying so.
 - Files are opened read-only without following symlinks. A file is skipped, and
   listed with its reason, if it is writable, has more than one hard link, is a
   symlink or not a regular file, changed while being read, was modified in the
-  last minute, or is a cloud placeholder.
-- The library's own files are written with no-follow opens, refuse symlink or
-  multiply linked destinations, and must be owned by the running user and not
-  writable by group or others. Records, index and config inside a source are
-  refused.
+  last minute, or is a cloud placeholder. A folder more than 64 levels deep is
+  skipped and listed as `too-deep`; the rest of the scan carries on.
+- The library's own files are written with no-follow opens through the
+  already-checked folder, refuse symlink or multiply linked destinations, and
+  must be owned by the running user and not writable by group or others. The
+  business folder and every folder on the way to the library's files must be
+  owned by you and closed to group and others, or the library refuses. The
+  index is one plain file replaced whole, with no database side files, so a
+  folder swapped for a symlink mid-run cannot redirect a write. A scan holds a
+  lock; a second scan is refused while it runs. Records, index and config inside
+  a source are refused. The folders above the business folder are resolved once,
+  when the command starts.
+- Names, creators and other text from files and records are printed with control
+  characters and line breaks written out (`\x0a`), so a file name cannot fake a
+  line of output.
+- Records and config are read with exact types (a quoted `"false"` is not
+  `false`), up to 1 MiB and 12 levels deep; anything else is refused by name.
 
 ## Limits
 

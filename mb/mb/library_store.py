@@ -13,7 +13,6 @@ import contextlib
 import os
 import re
 import secrets
-import sqlite3
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
@@ -28,17 +27,18 @@ from mb import library_source
 from mb.library_files import (
     LibraryError,
     MissingFolder,
-    check_file,
     display,
+    exclusive,
     open_dir,
     read_file,
     refuse_overlap,
     write_file,
 )
+from mb.library_index import Index, Sighting
 
 CONFIG_REL = ".mb/private/library"
 DEFAULT_RECORDS = "library/records"
-BATCH = 200
+BATCH = 5000  # files between index rewrites; the index is replaced whole each time
 MAX_YAML_BYTES = 1 << 20
 MAX_YAML_DEPTH = 12
 MAX_YAML_NODES = 50_000
@@ -50,16 +50,7 @@ _KINDS = {
     "audio": {"mp3", "wav", "m4a", "aac", "flac", "ogg"},
     "document": {"pdf"},
 }
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS sightings (
-    source TEXT NOT NULL, path TEXT NOT NULL, asset TEXT NOT NULL,
-    size INTEGER NOT NULL, mtime_ns INTEGER NOT NULL, kind TEXT NOT NULL,
-    PRIMARY KEY (source, path));
-CREATE INDEX IF NOT EXISTS sightings_asset ON sightings (asset);
-CREATE TABLE IF NOT EXISTS skipped (
-    source TEXT NOT NULL, path TEXT NOT NULL, reason TEXT NOT NULL,
-    PRIMARY KEY (source, path));
-"""
+LOCK_NAME = "index.lock"
 
 
 def kind_of(path: str) -> str:
@@ -249,19 +240,15 @@ class Library:
     # -- index ------------------------------------------------------------------
 
     @contextlib.contextmanager
-    def _db(self) -> Iterator[sqlite3.Connection]:
+    def _index(self) -> Iterator[Index]:
+        """The index for reading. Replaced whole by a scan, so a read sees one whole version."""
         with self._dir(CONFIG_REL, create=False) as fd:
-            for name in ("index.db", "index.db-journal", "index.db-wal", "index.db-shm"):
-                check_file(fd, name)
-            conn = sqlite3.connect(self.root / CONFIG_REL / "index.db")
-            try:
-                conn.executescript(_SCHEMA)
-                conn.commit()
-                with contextlib.suppress(FileNotFoundError):
-                    os.chmod("index.db", 0o600, dir_fd=fd)
-                yield conn
-            finally:
-                conn.close()
+            yield Index.load(fd)
+
+    @contextlib.contextmanager
+    def _index_for_scan(self) -> Iterator[Index]:
+        with self._dir(CONFIG_REL, create=False) as fd, exclusive(fd, LOCK_NAME):
+            yield Index.load(fd, rebuild=True)
 
     def scan(self, *, verify: bool = False) -> ScanReport:
         report = ScanReport()
@@ -271,37 +258,31 @@ class Library:
                     f"source {name!r} ({folder}) is writable by this user; refusing to scan"
                 )
         now_ns = int(self._now().timestamp() * 1_000_000_000)
-        with self._db() as db:
+        with self._index_for_scan() as index:
             for name, folder in sorted(self.sources.items()):
                 problem = library_source.root_problem(folder)
                 if problem:
                     report.unavailable.append((name, problem))
                     continue
-                self._scan_one(db, name, folder, now_ns, verify, report)
-            report.indexed = db.execute("SELECT COUNT(*) FROM sightings").fetchone()[0]
+                self._scan_one(index, name, folder, now_ns, verify, report)
+            report.indexed = index.count()
             report.duplicates = {
-                asset: self._sighting_names(db, asset)
-                for (asset,) in db.execute(
-                    "SELECT asset FROM sightings GROUP BY asset HAVING COUNT(*) > 1"
-                ).fetchall()
+                asset: sorted(f"{source}:{path}" for source, path, _ in places)
+                for asset, places in index.by_asset().items()
+                if len(places) > 1
             }
         return report
 
     def _scan_one(
         self,
-        db: sqlite3.Connection,
+        index: Index,
         name: str,
         folder: Path,
         now_ns: int,
         verify: bool,
         report: ScanReport,
     ) -> None:
-        known = {
-            path: (size, mtime, asset)
-            for path, size, mtime, asset in db.execute(
-                "SELECT path, size, mtime_ns, asset FROM sightings WHERE source = ?", (name,)
-            )
-        }
+        known = index.known(name)
         seen: set[str] = set()
         skipped: list[SkippedItem] = []
         pending = 0
@@ -321,36 +302,24 @@ class Library:
                     report.changed += 1
                     if reused:
                         report.mismatched.append(f"{name}:{item.rel}")
-                db.execute(
-                    "INSERT OR REPLACE INTO sightings VALUES (?, ?, ?, ?, ?, ?)",
-                    (name, item.rel, item.sha256, item.size, item.mtime_ns, kind_of(item.rel)),
+                index.put(
+                    name,
+                    item.rel,
+                    Sighting(item.sha256, item.size, item.mtime_ns, kind_of(item.rel)),
                 )
                 pending += 1
                 if pending >= BATCH:
-                    db.commit()
+                    index.flush()
                     pending = 0
         except OSError as exc:
             report.unavailable.append((name, exc.strerror or "unreadable"))
-            db.commit()
+            index.flush()
             return
         gone = [path for path in known if path not in seen]
         report.removed += len(gone)
-        db.executemany(
-            "DELETE FROM sightings WHERE source = ? AND path = ?",
-            [(name, path) for path in gone],
-        )
-        db.execute("DELETE FROM skipped WHERE source = ?", (name,))
-        db.executemany(
-            "INSERT OR REPLACE INTO skipped VALUES (?, ?, ?)",
-            [(s.source, s.path, s.reason) for s in skipped],
-        )
-        db.commit()
+        index.remove(name, gone)
+        index.flush()
         report.skipped.extend(skipped)
-
-    @staticmethod
-    def _sighting_names(db: sqlite3.Connection, asset: str) -> list[str]:
-        rows = db.execute("SELECT source, path FROM sightings WHERE asset = ?", (asset,))
-        return sorted(f"{source}:{path}" for source, path in rows)
 
     # -- records ------------------------------------------------------------------
 
@@ -447,14 +416,11 @@ class Library:
             raise LibraryError("give the full 64-character asset id (see `mb library find`)")
         return asset
 
-    def _sightings_of(self, db: sqlite3.Connection, asset: str) -> list[tuple[str, int, str]]:
-        rows = db.execute(
-            "SELECT source, path, size, kind FROM sightings WHERE asset = ? ORDER BY source, path",
-            (asset,),
-        ).fetchall()
+    def _sightings_of(self, index: Index, asset: str) -> list[tuple[str, int, str]]:
+        rows = index.by_asset().get(asset)
         if not rows:
             raise LibraryError(f"unknown asset {asset[:12]}…; run `mb library scan` first")
-        return [(f"{s}:{p}", size, kind) for s, p, size, kind in rows]
+        return [(f"{s}:{p}", row.size, row.kind) for s, p, row in rows]
 
     def find(
         self,
@@ -482,12 +448,9 @@ class Library:
         span = self._window(window)
         words = _words(query)
         grouped: dict[str, list[tuple[str, int, str]]] = defaultdict(list)
-        with self._db() as db:
-            rows = db.execute(
-                "SELECT asset, source, path, size, kind FROM sightings ORDER BY asset, source, path"
-            )
-            for asset, source, path, size, row_kind in rows:
-                grouped[asset].append((f"{source}:{path}", size, row_kind))
+        with self._index() as index:
+            for asset, places in index.by_asset().items():
+                grouped[asset] = [(f"{s}:{p}", row.size, row.kind) for s, p, row in places]
         records = self._all_records() if (words or use is not None) else {}
         hits: list[Hit] = []
         not_cleared = 0
@@ -520,8 +483,8 @@ class Library:
 
     def show(self, asset: str) -> AssetView:
         asset = self._asset_id(asset)
-        with self._db() as db:
-            sightings = self._sightings_of(db, asset)
+        with self._index() as index:
+            sightings = self._sightings_of(index, asset)
         rec = self._record_or_default(asset)
         return AssetView(
             asset=asset,
@@ -540,8 +503,8 @@ class Library:
         asset = self._asset_id(asset)
         self._check_use(use)
         span = self._window(window)
-        with self._db() as db:
-            sightings = self._sightings_of(db, asset)
+        with self._index() as index:
+            sightings = self._sightings_of(index, asset)
         rec = self._record_or_default(asset)
         return [
             SightingVerdict(s, rights.verdict(rec.deals, s, rec.provenance, use, span, asset=asset))
@@ -566,8 +529,8 @@ class Library:
         sightings: list[str] | None = None,
     ) -> rights.Deal:
         asset = self._asset_id(asset)
-        with self._db() as db:
-            current = [s for s, _, _ in self._sightings_of(db, asset)]
+        with self._index() as index:
+            current = [s for s, _, _ in self._sightings_of(index, asset)]
         chosen = sightings if sightings else current
         for name in chosen:
             if name not in current:

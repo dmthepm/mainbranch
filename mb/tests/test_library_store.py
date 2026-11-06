@@ -189,11 +189,11 @@ def test_the_index_may_not_be_a_symlink_or_hardlink(biz, tmp_path):
     original.write_bytes(b"original bytes")
     folder = biz / ".mb/private/library"
     (folder / "config.yaml").write_text(yaml.safe_dump({"sources": {}}))
-    os.symlink(original, folder / "index.db")
+    os.symlink(original, folder / "index.json")
     with pytest.raises(files.LibraryError, match="symlink"):
         library(biz).scan()
-    os.unlink(folder / "index.db")
-    os.link(original, folder / "index.db")
+    os.unlink(folder / "index.json")
+    os.link(original, folder / "index.json")
     with pytest.raises(files.LibraryError, match="more than one link"):
         library(biz).scan()
     assert original.read_bytes() == b"original bytes"
@@ -342,7 +342,7 @@ def test_a_writable_root_refuses_the_whole_scan(biz, tmp_path):
     cfg.write_text(yaml.safe_dump({"sources": {"open": str(open_folder)}}))
     with pytest.raises(files.LibraryError, match="writable"):
         library(biz).scan()
-    assert not (biz / ".mb/private/library/index.db").exists()
+    assert not (biz / ".mb/private/library/index.json").exists()
 
 
 @needs_nonroot
@@ -395,7 +395,7 @@ def test_a_deleted_index_rebuilds_identical_find_results(studio):
     biz, _, lib = studio
     lib.scan()
     before = [(h.asset, h.kind, h.size, h.sightings) for h in lib.find("")]
-    (biz / ".mb/private/library/index.db").unlink()
+    (biz / ".mb/private/library/index.json").unlink()
     again = library(biz)
     assert again.find("") == []
     again.scan()

@@ -1,21 +1,25 @@
 """The media library's own file writes: anchored, no-follow, never through an alias.
 
 Config, records and the index live inside the business folder. Every folder is
-opened one component at a time without following symlinks; every file is
-refused if it is a symlink, not regular, or has more than one link, so a
-library write can never land on an original through an alias. This is same-user
-accident prevention, not protection from a process with the same OS user.
+opened one component at a time without following symlinks, and each one, the
+business folder included, must be owned by the running user and closed to group
+and others. Every read and write then goes through the open folder descriptor,
+never back through a path, so a folder swapped for a symlink afterwards cannot
+redirect it. Every file is refused if it is a symlink, not regular, or has more
+than one link. This is same-user accident prevention, not protection from a
+process with the same OS user.
 """
 
 from __future__ import annotations
 
 import contextlib
 import errno
+import fcntl
 import os
 import secrets
 import stat
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 _DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
@@ -56,10 +60,11 @@ def open_dir(root: Path, rel: str, *, create: bool) -> int:
         raise LibraryError(f"cannot open the business folder {root}: {exc.strerror}") from exc
     walked = ""
     try:
+        _check_dir(fd, "the business folder")
         for part in [p for p in rel.split("/") if p]:
             walked = f"{walked}/{part}" if walked else part
             fd = _step(fd, part, walked, create)
-        _check_dir(fd, walked or ".")
+            _check_dir(fd, walked)
         return fd
     except BaseException:
         os.close(fd)
@@ -146,6 +151,30 @@ def write_file(dir_fd: int, name: str, data: bytes) -> None:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(temp, dir_fd=dir_fd)
         raise
+
+
+@contextlib.contextmanager
+def exclusive(dir_fd: int, name: str) -> Iterator[None]:
+    """Hold an advisory lock on a plain file in the checked folder; one holder at a time."""
+    _plain(name)
+    flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC
+    try:
+        fd = os.open(name, flags, 0o600, dir_fd=dir_fd)
+    except OSError as exc:
+        raise LibraryError(f"cannot open {name}: {exc.strerror}") from exc
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink > 1 or info.st_uid != os.geteuid():
+            raise LibraryError(f"{name} is not a plain file of our own; refusing to use it")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise LibraryError(
+                "another scan is already running here; wait for it to finish"
+            ) from None
+        yield
+    finally:
+        os.close(fd)
 
 
 def refuse_overlap(path: Path, sources: Iterable[Path]) -> None:
