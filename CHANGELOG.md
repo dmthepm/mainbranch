@@ -13,6 +13,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb library` now refuses a field it does not know in a record, a deal or the
+  library config, by name, and leaves the file as it was. `deal propose`,
+  `deal approve`, `deal revoke` and `source add` used to write the file back
+  without that field, which silently deleted hand-entered data. Put
+  business-only facts in `tags`. Closes #1318.
 - The checks-and-review guide now shows the real repair flow,
   `mb doctor repair --plan` then `mb doctor repair --apply`. It no longer
   mentions `--yes`, which that command does not accept.

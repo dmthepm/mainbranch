@@ -101,7 +101,11 @@ keeps saying so.
   `creator: 0`, `deals: false` or `sources: false` are refused, not read as empty.
   The same goes for the whole file: an empty or null file reads as an empty
   mapping, but a file that is only `false`, `0`, `[]` or `''` is refused as not
-  a mapping. A value the YAML reader cannot build (an impossible date, a number
+  a mapping. A field the library does not know, in a record, in a deal or in the
+  config, is refused by name, and the file is left as it was, because every
+  command that writes a record writes back only the fields it knows and would
+  delete the rest. Put business-only facts in `tags`; they are searchable and
+  never change the answer. A value the YAML reader cannot build (an impossible date, a number
   of thousands of digits) is refused by name, and a `records_dir` with a NUL
   character is refused.
   A file over 1 MiB is refused without reading past the limit. YAML aliases

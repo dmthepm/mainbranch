@@ -33,6 +33,27 @@ STATES = ("proposed", "approved", "revoked")
 PROVENANCE = ("own", "licensed", "third_party", "unknown")
 CLEARABLE_PROVENANCE = ("own", "licensed")
 
+DEAL_KEYS = frozenset(
+    {
+        "id",
+        "uses",
+        "platforms",
+        "from",
+        "to",
+        "perpetual",
+        "music",
+        "platform_code",
+        "said_by",
+        "evidence_hash",
+        "sightings",
+        "state",
+        "approved_by",
+        "approved_at",
+        "approval_hash",
+        "revoked_reason",
+        "revoked_at",
+    }
+)
 _DEAL_ID = re.compile(r"[0-9a-f]{8}")
 _UNAPPROVED_FIELDS = frozenset(
     {"state", "approved_by", "approved_at", "approval_hash", "revoked_reason", "revoked_at"}
@@ -154,6 +175,9 @@ class Deal:
         """Build a deal from a record. Types are checked, never coerced."""
         if not isinstance(raw, dict):
             raise ValueError("deal record is malformed: a deal must be a mapping")
+        for key in raw:
+            if key not in DEAL_KEYS:
+                raise ValueError(f"deal has unknown field {key!r}; put business-only facts in tags")
         try:
             code = raw.get("platform_code")
             to_raw = raw.get("to")
