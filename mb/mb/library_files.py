@@ -46,10 +46,17 @@ def display(text: str) -> str:
         if char == "\\":
             out.append("\\\\")
         elif unicodedata.category(char) in _UNSAFE:
-            out.append(f"\\x{code:02x}" if code < 0x100 else f"\\u{code:04x}")
+            out.append(_escape(code))
         else:
             out.append(char)
     return "".join(out)
+
+
+def _escape(code: int) -> str:
+    """Fixed width, so no escape can run into the characters after it and match another."""
+    if code < 0x100:
+        return f"\\x{code:02x}"
+    return f"\\u{code:04x}" if code <= 0xFFFF else f"\\U{code:08x}"
 
 
 def open_dir(root: Path, rel: str, *, create: bool) -> int:

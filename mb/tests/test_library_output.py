@@ -252,6 +252,14 @@ def test_an_unavailable_source_label_is_escaped(
     assert_plain(out.output, "unavailable")
 
 
+def test_distinct_text_never_displays_the_same() -> None:
+    assert files.display("\U000e0001") != files.display("" + "1")
+    assert files.display("\U000e0001") == "\\U000e0001"
+    assert files.display("") == "\\ue000"
+    assert files.display("\x1b") == "\\x1b"
+    assert files.display("\\x1b") != files.display("\x1b")
+
+
 # --- identifiers are checked where they come in ------------------------------
 
 

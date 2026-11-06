@@ -85,7 +85,9 @@ keeps saying so.
   when the command starts.
 - Every line `mb library` prints goes through one function that writes out
   control characters and line breaks (`\x0a`) in the whole line, so no name,
-  creator, id, date, label or error can fake a line of output. Source names,
+  creator, id, date, label or error can fake a line of output. Escapes are fixed
+  width (`\x0a`, ` `, `\U000e0001`), so two different names never print
+  alike. Source names,
   asset ids, kinds, deal ids and approval times are also checked where they are
   read, and a record or index row that fails is refused.
 - Records and config are read with exact types (a quoted `"false"` is not
