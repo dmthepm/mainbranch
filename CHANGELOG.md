@@ -17,6 +17,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   index, find assets, and check whether a use is cleared against owner-approved
   deals. Same-user accident prevention only; see [library](docs/library.md).
 
+- `mb connect remove <provider>`: confirm, then delete the repo metadata, the
+  user-scope record and the stored credentials, and report what was removed.
+  It stops with nothing removed when the credential store can't be reached.
+
 ### Fixed
 
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed

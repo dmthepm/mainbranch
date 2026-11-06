@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import errno
+import functools
 import hashlib
 import hmac
 import json
@@ -2391,6 +2392,126 @@ def _connect_provider(
     if prior_entry is not None:
         result["reconnect"] = _reconnect_changes(prior_entry, recorded_label, metadata)
     return result
+
+
+def _remove_user_scope_provider(repo_id: str, provider_id: str) -> None:
+    data = _read_user_scope()
+    repo_entry = data["repos"].get(repo_id)
+    providers = repo_entry.get("providers") if isinstance(repo_entry, dict) else None
+    if isinstance(providers, dict) and providers.pop(provider_id, None) is not None:
+        _write_user_scope(data)
+
+
+def _undo_removal(undo: list[Callable[[], object]]) -> bool:
+    """Run every undo step, newest first; True only when all of them worked."""
+
+    clean = True
+    for step in reversed(undo):
+        try:
+            step()
+        except Exception:
+            clean = False
+    return clean
+
+
+def remove_provider(
+    provider_id: str, repo: str | Path = ".", *, apply: bool = False
+) -> dict[str, Any]:
+    """Plan, or with ``apply`` carry out, forgetting one provider connection.
+
+    Removes the repo metadata, the user-scope record and every stored
+    credential the entry points at. The credential store is read first: if any
+    item cannot be reached, nothing is touched. A failure part way puts back
+    what was already removed, so a connection is either whole or gone.
+    """
+
+    provider = resolve_provider(provider_id, repo)
+    target = Path(repo).resolve()
+    with ExitStack() as locks:
+        locks.enter_context(_save_lock(target))
+        config = _read_config(target)
+        repo_id = _bound_repo_id(target, config)
+        repo_entry = config["providers"].get(provider.id)
+        user_entry = _user_scope_provider_entry(repo_id, provider.id)
+        entries = [entry for entry in (repo_entry, user_entry) if isinstance(entry, dict)]
+        slots: dict[str, tuple[str, str]] = {}
+        for entry in entries:
+            raw_secrets = entry.get("secrets")
+            for field, raw in (raw_secrets if isinstance(raw_secrets, dict) else {}).items():
+                if isinstance(raw, dict) and raw.get("ref"):
+                    slots[str(raw["ref"])] = (
+                        str(field),
+                        str(raw.get("backend") or "local-file"),
+                    )
+        result: dict[str, Any] = {
+            "ok": bool(entries),
+            "applied": False,
+            "provider": provider.id,
+            "state": "ready" if entries else "not_connected",
+            "repo_metadata": isinstance(repo_entry, dict),
+            "user_scope_metadata": isinstance(user_entry, dict),
+            "credentials": [
+                {"field": field, "backend": backend} for field, backend in slots.values()
+            ],
+        }
+        if not entries:
+            result["message"] = f"{provider.name} is not connected here; nothing to remove."
+            return result
+        if not apply:
+            return result
+        if isinstance(user_entry, dict):
+            _ensure_user_scope_writable()
+        locks.enter_context(credential_lock(_home(), list(slots), provider.name))
+        held: list[tuple[SecretStore, str, SecretProbe]] = []
+        for ref, (_field, backend) in slots.items():
+            store = SecretStore(backend)
+            probe = store.probe(ref, deadline=new_credential_deadline())
+            if not probe.backend_ok or probe.not_checked:
+                reason = probe.reason if not probe.backend_ok else "credential_store_timeout"
+                detail = _backend_repair(reason)
+                raise KeychainError(
+                    reason,
+                    f"{detail['summary']} Nothing was removed. {detail['repair']}",
+                )
+            held.append((store, ref, probe))
+        undo: list[Callable[[], object]] = []
+        try:
+            for store, ref, probe in held:
+                store.delete(ref)
+                forget_stored(store.backend, ref)
+                if probe.present:
+                    undo.append(functools.partial(store.set, ref, probe.value))
+            if isinstance(user_entry, dict):
+                _remove_user_scope_provider(repo_id, provider.id)
+                undo.append(
+                    lambda: _write_user_scope_provider(
+                        repo_id,
+                        repo_identity=config.get("repo_identity") or {},
+                        provider_id=provider.id,
+                        entry=user_entry,
+                    )
+                )
+            if isinstance(repo_entry, dict):
+                del config["providers"][provider.id]
+                _write_config(target, config)
+        except (CredentialStoreError, OSError, ConfigCorruptError) as exc:
+            restored = _undo_removal(undo)
+            kept = (
+                "Everything was put back."
+                if restored
+                else ("Some of it could not be put back; check `mb connect status`.")
+            )
+            reason = exc.reason if isinstance(exc, CredentialStoreError) else "metadata"
+            raise MetadataWriteError(
+                f"Removing the {provider.name} connection failed ({reason}). {kept}"
+            ) from None
+        result.update(
+            ok=True,
+            applied=True,
+            state="removed",
+            message=f"Removed the {provider.name} connection.",
+        )
+        return result
 
 
 def _reconnect_changes(

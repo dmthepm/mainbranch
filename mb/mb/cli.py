@@ -994,6 +994,10 @@ def issue_open_cmd(
 _F = TypeVar("_F", bound=Callable[..., Any])
 
 
+def _stdin_is_tty() -> bool:
+    return sys.stdin.isatty()
+
+
 _CONNECT_SUBCOMMANDS = frozenset(
     {
         "list",
@@ -1008,6 +1012,7 @@ _CONNECT_SUBCOMMANDS = frozenset(
         "token",
         "hydrate",
         "rebind",
+        "remove",
         "repair",
     }
 )
@@ -1186,7 +1191,7 @@ def connect_cmd(
         help=(
             "Provider to connect, or `list` / `plan` / `status` / `doctor` / `hygiene` / "
             "`identity` / `test` / `exec` / `rotate` / `token` / `audit` / `policy` / "
-            "`hydrate` / `rebind` / `repair`."
+            "`hydrate` / `rebind` / `remove` / `repair`."
         ),
     ),
     provider: str = typer.Argument(
@@ -1337,7 +1342,10 @@ def connect_cmd(
     yes: bool = typer.Option(
         False,
         "--yes",
-        help="With `mb connect rebind`, allow this folder to use the keys of the repo id it names.",
+        help=(
+            "With `mb connect rebind`, allow this folder to use the keys of the repo id it names. "
+            "With `mb connect remove`, skip the confirmation."
+        ),
     ),
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
 ) -> None:
@@ -1504,6 +1512,59 @@ def connect_cmd(
         else:
             typer.echo(result["message"])
         raise typer.Exit(0)
+    if target == "remove":
+        if not provider:
+            _connect_usage_exit("mb connect remove", "provider required", json_out=json_out)
+        try:
+            plan = connect_mod.remove_provider(provider, repo)
+        except ValueError as exc:
+            _connect_error_exit("mb connect remove", exc, json_out=json_out)
+        except RuntimeError as exc:
+            _connect_runtime_exit("mb connect remove", exc, json_out=json_out)
+        if plan["ok"] and not yes:
+            if json_out or not _stdin_is_tty():
+                _connect_failure(
+                    "mb connect remove",
+                    "removing a connection needs confirmation; rerun in a terminal, "
+                    "or add --yes to confirm it",
+                    json_out=json_out,
+                    exit_code=2,
+                    state="confirmation_required",
+                )
+            where = ", ".join(
+                part
+                for part in (
+                    "repo metadata" if plan["repo_metadata"] else "",
+                    "user-scope record" if plan["user_scope_metadata"] else "",
+                    f"{len(plan['credentials'])} stored credential(s)"
+                    if plan["credentials"]
+                    else "",
+                )
+                if part
+            )
+            if not typer.confirm(f"Remove the {plan['provider']} connection ({where})?"):
+                typer.echo("Nothing was removed.")
+                raise typer.Exit(1)
+        try:
+            result = connect_mod.remove_provider(provider, repo, apply=bool(plan["ok"]))
+        except ValueError as exc:
+            _connect_error_exit("mb connect remove", exc, json_out=json_out)
+        except RuntimeError as exc:
+            _connect_runtime_exit("mb connect remove", exc, json_out=json_out)
+        if json_out:
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.echo(result["message"])
+            if result["applied"]:
+                for part, present in (
+                    ("repo metadata", result["repo_metadata"]),
+                    ("user-scope record", result["user_scope_metadata"]),
+                ):
+                    if present:
+                        typer.echo(f"  removed: {part}")
+                for item in result["credentials"]:
+                    typer.echo(f"  removed: {item['field']} credential ({item['backend']})")
+        raise typer.Exit(0 if result["ok"] else 1)
     if target == "policy":
         result = connect_mod.caller_policy_status(repo)
         if json_out:

@@ -790,6 +790,20 @@ Stripe test key; pass `--metadata mode=test` with it. Kept metadata can disagree
 key (for example a kept Cloudflare `token_type` after you store a different kind of token);
 `--metadata key=` clears a kept key.
 
+### Remove a connection
+
+```bash
+mb connect remove cloudflare
+```
+
+This asks first (`--yes` skips the question; without a terminal it needs
+`--yes`). It deletes the repo metadata, the user-scope record and every stored
+credential the connection points at, and lists what it removed. It reads the
+credential store before it changes anything: if an item can't be reached, it
+stops with nothing removed. If a step fails part way, it puts back what it had
+already removed. It does not revoke the key at the provider; do that in the
+provider's own settings.
+
 ### Rotate from a recorded source
 
 Record where the credential lives once, as a non-secret reference:
