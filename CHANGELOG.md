@@ -60,7 +60,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
     before login stays a warning until the reboot test is proved;
   - shared-tool ownership and pin directories, the current account's tool path
     and heavy-work lock, and dated backup evidence. It inspects the job wrapper
-    without running it. Overdue restore tests fail;
+    without running it. Restore records expose only the date and result; overdue
+    restore tests fail;
   - root disk encryption, configured ufw defaults, reviewed foreign packages on
     Omarchy, and dated BIOS and firmware evidence. Shared tool links are
     accepted only inside the declared version's install directory with
@@ -98,9 +99,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   like a credential, or contains the released one, is counted ("N more not
   listed") instead of printed. The check is a shape check: a short password used
   as a variable name can still pass it.
-- Machine doctor accepts schema-valid suffixes in Tailscale minimum and
-  installed versions, comparing their numeric major, minor, and patch
-  components.
 
 ### Security
 
