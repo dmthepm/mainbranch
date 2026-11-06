@@ -148,13 +148,16 @@ class Library:
                 "run this from your business folder"
             )
         self.root = self.root.resolve()
-        with self._dir(CONFIG_REL, create=init) as fd:
-            raw = read_file(fd, "config.yaml")
+        no_library = LibraryError(
+            "no media library here yet: add a source first (mb library source add <name> <folder>)"
+        )
+        try:
+            with self._dir(CONFIG_REL, create=init) as fd:
+                raw = read_file(fd, "config.yaml")
+        except MissingFolder:
+            raise no_library from None
         if raw is None and not init:
-            raise LibraryError(
-                "no media library here yet: add a source first "
-                "(mb library source add <name> <folder>)"
-            )
+            raise no_library
         self._config = self._parse_config(raw)
         self.timezone: str = self._config["timezone"]
         self.records_rel: str = self._config["records_dir"]

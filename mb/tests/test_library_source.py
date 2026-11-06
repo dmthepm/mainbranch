@@ -190,6 +190,20 @@ def test_known_unchanged_files_are_not_read_again(read_only_source, monkeypatch)
     assert found["a.jpg"].sha256 == sha(data)  # --verify re-reads
 
 
+def test_a_known_file_that_gained_a_second_link_is_skipped_not_trusted(tmp_path):
+    root = make_tree(tmp_path / "sources" / "studio", {"a.jpg": blob("a")})
+    lock(root)
+    try:
+        info = (root / "a.jpg").stat()
+        known = {"a.jpg": (info.st_size, info.st_mtime_ns, sha(blob("a")))}
+        os.link(root / "a.jpg", tmp_path / "alias.jpg")
+        found, skipped = scan(root, known)
+        assert found == {}
+        assert skipped == {"a.jpg": "multiple-links"}
+    finally:
+        unlock(root)
+
+
 def test_a_changed_file_is_rehashed(read_only_source):
     root = read_only_source({"a.jpg": blob("a")})
     known = {"a.jpg": (1, 1, "0" * 64)}
