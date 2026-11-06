@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 RECENT_NS = 60 * 1_000_000_000
+MAX_DEPTH = 64  # folders below the source root; deeper ones are skipped and listed
 _CHUNK = 1 << 20
 _DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 _FILE_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
@@ -65,7 +66,7 @@ def scan_source(
     """
     root_fd = os.open(root, _DIR_FLAGS)
     try:
-        yield from _walk(root_fd, "", False, known, now_ns, reverify)
+        yield from _walk(root_fd, "", False, known, now_ns, reverify, 0)
     finally:
         os.close(root_fd)
 
@@ -77,6 +78,7 @@ def _walk(
     known: Mapping[str, tuple[int, int, str]],
     now_ns: int,
     reverify: bool,
+    depth: int,
 ) -> Iterator[Found | Skipped]:
     try:
         with os.scandir(dir_fd) as scanner:
@@ -100,7 +102,12 @@ def _walk(
         if stat.S_ISLNK(info.st_mode):
             yield Skipped(rel, "symlink")
         elif stat.S_ISDIR(info.st_mode):
-            yield from _walk_child(dir_fd, name, rel, dir_writable, known, now_ns, reverify)
+            if depth >= MAX_DEPTH:
+                yield Skipped(rel + "/", "too-deep")
+            else:
+                yield from _walk_child(
+                    dir_fd, name, rel, dir_writable, known, now_ns, reverify, depth + 1
+                )
         elif not stat.S_ISREG(info.st_mode):
             yield Skipped(rel, "not-regular")
         else:
@@ -115,6 +122,7 @@ def _walk_child(
     known: Mapping[str, tuple[int, int, str]],
     now_ns: int,
     reverify: bool,
+    depth: int,
 ) -> Iterator[Found | Skipped]:
     try:
         child_fd = os.open(name, _DIR_FLAGS, dir_fd=dir_fd)
@@ -123,7 +131,7 @@ def _walk_child(
         return
     try:
         writable = dir_writable or os.access(name, os.W_OK, dir_fd=dir_fd)
-        yield from _walk(child_fd, rel + "/", writable, known, now_ns, reverify)
+        yield from _walk(child_fd, rel + "/", writable, known, now_ns, reverify, depth)
     finally:
         os.close(child_fd)
 
