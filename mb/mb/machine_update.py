@@ -415,6 +415,7 @@ def parse_pro(data: bytes) -> dict[str, Any] | None:
     if not isinstance(value, dict) or not isinstance(value.get("attached"), bool):
         return None
     enabled: list[str] = []
+    # An unattached machine lists services with `available` and no `status`.
     services = value.get("services", [])
     if not isinstance(services, list):
         return None
@@ -424,7 +425,7 @@ def parse_pro(data: bytes) -> dict[str, Any] | None:
         if not (
             isinstance(name, str)
             and re.fullmatch(r"[a-z0-9\-]{1,40}", name)
-            and isinstance(status, str)
+            and (status is None or isinstance(status, str))
         ):
             return None
         if status == "enabled":

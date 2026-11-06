@@ -6,6 +6,7 @@ import re
 import stat
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -54,8 +55,15 @@ BREW = ("/fake/owner/brew", "outdated", "--json=v2")
 class Fake:
     """A Host whose every edge is a recorded fake."""
 
-    def __init__(self, os_release=UBUNTU, system="Linux", replies=None, free=None, **host):
-        self.events = []
+    def __init__(
+        self,
+        os_release: Any = UBUNTU,
+        system: str = "Linux",
+        replies: Any = None,
+        free: Any = None,
+        **host: Any,
+    ) -> None:
+        self.events: list[Any] = []
         self.replies = replies or {}
         self.free = {"/": 50 * GIB} if free is None else free
         self.owner = host.pop("owner", {"mise": "/fake/owner/mise"})
@@ -73,39 +81,39 @@ class Fake:
         )
         assert not host
 
-    def run(self, argv, *, timeout, merge_stderr=False):
+    def run(self, argv: Any, *, timeout: Any, merge_stderr: bool = False) -> Any:
         self.events.append(("run", tuple(argv)))
         reply = self.replies.get(tuple(argv))
         if reply is None:
             return mu.Out(reason="missing")
         return reply if isinstance(reply, mu.Out) else mu.Out(data=reply, returncode=0)
 
-    def find(self, name):
+    def find(self, name: Any) -> Any:
         self.events.append(("find", name))
         return self.owner.get(name)
 
-    def free_bytes(self, path):
+    def free_bytes(self, path: Any) -> Any:
         self.events.append(("disk", path))
         return self.free.get(path)
 
     @property
-    def argvs(self):
+    def argvs(self) -> Any:
         return [e[1] for e in self.events if e[0] == "run"]
 
 
-def plan(fake):
+def plan(fake: Any) -> Any:
     return mu.plan(fake.host)
 
 
-def phase(report, name):
+def phase(report: Any, name: Any) -> Any:
     return next(p for p in report["phases"] if p["id"] == name)
 
 
-def read(report, read_id):
+def read(report: Any, read_id: Any) -> Any:
     return next(r for p in report["phases"] for r in p["reads"] if r["id"] == read_id)
 
 
-def ubuntu(replies=None):
+def ubuntu(replies: Any = None) -> Any:
     return Fake(replies={APT: APT_OK, PRO: PRO_OK, MISE: b"{}", **(replies or {})})
 
 
@@ -250,6 +258,10 @@ def test_pro_status_is_a_fact_attach_is_never_ours():
     assert read(report, "pro.status")["facts"] == {"attached": True, "enabled": ["esm-infra"]}
     detached = plan(ubuntu())
     assert read(detached, "pro.status")["facts"]["attached"] is False
+    unattached = json.dumps(
+        {"attached": False, "services": [{"name": "esm-infra", "available": "yes"}]}
+    ).encode()
+    assert read(plan(ubuntu({PRO: unattached})), "pro.status")["state"] == "ok"
     text = json.dumps(detached) + mu.human_report(detached)
     assert "attach" in text.lower() and "owner" in text.lower()
     for bad in (b"[]", b'{"attached": "yes"}', b"not json"):
@@ -294,7 +306,7 @@ def test_nvm_beside_mise_is_named_as_a_duplicate_updater():
 # --- macOS -------------------------------------------------------------------
 
 
-def mac(replies=None):
+def mac(replies: Any = None) -> Any:
     return Fake(
         os_release=None,
         system="Darwin",
@@ -437,7 +449,7 @@ def test_unreadable_disk_is_not_verified():
 # --- the CLI ------------------------------------------------------------------
 
 
-def patch_host(monkeypatch, fake):
+def patch_host(monkeypatch: Any, fake: Any) -> Any:
     monkeypatch.setattr(mu.Host, "local", classmethod(lambda cls: fake.host))
 
 
@@ -491,7 +503,7 @@ def test_apply_is_refused_and_nothing_is_read(monkeypatch, flags):
 # --- the real runner ----------------------------------------------------------
 
 
-def script(tmp_path, body, mode=0o700):
+def script(tmp_path: Any, body: Any, mode: int = 0o700) -> Any:
     path = tmp_path / "tool"
     path.write_text("#!/bin/sh\n" + body)
     path.chmod(mode)
