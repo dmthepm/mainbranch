@@ -456,9 +456,7 @@ class Library:
         window: tuple[date, date] | None = None,
         any_word: bool = False,
     ) -> list[Hit]:
-        return self.find_report(
-            query, kind=kind, use=use, window=window, any_word=any_word
-        ).hits
+        return self.find_report(query, kind=kind, use=use, window=window, any_word=any_word).hits
 
     def find_report(
         self,

@@ -11,8 +11,10 @@ import signal
 import subprocess
 import sys
 import textwrap
+from collections.abc import Callable
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -35,27 +37,27 @@ def biz(tmp_path):
     return root
 
 
-def library(biz, *, init=False, now=NOW):
+def library(biz: Path, *, init: bool = False, now: datetime = NOW) -> store.Library:
     return store.Library(biz, now=lambda: now, init=init)
 
 
-def records_dir(biz):
+def records_dir(biz: Path) -> Path:
     return biz / "library" / "records"
 
 
-def edit_record(biz, asset, change):
+def edit_record(biz: Path, asset: str, change: Callable[[dict[str, Any]], object]) -> None:
     path = records_dir(biz) / f"{asset}.yaml"
     data = yaml.safe_load(path.read_text())
     change(data)
     path.write_text(yaml.safe_dump(data, sort_keys=False))
 
 
-def own(biz, asset):
+def own(biz: Path, asset: str) -> None:
     edit_record(biz, asset, lambda data: data.update(provenance="own"))
 
 
-def propose(lib, asset, **over):
-    terms = {
+def propose(lib: store.Library, asset: str, **over: Any) -> rights.Deal:
+    terms: dict[str, Any] = {
         "uses": ("paid-ad",),
         "platforms": ("meta",),
         "from_date": date(2026, 12, 1),
@@ -68,7 +70,12 @@ def propose(lib, asset, **over):
     return lib.propose_deal(asset, **terms)
 
 
-def check(lib, asset, platform="meta", window=WINDOW):
+def check(
+    lib: store.Library,
+    asset: str,
+    platform: str = "meta",
+    window: tuple[date, date] = WINDOW,
+) -> dict[str, rights.Verdict]:
     return {
         item.sighting: item.verdict
         for item in lib.check(asset, rights.Use("paid-ad", platform), window)
@@ -585,7 +592,7 @@ def test_today_follows_the_business_timezone(biz, read_only_source):
     lib.approve_deal(deal.id, deal.id, has_terminal=True, approver="Rowan Vale")
     use = rights.Use("paid-ad", "meta")
 
-    def on_the_last_day(now):
+    def on_the_last_day(now: datetime) -> list[bool]:
         return [s.verdict.cleared for s in library(biz, now=now).check(POUR_ID, use, window=None)]
 
     # `propose` ran with from 2026-12-01; the default window is "today".

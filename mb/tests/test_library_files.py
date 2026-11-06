@@ -57,7 +57,7 @@ def test_a_group_or_world_writable_folder_is_refused(biz):
 def test_a_folder_owned_by_someone_else_is_refused(biz, monkeypatch):
     (biz / "library").mkdir(mode=0o700)
     me = os.geteuid()
-    monkeypatch.setattr(files.os, "geteuid", lambda: me + 1)
+    monkeypatch.setattr(os, "geteuid", lambda: me + 1)
     with pytest.raises(files.LibraryError, match="not owned"):
         files.open_dir(biz, "library", create=True)
 

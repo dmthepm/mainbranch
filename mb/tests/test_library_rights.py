@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 from datetime import date, datetime, timezone
+from typing import Any
 
 import pytest
 
@@ -19,7 +20,7 @@ WINDOW = (date(2026, 12, 10), date(2026, 12, 20))
 PAID_META = rights.Use(kind="paid-ad", platform="meta")
 
 
-def deal(**over):
+def deal(**over: Any) -> rights.Deal:
     """An approved, wide-open deal for Acme Candles; each case narrows one thing."""
     base = rights.Deal(
         id="d7aa11bb",
@@ -38,7 +39,14 @@ def deal(**over):
     return base.approve(by="Rowan Vale", at="2026-11-03T10:00:00+00:00")
 
 
-def judge(deals, *, sighting=SIGHTING, provenance="own", use=PAID_META, window=WINDOW):
+def judge(
+    deals: list[rights.Deal],
+    *,
+    sighting: str = SIGHTING,
+    provenance: str = "own",
+    use: rights.Use = PAID_META,
+    window: tuple[date, date] = WINDOW,
+) -> rights.Verdict:
     return rights.verdict(deals, sighting, provenance, use, window)
 
 

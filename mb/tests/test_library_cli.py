@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from typing import Any, cast
+
 import pytest
 import yaml
 from typer.main import get_command
@@ -27,11 +30,11 @@ def shop(tmp_path, monkeypatch, read_only_source):
     return biz, src
 
 
-def run(*args, input=None):
+def run(*args: str, input: str | None = None) -> Any:
     return runner.invoke(app, ["library", *args], input=input)
 
 
-def commands(group, prefix=()):
+def commands(group: Any, prefix: tuple[str, ...] = ()) -> Iterator[tuple[tuple[str, ...], Any]]:
     for name, cmd in sorted(group.commands.items()):
         if hasattr(cmd, "commands"):
             yield from commands(cmd, (*prefix, name))
@@ -40,7 +43,7 @@ def commands(group, prefix=()):
 
 
 def test_the_eight_verbs_and_nothing_else():
-    library = get_command(app).commands["library"]
+    library = cast(Any, get_command(app)).commands["library"]
     assert sorted(" ".join(path) for path, _ in commands(library)) == [
         "check",
         "deal approve",
@@ -54,7 +57,7 @@ def test_the_eight_verbs_and_nothing_else():
 
 
 def test_no_verb_takes_a_business_folder_or_repo_option():
-    library = get_command(app).commands["library"]
+    library = cast(Any, get_command(app)).commands["library"]
     for path, cmd in commands(library):
         flags = {opt for p in cmd.params for opt in getattr(p, "opts", [])}
         assert not flags & {"--repo", "--root", "--dir", "--path", "--folder", "--records"}, path
