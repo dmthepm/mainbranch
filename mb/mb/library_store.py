@@ -215,7 +215,7 @@ class Library:
             sort_keys=False,
         )
         with self._dir(CONFIG_REL, create=True) as fd:
-            write_file(fd, "config.yaml", text.encode())
+            write_file(fd, "config.yaml", _readable(text, "config.yaml"))
 
     def add_source(self, name: str, path: str | Path) -> Path:
         if not _NAME.fullmatch(name):
@@ -372,7 +372,7 @@ class Library:
             },
             sort_keys=False,
         )
-        write_file(fd, f"{record.asset}.yaml", text.encode())
+        write_file(fd, f"{record.asset}.yaml", _readable(text, f"record {record.asset[:12]}"))
 
     def _all_records(self) -> dict[str, Record]:
         records: dict[str, Record] = {}
@@ -629,6 +629,16 @@ def _load_yaml(raw: bytes, label: str) -> Any:
             pending.extend((item, depth + 1) for item in [*value.keys(), *value.values()])
         elif isinstance(value, list):
             pending.extend((item, depth + 1) for item in value)
+    return data
+
+
+def _readable(text: str, label: str) -> bytes:
+    """`text` as bytes, if the reader would accept it; else refuse, so the old file stays."""
+    data = text.encode()
+    try:
+        _load_yaml(data, label)
+    except LibraryError as exc:
+        raise LibraryError(f"{exc}; nothing was saved and the earlier version is kept") from exc
     return data
 
 

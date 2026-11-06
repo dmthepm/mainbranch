@@ -15,14 +15,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from mb import library_files as files
 from mb import library_store as store
+from mb.cli import app
 from tests.library_fixtures import lock, make_tree, needs_nonroot, sha, unlock
 
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
 CAP = 128 * 1024 * 1024
 PACKAGE_ROOT = str(Path(store.__file__).resolve().parents[1])
+runner = CliRunner()
 
 
 def run_capped(code: str, *args: str) -> str:
@@ -167,3 +170,99 @@ def test_an_oversized_yaml_file_is_refused_without_being_read_whole(
     out = run_capped(code, str(biz), which, asset)
     assert out.startswith("LibraryError"), out
     assert "too large" in out
+
+
+# --- C: a write that the reader would refuse is refused instead ---------------
+
+
+def propose_args(asset: str, said_by: str) -> list[str]:
+    return [
+        "library",
+        "deal",
+        "propose",
+        asset,
+        "--use",
+        "website",
+        "--from",
+        "2026-01-01",
+        "--to",
+        "2027-01-01",
+        "--music",
+        "none",
+        "--said-by",
+        said_by,
+    ]
+
+
+@needs_nonroot
+def test_a_deal_that_would_make_the_record_unreadable_is_refused_and_the_old_one_kept(
+    biz: Path, tree: Callable[[dict[str, bytes]], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lib = library(biz, init=True)
+    lib.add_source("studio", tree({"clip.jpg": b"clip bytes"}))
+    lib.scan()
+    asset = sha(b"clip bytes")
+    record = biz / "library" / "records" / f"{asset}.yaml"
+    monkeypatch.chdir(biz)
+    refused = None
+    for _ in range(20):
+        before = record.read_bytes() if record.exists() else b""
+        out = runner.invoke(app, propose_args(asset, "x" * 65536))
+        if out.exit_code != 0:
+            refused = (before, out)
+            break
+    assert refused is not None, "twenty 64 KiB deals were all accepted"
+    before, out = refused
+    assert out.exit_code == 2 and "too large" in out.output
+    assert record.read_bytes() == before
+    assert len(lib.show(asset).deals) >= 1  # the old record still reads
+
+
+@needs_nonroot
+def test_a_deal_that_would_exceed_the_entry_limit_is_refused_and_the_old_one_kept(
+    biz: Path, tree: Callable[[dict[str, bytes]], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(store, "MAX_YAML_NODES", 200)
+    lib = library(biz, init=True)
+    lib.add_source("studio", tree({"clip.jpg": b"clip bytes"}))
+    lib.scan()
+    asset = sha(b"clip bytes")
+    record = biz / "library" / "records" / f"{asset}.yaml"
+    accepted = 0
+    for _ in range(40):
+        before = record.read_bytes() if record.exists() else b""
+        try:
+            lib.propose_deal(
+                asset,
+                uses=("website",),
+                platforms=(),
+                from_date=NOW.date(),
+                to_date=NOW.date(),
+                perpetual=False,
+                music="none",
+                said_by="Rowan Vale",
+            )
+        except files.LibraryError as exc:
+            assert "too many entries" in str(exc)
+            assert record.read_bytes() == before
+            break
+        accepted += 1
+    else:
+        pytest.fail("forty deals were all accepted under a 200-entry limit")
+    assert accepted >= 1
+    assert len(lib.show(asset).deals) == accepted
+
+
+@needs_nonroot
+def test_a_config_that_would_be_unreadable_is_not_written(
+    biz: Path, tree: Callable[[dict[str, bytes]], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lib = library(biz, init=True)
+    lib.add_source("studio", tree({"clip.jpg": b"x"}))
+    config = biz / ".mb/private/library/config.yaml"
+    before = config.read_bytes()
+    monkeypatch.setattr(store, "MAX_YAML_BYTES", len(before) + 10)
+    with pytest.raises(files.LibraryError, match="too large"):
+        lib.add_source("other", tree({"clip.jpg": b"y"}))
+    assert config.read_bytes() == before
+    assert "studio" in library(biz).sources
