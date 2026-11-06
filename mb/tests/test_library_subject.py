@@ -9,12 +9,12 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import re
 from collections.abc import Callable, Iterator
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import click
 import pytest
 import yaml
 from typer.testing import CliRunner
@@ -262,7 +262,7 @@ def check(window: tuple[str, str] = ("2026-12-10", "2026-12-20")) -> Any:
 def test_propose_cannot_skip_the_subject(shop: Shop) -> None:
     out = shop.propose()
     assert out.exit_code == 2, out.output
-    assert "--subject" in click.unstyle(out.output)
+    assert "--subject" in re.sub(r"\x1b\[[0-9;]*m", "", out.output)
     assert not shop.record.exists()
 
 
