@@ -27,7 +27,8 @@ Nano Banana generates images from text prompts with Google's Gemini models, so `
 
 ### 2. Add to Environment
 
-Add to `~/.config/vip/env.sh` (created during `/mb-setup` — see Step 4a in `mb-setup/SKILL.md` for full env setup):
+Prefer `mb connect plan` for tool credentials. If you already keep a
+`~/.config/vip/env.sh`, add it there (`/mb-setup` no longer creates it):
 
 ```bash
 export GOOGLE_API_KEY="your-api-key-here"

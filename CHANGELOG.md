@@ -16,6 +16,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - The checks-and-review guide now shows the real repair flow,
   `mb doctor repair --plan` then `mb doctor repair --apply`. It no longer
   mentions `--yes`, which that command does not accept.
+- `/mb-setup` no longer creates `~/.config/vip/env.sh` or adds a line to the
+  user's shell startup file on first run. Optional tool setup goes through
+  `mb connect`. An existing `env.sh` keeps working and is not migrated.
 
 ## [0.6.22] - 2026-11-06
 
