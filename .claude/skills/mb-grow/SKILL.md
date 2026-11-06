@@ -111,11 +111,11 @@ does not act on their behalf outside its own limits.
 ## 2026-11-04
 - Number: 14 checkout starts (last 7 days), read 08:10 from GA4.
 - Yesterday: rewrote the /pricing headline. Signal readable 2026-11-10.
-- Move: added two FAQ answers on delivery times to the help page (autonomy: site copy,
-  no publish ask needed on this business). Why: 3 of 5 support emails asked it.
+- Move: drafted two FAQ answers on delivery times for the help page, as a private
+  preview (autonomy: site copy drafts). Why: 3 of 5 support emails asked it.
 - Expect: fewer delivery questions; checkout starts from help-page visits up.
-  Check 2026-11-11.
-- Asked: none.
+  Check 7 days after they go live.
+- Asked: owner's yes to publish these two exact answers.
 ```
 
 Keep business facts, customer names and raw exports out of the log. Counts and
