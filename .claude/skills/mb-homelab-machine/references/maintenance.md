@@ -18,6 +18,18 @@ exit 2 means no verdict. Report NOT VERIFIED rows and their reasons. This first
 release has no manifest support, so a run cannot establish full machine health.
 The maintenance rows below still cover checks outside doctor's current scope.
 
+For updates, run `mb machine update` (draft; add `--json` for structure). It is a
+plan: disk space first, then the OS's pending updates, then a tools phase, then an
+agent phase that says it is not available yet. It runs only root-owned system tools
+(they may touch their own caches) and changes no packages or settings. It never
+runs the owner's mise or brew: it reports them NOT RUN and names `mise outdated` or
+`brew outdated` for the owner to run. It never applies; if asked for `--apply`,
+say the owner-run apply is coming. Report each read's state as given: failed,
+incomplete, unreachable, NOT VERIFIED and NOT RUN are never "no updates". On Omarchy the owner runs `omarchy update` (it also runs its own
+mise up with no release-age wait). Plain Arch and unknown systems are NOT
+VERIFIED. Ubuntu Pro status is a fact only; the owner attaches. The macOS,
+brew, Omarchy and Pro paths are tested with fakes only.
+
 ## Principles and their checks
 
 **Updates go through one version manager.** Shared tools move through one

@@ -396,3 +396,16 @@ results as text or JSON with exit codes, without changing anything or using
 every otherwise-passing Linux run gets that result for now. Real failures still
 exit 1. The reboot and lid-closed tests above
 are still the check.
+
+`mb machine update` (draft) shows what updating this machine would change:
+the operating system's pending updates, with which steps may need a reboot.
+It checks free disk space first and warns when it is low, because partial
+upgrades on a full disk are a known failure. It runs on one machine with no
+business repo and never uses `sudo`. It runs only root-owned system tools from
+a fixed list (`apt`, `pro`, `softwareupdate`); those tools may touch their own
+caches, and nothing it runs installs packages or changes settings. It does not
+run your own tools (`mise`, `brew`): they evaluate your config, so it can't
+promise that is read-only. The plan says they were not checked and names the
+command to run yourself (`mise outdated`, `brew outdated`). A read that fails
+is reported as failed, never as "no updates". Attaching Ubuntu Pro stays your
+step. The apply step is not built yet.
