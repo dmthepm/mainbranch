@@ -25,30 +25,37 @@ Nano Banana generates images from text prompts with Google's Gemini models, so `
 2. Click "Create API Key"
 3. Copy the key
 
-### 2. Add to Environment
+### 2. Store the Key
 
-Prefer `mb connect plan` for tool credentials. If you already keep a
-`~/.config/vip/env.sh`, add it there (`/mb-setup` no longer creates it):
-
-```bash
-export GOOGLE_API_KEY="your-api-key-here"
-```
-
-If you don't have `env.sh` yet, run `/mb-setup` first or create it manually:
+From the business repo, store the key with `mb connect`. Paste it at the prompt
+your terminal gives, never into chat, screenshots, or terminal output:
 
 ```bash
-mkdir -p ~/.config/vip
-chmod 700 ~/.config/vip
-$EDITOR ~/.config/vip/env.sh
+mb connect google-ai --custom --token-stdin --account "Google AI Studio"
 ```
 
-Add the `export GOOGLE_API_KEY="..."` line in the editor. Do not paste API keys
-into chat, screenshots, or terminal output.
+Check it without printing it:
+
+```bash
+mb connect status google-ai --json
+```
 
 ### 3. Add MCP Server
 
+The server needs the key in its environment, so start it through
+`mb connect exec`. Save this as `scripts/nano-banana-mcp.sh` in the business
+repo and make it executable:
+
 ```bash
-claude mcp add nano-banana --scope user -- npx nano-banana-mcp
+#!/bin/sh
+exec mb connect exec google-ai --env GOOGLE_API_KEY -- npx nano-banana-mcp
+```
+
+Then register it from the business repo:
+
+```bash
+chmod +x scripts/nano-banana-mcp.sh
+claude mcp add nano-banana --scope project -- ./scripts/nano-banana-mcp.sh
 ```
 
 ### 4. Verify
