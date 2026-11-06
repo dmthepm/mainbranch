@@ -149,32 +149,75 @@ class Deal:
 
     @classmethod
     def from_mapping(cls, raw: dict[str, Any]) -> Deal:
+        """Build a deal from a record. Types are checked, never coerced."""
+        if not isinstance(raw, dict):
+            raise ValueError("deal record is malformed: a deal must be a mapping")
         try:
             code = raw.get("platform_code")
             to_raw = raw.get("to")
             return cls(
-                id=str(raw["id"]),
-                uses=tuple(raw["uses"]),
-                platforms=tuple(raw.get("platforms") or ()),
+                id=_text(raw, "id"),
+                uses=_texts(raw, "uses"),
+                platforms=_texts(raw, "platforms", default=()),
                 from_date=_to_date(raw["from"]),
-                to_date=_to_date(to_raw) if to_raw else None,
-                perpetual=bool(raw.get("perpetual", False)),
-                music=str(raw.get("music", "unknown")),
-                platform_code=(
-                    (str(code["platform"]), _to_date(code["expires"])) if code else None
-                ),
-                said_by=str(raw["said_by"]),
-                evidence_hash=str(raw.get("evidence_hash", "")),
-                sightings=tuple(raw["sightings"]),
-                state=str(raw.get("state", "proposed")),
-                approved_by=str(raw.get("approved_by", "")),
-                approved_at=str(raw.get("approved_at", "")),
-                approval_hash=str(raw.get("approval_hash", "")),
-                revoked_reason=str(raw.get("revoked_reason", "")),
-                revoked_at=str(raw.get("revoked_at", "")),
+                to_date=_to_date(to_raw) if to_raw is not None else None,
+                perpetual=_flag(raw, "perpetual"),
+                music=_text(raw, "music", default="unknown"),
+                platform_code=_platform_code(code),
+                said_by=_text(raw, "said_by"),
+                evidence_hash=_text(raw, "evidence_hash", default=""),
+                sightings=_texts(raw, "sightings"),
+                state=_text(raw, "state", default="proposed"),
+                approved_by=_text(raw, "approved_by", default=""),
+                approved_at=_text(raw, "approved_at", default=""),
+                approval_hash=_text(raw, "approval_hash", default=""),
+                revoked_reason=_text(raw, "revoked_reason", default=""),
+                revoked_at=_text(raw, "revoked_at", default=""),
             )
         except (KeyError, TypeError) as exc:
             raise ValueError(f"deal record is malformed: {exc!r}") from exc
+
+
+_MISSING: Any = object()
+
+
+def _text(raw: dict[str, Any], key: str, *, default: Any = _MISSING) -> str:
+    value = raw.get(key, default)
+    if value is _MISSING:
+        raise KeyError(key)
+    if not isinstance(value, str):
+        raise ValueError(f"deal field {key} must be text, not {type(value).__name__}")
+    return value
+
+
+def _texts(raw: dict[str, Any], key: str, *, default: Any = _MISSING) -> tuple[str, ...]:
+    value = raw.get(key, default)
+    if value is _MISSING:
+        raise KeyError(key)
+    if value is None and default is not _MISSING:
+        return tuple(default)
+    if isinstance(value, tuple):
+        value = list(value)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"deal field {key} must be a list of text")
+    return tuple(value)
+
+
+def _flag(raw: dict[str, Any], key: str) -> bool:
+    value = raw.get(key, False)
+    if not isinstance(value, bool):
+        raise ValueError(
+            f"deal field {key} must be true or false without quotes, not {value!r}"
+        )
+    return value
+
+
+def _platform_code(code: Any) -> tuple[str, date] | None:
+    if code is None:
+        return None
+    if not isinstance(code, dict) or not isinstance(code.get("platform"), str):
+        raise ValueError("deal field platform_code must be a mapping with a text platform")
+    return (code["platform"], _to_date(code["expires"]))
 
 
 def _closed(label: str, values: tuple[str, ...], allowed: tuple[str, ...]) -> None:
@@ -188,7 +231,9 @@ def _to_date(value: Any) -> date:
         raise ValueError(f"expected a date, got a datetime: {value!r}")
     if isinstance(value, date):
         return value
-    return date.fromisoformat(str(value))
+    if not isinstance(value, str):
+        raise ValueError(f"expected a date as YYYY-MM-DD, got {type(value).__name__}")
+    return date.fromisoformat(value)
 
 
 def today(now: datetime, timezone_name: str) -> date:

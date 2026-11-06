@@ -39,6 +39,9 @@ from mb.library_files import (
 CONFIG_REL = ".mb/private/library"
 DEFAULT_RECORDS = "library/records"
 BATCH = 200
+MAX_YAML_BYTES = 1 << 20
+MAX_YAML_DEPTH = 12
+MAX_YAML_NODES = 50_000
 _NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _ASSET = re.compile(r"^[0-9a-f]{64}$")
 _KINDS = {
@@ -185,15 +188,14 @@ class Library:
             os.close(fd)
 
     def _parse_config(self, raw: bytes | None) -> dict[str, Any]:
-        try:
-            data = yaml.safe_load(raw or b"") or {}
-        except yaml.YAMLError as exc:
-            raise LibraryError(f"config.yaml is not valid YAML: {exc}") from exc
+        data = _load_yaml(raw or b"", "config.yaml")
         if not isinstance(data, dict):
             raise LibraryError("config.yaml must be a mapping")
         sources = data.get("sources") or {}
         records = data.get("records_dir", DEFAULT_RECORDS)
         zone = data.get("timezone", "UTC")
+        if not isinstance(zone, str):
+            raise LibraryError("config.yaml timezone must be text such as UTC")
         if not isinstance(sources, dict) or not all(
             isinstance(k, str) and _NAME.match(k) and isinstance(v, str) for k, v in sources.items()
         ):
@@ -360,10 +362,7 @@ class Library:
         if raw is None:
             return None
         label = f"record {asset[:12]}"
-        try:
-            data = yaml.safe_load(raw) or {}
-        except yaml.YAMLError as exc:
-            raise LibraryError(f"{label} is not valid YAML: {exc}") from exc
+        data = _load_yaml(raw, label)
         if not isinstance(data, dict):
             raise LibraryError(f"{label} must be a mapping")
         if data.get("asset") != asset:
@@ -377,15 +376,19 @@ class Library:
                 f"{label}: provenance {provenance!r} must be one of {', '.join(rights.PROVENANCE)}"
             )
         tags = data.get("tags") or []
-        if not isinstance(tags, list):
-            raise LibraryError(f"{label}: tags must be a list")
+        if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
+            raise LibraryError(f"{label}: tags must be a list of text")
+        creator = data.get("creator") or ""
+        if not isinstance(creator, str):
+            raise LibraryError(f"{label}: creator must be text")
+        raw_deals = data.get("deals") or []
+        if not isinstance(raw_deals, list):
+            raise LibraryError(f"{label}: deals must be a list")
         try:
-            deals = [rights.Deal.from_mapping(d) for d in (data.get("deals") or [])]
+            deals = [rights.Deal.from_mapping(d) for d in raw_deals]
         except (ValueError, AttributeError, TypeError) as exc:
             raise LibraryError(f"{label}: {exc}") from exc
-        return Record(
-            asset, provenance, [str(t) for t in tags], str(data.get("creator") or ""), deals
-        )
+        return Record(asset, provenance, list(tags), creator, deals)
 
     def _write_record(self, fd: int, record: Record) -> None:
         text = yaml.safe_dump(
@@ -635,6 +638,32 @@ class Library:
         revoked = deal.revoke(reason, self._now().isoformat())
         self._replace_deal(record, index, revoked)
         return revoked
+
+
+def _load_yaml(raw: bytes, label: str) -> Any:
+    """Parse a small YAML file, refusing big or deeply nested input by name."""
+    if len(raw) > MAX_YAML_BYTES:
+        raise LibraryError(f"{label} is too large ({len(raw)} bytes; limit {MAX_YAML_BYTES})")
+    try:
+        data = yaml.safe_load(raw) or {}
+    except yaml.YAMLError as exc:
+        raise LibraryError(f"{label} is not valid YAML: {exc}") from exc
+    except RecursionError:
+        raise LibraryError(f"{label} is nested too deeply to read") from None
+    pending: list[tuple[Any, int]] = [(data, 1)]
+    seen = 0
+    while pending:
+        value, depth = pending.pop()
+        seen += 1
+        if depth > MAX_YAML_DEPTH:
+            raise LibraryError(f"{label} is nested too deeply (limit {MAX_YAML_DEPTH} levels)")
+        if seen > MAX_YAML_NODES:
+            raise LibraryError(f"{label} has too many entries (limit {MAX_YAML_NODES})")
+        if isinstance(value, dict):
+            pending.extend((item, depth + 1) for item in [*value.keys(), *value.values()])
+        elif isinstance(value, list):
+            pending.extend((item, depth + 1) for item in value)
+    return data
 
 
 def _flat(text: str) -> str:
