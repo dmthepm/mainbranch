@@ -192,6 +192,10 @@ assignments alone do not supply a command: `env -i` and `env FOO=1` refuse.
 Option arguments are read the way `env` reads them, including clustered short
 options (`env -iu NAME`) and abbreviated long options. Any `-S`
 (`--split-string`) form refuses; pass the command as separate words instead.
+The rule looks through `command`, `exec`, `nice`, `nohup`, `setsid`, `stdbuf`,
+`time` and `timeout`. It is a guard against the plain dump, not a boundary:
+any program can read its own environment, including a shell or interpreter you
+start, so only run commands you trust with the credential.
 `env FOO=1 true` and `/usr/bin/env true` run normally. Other child commands
 are not inspected. This guards against obvious mistakes; it is not a sandbox.
 

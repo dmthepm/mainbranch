@@ -4104,7 +4104,29 @@ def _env_has_command(args: list[str]) -> bool:
     return False
 
 
+# Programs that only start another program. Best effort: any program can read
+# its own environment, so this catches the plain dump, not a determined one.
+_EXEC_WRAPPERS = frozenset(
+    {"command", "exec", "nice", "nohup", "setsid", "stdbuf", "time", "timeout"}
+)
+
+
+def _unwrapped(command: list[str]) -> list[str]:
+    """``command`` without leading wrapper programs, their options and operands."""
+
+    rest = list(command)
+    while rest and Path(rest[0]).name in _EXEC_WRAPPERS:
+        wrapper = Path(rest.pop(0)).name
+        while rest and rest[0].startswith("-"):
+            rest.pop(0)
+        # `timeout 5 env` and `nice -n 5 env`: a bare number is the wrapper's own.
+        if rest and wrapper in {"nice", "timeout"} and re.fullmatch(r"[0-9.]+[smhd]?", rest[0]):
+            rest.pop(0)
+    return rest
+
+
 def _check_exec_child(command: list[str]) -> None:
+    command = _unwrapped(command)
     if not command:
         return
     name = Path(command[0]).name

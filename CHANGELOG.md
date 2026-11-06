@@ -30,6 +30,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Security
 
+- The `mb connect exec` environment-dump guard looks through common wrappers
+  (`nohup`, `timeout`, `nice`, `command` and similar), and the `--token` help
+  says the token also lands in shell history.
 - `mb connect exec` refuses direct child arguments containing the released
   credential and warns when a shell script references its credential variable.
   See the MCP launcher guidance in [connect](docs/connect.md#mcp-bridges-and-header-arguments).

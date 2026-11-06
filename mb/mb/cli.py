@@ -1217,7 +1217,9 @@ def connect_cmd(
     token: str = typer.Option(
         "",
         "--token",
-        help="Deprecated: token is visible in process arguments. Use --token-stdin.",
+        help=(
+            "Deprecated: the token shows in process listings and shell history. Use --token-stdin."
+        ),
     ),
     token_stdin: bool = typer.Option(
         False,
