@@ -21,6 +21,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `mb connect`. An existing `env.sh` keeps working and is not migrated.
 - CONTRIBUTING no longer tells contributors to stop when a change spans skills,
   tools, CI and docs. It keeps "one concern per PR" and points at AGENTS.md.
+- The machine doctor skill, JSON contract and docs index no longer say there is
+  no manifest support. They describe `mb machine doctor --manifest`, the default
+  manifest path, and why a run still ends as incomplete verification (exit 3).
 
 ## [0.6.22] - 2026-11-06
 
