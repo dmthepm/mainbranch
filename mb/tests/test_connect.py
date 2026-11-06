@@ -3852,10 +3852,18 @@ def test_metadata_refuses_password_inside_url(value: str) -> None:
         "https://rowan:pw@[bad]/",
         "note: https://rowan:pw@[bad]/",
         "https://example.invalid/?next=https://rowan:pw@[bad]/",
+        # The outer URL is the one the parser rejects.
+        "https://[bad/?next=https://rowan:pw@example.invalid/",
+        "https://[bad/?next=https%3A%2F%2Frowan%3Apw%40example.invalid%2F",
     ],
 )
 def test_metadata_refuses_password_in_a_malformed_url(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+def test_metadata_accepts_a_malformed_url_nesting_a_safe_url() -> None:
+    value = "https://[bad/?next=https://rowan@example.invalid/shop"
+    assert connect_mod.metadata_value_rule(value) == ""
 
 
 def test_metadata_accepts_url_user_without_password() -> None:

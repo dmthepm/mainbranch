@@ -1855,9 +1855,14 @@ def _url_has_password(word: str, depth: int = 0) -> bool:
     except ValueError:
         # The parser rejected the URL (a bad host, say), so read the userinfo
         # by hand: a ":" before the last "@" in the authority is a password.
-        authority = re.split(r"[/?#]", text[url.end() - url.start() :], maxsplit=1)[0]
+        after_scheme = text[url.end() - url.start() :]
+        authority = re.split(r"[/?#]", after_scheme, maxsplit=1)[0]
         userinfo, at, _host = authority.rpartition("@")
-        return bool(at and ":" in userinfo)
+        if at and ":" in userinfo:
+            return True
+        # A URL nested in the rest is judged too, within the same depth limit.
+        rest = _fully_unquote(after_scheme[len(authority) :])
+        return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
     return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
 
 
