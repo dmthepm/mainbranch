@@ -645,9 +645,37 @@ def test_audit_readers_read_only_the_tail_and_skip_the_cut_line(tmp_path, monkey
     # A window that starts inside the old rows cuts one line in half.
     monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", len(json.dumps(row)) + 20)
     rows, state = c.recent_rebinds("r")
-    assert state == "ok"
     assert [entry["result"] for entry in rows] == ["applied"]
-    assert [entry["result"] for entry in c.read_release_audit()] == ["applied"]
+    assert state == "incomplete"  # cut, and fewer than five rebinds were found
+    # The cut line was dropped, not counted as corrupt: no corrupt-row error here.
+    assert [entry["result"] for entry in c.read_release_audit()][-1] == "applied"
+
+
+def _long_log_with_old_rebind(tmp_path, monkeypatch, *, recent_rebinds: int):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    filler = {"verb": "token", "provider": "example-tool", "repo_id": "r", "result": "released"}
+    lines = [json.dumps({**row, "result": "old", "provider": "example-tool"})]
+    lines += [json.dumps(filler)] * 6
+    lines += [json.dumps(row)] * recent_rebinds
+    audit.write_text("\n".join(lines) + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    # Room for the rebinds and one more line, but not for the old row at the top.
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", (len(json.dumps(row)) + 1) * recent_rebinds + 90)
+
+
+def test_cut_read_with_few_rebinds_is_incomplete_and_audit_reads_everything(tmp_path, monkeypatch):
+    _long_log_with_old_rebind(tmp_path, monkeypatch, recent_rebinds=1)
+    rows, state = c.recent_rebinds("r")
+    assert state == "incomplete"
+    assert [entry["result"] for entry in rows] == ["applied"]
+    old = c.read_release_audit(provider="example-tool", limit=50)
+    assert old[0]["result"] == "old"
+
+
+def test_cut_read_with_five_rebinds_stays_ok(tmp_path, monkeypatch):
+    _long_log_with_old_rebind(tmp_path, monkeypatch, recent_rebinds=5)
+    assert c.recent_rebinds("r")[1] == "ok"
 
 
 def test_failed_binding_records_outcome(tmp_path, monkeypatch):

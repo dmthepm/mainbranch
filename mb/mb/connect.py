@@ -4372,12 +4372,13 @@ def token_for_output(
     return result
 
 
-# Status reads at most this many bytes from the end of the audit log.
+# `mb connect status` reads at most this many bytes from the end of the audit
+# log; `mb connect audit` reads all of it.
 AUDIT_READ_MAX_BYTES = 4 * 1024 * 1024
 
 
-def _read_audit_lines() -> list[bytes]:
-    """The log's last ``AUDIT_READ_MAX_BYTES`` as lines, from a regular file only.
+def _read_audit_lines(max_bytes: int | None = None) -> tuple[list[bytes], bool]:
+    """The log's last ``max_bytes`` (None: all) as lines, and whether any were cut.
 
     Opens like the writer does (no symlink, no blocking on a named pipe) and
     raises OSError for anything else. When the log is longer than the bound the
@@ -4388,18 +4389,18 @@ def _read_audit_lines() -> list[bytes]:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
             raise OSError("audit log is not a regular file")
-        start = max(0, info.st_size - AUDIT_READ_MAX_BYTES)
+        start = 0 if max_bytes is None else max(0, info.st_size - max_bytes)
         lines = os.pread(fd, info.st_size - start, start).splitlines()
     finally:
         os.close(fd)
-    return lines[1:] if start else lines
+    return (lines[1:], True) if start else (lines, False)
 
 
 def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str, Any]]:
     from mb.feedback_scrub import scrub
 
     try:
-        entries = (json.loads(line) for line in _read_audit_lines() if line.strip())
+        entries = (json.loads(line) for line in _read_audit_lines()[0] if line.strip())
         rows = list(
             deque(
                 (entry for entry in entries if not provider or entry.get("provider") == provider),
@@ -4422,7 +4423,8 @@ def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
     rows: deque[dict[str, Any]] = deque(maxlen=5)
     state = "ok"
     try:
-        for line in _read_audit_lines():
+        lines, cut = _read_audit_lines(AUDIT_READ_MAX_BYTES)
+        for line in lines:
             if not line.strip():
                 continue
             try:
@@ -4450,6 +4452,8 @@ def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
         return [], "ok"
     except OSError:
         return [], "unavailable"
+    if cut and len(rows) < 5:
+        state = "incomplete"  # an older rebind may sit beyond the bound
     return list(rows), state
 
 
