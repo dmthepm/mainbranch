@@ -10,7 +10,7 @@ from pathlib import Path
 import typer
 
 from mb import library_rights as rights
-from mb.library_files import LibraryError
+from mb.library_files import LibraryError, display
 from mb.library_store import Library
 
 LIBRARY_HELP = (
@@ -31,7 +31,7 @@ _SIGHTINGS_OPTION = typer.Option(
 
 
 def _fail(message: str) -> typer.Exit:
-    typer.echo(f"mb library: {message}", err=True)
+    typer.echo(f"mb library: {display(message)}", err=True)
     return typer.Exit(2)
 
 
@@ -76,7 +76,7 @@ def library_source_add_cmd(
         path = lib.add_source(name, folder)
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(f"Added source {name}: {path}")
+    typer.echo(f"Added source {name}: {display(str(path))}")
     typer.echo("Next: mb library scan")
 
 
@@ -99,15 +99,15 @@ def library_scan_cmd(
     if verify:
         typer.echo(f"Verify: indexed {report.indexed}, verified {report.hashed}.")
     for sighting in report.mismatched:
-        typer.echo(f"  CONTENT CHANGED under the same size and time: {sighting}")
+        typer.echo(f"  CONTENT CHANGED under the same size and time: {display(sighting)}")
     typer.echo(f"Skipped ({len(report.skipped)}):")
     for item in report.skipped:
-        typer.echo(f"  {item.source}:{item.path}  {item.reason}")
+        typer.echo(f"  {display(f'{item.source}:{item.path}')}  {item.reason}")
     typer.echo(f"Duplicates ({len(report.duplicates)}):")
     for asset, places in sorted(report.duplicates.items()):
-        typer.echo(f"  {asset[:12]}…  {', '.join(places)}")
+        typer.echo(f"  {asset[:12]}…  {', '.join(display(p) for p in places)}")
     for name, reason in report.unavailable:
-        typer.echo(f"Unavailable: {name}  {reason} (its index entries were kept)")
+        typer.echo(f"Unavailable: {name}  {display(reason)} (its index entries were kept)")
 
 
 def library_find_cmd(
@@ -139,9 +139,9 @@ def library_find_cmd(
     for hit in report.hits:
         typer.echo(f"{hit.asset}  {hit.kind}  {hit.size} bytes")
         for sighting in hit.sightings:
-            typer.echo(f"  {sighting}")
+            typer.echo(f"  {display(sighting)}")
         if hit.cleared is not None:
-            typer.echo(f"  usable at: {', '.join(hit.cleared)}")
+            typer.echo(f"  usable at: {', '.join(display(s) for s in hit.cleared)}")
     typer.echo(f"{len(report.hits)} asset(s).")
     if report.not_cleared:
         typer.echo(f"{report.not_cleared} more match but are not cleared.")
@@ -157,19 +157,19 @@ def library_show_cmd(asset: str = typer.Argument(..., help="Full asset id.")) ->
     typer.echo(f"{view.asset}  {view.kind}  {view.size} bytes")
     typer.echo("sightings:")
     for sighting in view.sightings:
-        typer.echo(f"  {sighting}")
+        typer.echo(f"  {display(sighting)}")
     typer.echo(f"provenance: {view.provenance}")
-    typer.echo(f"creator: {view.creator or '-'}")
-    typer.echo(f"tags: {', '.join(view.tags) or '-'}")
+    typer.echo(f"creator: {display(view.creator) or '-'}")
+    typer.echo(f"tags: {', '.join(display(t) for t in view.tags) or '-'}")
     typer.echo("deals:")
     for item in view.deals:
         d = item.deal
         until = "perpetual" if d.perpetual else d.to_date
         typer.echo(
             f"  {d.id}  {item.status}  {','.join(d.uses)} on {','.join(d.platforms) or '-'} "
-            f"{d.from_date}..{until}  music {d.music}  said by {d.said_by}"
+            f"{d.from_date}..{until}  music {d.music}  said by {display(d.said_by)}"
         )
-        typer.echo(f"    covers: {', '.join(d.sightings)}")
+        typer.echo(f"    covers: {', '.join(display(s) for s in d.sightings)}")
 
 
 def library_check_cmd(
@@ -191,9 +191,11 @@ def library_check_cmd(
         verdict = answer.verdict
         if verdict.cleared:
             when = deals[verdict.deal_id].approved_at[:10]
-            typer.echo(f"{answer.sighting}  CLEARED (deal {verdict.deal_id}, approved {when})")
+            typer.echo(
+                f"{display(answer.sighting)}  CLEARED (deal {verdict.deal_id}, approved {when})"
+            )
         else:
-            typer.echo(f"{answer.sighting}  NOT CLEARED ({', '.join(verdict.reasons)})")
+            typer.echo(f"{display(answer.sighting)}  NOT CLEARED ({', '.join(verdict.reasons)})")
     raise typer.Exit(0 if all(a.verdict.cleared for a in answers) else 1)
 
 

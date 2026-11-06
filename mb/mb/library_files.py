@@ -14,10 +14,12 @@ import errno
 import os
 import secrets
 import stat
+import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
 
 _DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+_UNSAFE = frozenset({"Cc", "Cf", "Zl", "Zp", "Cs", "Co", "Cn"})
 
 
 class LibraryError(Exception):
@@ -26,6 +28,24 @@ class LibraryError(Exception):
 
 class MissingFolder(LibraryError):
     """A library folder that does not exist yet."""
+
+
+def display(text: str) -> str:
+    """`text` made safe to print: controls, line breaks and backslashes are written out.
+
+    Every name, creator, said-by and path that came from outside the library goes
+    through this before it reaches a terminal, so it cannot start a line of its own.
+    """
+    out: list[str] = []
+    for char in text:
+        code = ord(char)
+        if char == "\\":
+            out.append("\\\\")
+        elif unicodedata.category(char) in _UNSAFE:
+            out.append(f"\\x{code:02x}" if code < 0x100 else f"\\u{code:04x}")
+        else:
+            out.append(char)
+    return "".join(out)
 
 
 def open_dir(root: Path, rel: str, *, create: bool) -> int:
