@@ -532,6 +532,8 @@ class Library:
         perpetual: bool,
         music: str,
         said_by: str,
+        subject: str,
+        subject_proof: str = "",
         platform_code: tuple[str, date] | None = None,
         evidence_hash: str = "",
         sightings: list[str] | None = None,
@@ -562,6 +564,8 @@ class Library:
                     said_by=said_by,
                     evidence_hash=evidence_hash,
                     sightings=tuple(chosen),
+                    subject=subject,
+                    subject_proof=subject_proof,
                 )
             except ValueError as exc:
                 raise LibraryError(str(exc)) from exc

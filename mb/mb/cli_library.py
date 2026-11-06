@@ -176,7 +176,8 @@ def library_show_cmd(asset: str = typer.Argument(..., help="Full asset id.")) ->
         until = "perpetual" if d.perpetual else d.to_date
         _say(
             f"  {d.id}  {item.status}  {','.join(d.uses)} on {','.join(d.platforms) or '-'} "
-            f"{d.from_date}..{until}  music {d.music}  said by {d.said_by}"
+            f"{d.from_date}..{until}  music {d.music}  said by {d.said_by}  "
+            f"subject {d.subject}" + (f" (proof: {d.subject_proof})" if d.subject_proof else "")
         )
         _say(f"    covers: {', '.join(d.sightings)}")
 
@@ -215,6 +216,20 @@ def library_deal_propose_cmd(
     perpetual: bool = typer.Option(False, "--perpetual", help="No end date; say so explicitly."),
     music: str = typer.Option("unknown", "--music", help=f"One of: {', '.join(rights.MUSIC)}."),
     said_by: str = typer.Option(..., "--said-by", help="Who said yes, and how."),
+    subject: str = typer.Option(
+        ...,
+        "--subject",
+        help=(
+            "Did the person shown in the media (a client, customer or guest, not whoever "
+            f"said yes) agree? One of: {', '.join(rights.SUBJECTS)}. Only none-shown and "
+            "agreed can clear; the said-by person's okay never covers them."
+        ),
+    ),
+    subject_proof: str = typer.Option(
+        "",
+        "--subject-proof",
+        help="With --subject agreed: where the proof sits. Never a name.",
+    ),
     platform_code: str = typer.Option(
         "", "--platform-code", help="Platform permission code as PLATFORM:EXPIRY, no code itself."
     ),
@@ -237,6 +252,8 @@ def library_deal_propose_cmd(
             perpetual=perpetual,
             music=music,
             said_by=said_by,
+            subject=subject,
+            subject_proof=subject_proof,
             platform_code=code,
             evidence_hash=evidence_hash,
             sightings=list(sightings) or None,

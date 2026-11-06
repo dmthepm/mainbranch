@@ -68,6 +68,7 @@ class Shop:
             perpetual=False,
             music="none",
             said_by="Rowan Vale, email 2026-10-02",
+            subject="none-shown",
         )
         self.deal_id = deal.id
         self.record = biz / "library" / "records" / f"{ASSET}.yaml"
@@ -101,7 +102,7 @@ def lib_run(*args: str) -> Any:
 
 PROPOSE = [
     "deal", "propose", ASSET, "--use", "website", "--from", "2026-12-01", "--to", "2026-12-31",
-    "--music", "none", "--said-by", "Rowan Vale, email 2026-10-03",
+    "--music", "none", "--said-by", "Rowan Vale, email 2026-10-03", "--subject", "none-shown",
 ]  # fmt: skip
 
 READERS = {
@@ -193,6 +194,8 @@ def test_the_known_deal_fields_are_exactly_the_ones_a_deal_writes() -> None:
         said_by="Rowan Vale",
         evidence_hash="",
         sightings=("studio:clip.jpg",),
+        subject="agreed",
+        subject_proof="signed release, Releases folder",
     )
     assert set(deal.to_mapping()) == rights.DEAL_KEYS
 

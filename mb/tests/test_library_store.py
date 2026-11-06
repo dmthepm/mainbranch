@@ -65,6 +65,7 @@ def propose(lib: store.Library, asset: str, **over: Any) -> rights.Deal:
         "perpetual": False,
         "music": "original",
         "said_by": "Rowan Vale, email 2026-10-02",
+        "subject": "none-shown",
     }
     terms.update(over)
     return lib.propose_deal(asset, **terms)

@@ -35,6 +35,7 @@ def deal(**over: Any) -> rights.Deal:
         said_by="Rowan Vale, email 2026-10-02",
         evidence_hash="",
         sightings=(SIGHTING,),
+        subject="none-shown",
     )
     provenance = over.pop("approved_for", "own")
     base = dataclasses.replace(base, **over) if over else base

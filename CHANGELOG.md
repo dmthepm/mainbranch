@@ -11,6 +11,17 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
+  `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
+  subject is the person shown in the media other than whoever said yes. Only
+  `none-shown` and `agreed` clear; `check` says `subject-unknown` otherwise, and
+  `said_by` never stands in. `show` prints the subject and proof. Deals approved
+  before this keep their approval and fail only with `subject-unknown`. Engines
+  older than this release drop the subject keys on rewrite, so upgrade every
+  install that touches a business's records together.
+
 ### Fixed
 
 - `mb library` now refuses a field it does not know in a record, a deal or the

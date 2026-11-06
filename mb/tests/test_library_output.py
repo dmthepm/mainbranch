@@ -77,6 +77,7 @@ class World:
             "perpetual": False,
             "music": "none",
             "said_by": "Rowan Vale",
+            "subject": "none-shown",
         }
         first = self.lib.propose_deal(self.asset, **terms)
         self.lib.propose_deal(self.asset, **terms)
@@ -135,6 +136,8 @@ def every_verb(world: World, extra_asset: str, source_dir: Path) -> list[tuple[s
             "2026-02-01",
             "--said-by",
             HOST,
+            "--subject",
+            "none-shown",
             "--sighting",
             HOST,
         ],
