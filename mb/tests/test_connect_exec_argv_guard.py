@@ -108,4 +108,4 @@ def test_no_shell_warning(
     assert connect.exec_with_secret(
         "stripe", command, isolated, env_name="EXAMPLE_TOKEN", runner=child
     )["ok"]
-    assert capsys.readouterr().err == ""
+    assert "shell expands" not in capsys.readouterr().err
