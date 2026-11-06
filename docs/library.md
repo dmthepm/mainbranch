@@ -106,7 +106,13 @@ keeps saying so.
   character is refused.
   A file over 1 MiB is refused without reading past the limit. YAML aliases
   (`*name`) and merge keys (`<<:`) are refused before anything is built, because
-  a few hundred bytes of them can expand past the memory the process has. A
+  a few hundred bytes of them can expand past the memory the process has. Depth
+  (12 levels) and size (50,000 values and keys) are counted as the parser
+  produces them, and the parse stops at the first one past the limit, before
+  anything is built. These bounds cap what is built and how far a deep or long
+  document is parsed. They do not cap the time to scan a file up to 1 MiB, and
+  they give no named refusal if the process is already out of memory: that
+  failure is not caught. A
   record or config is checked against these same limits before it is saved; one
   that would be refused on reading is not written, and the earlier version stays.
 
