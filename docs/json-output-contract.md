@@ -657,3 +657,18 @@ exit 0. A completed check run has `result_status: ok`, including exits 1 and
 `checks`. This first slice only checks `host.os-release`; no manifest is
 loaded, `manifest.source` is `none`, and a passing platform check still exits
 3 with `manifest.reason: no_manifest`. It does not verify machine health.
+
+## Machine update
+
+`mb machine update --json` uses `mainbranch.machine.update.result` version
+`1.0`, with domain `schema: mb.machine.update` and `schema_version: 1`. It is a
+plan only (`mode: plan`). `machine` and `os` name the host so plans from several
+machines can be collected later. `phases` holds `host`, `tools` and `agents`;
+each has `reads`, `steps` and `notes`. A read state is `ok`, `not_present`,
+`not_verified`, `unreachable`, `incomplete` or `failed`, with a coded `reason`.
+A step carries `source`, `from`, `to`, `what` and `reboot`
+(`yes`, `likely`, `unknown` or `no`); `argv` is always null. Exit precedence is
+2, then 1 (any failed read), then 3 (any not verified, incomplete or
+unreachable read, or unreadable disk), then 0. Low disk and stale apt lists are
+`warnings` and do not change the exit code. `--apply` exits 2 with
+`machine.update.apply_unavailable`.

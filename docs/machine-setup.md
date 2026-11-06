@@ -396,3 +396,11 @@ results as text or JSON with exit codes, without changing anything or using
 every otherwise-passing Linux run gets that result for now. Real failures still
 exit 1. The reboot and lid-closed tests above
 are still the check.
+
+`mb machine update` (draft) shows what updating this machine would change:
+the operating system's pending updates, then the owner's mise tools, with
+which steps may need a reboot. It checks free disk space first and warns when
+it is low, because partial upgrades on a full disk are a known failure. It
+runs on one machine with no business repo, changes nothing, and never uses
+`sudo`. A read that fails is reported as failed, never as "no updates".
+Attaching Ubuntu Pro stays your step. The apply step is not built yet.

@@ -26,6 +26,7 @@ from mb import feedback as feedback_mod
 from mb import init as init_mod
 from mb import issue as issue_mod
 from mb import machine_doctor as machine_doctor_mod
+from mb import machine_update as machine_update_mod
 from mb import roles as roles_mod
 from mb import roles_codex as roles_codex_mod
 from mb import start as start_mod
@@ -2407,6 +2408,58 @@ def machine_doctor_cmd(
             )
             if report["exit_code"] == 2
             else machine_doctor_mod.human_report(report)
+        )
+    raise typer.Exit(report["exit_code"])
+
+
+@machine_app.command("update")
+def machine_update_cmd(
+    json_out: bool = typer.Option(False, "--json"),
+    apply: bool = typer.Option(False, "--apply", help="Not built yet; refused."),
+) -> None:
+    """Plan updating this machine. Reads only; nothing is changed."""
+    if apply:
+        message = "The owner-run apply is coming; this release only shows the plan."
+        if json_out:
+            payload = envelope(
+                {
+                    "schema": "mb.machine.update",
+                    "schema_version": 1,
+                    "mode": "plan",
+                    "ok": False,
+                    "exit_code": 2,
+                    "errors": [{"code": "machine.update.apply_unavailable", "message": message}],
+                },
+                command="mb machine update",
+                schema_name="mainbranch.machine.update.result",
+            )
+            typer.echo(json.dumps(payload, indent=2, default=json_default))
+        else:
+            typer.echo(f"mb: --apply is not available. {message}", err=True)
+        raise typer.Exit(2)
+    try:
+        report = machine_update_mod.plan(machine_update_mod.Host.local())
+    except Exception:
+        report = {
+            "schema": "mb.machine.update",
+            "schema_version": 1,
+            "mode": "plan",
+            "safe_to_share": False,
+            "ok": False,
+            "exit_code": 2,
+            "errors": [{"code": "machine.internal"}],
+        }
+    if json_out:
+        payload = envelope(
+            report, command="mb machine update", schema_name="mainbranch.machine.update.result"
+        )
+        payload["result_status"] = "error" if report["exit_code"] == 2 else "ok"
+        typer.echo(json.dumps(payload, indent=2, default=json_default))
+    else:
+        typer.echo(
+            "Machine update: no verdict: internal error."
+            if report["exit_code"] == 2
+            else machine_update_mod.human_report(report)
         )
     raise typer.Exit(report["exit_code"])
 

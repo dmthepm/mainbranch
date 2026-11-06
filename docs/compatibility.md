@@ -436,6 +436,16 @@ assurance. The check subset remains incomplete with exit 3 unless a check
 fails with exit 1; invalid manifests exit 2 before probes run. macOS only has partial
 OS detection. Fixture coverage does not establish real-host runtime support.
 
+`mb machine update [--json]` (draft) prints a read-only plan for updating this one machine and
+changes nothing; `--apply` is refused until the owner-run apply exists. The OS is detected on the
+machine: Ubuntu reads `apt list --upgradable` and, where `pro` exists, Ubuntu Pro status; macOS reads
+`softwareupdate -l` and `brew outdated` only where brew is present; Omarchy is planned as the owner
+running `omarchy update`, with no pending list read; plain Arch and unknown systems report NOT
+VERIFIED. Tools come from `mise outdated` for the owner's own tools. Exit codes follow doctor: 0, 1
+for a failed read, 2 for no verdict, 3 for not verified or incomplete. The agent phase says it is not
+available yet. Every backend, Ubuntu included, is tested with fakes shaped from the tools' documented
+output; none has run on a real host yet.
+
 Machine doctor with a manifest also reads local account and group databases,
 home privacy, the current business account's umask and private temporary
 directory, linger markers and user-session unit settings on Ubuntu and Omarchy.

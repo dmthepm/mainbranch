@@ -11,6 +11,17 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb machine update [--json]` (draft): a read-only plan for updating this one
+  machine, with no business repo needed. It checks disk space first, detects the
+  OS (Ubuntu via apt and Ubuntu Pro status, macOS via softwareupdate and brew
+  where present, Omarchy as the owner running `omarchy update`), and lists the
+  owner's mise tools. A failed, malformed, incomplete or unreachable read is
+  never reported as "no updates". Plain Arch and unknown systems report NOT
+  VERIFIED. `--apply` is refused until the owner-run apply exists. The macOS,
+  brew, Omarchy and Pro backends are tested with fakes, not on real hosts.
+
 ## [0.6.22] - 2026-11-06
 
 ### Breaking
