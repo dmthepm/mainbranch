@@ -11,6 +11,17 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.22] - 2026-11-06
+
+### Breaking
+
+- `mb connect exec` now refuses to run when the released credential appears in
+  the child command's own arguments (`exec_child_argv_secret`), for values of
+  four or more characters. A script that puts the credential value itself in
+  the child's arguments stops working. Let the tool expand the variable itself,
+  with the placeholder in single quotes. See the MCP launcher guidance in
+  [connect](docs/connect.md#mcp-bridges-and-header-arguments).
+
 ### Added
 
 - `/mb-grow` (draft): a daily growth loop for one agent per business. It reads
@@ -26,17 +37,60 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - `mb library`: register read-only media folders, scan them into a rebuildable
   index, find assets, and check whether a use is cleared against owner-approved
   deals. Same-user accident prevention only; see [library](docs/library.md).
-
 - `mb connect remove <provider>`: confirm, then delete the repo metadata, the
   user-scope record and the stored credentials, and report what was removed.
   It stops with nothing removed when the credential store can't be reached.
+- `/mb-support` (draft): customer support that keeps its promises. Policies,
+  money rules and help articles live in the business repo under `core/support/`;
+  `state/support/cases.md` logs each case with what was promised, by when, the
+  owner's approval and proof. The owner schedules the recurring check, every
+  send is verified, and the weekly review lists overdue promises first.
+  Messaging a customer, refunds and spend always ask.
+- `mb machine doctor` reads a machine manifest: the desired state of the box,
+  from root-owned `/etc/mainbranch/machine.json` or `--manifest PATH`. An invalid
+  manifest exits 2 before any check runs. A default file that root does not own,
+  or that others can write, fails and nothing else runs. A manifest you pick
+  with `--manifest` never counts as assurance. Sections whose checks are not
+  built yet show as not checked, never as passed.
+- Machine doctor now checks the box against that manifest:
+  - declared business accounts, private homes and temporary directories, group
+    membership, reboot persistence and session-unit settings, with resource
+    limits compared to each account's size class and a warning when host memory
+    has changed. `--scope all` lists other accounts as unverified. Startup
+    before login stays a warning until the reboot test is proved;
+  - shared-tool ownership and pin directories, the current account's tool path
+    and heavy-work lock, and dated backup evidence. It inspects the job wrapper
+    without running it. Overdue restore tests fail;
+  - root disk encryption, configured ufw defaults, reviewed foreign packages on
+    Omarchy, and dated BIOS and firmware evidence. Shared tool links are
+    accepted only inside the declared version's install directory with
+    root-owned, read-only components;
+  - Ubuntu screen lock, Tailscale package version and running state, named Serve
+    ports with Funnel disabled, and recent completed Omarchy upgrades. TPM
+    configuration is matched to root by disk UUID;
+  - manifest skips and dated owner attestations. Skipped checks and owner
+    evidence never count as passing; expired evidence stays unverified, or fails
+    when a backup or restore test is overdue. An invalid attestation identity
+    stops the run before probes.
+  Off-box listeners without proven process identity stay unverified, as do
+  snapshots, disk headers and Omarchy screen lock. Disk header verification
+  remains incomplete.
+
+### Changed
+
+- Connection rebinding records an audit entry, marks noninteractive approvals,
+  records applied or failed outcomes, and shows recent rebinds in connection
+  status with incomplete or unavailable history warnings. Repo identity uses
+  only the local origin remote and ignores all `GIT_*` environment overrides
+  (#1306).
+- The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New
+  installs get that release, and owners move only when a new release is pinned.
 
 ### Fixed
 
 - `mb connect` metadata checks refuse a password inside a URL
   (`https://user:pw@host/`), however short it is, including a URL the parser
   rejects (`https://user:pw@[bad]/`), where the userinfo is read by hand.
-
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
   versions, comparing their numeric major, minor, and patch components.
 - `mb connect exec` prints the names of the environment variables it drops from
@@ -44,6 +98,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   like a credential, or contains the released one, is counted ("N more not
   listed") instead of printed. The check is a shape check: a short password used
   as a variable name can still pass it.
+- Machine doctor accepts schema-valid suffixes in Tailscale minimum and
+  installed versions, comparing their numeric major, minor, and patch
+  components.
 
 ### Security
 
@@ -53,60 +110,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - `mb connect exec` refuses direct child arguments containing the released
   credential and warns when a shell script references its credential variable.
   See the MCP launcher guidance in [connect](docs/connect.md#mcp-bridges-and-header-arguments).
-
-### Added
-
-- `/mb-support` (draft): customer support that keeps its promises. Policies,
-  money rules and help articles live in the business repo under `core/support/`;
-  `state/support/cases.md` logs each case with what was promised, by when, the
-  owner's approval and proof. The owner schedules the recurring check, every
-  send is verified, and the weekly review lists overdue promises first.
-  Messaging a customer, refunds and spend always ask.
-
-- Machine doctor checks Ubuntu screen lock, Tailscale package version and
-  running state, named Serve ports and disabled Funnel, and recent completed
-  Omarchy upgrades. It matches TPM configuration to root by disk UUID.
-  Off-box listeners without proven process identity stay unverified, as do
-  snapshots, disk headers and Omarchy screen lock.
-
-- Machine doctor traces root disk encryption, checks configured ufw defaults
-  and reviewed foreign packages on Omarchy, and reports dated BIOS and firmware
-  evidence. Disk header verification remains incomplete. Shared
-  tool links are accepted only inside the declared version's install directory
-  with root-owned, read-only components.
-
-- Machine doctor checks shared-tool ownership and pin directories, the current
-  business account's tool path and heavy-work lock, and dated backup evidence.
-  It inspects the job wrapper without running it. Restore records expose only
-  the date and result; overdue restore tests fail.
-
-- Machine doctor checks declared business accounts, private homes and temporary
-  directories, group membership, reboot persistence and session-unit settings.
-  It compares resource limits with each account's size class and warns when
-  host memory has changed. `--scope all` lists other accounts as unverified.
-  Startup-before-login remains a warning until the reboot test is proved.
-
-- Machine doctor honors manifest skips and dated owner attestations. Skipped
-  checks and owner evidence never count as passing. Expired evidence stays
-  unverified, or fails when a backup or restore test is overdue. Invalid
-  attestation identities stop the run before probes.
-
-- `mb machine doctor` reads a machine manifest: the desired state of the box,
-  from root-owned `/etc/mainbranch/machine.json` or `--manifest PATH`. An invalid
-  manifest exits 2 before any check runs. A default file that root does not own,
-  or that others can write, fails and nothing else runs. A manifest you pick
-  with `--manifest` never counts as assurance. Sections whose checks are not
-  built yet show as not checked, never as passed.
-
-### Changed
-
-- Connection rebinding records an audit entry, marks noninteractive approvals,
-  records applied or failed outcomes, and shows recent rebinds in connection
-  status with incomplete or unavailable history warnings. Repo identity uses only the local
-  origin remote and ignores all `GIT_*` environment overrides (#1306).
-
-- The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New
-  installs get that release, and owners move only when a new release is pinned.
+- `mb connect exec` also warns when a direct `sh`, `bash`, `dash` or `zsh` `-c`
+  script references its credential variable in plain `$NAME` or `${NAME}` form.
+  The warning is advice and misses other forms. The environment stays readable
+  by the same OS user.
 
 ## [0.6.21] - 2026-11-03
 
