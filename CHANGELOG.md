@@ -11,6 +11,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb library`: register read-only media folders, scan them into a rebuildable
+  index, find assets, and check whether a use is cleared against owner-approved
+  deals. Same-user accident prevention only; see [library](docs/library.md).
+
 ### Fixed
 
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed

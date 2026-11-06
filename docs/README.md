@@ -41,6 +41,7 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 - [`role-cards.md`](role-cards.md) — role cards: tell each restarted agent what it is for (Claude Code and Codex).
 - [`homelab-skills.md`](homelab-skills.md) — read-only Claude Code skills that inspect the machines running your agents.
 - [`books.md`](books.md) — bookkeeping safety, hledger, and the private ledger vault model.
+- [`library.md`](library.md) — `mb library`: what media exists, where, and whether a use is cleared.
 - [`books-workflow.md`](books-workflow.md) — the statement-anchored books protocol inside a private hledger books repo.
 - [`business-connections.md`](business-connections.md) — when to use frontmatter links, inline links, tags, data refs, or context.
 - [`markdown-link-conventions.md`](markdown-link-conventions.md) — markdown and link rules.
