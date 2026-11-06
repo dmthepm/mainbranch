@@ -19,6 +19,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - `/mb-setup` no longer creates `~/.config/vip/env.sh` or adds a line to the
   user's shell startup file on first run. Optional tool setup goes through
   `mb connect`. An existing `env.sh` keeps working and is not migrated.
+- CONTRIBUTING no longer tells contributors to stop when a change spans skills,
+  tools, CI and docs. It keeps "one concern per PR" and points at AGENTS.md.
 
 ## [0.6.22] - 2026-11-06
 

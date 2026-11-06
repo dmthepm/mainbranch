@@ -15,7 +15,7 @@ start and review.
 
 ## Branch + PR shape
 
-**One workspace = one branch = one PR.** Hard rule. Cross-cutting work that "feels obvious" gets flagged and stopped. Never reuse a branch.
+**One workspace = one branch = one PR.** Hard rule. Keep one concern per PR; a change that needs tests, fixtures or docs alongside it is still one concern. See Work Shape in [AGENTS.md](AGENTS.md). Never reuse a branch.
 
 **Branch convention:** if a Linear issue exists, use Linear's official branch
 name so Linear Releases can attach the work. Otherwise use
@@ -159,12 +159,6 @@ Any change to `.claude/skills/*/SKILL.md` or its `references/` should:
    composable/internal skill files may also carry `tier:` and `calls:` while
    they are being migrated, but new bundled skills should use `loops:` as the
    routing contract.
-
----
-
-## Cross-cutting flags
-
-If your change touches more than one of: skills + tools + mb umbrella + CI workflows + docs — STOP. Open a tracking issue, narrow scope, ship the smallest coherent slice. Cross-cutting branches are how regressions ship.
 
 ---
 
