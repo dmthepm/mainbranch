@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -32,6 +33,7 @@ STATES = ("proposed", "approved", "revoked")
 PROVENANCE = ("own", "licensed", "third_party", "unknown")
 CLEARABLE_PROVENANCE = ("own", "licensed")
 
+_DEAL_ID = re.compile(r"[0-9a-f]{8}")
 _UNAPPROVED_FIELDS = frozenset(
     {"state", "approved_by", "approved_at", "approval_hash", "revoked_reason", "revoked_at"}
 )
@@ -156,7 +158,7 @@ class Deal:
             code = raw.get("platform_code")
             to_raw = raw.get("to")
             return cls(
-                id=_text(raw, "id"),
+                id=_deal_id(_text(raw, "id")),
                 uses=_texts(raw, "uses"),
                 platforms=_texts(raw, "platforms", default=()),
                 from_date=_to_date(raw["from"]),
@@ -169,10 +171,10 @@ class Deal:
                 sightings=_texts(raw, "sightings"),
                 state=_text(raw, "state", default="proposed"),
                 approved_by=_text(raw, "approved_by", default=""),
-                approved_at=_text(raw, "approved_at", default=""),
+                approved_at=_stamp(raw, "approved_at"),
                 approval_hash=_text(raw, "approval_hash", default=""),
                 revoked_reason=_text(raw, "revoked_reason", default=""),
-                revoked_at=_text(raw, "revoked_at", default=""),
+                revoked_at=_stamp(raw, "revoked_at"),
             )
         except (KeyError, TypeError) as exc:
             raise ValueError(f"deal record is malformed: {exc!r}") from exc
@@ -187,6 +189,25 @@ def _text(raw: dict[str, Any], key: str, *, default: Any = _MISSING) -> str:
         raise KeyError(key)
     if not isinstance(value, str):
         raise ValueError(f"deal field {key} must be text, not {type(value).__name__}")
+    return value
+
+
+def _deal_id(value: str) -> str:
+    if not _DEAL_ID.fullmatch(value):
+        raise ValueError("deal field id must be 8 lowercase hex characters")
+    return value
+
+
+def _stamp(raw: dict[str, Any], key: str) -> str:
+    """Empty, or a time as `datetime.isoformat` writes it; nothing else is printed back."""
+    value = _text(raw, key, default="")
+    if value:
+        try:
+            datetime.fromisoformat(value)
+        except ValueError:
+            raise ValueError(f"deal field {key} must be empty or an ISO time") from None
+        if not value.isprintable():
+            raise ValueError(f"deal field {key} must be empty or an ISO time")
     return value
 
 

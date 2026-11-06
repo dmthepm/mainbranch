@@ -30,8 +30,17 @@ _SIGHTINGS_OPTION = typer.Option(
 )
 
 
+def _say(line: str) -> None:
+    """The only way library output reaches the terminal: the whole line is written out safe.
+
+    Callers interpolate raw values; nothing here trusts them, so a field cannot
+    reach the terminal unescaped by being left out of a list.
+    """
+    typer.echo(display(line))
+
+
 def _fail(message: str) -> typer.Exit:
-    typer.echo(f"mb library: {display(message)}", err=True)
+    typer.echo(display(f"mb library: {message}"), err=True)
     return typer.Exit(2)
 
 
@@ -76,8 +85,8 @@ def library_source_add_cmd(
         path = lib.add_source(name, folder)
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(f"Added source {name}: {display(str(path))}")
-    typer.echo("Next: mb library scan")
+    _say(f"Added source {name}: {path}")
+    _say("Next: mb library scan")
 
 
 def library_scan_cmd(
@@ -91,23 +100,23 @@ def library_scan_cmd(
         report = lib.scan(verify=verify)
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(
+    _say(
         f"Scanned {len(lib.sources)} source(s): indexed {report.indexed} "
         f"(new {report.new}, changed {report.changed}, removed {report.removed}); "
         f"read {report.hashed} file(s)."
     )
     if verify:
-        typer.echo(f"Verify: indexed {report.indexed}, verified {report.hashed}.")
+        _say(f"Verify: indexed {report.indexed}, verified {report.hashed}.")
     for sighting in report.mismatched:
-        typer.echo(f"  CONTENT CHANGED under the same size and time: {display(sighting)}")
-    typer.echo(f"Skipped ({len(report.skipped)}):")
+        _say(f"  CONTENT CHANGED under the same size and time: {sighting}")
+    _say(f"Skipped ({len(report.skipped)}):")
     for item in report.skipped:
-        typer.echo(f"  {display(f'{item.source}:{item.path}')}  {item.reason}")
-    typer.echo(f"Duplicates ({len(report.duplicates)}):")
+        _say(f"  {item.source}:{item.path}  {item.reason}")
+    _say(f"Duplicates ({len(report.duplicates)}):")
     for asset, places in sorted(report.duplicates.items()):
-        typer.echo(f"  {asset[:12]}…  {', '.join(display(p) for p in places)}")
+        _say(f"  {asset[:12]}…  {', '.join(places)}")
     for name, reason in report.unavailable:
-        typer.echo(f"Unavailable: {name}  {display(reason)} (its index entries were kept)")
+        _say(f"Unavailable: {name}  {reason} (its index entries were kept)")
 
 
 def library_find_cmd(
@@ -137,14 +146,14 @@ def library_find_cmd(
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
     for hit in report.hits:
-        typer.echo(f"{hit.asset}  {hit.kind}  {hit.size} bytes")
+        _say(f"{hit.asset}  {hit.kind}  {hit.size} bytes")
         for sighting in hit.sightings:
-            typer.echo(f"  {display(sighting)}")
+            _say(f"  {sighting}")
         if hit.cleared is not None:
-            typer.echo(f"  usable at: {', '.join(display(s) for s in hit.cleared)}")
-    typer.echo(f"{len(report.hits)} asset(s).")
+            _say(f"  usable at: {', '.join(hit.cleared)}")
+    _say(f"{len(report.hits)} asset(s).")
     if report.not_cleared:
-        typer.echo(f"{report.not_cleared} more match but are not cleared.")
+        _say(f"{report.not_cleared} more match but are not cleared.")
 
 
 def library_show_cmd(asset: str = typer.Argument(..., help="Full asset id.")) -> None:
@@ -154,22 +163,22 @@ def library_show_cmd(asset: str = typer.Argument(..., help="Full asset id.")) ->
         view = lib.show(asset)
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(f"{view.asset}  {view.kind}  {view.size} bytes")
-    typer.echo("sightings:")
+    _say(f"{view.asset}  {view.kind}  {view.size} bytes")
+    _say("sightings:")
     for sighting in view.sightings:
-        typer.echo(f"  {display(sighting)}")
-    typer.echo(f"provenance: {view.provenance}")
-    typer.echo(f"creator: {display(view.creator) or '-'}")
-    typer.echo(f"tags: {', '.join(display(t) for t in view.tags) or '-'}")
-    typer.echo("deals:")
+        _say(f"  {sighting}")
+    _say(f"provenance: {view.provenance}")
+    _say(f"creator: {view.creator or '-'}")
+    _say(f"tags: {', '.join(view.tags) or '-'}")
+    _say("deals:")
     for item in view.deals:
         d = item.deal
         until = "perpetual" if d.perpetual else d.to_date
-        typer.echo(
+        _say(
             f"  {d.id}  {item.status}  {','.join(d.uses)} on {','.join(d.platforms) or '-'} "
-            f"{d.from_date}..{until}  music {d.music}  said by {display(d.said_by)}"
+            f"{d.from_date}..{until}  music {d.music}  said by {d.said_by}"
         )
-        typer.echo(f"    covers: {', '.join(display(s) for s in d.sightings)}")
+        _say(f"    covers: {', '.join(d.sightings)}")
 
 
 def library_check_cmd(
@@ -191,11 +200,9 @@ def library_check_cmd(
         verdict = answer.verdict
         if verdict.cleared:
             when = deals[verdict.deal_id].approved_at[:10]
-            typer.echo(
-                f"{display(answer.sighting)}  CLEARED (deal {verdict.deal_id}, approved {when})"
-            )
+            _say(f"{answer.sighting}  CLEARED (deal {verdict.deal_id}, approved {when})")
         else:
-            typer.echo(f"{display(answer.sighting)}  NOT CLEARED ({', '.join(verdict.reasons)})")
+            _say(f"{answer.sighting}  NOT CLEARED ({', '.join(verdict.reasons)})")
     raise typer.Exit(0 if all(a.verdict.cleared for a in answers) else 1)
 
 
@@ -236,8 +243,8 @@ def library_deal_propose_cmd(
         )
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(f"Proposed deal {deal.id} (inactive). Review the record, then:")
-    typer.echo(f"  mb library deal approve {deal.id}")
+    _say(f"Proposed deal {deal.id} (inactive). Review the record, then:")
+    _say(f"  mb library deal approve {deal.id}")
 
 
 def library_deal_approve_cmd(
@@ -247,12 +254,12 @@ def library_deal_approve_cmd(
     lib = _open()
     if not _has_terminal():
         raise _fail("approving a deal needs a person at a terminal; none is attached")
-    typed = typer.prompt(f"Type the deal id ({deal_id}) to approve it")
+    typed = typer.prompt(display(f"Type the deal id ({deal_id}) to approve it"))
     try:
         deal = lib.approve_deal(deal_id, typed, has_terminal=True, approver=getpass.getuser())
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(f"Approved deal {deal.id} as {deal.approved_by} at {deal.approved_at}.")
+    _say(f"Approved deal {deal.id} as {deal.approved_by} at {deal.approved_at}.")
 
 
 def library_deal_revoke_cmd(
@@ -265,4 +272,4 @@ def library_deal_revoke_cmd(
         deal = lib.revoke_deal(deal_id, reason)
     except LibraryError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(f"Revoked deal {deal.id}.")
+    _say(f"Revoked deal {deal.id}.")

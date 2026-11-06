@@ -34,7 +34,7 @@ from mb.library_files import (
     refuse_overlap,
     write_file,
 )
-from mb.library_index import Index, Sighting
+from mb.library_index import ASSET_ID, SOURCE_NAME, Index, Sighting
 
 CONFIG_REL = ".mb/private/library"
 DEFAULT_RECORDS = "library/records"
@@ -42,8 +42,8 @@ BATCH = 5000  # files between index rewrites; the index is replaced whole each t
 MAX_YAML_BYTES = 1 << 20
 MAX_YAML_DEPTH = 12
 MAX_YAML_NODES = 50_000
-_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-_ASSET = re.compile(r"^[0-9a-f]{64}$")
+_NAME = SOURCE_NAME
+_ASSET = ASSET_ID
 _KINDS = {
     "photo": {"jpg", "jpeg", "png", "webp", "gif", "heic", "tif", "tiff", "avif"},
     "video": {"mp4", "mov", "m4v", "webm", "mkv", "avi"},
@@ -188,7 +188,8 @@ class Library:
         if not isinstance(zone, str):
             raise LibraryError("config.yaml timezone must be text such as UTC")
         if not isinstance(sources, dict) or not all(
-            isinstance(k, str) and _NAME.match(k) and isinstance(v, str) for k, v in sources.items()
+            isinstance(k, str) and _NAME.fullmatch(k) and isinstance(v, str)
+            for k, v in sources.items()
         ):
             raise LibraryError("config.yaml sources must map plain names to folder paths")
         if (
@@ -216,7 +217,7 @@ class Library:
             write_file(fd, "config.yaml", text.encode())
 
     def add_source(self, name: str, path: str | Path) -> Path:
-        if not _NAME.match(name):
+        if not _NAME.fullmatch(name):
             raise LibraryError(
                 f"source name {name!r} must be lowercase letters, digits, - or _ (no ':' or '/')"
             )
@@ -380,7 +381,7 @@ class Library:
                     names = sorted(e.name for e in entries)
                 for name in names:
                     stem = name[:-5]
-                    if name.endswith(".yaml") and _ASSET.match(stem):
+                    if name.endswith(".yaml") and _ASSET.fullmatch(stem):
                         rec = self._read_record(fd, stem)
                         if rec:
                             records[stem] = rec
@@ -412,7 +413,7 @@ class Library:
 
     @staticmethod
     def _asset_id(asset: str) -> str:
-        if not _ASSET.match(asset):
+        if not _ASSET.fullmatch(asset):
             raise LibraryError("give the full 64-character asset id (see `mb library find`)")
         return asset
 

@@ -10,12 +10,16 @@ side files of its own; this does neither.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, NamedTuple
 
 from mb.library_files import LibraryError, read_file, write_file
 
 INDEX_NAME = "index.json"
 _VERSION = 1
+SOURCE_NAME = re.compile(r"[a-z0-9][a-z0-9_-]*")
+ASSET_ID = re.compile(r"[0-9a-f]{64}")
+KINDS = ("photo", "video", "audio", "document", "other")
 
 
 class Sighting(NamedTuple):
@@ -88,5 +92,7 @@ def _decode(raw: bytes) -> dict[tuple[str, str], Sighting]:
             isinstance(n, int) and not isinstance(n, bool) for n in numbers
         ):
             raise ValueError("index row has the wrong types")
+        if not (SOURCE_NAME.fullmatch(source) and ASSET_ID.fullmatch(asset) and kind in KINDS):
+            raise ValueError("index row has a source, asset or kind that is not one of ours")
         rows[(source, path)] = Sighting(asset, size, mtime_ns, kind)
     return rows

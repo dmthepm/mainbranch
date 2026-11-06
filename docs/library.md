@@ -83,9 +83,11 @@ keeps saying so.
   lock; a second scan is refused while it runs. Records, index and config inside
   a source are refused. The folders above the business folder are resolved once,
   when the command starts.
-- Names, creators and other text from files and records are printed with control
-  characters and line breaks written out (`\x0a`), so a file name cannot fake a
-  line of output.
+- Every line `mb library` prints goes through one function that writes out
+  control characters and line breaks (`\x0a`) in the whole line, so no name,
+  creator, id, date, label or error can fake a line of output. Source names,
+  asset ids, kinds, deal ids and approval times are also checked where they are
+  read, and a record or index row that fails is refused.
 - Records and config are read with exact types (a quoted `"false"` is not
   `false`), up to 1 MiB and 12 levels deep; anything else is refused by name.
 
@@ -100,6 +102,8 @@ keeps saying so.
   the same OS user can run it. Reviewing the git diff of the record is the check.
 - Nothing here enforces rights at publication. Image generation and ad upload
   do not consult the library.
+- The index is held in memory whole, for queries as well as scans. It has no size
+  limit, so a very large library costs memory on every command.
 - Reading can update access times; cloud-backed mounts can download on read.
   `scan --verify` compares content now with the index; it shows what the files
   contain, not that nothing wrote to them. Prevention is the read-only mount.
