@@ -24,6 +24,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - The machine doctor skill, JSON contract and docs index no longer say there is
   no manifest support. They describe `mb machine doctor --manifest`, the default
   manifest path, and why a run still ends as incomplete verification (exit 3).
+- The README's "preview before every save" now names its one bounded exception:
+  `/mb-grow` log entries the owner approved in `autonomy.md`.
 
 ## [0.6.22] - 2026-11-06
 
