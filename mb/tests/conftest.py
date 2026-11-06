@@ -10,6 +10,7 @@ import pytest
 from mb import __version__
 from mb import codex as codex_mod
 from mb import engine as engine_mod
+from tests.library_fixtures import read_only_source  # noqa: F401 (shared fixture)
 
 
 @pytest.fixture()

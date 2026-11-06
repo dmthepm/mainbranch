@@ -43,6 +43,9 @@ CODEX_EXEMPT = {
     # `mb think` is a redirect stub pointing the operator INTO Claude Code;
     # Codex has its own Think workflow section in generated AGENTS.md.
     "think",
+    # `mb library` v1 is an operator-run CLI; no workflow or generated
+    # AGENTS.md teaches agents to call it until a pilot shows it earns a route.
+    "library",
 }
 
 MAX_EXEMPTIONS = 6

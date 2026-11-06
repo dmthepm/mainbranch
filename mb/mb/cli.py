@@ -56,6 +56,15 @@ from mb.cli_common import _json_error_payload as _json_error_payload
 from mb.cli_common import _json_payload as _json_payload
 from mb.cli_common import _today_utc as _today_utc
 from mb.cli_common import _unreadable_guard as _unreadable_guard
+from mb.cli_library import LIBRARY_HELP as LIBRARY_HELP
+from mb.cli_library import library_check_cmd as library_check_cmd
+from mb.cli_library import library_deal_approve_cmd as library_deal_approve_cmd
+from mb.cli_library import library_deal_propose_cmd as library_deal_propose_cmd
+from mb.cli_library import library_deal_revoke_cmd as library_deal_revoke_cmd
+from mb.cli_library import library_find_cmd as library_find_cmd
+from mb.cli_library import library_scan_cmd as library_scan_cmd
+from mb.cli_library import library_show_cmd as library_show_cmd
+from mb.cli_library import library_source_add_cmd as library_source_add_cmd
 from mb.cli_onboarding import _onboard_target_path as _onboard_target_path
 from mb.cli_onboarding import _render_onboard_human as _render_onboard_human
 from mb.cli_onboarding import _render_onboard_intro as _render_onboard_intro
@@ -238,6 +247,19 @@ books_report_app = typer.Typer(
     no_args_is_help=True,
 )
 books_app.add_typer(books_report_app, name="report")
+
+library_app = typer.Typer(name="library", help=LIBRARY_HELP, no_args_is_help=True)
+app.add_typer(library_app, name="library")
+
+library_source_app = typer.Typer(
+    name="source", help="Register media folders to read.", no_args_is_help=True
+)
+library_app.add_typer(library_source_app, name="source")
+
+library_deal_app = typer.Typer(
+    name="deal", help="Propose, approve and revoke written permissions.", no_args_is_help=True
+)
+library_app.add_typer(library_deal_app, name="deal")
 
 google_app = typer.Typer(
     name="google",
@@ -1891,6 +1913,16 @@ books_app.command("exposure")(books_exposure_cmd)
 
 
 books_report_app.command("monthly")(books_report_monthly_cmd)
+
+
+library_source_app.command("add")(library_source_add_cmd)
+library_app.command("scan")(library_scan_cmd)
+library_app.command("find")(library_find_cmd)
+library_app.command("show")(library_show_cmd)
+library_app.command("check")(library_check_cmd)
+library_deal_app.command("propose")(library_deal_propose_cmd)
+library_deal_app.command("approve")(library_deal_approve_cmd)
+library_deal_app.command("revoke")(library_deal_revoke_cmd)
 
 
 ads_meta_app.command("summary")(ads_meta_summary_cmd)
