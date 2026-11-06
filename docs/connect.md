@@ -242,6 +242,10 @@ A request already refused keeps its refusal exit code if logging also fails.
 
 Read recent entries with `mb connect audit`, `mb connect audit --limit 50`,
 or `mb connect audit --provider stripe --json`. A missing log has no entries.
+`mb connect audit` reads the whole log. `mb connect status` reads only the last
+4 MiB and calls the rebind history incomplete when that could hide a rebind
+(the read was cut and fewer than five rebinds were found). A symlink or named
+pipe at the log path is refused, and status shows history as unavailable.
 The audit records releases by same-user processes that go through `mb`,
 not credential-store reads that bypass `mb`.
 Per-process separation requires a separate OS user.

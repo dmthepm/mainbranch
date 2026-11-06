@@ -35,6 +35,14 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   Omarchy and Pro backends are tested with fakes, not on real hosts.
 ### Fixed
 
+- `mb connect status` no longer hangs when the audit log path is a named pipe.
+  A symlink or named pipe there is refused and history shows as unavailable.
+  Status reads only the last 4 MiB and reports history as incomplete when that
+  could hide a rebind; `mb connect audit` reads the whole log. A password in a
+  URL nested inside a URL that does not parse is now caught. `mb connect remove`
+  puts the repo metadata back when its write lands and still fails, reads each
+  restore back, and says everything was put back only when it was. Closes #1323
+  and #1313.
 - `mb library` now refuses a field it does not know in a record, a deal or the
   library config, by name, and leaves the file as it was. `deal propose`,
   `deal approve`, `deal revoke` and `source add` used to write the file back
