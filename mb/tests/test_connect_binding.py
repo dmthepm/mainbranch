@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import threading
+import tracemalloc
 from pathlib import Path
 from typing import Any
 
@@ -649,6 +650,35 @@ def test_audit_readers_read_only_the_tail_and_skip_the_cut_line(tmp_path, monkey
     assert state == "incomplete"  # cut, and fewer than five rebinds were found
     # The cut line was dropped, not counted as corrupt: no corrupt-row error here.
     assert [entry["result"] for entry in c.read_release_audit()][-1] == "applied"
+
+
+def test_full_audit_streams_a_large_log_within_a_small_memory_bound(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    rows = [
+        {"verb": "token", "provider": "example-tool", "result": "released", "n": n}
+        for n in range(60000)
+    ]
+    audit.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    size = audit.stat().st_size
+    assert size > 4 * 1024 * 1024
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    read_sizes: list[int] = []
+    real_pread = os.pread
+
+    def spy(fd: int, length: int, offset: int) -> bytes:
+        read_sizes.append(length)
+        return real_pread(fd, length, offset)
+
+    monkeypatch.setattr(os, "pread", spy)
+    tracemalloc.start()
+    try:
+        newest = c.read_release_audit(limit=2)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert [row["n"] for row in newest] == [59998, 59999]
+    assert all(length < size for length in read_sizes)
+    assert peak < size // 4  # bounded by the limit, not by the file
 
 
 def _long_log_with_old_rebind(tmp_path, monkeypatch, *, recent_rebinds: int):

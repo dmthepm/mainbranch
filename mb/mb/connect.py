@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, BinaryIO, NoReturn
 
 import yaml
 
@@ -4377,22 +4377,34 @@ def token_for_output(
 AUDIT_READ_MAX_BYTES = 4 * 1024 * 1024
 
 
-def _read_audit_lines(max_bytes: int | None = None) -> tuple[list[bytes], bool]:
-    """The log's last ``max_bytes`` (None: all) as lines, and whether any were cut.
+def _open_audit_log() -> BinaryIO:
+    """The audit log as a binary stream, opened like the writer does.
 
-    Opens like the writer does (no symlink, no blocking on a named pipe) and
-    raises OSError for anything else. When the log is longer than the bound the
-    first line is cut mid-row, so it is dropped rather than read as corrupt.
+    No symlink and no blocking on a named pipe; the type is checked on the
+    opened descriptor, so a later swap of the path cannot change what is read.
+    Raises OSError for anything but a regular file.
     """
     fd = os.open(audit_path(), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
-        info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode):
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise OSError("audit log is not a regular file")
-        start = 0 if max_bytes is None else max(0, info.st_size - max_bytes)
-        lines = os.pread(fd, info.st_size - start, start).splitlines()
-    finally:
+        return os.fdopen(fd, "rb")
+    except BaseException:
         os.close(fd)
+        raise
+
+
+def _read_audit_tail(max_bytes: int) -> tuple[list[bytes], bool]:
+    """The log's last ``max_bytes`` as lines, and whether any were cut.
+
+    When the log is longer than the bound the first line is cut mid-row, so it
+    is dropped rather than read as corrupt.
+    """
+    with _open_audit_log() as stream:
+        size = os.fstat(stream.fileno()).st_size
+        start = max(0, size - max_bytes)
+        stream.seek(start)
+        lines = stream.read(size - start).splitlines()
     return (lines[1:], True) if start else (lines, False)
 
 
@@ -4400,13 +4412,18 @@ def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str,
     from mb.feedback_scrub import scrub
 
     try:
-        entries = (json.loads(line) for line in _read_audit_lines()[0] if line.strip())
-        rows = list(
-            deque(
-                (entry for entry in entries if not provider or entry.get("provider") == provider),
-                maxlen=limit,
+        with _open_audit_log() as stream:
+            entries = (json.loads(line) for line in stream if line.strip())
+            rows = list(
+                deque(
+                    (
+                        entry
+                        for entry in entries
+                        if not provider or entry.get("provider") == provider
+                    ),
+                    maxlen=limit,
+                )
             )
-        )
     except FileNotFoundError:
         return []
     # Keep display read-only and scrub strings again in case the file was edited.
@@ -4423,7 +4440,7 @@ def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
     rows: deque[dict[str, Any]] = deque(maxlen=5)
     state = "ok"
     try:
-        lines, cut = _read_audit_lines(AUDIT_READ_MAX_BYTES)
+        lines, cut = _read_audit_tail(AUDIT_READ_MAX_BYTES)
         for line in lines:
             if not line.strip():
                 continue
