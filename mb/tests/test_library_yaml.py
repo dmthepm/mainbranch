@@ -192,7 +192,7 @@ def never_build(*_args: object, **_kwargs: object) -> object:
 def test_depth_and_count_are_refused_before_anything_is_built(
     text: str, match: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(store.yaml, "safe_load", never_build)
+    monkeypatch.setattr(yaml, "safe_load", never_build)
     with pytest.raises(files.LibraryError, match=match):
         store._load_yaml(text.encode(), "probe.yaml")
 
