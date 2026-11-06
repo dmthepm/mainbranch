@@ -32,7 +32,9 @@ STATES = ("proposed", "approved", "revoked")
 PROVENANCE = ("own", "licensed", "third_party", "unknown")
 CLEARABLE_PROVENANCE = ("own", "licensed")
 
-_UNAPPROVED_FIELDS = frozenset({"state", "approved_by", "approved_at", "approval_hash"})
+_UNAPPROVED_FIELDS = frozenset(
+    {"state", "approved_by", "approved_at", "approval_hash", "revoked_reason", "revoked_at"}
+)
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,8 @@ class Deal:
     approved_by: str = ""
     approved_at: str = ""
     approval_hash: str = ""
+    revoked_reason: str = ""
+    revoked_at: str = ""
 
     def __post_init__(self) -> None:
         if self.to_date is None and not self.perpetual:
@@ -103,8 +107,8 @@ class Deal:
             approval_hash=self.fields_hash(),
         )
 
-    def revoke(self) -> Deal:
-        return dataclasses.replace(self, state="revoked")
+    def revoke(self, reason: str, at: str) -> Deal:
+        return dataclasses.replace(self, state="revoked", revoked_reason=reason, revoked_at=at)
 
     @property
     def is_active(self) -> bool:
@@ -131,6 +135,8 @@ class Deal:
             "approved_by": self.approved_by,
             "approved_at": self.approved_at,
             "approval_hash": self.approval_hash,
+            "revoked_reason": self.revoked_reason,
+            "revoked_at": self.revoked_at,
         }
 
     @classmethod
@@ -156,6 +162,8 @@ class Deal:
                 approved_by=str(raw.get("approved_by", "")),
                 approved_at=str(raw.get("approved_at", "")),
                 approval_hash=str(raw.get("approval_hash", "")),
+                revoked_reason=str(raw.get("revoked_reason", "")),
+                revoked_at=str(raw.get("revoked_at", "")),
             )
         except (KeyError, TypeError) as exc:
             raise ValueError(f"deal record is malformed: {exc!r}") from exc

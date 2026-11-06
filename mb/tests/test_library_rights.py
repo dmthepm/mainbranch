@@ -211,6 +211,9 @@ def test_unknown_timezone_is_refused():
 def test_deal_round_trips_through_a_plain_mapping():
     original = deal(platform_code=("meta", date(2027, 1, 31)))
     assert rights.Deal.from_mapping(original.to_mapping()) == original
+    revoked = original.revoke("creator withdrew", "2026-11-04T09:00:00+00:00")
+    assert rights.Deal.from_mapping(revoked.to_mapping()) == revoked
+    assert revoked.revoked_reason == "creator withdrew"
 
 
 def test_approval_hash_ignores_state_but_not_terms():
