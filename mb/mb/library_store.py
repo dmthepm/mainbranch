@@ -52,6 +52,9 @@ _KINDS = {
 }
 _MERGE_TAG = "tag:yaml.org,2002:merge"
 LOCK_NAME = "index.lock"
+_CONFIG_KEYS = frozenset({"timezone", "records_dir", "sources"})
+_RECORD_KEYS = frozenset({"asset", "provenance", "tags", "creator", "deals"})
+_TAGS_HINT = "put business-only facts in tags"
 
 
 def kind_of(path: str) -> str:
@@ -183,6 +186,7 @@ class Library:
         data = _load_yaml(raw or b"", "config.yaml")
         if not isinstance(data, dict):
             raise LibraryError("config.yaml must be a mapping")
+        _refuse_unknown(data, _CONFIG_KEYS, "config.yaml", "remove it")
         sources = _default(data.get("sources"), {})
         records = _default(data.get("records_dir"), DEFAULT_RECORDS)
         zone = _default(data.get("timezone"), "UTC")
@@ -337,6 +341,7 @@ class Library:
         data = _load_yaml(raw, label)
         if not isinstance(data, dict):
             raise LibraryError(f"{label} must be a mapping")
+        _refuse_unknown(data, _RECORD_KEYS, label, _TAGS_HINT)
         if data.get("asset") != asset:
             raise LibraryError(
                 f"{label}: its asset field {display(str(data.get('asset')))!r} does not match "
@@ -527,6 +532,8 @@ class Library:
         perpetual: bool,
         music: str,
         said_by: str,
+        subject: str,
+        subject_proof: str = "",
         platform_code: tuple[str, date] | None = None,
         evidence_hash: str = "",
         sightings: list[str] | None = None,
@@ -557,6 +564,8 @@ class Library:
                     said_by=said_by,
                     evidence_hash=evidence_hash,
                     sightings=tuple(chosen),
+                    subject=subject,
+                    subject_proof=subject_proof,
                 )
             except ValueError as exc:
                 raise LibraryError(str(exc)) from exc
@@ -618,6 +627,13 @@ def _load_yaml(raw: bytes, label: str) -> Any:
     except RecursionError:
         raise LibraryError(f"{label} is nested too deeply to read") from None
     return {} if data is None else data
+
+
+def _refuse_unknown(data: dict[Any, Any], known: frozenset[str], label: str, hint: str) -> None:
+    """Writers keep only known fields, so an unknown one would be deleted on the next write."""
+    for key in data:
+        if key not in known:
+            raise LibraryError(f"{label}: unknown field {key!r}; {hint}")
 
 
 def _default(value: Any, default: Any) -> Any:

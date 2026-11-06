@@ -13,6 +13,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
+  `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
+  subject is the person shown in the media other than whoever said yes. Only
+  `none-shown` and `agreed` clear; `check` says `subject-unknown` otherwise, and
+  `said_by` never stands in. `show` prints the subject and proof. Deals approved
+  before this keep their approval and fail only with `subject-unknown`. Engines
+  older than this release drop the subject keys on rewrite, so upgrade every
+  install that touches a business's records together.
+
 - `mb machine update [--json]` (draft): a plan for updating this one machine,
   with no business repo needed. It runs only root-owned system tools from a
   fixed list (which may touch their own caches) and changes no packages or
@@ -26,6 +35,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   Omarchy and Pro backends are tested with fakes, not on real hosts.
 ### Fixed
 
+- `mb library` now refuses a field it does not know in a record, a deal or the
+  library config, by name, and leaves the file as it was. `deal propose`,
+  `deal approve`, `deal revoke` and `source add` used to write the file back
+  without that field, which silently deleted hand-entered data. Put
+  business-only facts in `tags`. Closes #1318.
 - The checks-and-review guide now shows the real repair flow,
   `mb doctor repair --plan` then `mb doctor repair --apply`. It no longer
   mentions `--yes`, which that command does not accept.

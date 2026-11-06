@@ -29,10 +29,34 @@ PLATFORMS = (
     "snapchat",
 )
 MUSIC = ("original", "licensed", "none", "unknown")
+SUBJECTS = ("none-shown", "agreed", "unknown")
 STATES = ("proposed", "approved", "revoked")
 PROVENANCE = ("own", "licensed", "third_party", "unknown")
 CLEARABLE_PROVENANCE = ("own", "licensed")
 
+DEAL_KEYS = frozenset(
+    {
+        "id",
+        "uses",
+        "platforms",
+        "from",
+        "to",
+        "perpetual",
+        "music",
+        "platform_code",
+        "said_by",
+        "evidence_hash",
+        "sightings",
+        "subject",
+        "subject_proof",
+        "state",
+        "approved_by",
+        "approved_at",
+        "approval_hash",
+        "revoked_reason",
+        "revoked_at",
+    }
+)
 _DEAL_ID = re.compile(r"[0-9a-f]{8}")
 _UNAPPROVED_FIELDS = frozenset(
     {"state", "approved_by", "approved_at", "approval_hash", "revoked_reason", "revoked_at"}
@@ -67,6 +91,8 @@ class Deal:
     said_by: str
     evidence_hash: str
     sightings: tuple[str, ...]
+    subject: str = "unknown"
+    subject_proof: str = ""
     state: str = "proposed"
     approved_by: str = ""
     approved_at: str = ""
@@ -85,6 +111,13 @@ class Deal:
         _closed("platform", self.platforms, PLATFORMS)
         _closed("music", (self.music,), MUSIC)
         _closed("state", (self.state,), STATES)
+        _closed("subject", (self.subject,), SUBJECTS)
+        if self.subject == "agreed" and not self.subject_proof.strip():
+            raise ValueError(
+                "subject agreed needs a proof location: where the proof sits, never a name"
+            )
+        if self.subject != "agreed" and self.subject_proof:
+            raise ValueError("a subject proof location goes with subject agreed only")
         if self.platform_code is not None:
             _closed("platform", (self.platform_code[0],), PLATFORMS)
         if not self.uses:
@@ -129,6 +162,13 @@ class Deal:
         code = None
         if self.platform_code is not None:
             code = {"platform": self.platform_code[0], "expires": self.platform_code[1].isoformat()}
+        # Subject keys are left out while the subject is unknown, so a deal approved
+        # before they existed keeps the hash it was approved under.
+        subject = (
+            {}
+            if self.subject == "unknown"
+            else {"subject": self.subject, "subject_proof": self.subject_proof}
+        )
         return {
             "id": self.id,
             "uses": list(self.uses),
@@ -141,6 +181,7 @@ class Deal:
             "said_by": self.said_by,
             "evidence_hash": self.evidence_hash,
             "sightings": list(self.sightings),
+            **subject,
             "state": self.state,
             "approved_by": self.approved_by,
             "approved_at": self.approved_at,
@@ -154,6 +195,9 @@ class Deal:
         """Build a deal from a record. Types are checked, never coerced."""
         if not isinstance(raw, dict):
             raise ValueError("deal record is malformed: a deal must be a mapping")
+        for key in raw:
+            if key not in DEAL_KEYS:
+                raise ValueError(f"deal has unknown field {key!r}; put business-only facts in tags")
         try:
             code = raw.get("platform_code")
             to_raw = raw.get("to")
@@ -169,6 +213,8 @@ class Deal:
                 said_by=_text(raw, "said_by"),
                 evidence_hash=_text(raw, "evidence_hash", default=""),
                 sightings=_texts(raw, "sightings"),
+                subject=_text(raw, "subject", default="unknown"),
+                subject_proof=_text(raw, "subject_proof", default=""),
                 state=_text(raw, "state", default="proposed"),
                 approved_by=_text(raw, "approved_by", default=""),
                 approved_at=_stamp(raw, "approved_at"),
@@ -236,6 +282,11 @@ def _platform_code(code: Any) -> tuple[str, date] | None:
         return None
     if not isinstance(code, dict) or not isinstance(code.get("platform"), str):
         raise ValueError("deal field platform_code must be a mapping with a text platform")
+    for key in code:
+        if key not in ("platform", "expires"):
+            raise ValueError(
+                f"deal platform_code has unknown field {key!r}; put business-only facts in tags"
+            )
     return (code["platform"], _to_date(code["expires"]))
 
 
@@ -310,6 +361,8 @@ def _deal_reasons(
         reasons.append("outside-window")
     if deal.music == "unknown":
         reasons.append("music-unknown")
+    if deal.subject == "unknown":
+        reasons.append("subject-unknown")
     reasons.extend(_platform_code_reasons(deal, provenance, use, end))
     return sorted(reasons)
 

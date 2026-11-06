@@ -244,6 +244,8 @@ def propose_args(asset: str, said_by: str) -> list[str]:
         "none",
         "--said-by",
         said_by,
+        "--subject",
+        "none-shown",
     ]
 
 
@@ -294,6 +296,7 @@ def test_a_deal_that_would_exceed_the_entry_limit_is_refused_and_the_old_one_kep
                 perpetual=False,
                 music="none",
                 said_by="Rowan Vale",
+                subject="none-shown",
             )
         except files.LibraryError as exc:
             assert "too many entries" in str(exc)

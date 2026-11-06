@@ -17,7 +17,7 @@ mb library find --for paid-ad --platform meta --from 2026-12-01 --to 2026-12-15
 mb library show <full asset id>                # every sighting, provenance, tags, deals
 mb library check <full asset id> --use paid-ad --platform tiktok --from 2026-12-10 --to 2026-12-20
 mb library deal propose <id> --use paid-ad --platform meta --from 2026-12-01 --to 2026-12-31 \
-    --music original --said-by "Rowan Vale, email 2026-10-02"
+    --music original --said-by "Rowan Vale, email 2026-10-02" --subject none-shown
 mb library deal approve <deal id>              # a person at a terminal types the deal id
 mb library deal revoke <deal id> --reason "creator withdrew"
 ```
@@ -53,8 +53,30 @@ A sighting is cleared only when all of these hold:
 - the whole `--from`..`--to` window sits inside the deal, ends included, using
   the business timezone (default UTC; `timezone:` in the config);
 - the deal states where the music came from (`unknown` is not cleared);
+- the deal states whether the person shown agreed (see below); `unknown` is not
+  cleared, and the reason `check` prints is `subject-unknown`;
 - for licensed paid ads, a platform code for that platform that does not expire
   inside the window (record the platform and expiry, never the code itself).
+
+The **subject** is a person shown in the media other than whoever said yes: a
+client, customer or guest. `deal propose` needs `--subject`:
+
+- `none-shown`: no one is shown, so nothing needs agreeing;
+- `agreed`: the subject agreed, with `--subject-proof "<where the proof sits>"`,
+  for example `signed release, Releases/2026-10`. Say where it is, never who
+  they are;
+- `unknown`: not known yet. This never clears.
+
+The deal's uses, platforms and window are the scope the subject agreed to, so if
+a client agreed to organic posts only, propose a deal limited to organic posts.
+The creator's okay never covers the person shown: `said_by` is not read for the
+subject, so a photographer saying yes does not clear a photo of their client.
+The subject and the proof are terms of the deal; editing them after approval
+removes the approval. A deal approved before this field existed keeps its
+approval and shows as not cleared with `subject-unknown` until a new deal states
+the subject. While the subject is `unknown` the keys are not written to the
+record. An engine older than this one drops the subject keys when it rewrites a
+record, so upgrade every install that touches a business's records together.
 
 Tags and creator never change the answer. A proposed deal clears nothing. Editing
 an approved deal's terms removes its approval, and so does changing the asset
@@ -101,7 +123,11 @@ keeps saying so.
   `creator: 0`, `deals: false` or `sources: false` are refused, not read as empty.
   The same goes for the whole file: an empty or null file reads as an empty
   mapping, but a file that is only `false`, `0`, `[]` or `''` is refused as not
-  a mapping. A value the YAML reader cannot build (an impossible date, a number
+  a mapping. A field the library does not know, in a record, in a deal or in the
+  config, is refused by name, and the file is left as it was, because every
+  command that writes a record writes back only the fields it knows and would
+  delete the rest. Put business-only facts in `tags`; they are searchable and
+  never change the answer. A value the YAML reader cannot build (an impossible date, a number
   of thousands of digits) is refused by name, and a `records_dir` with a NUL
   character is refused.
   A file over 1 MiB is refused without reading past the limit. YAML aliases

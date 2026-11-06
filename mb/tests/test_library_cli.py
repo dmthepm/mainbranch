@@ -115,7 +115,7 @@ def test_a_whole_session_from_source_to_cleared(shop):
     out = run(
         "deal", "propose", POUR_ID, "--use", "paid-ad", "--platform", "meta",
         "--from", "2026-12-01", "--to", "2026-12-31", "--music", "original",
-        "--said-by", "Rowan Vale, email 2026-10-02",
+        "--said-by", "Rowan Vale, email 2026-10-02", "--subject", "none-shown",
     )  # fmt: skip
     assert out.exit_code == 0, out.output
     deal_id = out.output.split("deal ")[1].split()[0]

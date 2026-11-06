@@ -53,6 +53,7 @@ def propose(lib: store.Library, asset: str, **over: Any) -> rights.Deal:
         "perpetual": False,
         "music": "original",
         "said_by": "Rowan Vale, email 2026-10-02",
+        "subject": "none-shown",
     }
     terms.update(over)
     return lib.propose_deal(asset, **terms)
@@ -134,7 +135,7 @@ def test_creator_said_by_and_error_paths_are_escaped_too(
         app,
         ["library", "deal", "propose", asset, "--use", "paid-ad", "--platform", "meta",
          "--from", "2026-12-01", "--to", "2026-12-31", "--said-by", "x",
-         "--sighting", "studio:no\nFORGED: CLEARED.jpg"],
+         "--subject", "none-shown", "--sighting", "studio:no\nFORGED: CLEARED.jpg"],
         color=True,
     )  # fmt: skip
     for out in (shown, bad):
