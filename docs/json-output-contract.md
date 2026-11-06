@@ -654,9 +654,14 @@ Exit precedence is errors (2), failed checks (1), incomplete baseline
 verification (3), then verified baseline checks (0). `ok` is true only for
 exit 0. A completed check run has `result_status: ok`, including exits 1 and
 3; an internal error has `result_status: error`, coded `errors`, and empty
-`checks`. This first slice only checks `host.os-release`; no manifest is
-loaded, `manifest.source` is `none`, and a passing platform check still exits
-3 with `manifest.reason: no_manifest`. It does not verify machine health.
+`checks`. `--manifest <path>` selects a manifest file; otherwise
+`/etc/mainbranch/machine.json` is used. `manifest.source` is `default_path`,
+`caller_selected`, or `none` when no manifest exists (`manifest.reason:
+no_manifest`). A caller-selected manifest is reported with reason
+`caller_selected_policy`, because its trust is not verified. An invalid manifest
+exits 2 with error `manifest.invalid`, and a manifest that fails its integrity
+check exits 1. A run that would otherwise pass still exits 3, because the
+baseline verification stays incomplete. Doctor does not verify machine health.
 
 ## Machine update
 

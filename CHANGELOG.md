@@ -24,6 +24,21 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   is never reported as "no updates". Plain Arch and unknown systems report NOT
   VERIFIED. `--apply` is refused until the owner-run apply exists. The macOS,
   Omarchy and Pro backends are tested with fakes, not on real hosts.
+### Fixed
+
+- The checks-and-review guide now shows the real repair flow,
+  `mb doctor repair --plan` then `mb doctor repair --apply`. It no longer
+  mentions `--yes`, which that command does not accept.
+- `/mb-setup` no longer creates `~/.config/vip/env.sh` or adds a line to the
+  user's shell startup file on first run. Optional tool setup goes through
+  `mb connect`. An existing `env.sh` keeps working and is not migrated.
+- CONTRIBUTING no longer tells contributors to stop when a change spans skills,
+  tools, CI and docs. It keeps "one concern per PR" and points at AGENTS.md.
+- The machine doctor skill, JSON contract and docs index no longer say there is
+  no manifest support. They describe `mb machine doctor --manifest`, the default
+  manifest path, and why a run still ends as incomplete verification (exit 3).
+- The README's "preview before every save" now names its one bounded exception:
+  `/mb-grow` log entries the owner approved in `autonomy.md`.
 
 ## [0.6.22] - 2026-11-06
 

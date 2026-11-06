@@ -19,7 +19,11 @@ Run `mb machine doctor` first for the current account's read-only baseline.
 Use `mb machine doctor --json` when structured results are needed. Exit 3 means
 incomplete verification, not failed verification. Exit 1 means a failed check;
 exit 2 means no verdict. Report NOT VERIFIED rows and their reasons. This first
-release has no manifest support, so a run cannot establish full machine health.
+release reads a machine manifest from `/etc/mainbranch/machine.json`, or the
+file given with `--manifest`. A manifest from `--manifest` is reported as
+caller-selected, so its trust is not verified. Without a manifest the run says
+so. Either way, doctor still exits 3 at best, so a run cannot establish full
+machine health.
 The maintenance rows below still cover checks outside doctor's current scope.
 
 ## Pick the job

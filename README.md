@@ -22,7 +22,8 @@ starts from what you decided, not from a blank chat.
 - Proposals you approve, edit, or reject. Nothing publishes, spends, or contacts
   a customer without your say.
 - Decisions and lessons saved as files, so the next session reads them.
-- Readable saved history in git, with a preview before every save.
+- Readable saved history in git, with a preview before every save. The one bounded exception: `/mb-grow` log
+  entries the owner approved in `autonomy.md`.
 
 ## Try it
 
