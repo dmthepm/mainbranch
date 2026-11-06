@@ -108,6 +108,33 @@ def test_exec_names_dropped_variables_on_stderr(
         assert value not in result.output
 
 
+def test_exec_does_not_print_a_dropped_name_that_looks_like_a_credential(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret_shaped = "sk_test_SyntheticAlphabeticCredential"
+    monkeypatch.setenv(secret_shaped, "1")
+    monkeypatch.setenv("ACME_ACCOUNT_ID", "1")
+    result = invoke(repo, "exec", "--", sys.executable, "-c", "pass")
+    assert result.exit_code == 0, result.output
+    assert secret_shaped not in result.output
+    assert "ACME_ACCOUNT_ID" in result.stderr
+    assert re.search(r"\d+ more not listed", result.stderr)
+
+
+def test_exec_does_not_print_a_dropped_name_that_holds_the_released_credential(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = "rowanvaleplaintoken1"
+    target = tmp_path / "repo"
+    target.mkdir()
+    connect.connect_provider("cloudflare", repo=target, token=token)
+    monkeypatch.setenv(token, "1")
+    result = invoke(target, "exec", "--", sys.executable, "-c", "pass")
+    assert result.exit_code == 0, result.output
+    assert token not in result.output
+    assert re.search(r"\d+ more not listed", result.stderr)
+
+
 def test_exec_says_nothing_when_nothing_is_dropped(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

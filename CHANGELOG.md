@@ -29,7 +29,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - Machine doctor accepts schema-valid suffixes in Tailscale minimum and installed
   versions, comparing their numeric major, minor, and patch components.
 - `mb connect exec` prints the names of the environment variables it drops from
-  the child, never their values, and points at `--keep-env`.
+  the child, never their values, and points at `--keep-env`. A name that looks
+  like a credential, or contains the released one, is counted ("N more not
+  listed") instead of printed. The check is a shape check: a short password used
+  as a variable name can still pass it.
 
 ### Security
 

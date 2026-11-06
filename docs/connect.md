@@ -88,6 +88,12 @@ Use repeatable `--keep-env NAME` to retain other named variables, or
 `--keep-env` accepts shell variable names and refuses the provider variable
 with `exec_env_conflict`; use `--env NAME` to choose that variable.
 
+On stderr, `exec` lists the names (never values) of the variables it dropped, so
+you know what to pass to `--keep-env`. A name that looks like a credential, or
+contains the released one, is counted as "N more not listed" instead. This is a
+shape check, not a guarantee: a short password that someone used as a variable
+name can look ordinary and be printed.
+
 This is the path agents and scripts should use. What the command prints is
 still the command's business: avoid commands that echo their environment.
 

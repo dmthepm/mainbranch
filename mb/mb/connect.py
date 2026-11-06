@@ -4521,14 +4521,25 @@ def _exec_with_secret(
         or key.startswith("LC_")
         or key in (keep_env or [])
     }
-    # Names only, and only plain variable names: a value, or an oddly shaped
-    # name, could itself be sensitive.
-    dropped = sorted(
-        key for key in os.environ if key not in env and key != name and ENV_NAME_RE.fullmatch(key)
-    )
+    # Names only, never values. A name can itself be a credential, so it is
+    # listed only when it passes the same display check as any echoed input and
+    # does not contain the released token; the rest are counted.
+    dropped = sorted(key for key in os.environ if key not in env and key != name)
+    listed = [
+        key
+        for key in dropped
+        if ENV_NAME_RE.fullmatch(key)
+        and echoable_input(key)
+        and result["token"] not in key
+        and key not in result["token"]
+    ]
     if dropped:
+        unlisted = len(dropped) - len(listed)
+        names = ", ".join(listed)
+        if unlisted:
+            names += f"{', ' if names else ''}{unlisted} more not listed"
         print(
-            f"mb connect exec: dropped from the child environment: {', '.join(dropped)}. "
+            f"mb connect exec: dropped from the child environment: {names}. "
             "Name any it needs with --keep-env.",
             file=sys.stderr,
         )
