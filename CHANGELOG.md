@@ -11,6 +11,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- The checks-and-review guide now shows the real repair flow,
+  `mb doctor repair --plan` then `mb doctor repair --apply`. It no longer
+  mentions `--yes`, which that command does not accept.
+
 ## [0.6.22] - 2026-11-06
 
 ### Breaking
