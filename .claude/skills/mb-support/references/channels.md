@@ -13,14 +13,16 @@ community chat below are examples only.
 | chat | the store's Messaging and Inbox | the owner | store access the owner granted | read; reply asks |
 | voicemail | the phone provider's inbox | the owner | none | the owner logs by hand |
 | text | the business phone's messages | the owner | none | the owner logs by hand |
-| community chat | the group the business runs | a named moderator | none | read only; reply asks |
+| community chat | the group the business runs | the moderator role | none | read only; reply asks |
 ```
 
 ## Columns
 
 - **Channel**: the name the business uses.
 - **Where it lives**: the provider or app that holds the conversations.
-- **Who owns replies**: a person, never "the agent".
+- **Who owns replies**: a role label (owner, support lead, moderator), never
+  "the agent". Prefer the role over a person's name, so no private identity is
+  committed.
 - **Read route**: how the agent reads it (an `mb connect` provider, a granted
   store access). Write `none` if there is no way to read it.
 - **Read or reply**: what the agent may do there. Reading is one permission;

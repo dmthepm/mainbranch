@@ -24,7 +24,10 @@ Check: 2026-11-04 08:00, 2 new, 3 open
   one table; a chat case has the same promise, due date, approval and proof as
   an email case.
 - **Conversations**: every conversation the case covers, as provider ids only
-  (a thread id, a chat id). No names or addresses. One customer asking twice, or
+  (a thread id, a chat id). No names or addresses. Only opaque, nonpersonal ids
+  are saved. If the provider's id is an email address, a phone number or an
+  identifying handle, stop and ask the owner for a safe provider-side reference;
+  never save that value. One customer asking twice, or
   on two channels, is one case with several ids. The repo keeps only the link;
   the agent matches by reading the providers.
 - **Asked**: the customer's request in a few words. No personal detail.
@@ -64,6 +67,15 @@ it and sit in a different place with different readers.
   (conversations, asked, promised, due, approved, proof, status). The same
   rules apply: provider ids only, no names, addresses or message bodies.
 - Write only what everyone with tracker access may see. Assume it is shared.
+  The id rule above applies to item titles and every field: title an item with
+  the case id, never a name, address, phone number or handle.
+- Every step reads the tracker: handling, matching, role startup and the weekly
+  review. Search it for the same request before opening an item.
+- If the tracker cannot be read, the gap is stated in the check and the review
+  ("tracker: unreadable since <time>"). It is never treated as no cases, and
+  nothing is copied into `state/` to fill the gap.
+- Before any tracker write, check whether it notifies a customer. If it does,
+  or you cannot tell, it is a send.
 - `state/support/cases.md` then holds the `Check:` lines and the tracker's name,
   and no case rows.
 - Where the tracker syncs with a mail thread, a comment there may email the

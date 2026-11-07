@@ -1,4 +1,8 @@
-"""Acceptance checks for the support skill's case, channel and tracker rules."""
+"""Prose contract checks for the support skill's case, channel and tracker rules.
+
+These assert that the skill text says what it must. They do not run an agent or
+a provider, so they prove nothing about runtime behaviour.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +15,9 @@ SKILL_DIR = ROOT / ".claude/skills/mb-support"
 SKILL = SKILL_DIR / "SKILL.md"
 CASES = SKILL_DIR / "references/cases.md"
 CHANNELS = SKILL_DIR / "references/channels.md"
+EXAMPLES = SKILL_DIR / "references/examples.md"
+REVIEW = SKILL_DIR / "references/review-the-week.md"
+ROLE = SKILL_DIR / "references/role-card.md"
 SETUP = SKILL_DIR / "references/setup.md"
 
 
@@ -83,3 +90,41 @@ def test_synced_tracker_comment_that_emails_is_a_send() -> None:
 
 def test_setup_creates_the_channels_register() -> None:
     assert "channels.md" in _flat(SETUP)
+
+
+def test_tracker_is_the_case_log_for_every_step() -> None:
+    assert "The tracker is then the one place" in _flat(SKILL)
+    assert "Search the tracker before opening an item" in _flat(SKILL)
+    assert "tracker it names" in _flat(REVIEW)
+    assert "tracker it names" in _flat(ROLE)
+    assert "never treated as no cases" in _flat(CASES)
+    assert "never treated as no cases" in _flat(REVIEW)
+
+
+def test_only_opaque_ids_are_saved() -> None:
+    for text in (_flat(SKILL), _flat(CASES)):
+        assert "opaque, nonpersonal" in text
+        assert "safe provider-side reference" in text
+    assert "tracker titles" in _flat(SKILL)
+    assert "never a name, address, phone number or handle" in _flat(CASES)
+
+
+def test_tracker_write_checks_for_customer_notification() -> None:
+    assert "whether it notifies the customer" in _flat(SKILL)
+    assert "treat it as a send" in _flat(SKILL)
+
+
+def test_channels_register_prefers_role_labels() -> None:
+    assert "role label" in _flat(CHANNELS)
+
+
+def test_worked_examples_cover_each_scenario() -> None:
+    examples = _flat(EXAMPLES)
+    assert "references/examples.md" in _flat(SKILL)
+    for heading in (
+        "Same request on two channels",
+        "An unsure match",
+        "A tracker case",
+    ):
+        assert heading in examples
+    assert "Invented for illustration" in examples
