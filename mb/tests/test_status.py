@@ -2737,10 +2737,7 @@ def test_status_names_integration_repairs(tmp_path: Path, monkeypatch) -> None:
     payload = json.loads(json_result.stdout)
     assert payload["integrations"]["providers"][0]["state"] == "missing_secret"
     assert any(item["id"] == "unhealthy_integrations" for item in payload["drift"]["items"])
-    assert any(
-        "mb connect cloudflare --token-stdin" in action
-        for action in payload["readiness"]["next_actions"]
-    )
+    assert any("mb connect cloudflare" in action for action in payload["readiness"]["next_actions"])
     assert any(
         action["id"] == "repair_unhealthy_integrations" for action in payload["ranked_actions"]
     )
@@ -2749,7 +2746,7 @@ def test_status_names_integration_repairs(tmp_path: Path, monkeypatch) -> None:
 
     assert human_result.exit_code == 0
     assert "cloudflare: missing_secret" in human_result.stdout
-    assert "mb connect cloudflare --token-stdin" in human_result.stdout
+    assert "mb connect cloudflare" in human_result.stdout
 
 
 def test_status_drift_aligns_unhealthy_integrations_with_readiness(

@@ -516,10 +516,12 @@ def _reconnect_command(
     can be read, and ``--oauth --reauth --client-file ...`` when it cannot,
     since ``--reauth`` alone is then refused. Only a legacy access-token entry
     keeps ``--token-stdin``, the one path that replaces that token in place.
+    Every other provider's step is the plain connect command: an owner at a
+    terminal gets the hidden prompt, and ``--token-stdin`` is for piped use.
     """
 
     if provider.id != "google":
-        return _connect_command(provider, token_stdin=True)
+        return _connect_command(provider)
     if _entry_records_slot(entry, GOOGLE_OAUTH_GRANT_SLOT):
         from mb import google_connect
 
@@ -536,7 +538,7 @@ def _reconnect_step(provider: Provider, google_sign_in: bool) -> str:
 
     if google_sign_in:
         return f"sign in with `{GOOGLE_SIGN_IN_COMMAND}`"
-    return f"reconnect with `{_connect_command(provider, token_stdin=True)}`"
+    return f"reconnect with `{_connect_command(provider)}`"
 
 
 def _safe_identity_metadata(metadata: dict[str, Any]) -> dict[str, str]:
@@ -1495,7 +1497,7 @@ def _repair(
 
 
 def _meta_repair(state: str, missing: list[str] | None = None) -> dict[str, str]:
-    connect_command = "mb connect meta --token-stdin --metadata ad_account_id=<act_id>"
+    connect_command = "mb connect meta --metadata ad_account_id=<act_id>"
     install_command = "pipx install --python <python3.12-or-newer> meta-ads"
     if state == "wrong_python":
         return {
@@ -1945,7 +1947,7 @@ def _parse_metadata(pairs: list[str]) -> dict[str, str]:
                 "metadata_secret_value",
                 f"metadata value for {quoted_input(key)} (--metadata argument {position}) "
                 f"looks like a secret (rule: {rule}). "
-                "Nothing was stored. Pass the credential with --token-stdin; "
+                "Nothing was stored. Enter the credential at the hidden prompt; "
                 "metadata holds labels and ids only.",
             )
         key_rule = metadata_value_rule(key)
@@ -1954,7 +1956,7 @@ def _parse_metadata(pairs: list[str]) -> dict[str, str]:
                 "metadata_secret_key",
                 f"metadata key {HIDDEN_INPUT} (--metadata argument {position}) "
                 f"looks like a secret (rule: {key_rule}). "
-                "Nothing was stored. Pass the credential with --token-stdin; "
+                "Nothing was stored. Enter the credential at the hidden prompt; "
                 "metadata keys are names such as zone_id.",
             )
         metadata[key] = value
@@ -3404,9 +3406,7 @@ def _hydrate_locked(target: Path, repo: str | Path, provider_id: str) -> dict[st
         "missing": missing,
         "statuses": statuses,
         "safe_to_share": True,
-        "repair_command": ""
-        if hydrated
-        else "mb connect <provider> --scope user --token-stdin --repo .",
+        "repair_command": "" if hydrated else "mb connect <provider> --scope user --repo .",
     }
 
 
@@ -4842,7 +4842,7 @@ def rotate_provider(
             f"{provider.name} has no recorded source, so Main Branch does not know where "
             "to read the new credential from. Record one with "
             f"`mb connect {provider.id} --source op://vault/item/field`, or reconnect "
-            f"the new credential with `{_connect_command(provider, token_stdin=True)}`.",
+            f"the new credential with `{_reconnect_command(provider, entry)}`.",
         )
     if not source.startswith(ONEPASSWORD_REF_PREFIX):
         _refuse(
@@ -6174,7 +6174,7 @@ def _walk_json_for_secrets(
                             "mask": f"••• ({len(value)} chars)",
                             "remediation": (
                                 "move the value into the OS keychain "
-                                "(`mb connect <provider> --token-stdin`), run the command "
+                                "(`mb connect <provider>`), run the command "
                                 "through `mb connect exec`, then reference it as "
                                 "${ENV_VAR} in this config"
                             ),

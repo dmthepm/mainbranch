@@ -44,8 +44,10 @@ adapter; new connections record the native backend name.
 
 The public `--token` option remains as deprecated input compatibility. A value
 supplied there is visible in the caller's process arguments. Main Branch never
-uses that option in generated commands or internal helper invocation; use
-`--token-stdin` for real credentials.
+uses that option in generated commands or internal helper invocation. At a
+terminal, run `mb connect <provider>` and enter the credential at the hidden
+prompt; hints name that plain command. Use `--token-stdin` for piped use, such
+as a secret manager's output.
 
 ## Using a Credential: `exec`
 

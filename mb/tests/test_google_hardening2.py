@@ -432,13 +432,11 @@ def test_a_legacy_access_token_entry_keeps_token_stdin(repo: Path) -> None:
     assert payload["repair_command"] == "mb connect google --token-stdin"
 
 
-def test_other_providers_keep_token_stdin(repo: Path) -> None:
+def test_other_providers_name_the_plain_connect_command(repo: Path) -> None:
     result = runner.invoke(app, ["connect", "test", "stripe", "--repo", str(repo), "--json"])
 
     assert result.exit_code == 1
-    assert json.loads(result.stdout)["status"]["repair_command"] == (
-        "mb connect stripe --token-stdin"
-    )
+    assert json.loads(result.stdout)["status"]["repair_command"] == ("mb connect stripe")
 
 
 # --- N3. The authorization-code wording -----------------------------------------------------
@@ -464,7 +462,7 @@ def _stripe_check(monkeypatch: pytest.MonkeyPatch, *, ok: bool) -> None:
             "provider_verified": ok,
             "summary": "Stripe accepted the key." if ok else "Stripe refused the key.",
             "repair": "" if ok else "Replace the key.",
-            "repair_command": "" if ok else "mb connect stripe --token-stdin",
+            "repair_command": "" if ok else "mb connect stripe",
             "safe_to_share": True,
         }
 
@@ -493,7 +491,7 @@ def test_another_providers_check_is_not_recorded_into_a_tracked_config(
     plain = _plain(human.stdout)
     assert "mb connect test stripe: warn (invalid)" in plain
     assert "recorded: no (.mb/connect.yaml is tracked by git" in plain
-    assert "next: mb connect stripe --token-stdin" in plain
+    assert "next: mb connect stripe" in plain
     assert _yaml(repo) == before
     assert _git_status(repo) == ""
     assert STRIPE_SENTINEL not in human.output + as_json.output + _yaml(repo)
@@ -806,3 +804,11 @@ def test_every_stored_grant_state_names_a_next_step_that_is_not_refused(
     text = "\n".join(seen) + _yaml(repo)
     assert GRANT_SENTINEL not in text
     _assert_never_shown(text)
+
+
+def test_a_repair_step_is_the_plain_command_so_an_owner_gets_the_hidden_prompt() -> None:
+    """`--token-stdin` is for piped use; the one reviewed exception is a legacy Google token."""
+    for provider_id in ("stripe", "cloudflare", "meta"):
+        provider = connect_mod.resolve_provider(provider_id, Path("."))
+        assert connect_mod._reconnect_command(provider) == f"mb connect {provider_id}"
+        assert "--token-stdin" not in connect_mod._reconnect_step(provider, False)

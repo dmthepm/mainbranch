@@ -82,6 +82,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- Connect repair hints name one wording for an owner at a terminal: the plain
+  `mb connect <provider>`, which opens the hidden prompt, in `status`, `doctor`,
+  `plan`, `test`, `exec`, `token`, `rotate` and the Meta and metadata refusals.
+  `--token-stdin` stays for piped use, and a legacy Google access-token
+  connection still names it. Closes #1333.
 - `mb library source add` now holds a lock from reading the library config to
   writing it, and reads the config again once it has the lock. Before, a library
   opened before another `source add` finished could write that source away while
