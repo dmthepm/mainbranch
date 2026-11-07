@@ -75,9 +75,13 @@ payload runs to hundreds of KB; the summary is a few KB and implies `--json
 `generated_at`, `ranked_actions` (`id`, `title`, `command`, `priority`,
 `reason`), `readiness` (`level`, `score`, `summary`, `failing_checks`,
 `business_memory`), `save` (`branch`, `dirty_count`, `ahead`, `behind`,
-`summary`), `update` (`installed`, `latest`, `severity`, `command`), and
-`full_status`, the command that returns everything. Text fields are clipped to
-200 characters. A test caps the summary on the dogfood fixture. Read the full
+`summary`), `update` (`installed`, `latest`, `severity`, `command`),
+`runtime.codex_cli.status` and `drift.items[]` (`id`, `severity`, `summary`,
+`repair`; warn and error only), the same field paths as the full payload so one
+stop rule reads both, and `full_status`, the command that returns everything. Text fields are clipped to
+200 characters; commands are never clipped. Over a byte budget, `repair` is dropped
+from every drift item (ids stay) and `drift.repair_omitted` points at the full
+command. A test caps the summary on the dogfood fixture. Read the full
 payload only for a section the summary does not carry.
 
 `mb status --json` includes a `money_path` section for read-only business-path

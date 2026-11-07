@@ -37,12 +37,12 @@ equals `codex_runtime_mb_mismatch`. Treat that as a runtime `mb` mismatch: tell
 the operator to fix the runtime/login-shell PATH and rerun read-only checks
 before Main Branch advice, repair planning, or writes.
 
-Use `mb status --json --peek` as the default daily briefing before routing the
-operator (readiness, drift, update state, provider signals, recent work, MoneyPath,
-ranked actions, bets, pushes, checkpoint state). It is large; `mb status --summary`
-is the few-KB first look (ranked actions, readiness, save and update state, warn and
-error drift, `runtime.codex_cli`), and the same stop rules apply to it. Run the full
-command when the summary is not enough.
+Start with `mb status --summary` as the daily briefing: a few KB with ranked
+actions, readiness, save and update state, and warn and error drift. It carries the
+same `runtime.codex_cli.status` and `drift.items[].id` fields as the full payload, so
+the stop rules above apply to it unchanged. Run `mb status --json --peek` (large:
+recent work, MoneyPath, bets, pushes, checkpoint state) only when the summary is not
+enough; if the summary says `repair_omitted`, run it for the repair steps.
 Do not replace those facts with ad hoc shell inspection unless `mb` says a section is unavailable.
 
 Read-only commands can be run without asking first. Commands that write files,

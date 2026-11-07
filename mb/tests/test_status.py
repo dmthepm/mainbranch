@@ -4587,8 +4587,8 @@ def test_status_summary_keeps_the_codex_runtime_mismatch_stop(tmp_path: Path, mo
     report = status_mod.run(path=str(repo), update_marker=False)
     summary = status_mod.summarize(report, repo)
 
-    assert summary["runtime"]["codex_cli"] == "runtime_mismatch"
-    finding = next(i for i in summary["drift"] if i["id"] == "codex_runtime_mb_mismatch")
+    assert summary["runtime"]["codex_cli"]["status"] == "runtime_mismatch"
+    finding = next(i for i in summary["drift"]["items"] if i["id"] == "codex_runtime_mb_mismatch")
     assert "login-shell PATH" in finding["repair"]
 
 
@@ -4606,3 +4606,31 @@ def test_status_summary_keeps_commands_whole(tmp_path: Path) -> None:
     assert summary["ranked_actions"][0]["command"] == command
     assert summary["update"]["command"] == command
     assert len(summary["ranked_actions"][0]["title"]) <= status_mod.SUMMARY_TEXT_LIMIT
+
+
+def test_status_summary_over_budget_keeps_every_drift_id_and_drops_repair(tmp_path: Path) -> None:
+    repo = tmp_path / ("a long business name " * 6)
+    repair = f"mb doctor repair --plan {shlex.quote(str(repo))} --only everything"
+    items = [
+        {"id": f"drift_{n}", "severity": "warn", "summary": "S" * 300, "repair": repair}
+        for n in range(8)
+    ]
+    report = {"drift": {"items": items}, "runtime": {"codex_cli": {"status": "runtime_mismatch"}}}
+
+    summary = status_mod.summarize(report, repo)
+
+    assert len(json.dumps(summary).encode()) <= status_mod.SUMMARY_BUDGET_BYTES
+    assert [i["id"] for i in summary["drift"]["items"]] == [i["id"] for i in items]
+    assert all(i["severity"] == "warn" for i in summary["drift"]["items"])
+    assert all("repair" not in i for i in summary["drift"]["items"])
+    assert summary["full_status"] in summary["drift"]["repair_omitted"]
+    assert summary["runtime"]["codex_cli"]["status"] == "runtime_mismatch"
+
+
+def test_status_summary_under_budget_keeps_repair(tmp_path: Path) -> None:
+    items = [{"id": "d", "severity": "error", "summary": "s", "repair": "mb fix"}]
+
+    summary = status_mod.summarize({"drift": {"items": items}}, tmp_path)
+
+    assert summary["drift"]["items"][0]["repair"] == "mb fix"
+    assert "repair_omitted" not in summary["drift"]
