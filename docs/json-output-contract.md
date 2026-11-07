@@ -68,6 +68,22 @@ status schema object, `mb doctor repair --json` keeps
 can keep a domain `status` such as `ready` while the envelope reports
 `result_status: "ok"`.
 
+`mb status --summary` is the compact view of `mb status --json` (#994). The full
+payload runs to hundreds of KB; the summary is a few KB and implies `--json
+--peek`, so it never moves the last-status-seen marker. Its envelope uses
+`result_schema.name: "mainbranch.status.summary"` and carries `ok`,
+`generated_at`, `ranked_actions` (`id`, `title`, `command`, `priority`,
+`reason`), `readiness` (`level`, `score`, `summary`, `failing_checks`,
+`business_memory`), `save` (`branch`, `dirty_count`, `ahead`, `behind`,
+`summary`), `update` (`installed`, `latest`, `severity`, `command`),
+`runtime.codex_cli.status` and `drift.items[]` (`id`, `severity`, `summary`,
+`repair`; warn and error only), the same field paths as the full payload so one
+stop rule reads both, and `full_status`, the command that returns everything. Text fields are clipped to
+200 characters; commands are never clipped. Over a byte budget, `repair` is dropped
+from every drift item (ids stay) and `drift.repair_omitted` points at the full
+command. A test caps the summary on the dogfood fixture. Read the full
+payload only for a section the summary does not carry.
+
 `mb status --json` includes a `money_path` section for read-only business-path
 readiness. It reports gated component objects for customer progress, offer,
 audience, proof, product ladder, CTA path, channel strategy, active push,
@@ -647,7 +663,8 @@ command `ok`, exit codes or launch decisions, and do not repair either source.
 `mb machine doctor --json` uses `mainbranch.machine.doctor.result` version
 `1.0`, with domain `schema: mb.machine.doctor` and `schema_version: 1`.
 `safe_to_share` is false because `run_as` includes the account name. `scope`
-is currently `self`. `checks` keeps every parsed read and its coded reason;
+is `self` (the default) or `all`, chosen with `--scope`; any other value is an
+error (exit 2). `checks` keeps every parsed read and its coded reason;
 raw probe output is never included. `summary` counts each result state.
 
 Exit precedence is errors (2), failed checks (1), incomplete baseline

@@ -13,6 +13,7 @@ import stat
 import string
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -3852,10 +3853,46 @@ def test_metadata_refuses_password_inside_url(value: str) -> None:
         "https://rowan:pw@[bad]/",
         "note: https://rowan:pw@[bad]/",
         "https://example.invalid/?next=https://rowan:pw@[bad]/",
+        # The outer URL is the one the parser rejects.
+        "https://[bad/?next=https://rowan:pw@example.invalid/",
+        "https://[bad/?next=https%3A%2F%2Frowan%3Apw%40example.invalid%2F",
     ],
 )
 def test_metadata_refuses_password_in_a_malformed_url(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+_BAD_WRAPPER = "https://[bad/?next="
+_FAKE_PASSWORD_URL = "https://rowan:pw@example.invalid/"
+
+
+# Past the nesting limit a URL is not judged, so it is refused rather than let through.
+@pytest.mark.parametrize("wrappers", [3, 4, 5, 50])
+def test_metadata_refuses_a_password_hidden_behind_many_malformed_wrappers(wrappers: int) -> None:
+    value = _BAD_WRAPPER * wrappers + _FAKE_PASSWORD_URL
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize("wrappers", [4, 5])
+def test_metadata_refuses_a_password_hidden_behind_many_parsed_wrappers(wrappers: int) -> None:
+    value = "https://example.invalid/?next=" * wrappers + _FAKE_PASSWORD_URL
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+def test_metadata_accepts_a_plain_url_with_no_nesting() -> None:
+    assert connect_mod.metadata_value_rule("https://example.invalid/shop?page=2") == ""
+
+
+def test_metadata_judges_a_long_nested_value_quickly() -> None:
+    value = _BAD_WRAPPER * 5000 + "a" * 200_000 + _FAKE_PASSWORD_URL
+    started = time.monotonic()
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+    assert time.monotonic() - started < 2
+
+
+def test_metadata_accepts_a_malformed_url_nesting_a_safe_url() -> None:
+    value = "https://[bad/?next=https://rowan@example.invalid/shop"
+    assert connect_mod.metadata_value_rule(value) == ""
 
 
 def test_metadata_accepts_url_user_without_password() -> None:

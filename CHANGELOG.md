@@ -23,6 +23,30 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `.jpeg` name: an existing file, a symlink, or the spec itself is refused, and the
   file appears whole or not at all. Long words and headings wrap, control characters
   and oversized specs are refused.
+- `mb agent check [name]` validates the `agents.json` policy and the files it names: schema,
+  card locations, profiles and the PATH list, refusing any group or world writable path
+  and any symlink on the way. Exit 0 means the policy is valid and says nothing about a
+  running agent. It launches nothing and writes no state.
+- `mb status --summary` returns ranked actions, readiness, save state and update
+  state in about 2 KB, against about 380 KB for `mb status --json --peek` on the
+  dogfood fixture. It implies `--json --peek`. `/mb-start` and the generated
+  `CLAUDE.md` and `AGENTS.md` now start there; the full payload is unchanged (#994).
+- Role hook source policy: a fresh `startup` with cards but no `MB_ROLE` keeps the STOP
+  refusal; `resume`, `clear`, `compact` and `fork` print one informational warning line
+  instead, for Claude Code and Codex. When `mb` is missing or failing, Claude Code keeps
+  that split and Codex keeps the STOP on every source. Neither is a permission boundary. A named role that cannot be loaded always keeps the STOP. The
+  Claude hook commands now declare a 20 second timeout, and `mb role codex-hook` replaces
+  or removes the hook an earlier release wrote.
+- `/mb-support` (draft): a case now lists every conversation it covers as
+  provider ids only. The agent checks open cases for the same request and reads
+  the linked conversations before opening a case or drafting a reply, asks the
+  owner when unsure, and never merges on a guess. One reply per case unless the
+  owner approves more. A new channels register (`core/support/channels.md`)
+  records where each channel lives, who owns replies and the agent's read route;
+  a channel with no read route is logged by hand and the gap is stated. Cases
+  kept in a tracker are covered, and a synced tracker comment that emails a
+  customer counts as a send.
+
 - `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
   `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
   subject is the person shown in the media other than whoever said yes. Only
@@ -45,11 +69,42 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   Omarchy and Pro backends are tested with fakes, not on real hosts.
 ### Fixed
 
+- `mb validate --paths` with no records under the named paths now says
+  "nothing to check in tools/, state/: no Main Branch records there, so this run
+  checked nothing", instead of the bare "nothing to check yet" that lanes cited
+  as a pass. The exit code is unchanged.
+- `mb connect status` no longer hangs when the audit log path is a named pipe.
+  A symlink or named pipe there is refused and history shows as unavailable.
+  Status reads only the last 4 MiB and reports history as incomplete when that
+  could hide a rebind, or when the log shrinks while it is read; `mb connect
+  audit` streams the whole log and keeps only the rows it shows. A password in a
+  URL nested inside a URL that does not parse is now caught, and a nested URL
+  too deep to inspect is refused rather than let through. `mb connect remove`
+  puts the repo metadata back when its write lands and still fails, puts
+  everything back after a read-only user-scope file or a moved metadata path
+  too, reads each restore back, and says everything was put back only when it
+  was. A refusal during removal now exits 1 with `metadata_write_failed`, not
+  exit 2. Closes #1323 and #1313.
+- `mb library deal propose`, `approve` and `revoke` now hold a lock from reading
+  a record to writing it. Before, two overlapping changes could lose one while
+  both reported success, so a revocation could vanish and `check` would clear a
+  withdrawn use. A change that cannot get the lock within a few seconds is
+  refused and writes nothing. Closes #1322.
 - `mb library` now refuses a field it does not know in a record, a deal or the
   library config, by name, and leaves the file as it was. `deal propose`,
   `deal approve`, `deal revoke` and `source add` used to write the file back
   without that field, which silently deleted hand-entered data. Put
   business-only facts in `tags`. Closes #1318.
+- Skills no longer tell users to put a key in `~/.config/vip/env.sh`, a `.env`
+  file or a shell line. Gemini, Grok, Stripe, Cloudflare and Porkbun guidance
+  and script hints now say to store it with `mb connect` and run the command
+  through `mb connect exec`. Removed `mb-site/scripts/setup_creds.sh`, which
+  wrote Cloudflare keys into `env.sh` and was referenced by nothing, and the
+  deprecated `mb-think/scripts/detect-tools.sh`. An existing `env.sh` still
+  works for anything that sources it. A test now fails if a skill points at
+  `env.sh` again. Closes #1317.
+- `docs/json-output-contract.md` said machine doctor `scope` is only `self`; the
+  CLI also accepts `all` (`--scope`), and anything else is an error (exit 2).
 - The checks-and-review guide now shows the real repair flow,
   `mb doctor repair --plan` then `mb doctor repair --apply`. It no longer
   mentions `--yes`, which that command does not accept.
