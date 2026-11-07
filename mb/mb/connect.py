@@ -2563,7 +2563,16 @@ def remove_provider(
                 undo.append(functools.partial(_restore_repo_entry, target, provider.id, repo_entry))
                 del config["providers"][provider.id]
                 _write_config(target, config)
-        except (CredentialStoreError, OSError, ConfigCorruptError) as exc:
+        except (
+            CredentialStoreError,
+            OSError,
+            ConfigCorruptError,
+            ConfigBoundaryError,
+            ConnectRefusal,
+        ) as exc:
+            # Every failure here comes after the first deletion, so a refusal
+            # (a user-scope file that turned read-only) must not skip the undo
+            # or claim that nothing was changed.
             restored = _undo_removal(undo)
             kept = (
                 "Everything was put back and read back to check."
@@ -2575,7 +2584,13 @@ def remove_provider(
                     "is missing."
                 )
             )
-            reason = exc.reason if isinstance(exc, CredentialStoreError) else "metadata"
+            reason = (
+                exc.reason
+                if isinstance(exc, CredentialStoreError)
+                else exc.rule
+                if isinstance(exc, ConnectRefusal)
+                else "metadata"
+            )
             raise MetadataWriteError(
                 f"Removing the {provider.name} connection failed ({reason}). {kept}"
             ) from None

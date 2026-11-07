@@ -311,6 +311,48 @@ def test_user_scope_restore_that_does_not_stick_makes_no_whole_state_claim(
     assert "could not be put back" in result.stderr
 
 
+def test_user_scope_refusal_after_a_credential_was_deleted_is_undone(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = connect(repo, "user")
+    repo_id = c._read_config(repo)["repo_id"]
+    before = c._user_scope_provider_entry(repo_id, "cloudflare")
+
+    def refuse(repo_id: str, provider_id: str) -> None:
+        raise c.UserScopeReadOnlyError(c._user_scope_path())
+
+    monkeypatch.setattr(c, "_remove_user_scope_provider", refuse)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert result.exit_code == 1
+    assert stored(ref)
+    assert c._user_scope_provider_entry(repo_id, "cloudflare") == before
+    assert "Everything was put back" in result.stderr
+    assert "Nothing else was changed" not in result.output
+    assert SECRET not in result.output
+
+
+def test_repo_boundary_failure_after_a_credential_was_deleted_is_undone(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = connect(repo)
+
+    def refuse(*args: Any, **kwargs: Any) -> None:
+        raise c.ConfigBoundaryError("metadata path left the repo")
+
+    monkeypatch.setattr(c, "_write_config", refuse)
+    result = remove(repo, "--yes")
+    monkeypatch.undo()
+    monkeypatch.setenv("MAINBRANCH_HOME", str(repo.parent / "home"))
+    monkeypatch.setenv("MB_CONNECT_SECRET_BACKEND", "local-file")
+    assert result.exit_code == 1
+    assert stored(ref)
+    assert "Everything was put back" in result.stderr
+    assert "cloudflare" in c._read_config(repo)["providers"]
+
+
 def test_metadata_failure_puts_the_credential_back(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
