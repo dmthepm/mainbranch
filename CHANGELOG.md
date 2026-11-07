@@ -13,6 +13,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb agent check [name]` validates the `agents.json` policy and the files it names: schema,
+  card locations, profiles and the PATH list, refusing any group or world writable path
+  and any symlink on the way. Exit 0 means the policy is valid and says nothing about a
+  running agent. It launches nothing and writes no state.
 - `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
   `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
   subject is the person shown in the media other than whoever said yes. Only
