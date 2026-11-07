@@ -35,15 +35,9 @@ _REFUSAL = (
     "could not be loaded. STOP. Do not start work and do not pick a role yourself. "
     "Tell the owner this message and ask them to fix the role setup. This session has no role."
 )
-# Codex has one command for every source, so the fallback reads the source from the stdin
-# payload. A fresh start, a named role, or any payload it cannot read as one flat object with a
-# single top-level source keeps the STOP; only a resumed, cleared, compacted or forked session
-# with no role gets one informational line. No single quotes in here.
-_WARNING = (
-    "MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be "
-    "running as the role you meant. Informational only, not enforcement. "
-    "Restart it with MB_ROLE set to the role you meant."
-)
+# Codex has one command for every source and the shell cannot read JSON safely, so this
+# fallback never looks at the payload: it keeps the STOP on every source. The one-line warning
+# for resume, clear, compact and fork lives in the Python path (mb role hook), which parses it.
 CODEX_HOOK_COMMAND = (
     "sh -c '"
     'd=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
@@ -52,15 +46,7 @@ CODEX_HOOK_COMMAND = (
     f'if command -v mb >/dev/null 2>&1 && out=$(printf "%s" "$in" | {_MARK} 2>/dev/null); '
     'then [ -z "$out" ] || printf "%s\\n" "$out"; '
     'else set -- "$d"/core/roles/*.md; '
-    'if [ -e "$1" ] || [ -L "$1" ]; then '
-    "w=; case ${MB_ROLE:-} in *[![:space:]]*) ;; "
-    '*) case $(printf "%s" "$in" | tr -d " \\n\\t\\r") in '
-    '*\\{*\\{*|*\\"source\\"*\\"source\\"*) ;; '
-    '\\{*\\"source\\":\\"resume\\"*\\}|\\{*\\"source\\":\\"clear\\"*\\}|'
-    '\\{*\\"source\\":\\"compact\\"*\\}|\\{*\\"source\\":\\"fork\\"*\\}) w=1;; '
-    "esac;; esac; "
-    f'if [ -n "$w" ]; then printf "%s\\n" "{_WARNING}"; else printf "%s\\n" "{_REFUSAL}"; fi; '
-    "fi; fi; exit 0'"
+    f'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\''
 )
 # The exact command an earlier release wrote. Still ours, so apply replaces it and remove clears it.
 _PREVIOUS_COMMANDS = (

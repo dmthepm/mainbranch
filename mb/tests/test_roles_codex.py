@@ -360,13 +360,8 @@ def test_hook_when_mb_is_missing_and_a_card_exists(repo: Path, tmp_path: Path, s
     empty.mkdir()
     result = _run(repo / "state", empty, {"source": source}, role=None)
     assert result.returncode == 0
-    if source == "startup":
-        assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
-    else:
-        assert result.stdout.startswith("MAIN BRANCH ROLE WARNING")
-        assert "Restart it with MB_ROLE set to the role you meant." in result.stdout
-        assert "mb agent" not in result.stdout
-        assert "STOP" not in result.stdout and "ROLE CHECK FAILED" not in result.stdout
+    assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    assert "ROLE WARNING" not in result.stdout
 
 
 @pytest.mark.parametrize("payload", [None, {}, {"source": "weird"}, {"cwd": "x"}])
@@ -406,19 +401,16 @@ def test_hook_with_a_selected_role_never_downgrades_to_a_warning(
 @pytest.mark.parametrize(
     "raw",
     [
+        '{"source":"resume",}',
+        '{"source":"resume","\\u0073ource":"startup"}',
+        '{"source":"re sume"}',
         '{"source":"startup","metadata":{"source":"resume"}}',
-        '{"metadata":{"source":"resume"}}',
         '{"source":"resume","source":"startup"}',
-        '{"source":"startup","source":"resume"}',
         '{"source":"resume"',
-        'not json "source":"resume"',
-        '"source":"resume"}',
-        '{"source":"startup","note":"x' + "a" * 70000 + '","tail":"\\"source\\":\\"resume\\""}',
+        '{"source":"resume"}',
     ],
 )
-def test_hook_fallback_reads_only_the_top_level_source(
-    repo: Path, tmp_path: Path, raw: str
-) -> None:
+def test_hook_fallback_never_reads_the_payload(repo: Path, tmp_path: Path, raw: str) -> None:
     empty = tmp_path / "empty-bin"
     empty.mkdir()
     env = {"PATH": f"{empty}:/usr/bin:/bin", "HOME": str(repo)}
@@ -433,14 +425,6 @@ def test_hook_fallback_reads_only_the_top_level_source(
         check=False,
     )
     assert "STOP" in result.stdout and "ROLE WARNING" not in result.stdout
-
-
-def test_hook_fallback_warns_for_a_real_flat_payload(repo: Path, tmp_path: Path) -> None:
-    empty = tmp_path / "empty-bin"
-    empty.mkdir()
-    payload = {"session_id": "s", "cwd": str(repo), "source": "resume"}
-    result = _run(repo / "state", empty, payload, role=None)
-    assert result.stdout.startswith("MAIN BRANCH ROLE WARNING") and "STOP" not in result.stdout
 
 
 # The exact command `mb role codex-hook --apply` wrote before the source split.
