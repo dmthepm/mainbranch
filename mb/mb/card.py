@@ -160,7 +160,7 @@ def layout(spec: dict[str, Any]) -> Plan:
             y += 18
         for opt in sec.get("options", []):
             pick = bool(opt.get("rec"))
-            head = f"{opt['key']}  {opt['label']}" + ("  (my pick)" if pick else "")
+            head = f"{opt['key']}. {opt['label']}" + (" (my pick)" if pick else "")
             head_lines = _wrap(head, mid, inner - 80, 1)
             detail = _wrap(opt["detail"], body, inner - 80) if opt.get("detail") else []
             height = 30 + 80 * (len(head_lines) + len(detail)) + 30

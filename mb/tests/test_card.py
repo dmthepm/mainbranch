@@ -66,8 +66,8 @@ def test_render_makes_a_1320_wide_jpg_under_2mb(tmp_path):
 def test_recommended_option_is_marked_in_the_layout():
     plan = card.layout(SPEC)
     picks = [line for line in plan.text_lines() if "my pick" in line]
-    assert picks == ["B  Raise spend  (my pick)"]
-    assert any(line.startswith("A  Hold spend") for line in plan.text_lines())
+    assert picks == ["B. Raise spend (my pick)"]
+    assert any(line.startswith("A. Hold spend") for line in plan.text_lines())
 
 
 @needs_pillow
