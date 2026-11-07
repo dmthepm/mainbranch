@@ -53,6 +53,7 @@ from mb.cli_bootstrap import pulse_install_cmd as pulse_install_cmd
 from mb.cli_bootstrap import spine_declare_cmd as spine_declare_cmd
 from mb.cli_bootstrap import spine_init_cmd as spine_init_cmd
 from mb.cli_bootstrap import spine_show_cmd as spine_show_cmd
+from mb.cli_card import CARD_HELP, card_render_cmd
 from mb.cli_common import VALIDATE_PATHS_OPTION as VALIDATE_PATHS_OPTION
 from mb.cli_common import _json_error_payload as _json_error_payload
 from mb.cli_common import _json_payload as _json_payload
@@ -311,6 +312,9 @@ image_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(image_app, name="image")
+
+card_app = typer.Typer(name="card", help=CARD_HELP, no_args_is_help=True)
+app.add_typer(card_app, name="card")
 
 dashboard_app = typer.Typer(
     name="dashboard",
@@ -2034,6 +2038,9 @@ image_app.command("smoke-openai")(image_smoke_openai_cmd)
 
 
 image_app.command("smoke-fal")(image_smoke_fal_cmd)
+
+
+card_app.command("render")(card_render_cmd)
 
 
 dashboard_app.command("build")(dashboard_build_cmd)
