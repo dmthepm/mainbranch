@@ -216,10 +216,7 @@ def test_hook_non_startup_without_role_warns_one_line_without_stop(repo: Path, s
         out = _hook(repo, source, role=role)
         assert out.count("\n") == 0 and out.startswith("MAIN BRANCH ROLE WARNING")
         assert "STOP" not in out and "ROLE CHECK FAILED" not in out
-        assert (
-            "restart it with MB_ROLE set to the role you meant" in out.lower()
-            and "mb agent" not in out
-        )
+        assert "Restart it with MB_ROLE set to the role you meant." in out and "mb agent" not in out
         assert "running as role" not in out
 
 
