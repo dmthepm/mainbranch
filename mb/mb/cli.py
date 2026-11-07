@@ -502,6 +502,40 @@ def _connect_failure(
     raise typer.Exit(exit_code)
 
 
+# Verbs that read a business repo's connections. Without --repo they start from
+# the git top level of the current folder; every other verb keeps ".".
+_CONNECT_REPO_ROOT_VERBS = frozenset({"exec", "token", "status", "test", "policy"})
+
+
+def _connect_default_repo(target: str, provider: str, *, json_out: bool, flags: list[str]) -> str:
+    """Pick the repo for a connect verb run without --repo."""
+    if target not in _CONNECT_REPO_ROOT_VERBS:
+        return "."
+    try:
+        return str(connect_mod.find_business_repo("."))
+    except connect_mod.ConnectRefusal as exc:
+        if target in {"exec", "token"}:
+            # Same audit line any other refusal leaves, before anything is read.
+            with suppress(connect_mod.ConnectRefusal):
+                connect_mod.write_release_audit(
+                    target,
+                    provider,
+                    ".",
+                    result="refused",
+                    reason=exc.rule,
+                    exit_code=2,
+                    flags=flags,
+                )
+        _connect_failure(
+            f"mb connect {target}",
+            str(exc),
+            json_out=json_out,
+            exit_code=2,
+            state=exc.rule,
+            rule=exc.rule,
+        )
+
+
 def _connect_usage_exit(command: str, message: str, *, json_out: bool) -> NoReturn:
     """Exit 2 for a usage error, with a JSON envelope under ``--json``."""
     _connect_failure(command, message, json_out=json_out, exit_code=2, state="usage_error")
@@ -1205,7 +1239,14 @@ def connect_cmd(
         help="Provider for subcommands such as `mb connect test <provider>`.",
     ),
     command: list[str] = CONNECT_EXEC_COMMAND_ARGUMENT,
-    repo: str = typer.Option(".", "--repo", help="Business repo whose metadata is updated."),
+    repo: str | None = typer.Option(
+        None,
+        "--repo",
+        help=(
+            "Business repo whose metadata is updated. Default: the git repo you are in "
+            "(exec, token, status, test, policy), otherwise the current folder."
+        ),
+    ),
     account_label: str | None = typer.Option(
         None,
         "--account",
@@ -1359,6 +1400,19 @@ def connect_cmd(
 ) -> None:
     """Connect provider credentials without committing secrets."""
     command = command or []
+    if repo is None:
+        # A usage error comes first: it needs no repo to be reported.
+        usage_error = (bool(command) and target != "exec") or (
+            target in {"exec", "token", "test"} and not provider
+        )
+        flags = ["inherit_env"] if inherit_env else []
+        flags += ["keep_env"] if keep_env else []
+        flags += ["print"] if print_token else []
+        repo = (
+            "."
+            if usage_error
+            else _connect_default_repo(target, provider, json_out=json_out, flags=flags)
+        )
     if command and target != "exec":
         _connect_usage_exit(
             "mb connect",

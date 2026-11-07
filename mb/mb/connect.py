@@ -4242,6 +4242,64 @@ def _check_exec_child(command: list[str]) -> None:
         )
 
 
+def _is_git_top(folder: Path) -> bool:
+    """A folder is a git top when ``.git`` is a gitfile or a folder holding HEAD.
+
+    One lstat of ``.git`` decides whether the marker exists, and only a missing
+    entry there lets the search go on to the parent. Any ``.git`` entry at all
+    ends it with a repo or a refusal, never a third outcome: a gitfile without
+    ``gitdir:``, a folder without a regular HEAD, a FIFO or other odd type, a
+    dangling link, and any failed inspection after the lstat all refuse. A link
+    counts as what it resolves to. An uninspectable marker may be a nested repo,
+    so the search never walks on past it.
+    """
+    git = folder / ".git"
+    try:
+        git.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        _refuse_marker(git)
+    try:
+        if stat.S_ISREG(mode := git.stat().st_mode):
+            if git.read_text(encoding="utf-8", errors="replace").startswith("gitdir:"):
+                return True
+        elif stat.S_ISDIR(mode) and stat.S_ISREG((git / "HEAD").stat().st_mode):
+            return True
+    except OSError:
+        pass
+    _refuse_marker(git)
+
+
+def _refuse_marker(git: Path) -> NoReturn:
+    _refuse(
+        "unreadable_repo_marker",
+        f"Cannot read the git marker at {git}, so I cannot tell which repo this is. "
+        "Fix its permissions, or cd into the business repo or pass --repo.",
+    )
+
+
+def find_business_repo(start: str | Path = ".") -> Path:
+    """Find the business repo for a command run without ``--repo``.
+
+    Starts at the nearest git top level at or above ``start`` and goes no
+    higher: a repo cloned inside the hub is its own repo and never borrows the
+    hub's keys. A git marker that cannot be read refuses; the search never walks
+    past it. That folder must hold ``.mb/connect.yaml``. This only chooses
+    which folder is read; binding and reference checks run on it as on
+    ``--repo``.
+    """
+    here = Path(start).resolve()
+    top = next((folder for folder in (here, *here.parents) if _is_git_top(folder)), None)
+    if top is not None and (top / CONFIG_RELATIVE_PATH).is_file():
+        return top
+    _refuse(
+        "no_business_repo",
+        f"No business repo here: {here} is not inside a git repo with "
+        f"{CONFIG_RELATIVE_PATH.as_posix()}. cd into the business repo or pass --repo.",
+    )
+
+
 def release_refusal_exit_code(exc: ValueError) -> int:
     if isinstance(exc, ConnectRefusal):
         if exc.rule in {"audit_unavailable", "caller_policy_invalid"}:

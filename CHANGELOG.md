@@ -11,7 +11,26 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb connect exec`, `token`, `status`, `test` and `policy` find the business repo
+  from the git top level of the current folder when `--repo` is not given, so a
+  command run in a subfolder of the hub works. Outside a git repo with
+  `.mb/connect.yaml`, including inside a repo cloned within the hub, they stop
+  with `no_business_repo` (exit 2) instead of "unknown provider", and `exec` and
+  `token` log the refusal. Which folder is read changes; who may read does not.
+  `--repo` behaves as before. Only a missing `.git` counts as absent. Any `.git`
+  entry ends the search with a working repo (a `gitdir:` file or a folder with a
+  regular HEAD) or a refusal: an empty `.git`, a missing HEAD, a gitfile without
+  `gitdir:`, a special file, a dangling link, or one that fails inspection stops
+  with `unreadable_repo_marker` (exit 2) rather than falling through to a parent
+  repo's keys.
+
 ### Fixed
+
+- A regression test pins that a malformed outer URL (`https://[bad]/?next=...`)
+  holding a nested URL with a password is refused as `url_password` in connection
+  metadata. The fix shipped in #1330. Closes #1312.
 
 - Connect repair hints name one wording for an owner at a terminal: the plain
   `mb connect <provider>`, which opens the hidden prompt, in `status`, `doctor`,

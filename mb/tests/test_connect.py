@@ -3858,6 +3858,12 @@ def test_metadata_refuses_password_in_a_malformed_url(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == "url_password"
 
 
+# #1312: a malformed outer URL must not hide a nested URL's password.
+def test_metadata_refuses_a_password_nested_in_a_malformed_outer_url() -> None:
+    value = "https://[bad]/?next=https://rowan:pw@example.invalid/"
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
 _BAD_WRAPPER = "https://[bad/?next="
 _FAKE_PASSWORD_URL = "https://rowan:pw@example.invalid/"
 
