@@ -4394,18 +4394,29 @@ def _open_audit_log() -> BinaryIO:
         raise
 
 
-def _read_audit_tail(max_bytes: int) -> tuple[list[bytes], bool]:
-    """The log's last ``max_bytes`` as lines, and whether any were cut.
+def _read_audit_tail(max_bytes: int) -> tuple[list[bytes], bool, bool]:
+    """The log's last ``max_bytes`` as lines, whether any were cut, and whether
+    the read was whole.
 
-    When the log is longer than the bound the first line is cut mid-row, so it
-    is dropped rather than read as corrupt.
+    The size is only a guess about a file that may change, so the stream is
+    read to its end and the read counts as whole only if as many bytes arrived
+    as the size promised and the file did not shrink meanwhile. When the log is
+    longer than the bound the read starts one byte early: the first line is
+    then either the end of a cut row or empty (the cut fell on a line
+    boundary), and is dropped either way, so a whole first row is kept.
     """
     with _open_audit_log() as stream:
         size = os.fstat(stream.fileno()).st_size
         start = max(0, size - max_bytes)
-        stream.seek(start)
-        lines = stream.read(size - start).splitlines()
-    return (lines[1:], True) if start else (lines, False)
+        begin = max(0, start - 1)
+        stream.seek(begin)
+        chunks: list[bytes] = []
+        while chunk := stream.read(1024 * 1024):
+            chunks.append(chunk)
+        data = b"".join(chunks)
+        whole = len(data) >= size - begin and os.fstat(stream.fileno()).st_size >= size
+    lines = data.splitlines()
+    return (lines[1:], True, whole) if start else (lines, False, whole)
 
 
 def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str, Any]]:
@@ -4440,7 +4451,9 @@ def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
     rows: deque[dict[str, Any]] = deque(maxlen=5)
     state = "ok"
     try:
-        lines, cut = _read_audit_tail(AUDIT_READ_MAX_BYTES)
+        lines, cut, whole = _read_audit_tail(AUDIT_READ_MAX_BYTES)
+        if not whole:
+            state = "incomplete"
         for line in lines:
             if not line.strip():
                 continue

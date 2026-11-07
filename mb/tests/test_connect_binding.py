@@ -708,6 +708,57 @@ def test_cut_read_with_five_rebinds_stays_ok(tmp_path, monkeypatch):
     assert c.recent_rebinds("r")[1] == "ok"
 
 
+def test_cut_landing_on_a_line_boundary_keeps_the_first_whole_row(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    old = json.dumps({**row, "result": "old"})
+    audit.write_text("\n".join([old, *[json.dumps(row)] * 5]) + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    # The window starts exactly where the five newest rows start.
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", (len(json.dumps(row)) + 1) * 5)
+    rows, state = c.recent_rebinds("r")
+    assert [entry["result"] for entry in rows] == ["applied"] * 5
+    assert state == "ok"
+
+
+class _TruncatingLog:
+    """The real audit stream, with the file emptied at a chosen moment."""
+
+    def __init__(self, stream, path, when):
+        self._stream, self._path, self._when = stream, path, when
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self._stream.close()
+
+    def fileno(self):
+        return self._stream.fileno()
+
+    def seek(self, *args):
+        if self._when == "before_read":
+            os.truncate(self._path, 0)
+        return self._stream.seek(*args)
+
+    def read(self, *args):
+        data = self._stream.read(*args)
+        if self._when == "after_read" and data:
+            os.truncate(self._path, 0)
+        return data
+
+
+@pytest.mark.parametrize("when", ["before_read", "after_read"])
+def test_status_history_is_incomplete_when_the_log_shrinks_while_read(tmp_path, monkeypatch, when):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    audit.write_text((json.dumps(row) + "\n") * 6)
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    real_open = c._open_audit_log
+    monkeypatch.setattr(c, "_open_audit_log", lambda: _TruncatingLog(real_open(), audit, when))
+    assert c.recent_rebinds("r")[1] == "incomplete"
+
+
 def test_failed_binding_records_outcome(tmp_path, monkeypatch):
     business = _business(tmp_path)
     borrower = _borrower(tmp_path, business)
