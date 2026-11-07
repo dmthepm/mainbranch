@@ -64,77 +64,38 @@ def _close(fd: int | None) -> None:
         os.close(fd)
 
 
-def _close_if_open(fd: int, path: Path) -> None:
-    """Close ``fd`` unless it was already closed; it must still be the file at ``path``."""
+def _sync_directory(directory: Path) -> None:
+    fd = _open_directory(directory)
     try:
-        if os.path.samestat(os.fstat(fd), os.stat(path)):
-            os.close(fd)
-    except OSError:
-        pass
+        _fsync_fd(fd)
+    finally:
+        _close(fd)
 
 
 def _make_parents(parent: Path) -> None:
     """Create missing directories one level at a time, each synced through its own parent.
 
-    A failure removes what this call created, so a retry starts from the same
-    state and syncs every level again. Each created directory's device and
-    inode are recorded, and it is removed through the held descriptor of its
-    parent only while both still match, so a directory another process put at
-    that name is left alone. Race that remains: between that check and the
-    ``rmdir`` the name can still be swapped for an empty directory, because no
-    system call removes a directory by identity. A directory whose open failed
-    right after our ``mkdir`` is not recorded, so it is left in place. Windows
-    cannot open directories, so there the same check runs by path.
+    A failure removes the directories this call created, so a retry starts from
+    the same state and syncs every level again. Cleanup is best effort: it
+    removes only empty directories, and a concurrent swap by the same user can
+    lose an empty directory.
     """
     missing = [parent, *parent.parents]
     missing = missing[: next((i for i, d in enumerate(missing) if d.exists()), len(missing))]
-    if not missing:
-        return
-    held: list[int] = []
-    # (descriptor of the parent or None, path, name, device, inode)
-    made: list[tuple[int | None, Path, str, int, int]] = []
+    made: list[Path] = []
     try:
-        cur = _open_directory(missing[-1].parent)
-        if cur is not None:
-            held.append(cur)
         for directory in reversed(missing):
-            created = True
             try:
-                if cur is None:
-                    directory.mkdir()
-                else:
-                    os.mkdir(directory.name, dir_fd=cur)
+                directory.mkdir()
+                made.append(directory)
             except FileExistsError:
-                created = False  # another process made it: it exists, and is not ours to remove
-            child: int | None = None
-            if cur is not None:
-                child = os.open(
-                    directory.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=cur
-                )
-                held.append(child)
-            if created:
-                st = os.fstat(child) if child is not None else directory.stat()
-                made.append((cur, directory, directory.name, st.st_dev, st.st_ino))
-            _fsync_fd(cur)
-            cur = child
+                pass  # another process made it: it exists, and is not ours to remove
+            _sync_directory(directory.parent)
     except BaseException:
-        for dir_fd, path, name, dev, ino in reversed(made):
+        for directory in reversed(made):
             with suppress(OSError):
-                st = (
-                    os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
-                    if dir_fd is not None
-                    else path.stat()
-                )
-                if (st.st_dev, st.st_ino) == (dev, ino):
-                    if dir_fd is not None:
-                        os.rmdir(name, dir_fd=dir_fd)
-                    else:
-                        path.rmdir()
+                directory.rmdir()
         raise
-    finally:
-        for fd in held:
-            with suppress(OSError):
-                os.close(fd)
 
 
 def atomic_write_text(
@@ -156,6 +117,10 @@ def atomic_write_text(
     is not guaranteed to survive a crash. Callers must say so, not "nothing
     was written", and a retry rewrites and syncs it.
     """
+    # Encode first so no encoding failure sits between mkstemp and owning the descriptor.
+    # Newlines follow text mode: None translates to os.linesep, "" keeps as is.
+    eol = os.linesep if newline is None else (newline or "\n")
+    data = text.replace("\n", eol).encode(encoding)
     _make_parents(path.parent)
     if mode is None:
         mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
@@ -165,12 +130,12 @@ def atomic_write_text(
         fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
         tmp = Path(tmp_name)
         try:
-            handle = os.fdopen(fd, "w", encoding=encoding, newline=newline)
+            handle = os.fdopen(fd, "wb")
         except BaseException:
-            _close_if_open(fd, tmp)  # fdopen owns the descriptor only once it succeeds
+            os.close(fd)  # fdopen failed before taking the descriptor, so this is the only close
             raise
         with handle:
-            handle.write(text)
+            handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(tmp, mode)

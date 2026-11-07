@@ -174,8 +174,8 @@ def test_a_directory_made_by_another_process_survives_a_later_sync_failure(
     target = tmp_path / "a" / "b" / "state.json"
     real_mkdir = os.mkdir
 
-    def racing_mkdir(name: str, *args: object, **kwargs: object) -> None:
-        if name == "a":
+    def racing_mkdir(name: str | Path, *args: object, **kwargs: object) -> None:
+        if Path(name) == tmp_path / "a":
             real_mkdir(name, *args, **kwargs)  # type: ignore[arg-type]  # the other process wins
         real_mkdir(name, *args, **kwargs)  # type: ignore[arg-type]
 
@@ -207,28 +207,25 @@ def test_an_unopenable_parent_leaves_no_descriptor_behind(tmp_path: Path) -> Non
     assert list(folder.iterdir()) == []
 
 
-@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="uses directory descriptors")
-def test_a_directory_replaced_after_our_mkdir_is_not_removed_by_cleanup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    target = tmp_path / "a" / "b" / "state.json"
-    real_fsync = os.fsync
-    swapped: list[bool] = []
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc/self/fd")
+def test_an_encoding_failure_leaves_no_descriptor_and_no_temp_file(tmp_path: Path) -> None:
+    before = len(os.listdir("/proc/self/fd"))
 
-    def fsync(fd: int) -> None:
-        if not swapped:
-            swapped.append(True)
-            os.rename(tmp_path / "a", tmp_path / "moved")  # another call takes ours away
-            os.mkdir(tmp_path / "a")  # and puts its own empty directory at the name
-            raise OSError(5, "directory fsync failed")
-        real_fsync(fd)
+    with pytest.raises(UnicodeEncodeError):
+        atomic_write_text(tmp_path / "state.json", "caf\u00e9\n", encoding="ascii")
 
-    monkeypatch.setattr(os, "fsync", fsync)
+    assert len(os.listdir("/proc/self/fd")) == before
+    assert list(tmp_path.iterdir()) == []
 
-    with pytest.raises(OSError, match="directory fsync failed"):
-        atomic_write_text(target, "{}\n")
 
-    assert (tmp_path / "a").is_dir()  # not ours any more: cleanup must leave it
+def test_newline_translation_matches_text_mode(tmp_path: Path) -> None:
+    atomic_write_text(tmp_path / "a", "x\ny\n", newline="\r\n")
+    atomic_write_text(tmp_path / "b", "x\ny\n", newline="")
+    atomic_write_text(tmp_path / "c", "x\ny\n")
+
+    assert (tmp_path / "a").read_bytes() == b"x\r\ny\r\n"
+    assert (tmp_path / "b").read_bytes() == b"x\ny\n"
+    assert (tmp_path / "c").read_bytes() == ("x\ny\n".replace("\n", os.linesep)).encode()
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc/self/fd")
