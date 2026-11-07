@@ -19,8 +19,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `.mb/connect.yaml`, including inside a repo cloned within the hub, they stop
   with `no_business_repo` (exit 2) instead of "unknown provider", and `exec` and
   `token` log the refusal. Which folder is read changes; who may read does not.
-  `--repo` behaves as before. A `.git` marker that cannot be read stops the search
-  with `unreadable_repo_marker` (exit 2) rather than falling through to a parent
+  `--repo` behaves as before. Only a missing `.git` counts as absent; one that exists but cannot be
+  fully inspected, such as a dangling link, stops the search with
+  `unreadable_repo_marker` (exit 2) rather than falling through to a parent
   repo's keys.
 
 ### Fixed

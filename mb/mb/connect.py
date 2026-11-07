@@ -4242,29 +4242,50 @@ def _check_exec_child(command: list[str]) -> None:
         )
 
 
+def _lstat_or_none(path: Path) -> os.stat_result | None:
+    """``path`` itself without following links; None only when it is not there."""
+    try:
+        return path.lstat()
+    except (FileNotFoundError, NotADirectoryError):
+        return None
+
+
 def _is_git_top(folder: Path) -> bool:
     """A folder is a git top when ``.git`` is a gitfile or a folder holding HEAD.
 
-    Absent, or an empty marker nothing reads as a repo, is False. A marker that
-    cannot be inspected is not False: it may be a nested repo, so the search
-    refuses rather than walk on to a parent.
+    One lstat of ``.git`` decides whether the marker exists, and only a missing
+    entry there means absent. Once anything named ``.git`` exists, every later
+    failure refuses, whatever the error: a dangling link, a target that cannot
+    be inspected, a file that vanishes after the lstat. The same holds for HEAD
+    in a ``.git`` folder. A readable ``.git`` folder with no HEAD, or a gitfile
+    that is not a pointer, is False. The search refuses rather than walk on to a
+    parent, because an uninspectable marker may be a nested repo.
     """
     git = folder / ".git"
+    try:
+        if _lstat_or_none(git) is None:
+            return False
+    except OSError:
+        return _refuse_marker(git)
     try:
         mode = git.stat().st_mode
         if stat.S_ISREG(mode):
             return git.read_text(encoding="utf-8", errors="replace").startswith("gitdir:")
         if stat.S_ISDIR(mode):
+            if _lstat_or_none(git / "HEAD") is None:
+                return False
             return stat.S_ISREG((git / "HEAD").stat().st_mode)
         return False
-    except (FileNotFoundError, NotADirectoryError):
-        return False
     except OSError:
-        _refuse(
-            "unreadable_repo_marker",
-            f"Cannot read the git marker at {git}, so I cannot tell which repo this is. "
-            "Fix its permissions, or cd into the business repo or pass --repo.",
-        )
+        return _refuse_marker(git)
+
+
+def _refuse_marker(git: Path) -> NoReturn:
+    _refuse(
+        "unreadable_repo_marker",
+        f"Cannot read the git marker at {git}, so I cannot tell which repo this is. "
+        "Fix its permissions, or cd into the business repo or pass --repo.",
+    )
 
 
 def find_business_repo(start: str | Path = ".") -> Path:

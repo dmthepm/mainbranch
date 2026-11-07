@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -211,7 +212,18 @@ def test_explicit_repo_behaves_as_before(
 
 # --- an uninspectable git marker refuses; discovery never walks on to a parent ---
 
-BREAKS = ["unreadable-gitfile", "unreadable-gitdir", "other-oserror"]
+BREAKS = [
+    "unreadable-gitfile",
+    "unreadable-gitdir",
+    "other-oserror",
+    "dangling-link",
+    "link-loop",
+    "vanished-gitfile",
+    "gitfile-parent-gone",
+    "dangling-head",
+    "vanished-head",
+]
+POST_LSTAT = {"vanished-gitfile", "gitfile-parent-gone", "vanished-head"}
 
 
 def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -219,10 +231,44 @@ def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) 
     nested = hub / "nested"
     (nested / "src").mkdir(parents=True)
     marker = nested / ".git"
-    if kind == "unreadable-gitfile":
+    if kind in {"unreadable-gitfile", "vanished-gitfile", "gitfile-parent-gone"}:
         marker.write_text("gitdir: /somewhere/else\n")
     else:
         make_git(nested)
+    if kind == "dangling-link":
+        shutil.rmtree(marker)
+        marker.symlink_to(nested / "missing-git-dir")
+    elif kind == "link-loop":
+        shutil.rmtree(marker)
+        marker.symlink_to(marker.name)
+    elif kind == "dangling-head":
+        (marker / "HEAD").unlink()
+        (marker / "HEAD").symlink_to(nested / "missing-head")
+    elif kind in POST_LSTAT:
+        # The entry exists at lstat; the later read or stat then fails as if the
+        # file or a path component vanished in between.
+        error = NotADirectoryError if kind == "gitfile-parent-gone" else FileNotFoundError
+        target = marker / "HEAD" if kind == "vanished-head" else marker
+        seen: list[Path] = []
+        real_lstat, real_stat, real_read = Path.lstat, Path.stat, Path.read_text
+
+        def lstat(self: Path, *args: Any, **kwargs: Any) -> Any:
+            result = real_lstat(self, *args, **kwargs)
+            if self == target:
+                seen.append(self)
+            return result
+
+        def gone(real: Any) -> Any:
+            def call(self: Path, *args: Any, **kwargs: Any) -> Any:
+                if self == target and seen:
+                    raise error(errno.ENOENT, "vanished after lstat")
+                return real(self, *args, **kwargs)
+
+            return call
+
+        monkeypatch.setattr(Path, "lstat", lstat)
+        monkeypatch.setattr(Path, "stat", gone(real_stat))
+        monkeypatch.setattr(Path, "read_text", gone(real_read))
     if kind == "other-oserror":
         real = Path.stat
 
@@ -232,7 +278,7 @@ def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) 
             return real(self, *args, **kwargs)
 
         monkeypatch.setattr(Path, "stat", failing)
-    else:
+    elif kind in {"unreadable-gitfile", "unreadable-gitdir"}:
         assert os.geteuid() != 0, "run as a non-root user: root can read a mode 0 marker"
         marker.chmod(0)
     return nested
@@ -251,7 +297,7 @@ def test_finder_refuses_and_never_selects_the_parent(
         with pytest.raises(connect.ConnectRefusal) as caught:
             connect.find_business_repo(nested / "src")
     finally:
-        if kind != "other-oserror":
+        if kind in {"unreadable-gitfile", "unreadable-gitdir"}:
             _restore(nested)
     assert caught.value.rule == "unreadable_repo_marker"
 
@@ -282,7 +328,7 @@ def test_cli_unreadable_marker_reads_no_key_launches_nothing_and_is_logged(
     try:
         result = runner.invoke(app, ["connect", verb, "stripe", *args])
     finally:
-        if kind != "other-oserror":
+        if kind in {"unreadable-gitfile", "unreadable-gitdir"}:
             _restore(nested)
     assert result.exit_code == 2, result.output
     assert "Cannot read the git marker" in result.stderr
@@ -304,3 +350,38 @@ def test_empty_marker_is_still_ignored_not_refused(hub: Path) -> None:
     (hub / "b" / ".git").write_text("not a pointer\n")
     assert connect.find_business_repo(hub / "a") == hub
     assert connect.find_business_repo(hub / "b") == hub
+
+
+def test_failing_marker_at_a_higher_level_stops_the_walk(
+    hub: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The repo marker in the starting folder is absent; an ancestor's marker is a
+    # dangling link. Discovery refuses there and never selects the hub above it.
+    mid = hub / "mid"
+    start = mid / "deep" / "er"
+    start.mkdir(parents=True)
+    (mid / ".git").symlink_to(mid / "missing-git-dir")
+    reads: list[object] = []
+    launches: list[object] = []
+
+    def read_token(*args: Any, **kwargs: Any) -> str:
+        reads.append(args)
+        return SECRET
+
+    monkeypatch.setattr(connect, "read_token", read_token)
+    for owner, name in ((subprocess, "run"), (subprocess, "Popen"), (os, "execvp")):
+        monkeypatch.setattr(owner, name, lambda *a, **k: launches.append(a))
+    with pytest.raises(connect.ConnectRefusal) as caught:
+        connect.find_business_repo(start)
+    assert caught.value.rule == "unreadable_repo_marker"
+    monkeypatch.chdir(start)
+    for verb, args in (("exec", ["--", *CHILD_PRINTS_PATH]), ("token", ["--print"])):
+        result = runner.invoke(app, ["connect", verb, "stripe", *args])
+        assert result.exit_code == 2, result.output
+        assert SECRET not in result.output and result.stdout == ""
+    assert reads == [] and launches == []
+    logged = rows()
+    assert [(r["verb"], r["result"], r["reason"]) for r in logged] == [
+        ("exec", "refused", "unreadable_repo_marker"),
+        ("token", "refused", "unreadable_repo_marker"),
+    ]
