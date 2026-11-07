@@ -358,7 +358,7 @@ def test_hook_does_not_climb_past_a_git_root_into_a_parent_repo(repo: Path, tmp_
 def test_hook_when_mb_is_missing_and_a_card_exists(repo: Path, tmp_path: Path, source: str) -> None:
     empty = tmp_path / "empty-bin"
     empty.mkdir()
-    result = _run(repo / "state", empty, {"source": source})
+    result = _run(repo / "state", empty, {"source": source}, role=None)
     assert result.returncode == 0
     if source == "startup":
         assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
@@ -375,8 +375,106 @@ def test_hook_when_mb_is_missing_and_source_is_unknown_keeps_stop(
 ) -> None:
     empty = tmp_path / "empty-bin"
     empty.mkdir()
-    result = _run(repo / "state", empty, payload)
+    result = _run(repo / "state", empty, payload, role=None)
     assert "STOP" in result.stdout
+
+
+def _failing_mb(directory: Path) -> Path:
+    directory.mkdir()
+    shim = directory / "mb"
+    shim.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    shim.chmod(0o755)
+    return directory
+
+
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+@pytest.mark.parametrize("role", ["scout", "ghost", "Bad Name"])
+@pytest.mark.parametrize("binary", ["missing", "failing"])
+def test_hook_with_a_selected_role_never_downgrades_to_a_warning(
+    repo: Path, tmp_path: Path, source: str, role: str, binary: str
+) -> None:
+    if binary == "missing":
+        path_dir = tmp_path / "empty-bin"
+        path_dir.mkdir()
+    else:
+        path_dir = _failing_mb(tmp_path / "fail-bin")
+    result = _run(repo / "state", path_dir, {"source": source}, role=role)
+    assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    assert "ROLE WARNING" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"source":"startup","metadata":{"source":"resume"}}',
+        '{"metadata":{"source":"resume"}}',
+        '{"source":"resume","source":"startup"}',
+        '{"source":"startup","source":"resume"}',
+        '{"source":"resume"',
+        'not json "source":"resume"',
+        '"source":"resume"}',
+        '{"source":"startup","note":"x' + "a" * 70000 + '","tail":"\\"source\\":\\"resume\\""}',
+    ],
+)
+def test_hook_fallback_reads_only_the_top_level_source(
+    repo: Path, tmp_path: Path, raw: str
+) -> None:
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    env = {"PATH": f"{empty}:/usr/bin:/bin", "HOME": str(repo)}
+    result = subprocess.run(
+        ["/bin/sh", "-c", roles_codex.CODEX_HOOK_COMMAND],
+        cwd=repo / "state",
+        env=env,
+        input=raw,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert "STOP" in result.stdout and "ROLE WARNING" not in result.stdout
+
+
+def test_hook_fallback_warns_for_a_real_flat_payload(repo: Path, tmp_path: Path) -> None:
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    payload = {"session_id": "s", "cwd": str(repo), "source": "resume"}
+    result = _run(repo / "state", empty, payload, role=None)
+    assert result.stdout.startswith("MAIN BRANCH ROLE WARNING") and "STOP" not in result.stdout
+
+
+# The exact command `mb role codex-hook --apply` wrote before the source split.
+PREVIOUS_COMMAND = (
+    'sh -c \'d=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
+    '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
+    "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --runtime codex 2>/dev/null); "
+    'then [ -z "$out" ] || printf "%s\\n" "$out"; '
+    'else set -- "$d"/core/roles/*.md; '
+    'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "MAIN BRANCH ROLE CHECK FAILED: '
+    "this repo has role cards (core/roles) but the role could not be loaded. STOP. "
+    "Do not start work and do not pick a role yourself. Tell the owner this message and ask "
+    "them to fix the role setup. This session has no role.\"; fi; fi; exit 0'"
+)
+
+
+def test_previously_generated_command_is_replaced_on_apply(codex_home: Path) -> None:
+    old = {
+        "matcher": roles_codex.CODEX_MATCHER,
+        "hooks": [{"type": "command", "command": PREVIOUS_COMMAND, "timeout": 20}],
+    }
+    _write(codex_home, {"hooks": {"SessionStart": [OTHER_GROUP, old]}})
+    assert roles_codex.plan()["action"] == "replace"
+    roles_codex.apply()
+    groups = _groups(codex_home)
+    assert groups[0] == OTHER_GROUP and groups[1:] == [roles_codex.hook_group()]
+
+
+def test_previously_generated_command_is_removed_on_remove(codex_home: Path) -> None:
+    old = {"matcher": "startup", "hooks": [{"type": "command", "command": PREVIOUS_COMMAND}]}
+    _write(codex_home, {"hooks": {"SessionStart": [OTHER_GROUP, old]}})
+    assert roles_codex.plan(remove=True)["action"] != "unchanged"
+    roles_codex.apply(remove=True)
+    assert _groups(codex_home) == [OTHER_GROUP]
 
 
 @pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])

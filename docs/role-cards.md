@@ -97,8 +97,9 @@ Other limits:
 
 - If the hook command cannot run `mb role hook`, it cannot load the card.
   When at least one `core/roles/*.md` file exists it prints a plain refusal
-  (role could not be loaded; stop and ask, no cause claimed) on `startup`, and one
-  informational warning line on the other sources; with none, even
+  (role could not be loaded; stop and ask, no cause claimed) on `startup` and whenever
+  `MB_ROLE` names a role, and one informational warning line on the other sources when
+  no role is named (Codex: only for a flat payload with one top-level source); with none, even
   with an empty folder, it prints nothing. The command is POSIX `sh` and always exits 0.
 - With no cards at all, a set `MB_ROLE` is ignored, by design.
 - A repo-local `SessionStart` hook running `mb role hook --source <source>`

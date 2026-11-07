@@ -535,7 +535,7 @@ def test_hook_command_when_mb_is_missing_and_cards_dir_exists(
     _card(repo)
     empty = tmp_path / "empty-bin"
     empty.mkdir()
-    result = _run_hook(source, repo, empty)
+    result = _run_hook(source, repo, empty, role=None)
     _assert_split(source, result)
     assert "too old" not in result.stdout
 
@@ -543,9 +543,56 @@ def test_hook_command_when_mb_is_missing_and_cards_dir_exists(
 @pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
 def test_hook_command_when_mb_is_too_old_for_role(repo: Path, tmp_path: Path, source: str) -> None:
     _card(repo)
-    result = _run_hook(source, repo, _old_mb(tmp_path / "old-bin"))
+    result = _run_hook(source, repo, _old_mb(tmp_path / "old-bin"), role=None)
     _assert_split(source, result)
     assert "No such command" not in result.stdout + result.stderr
+
+
+def _failing_mb(directory: Path) -> Path:
+    directory.mkdir()
+    shim = directory / "mb"
+    shim.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    shim.chmod(0o755)
+    return directory
+
+
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+@pytest.mark.parametrize("role", ["scout", "ghost", "Bad Name"])
+@pytest.mark.parametrize("binary", ["missing", "old", "failing"])
+def test_hook_command_with_a_selected_role_never_downgrades_to_a_warning(
+    repo: Path, tmp_path: Path, source: str, role: str, binary: str
+) -> None:
+    """A role was named but mb could not validate it: STOP on every source."""
+    _card(repo)
+    bins = {"missing": tmp_path / "empty-bin", "old": tmp_path / "old-bin"}
+    if binary == "missing":
+        bins["missing"].mkdir()
+        path_dir = bins["missing"]
+    elif binary == "old":
+        path_dir = _old_mb(bins["old"])
+    else:
+        path_dir = _failing_mb(tmp_path / "fail-bin")
+    result = _run_hook(source, repo, path_dir, role=role)
+    assert result.returncode == 0
+    assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    assert "ROLE WARNING" not in result.stdout
+
+
+def test_hook_command_blank_role_counts_as_unset_in_the_fallback(
+    repo: Path, tmp_path: Path
+) -> None:
+    _card(repo)
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    env = {"PATH": str(empty), "CLAUDE_PROJECT_DIR": str(repo), roles.ROLE_ENV: "   "}
+    out = subprocess.run(
+        ["/bin/sh", "-c", _hook_commands()["resume"]],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout
+    assert out.startswith("MAIN BRANCH ROLE WARNING")
 
 
 @pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])

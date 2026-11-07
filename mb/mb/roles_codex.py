@@ -36,8 +36,9 @@ _REFUSAL = (
     "Tell the owner this message and ask them to fix the role setup. This session has no role."
 )
 # Codex has one command for every source, so the fallback reads the source from the stdin
-# payload: a fresh start keeps the STOP, a resumed session gets one informational line.
-# An unreadable or unknown source is treated as a fresh start. No single quotes in here.
+# payload. A fresh start, a named role, or any payload it cannot read as one flat object with a
+# single top-level source keeps the STOP; only a resumed, cleared, compacted or forked session
+# with no role gets one informational line. No single quotes in here.
 _WARNING = (
     "MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be "
     "running as the role you meant. Informational only, not enforcement. "
@@ -52,11 +53,23 @@ CODEX_HOOK_COMMAND = (
     'then [ -z "$out" ] || printf "%s\\n" "$out"; '
     'else set -- "$d"/core/roles/*.md; '
     'if [ -e "$1" ] || [ -L "$1" ]; then '
-    'case $(printf "%s" "$in" | tr -d " ") in '
-    '*\\"source\\":\\"resume\\"*|*\\"source\\":\\"clear\\"*|'
-    '*\\"source\\":\\"compact\\"*|*\\"source\\":\\"fork\\"*) '
-    f'printf "%s\\n" "{_WARNING}";; '
-    f'*) printf "%s\\n" "{_REFUSAL}";; esac; fi; fi; exit 0\''
+    "w=; case ${MB_ROLE:-} in *[![:space:]]*) ;; "
+    '*) case $(printf "%s" "$in" | tr -d " \\n\\t\\r") in '
+    '*\\{*\\{*|*\\"source\\"*\\"source\\"*) ;; '
+    '\\{*\\"source\\":\\"resume\\"*\\}|\\{*\\"source\\":\\"clear\\"*\\}|'
+    '\\{*\\"source\\":\\"compact\\"*\\}|\\{*\\"source\\":\\"fork\\"*\\}) w=1;; '
+    "esac;; esac; "
+    f'if [ -n "$w" ]; then printf "%s\\n" "{_WARNING}"; else printf "%s\\n" "{_REFUSAL}"; fi; '
+    "fi; fi; exit 0'"
+)
+# The exact command an earlier release wrote. Still ours, so apply replaces it and remove clears it.
+_PREVIOUS_COMMANDS = (
+    'sh -c \'d=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
+    '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
+    f"if command -v mb >/dev/null 2>&1 && out=$({_MARK} 2>/dev/null); "
+    'then [ -z "$out" ] || printf "%s\\n" "$out"; '
+    'else set -- "$d"/core/roles/*.md; '
+    f'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\'',
 )
 
 
@@ -84,8 +97,11 @@ def hook_group() -> dict[str, Any]:
 
 
 def _is_ours(hook: object) -> bool:
-    """Only the exact generated command. Anything else is the owner's, even if it mentions us."""
-    return isinstance(hook, dict) and hook.get("command") == CODEX_HOOK_COMMAND
+    """Only an exact generated command, current or previous. Anything else is the owner's."""
+    return isinstance(hook, dict) and hook.get("command") in (
+        CODEX_HOOK_COMMAND,
+        *_PREVIOUS_COMMANDS,
+    )
 
 
 def _mentions_us(hook: object) -> bool:
