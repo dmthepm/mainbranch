@@ -365,7 +365,7 @@ def ensure(
                 message="CLOUDFLARE_API_TOKEN not set.",
                 suggestion=(
                     "Store a token with Zone:Edit + DNS:Edit permissions using "
-                    "`mb connect cloudflare --token-stdin`, then run this through "
+                    "`mb connect cloudflare` (it prompts with hidden input), then run this through "
                     "`mb connect exec cloudflare -- <command>`."
                 ),
             ),
@@ -380,8 +380,10 @@ def ensure(
                 code="cf_account_id_missing",
                 message="CF_ACCOUNT_ID not set.",
                 suggestion=(
-                    "Set CF_ACCOUNT_ID for this command; it is not a secret "
-                    "(find it at dash.cloudflare.com → right sidebar of any zone)."
+                    "CF_ACCOUNT_ID is not a secret (find it at dash.cloudflare.com → "
+                    "right sidebar of any zone). `mb connect exec` drops it unless "
+                    "you name it: CF_ACCOUNT_ID=<id> mb connect exec cloudflare "
+                    "--keep-env CF_ACCOUNT_ID -- <command>."
                 ),
             ),
         )

@@ -595,7 +595,7 @@ def create_project(
             error=PagesCreateProjectError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare --token-stdin`, then run this through `mb connect exec cloudflare -- <command>`.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`.",
             ),
         )
         sys.exit(emit(env))
@@ -807,7 +807,7 @@ def set_domain(
             error=PagesSetDomainError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare --token-stdin`, then run this through `mb connect exec cloudflare -- <command>`.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`.",
             ),
         )
         sys.exit(emit(env))

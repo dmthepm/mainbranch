@@ -131,7 +131,7 @@ or committed config.
 Disposable workspaces can use user scope:
 
 ```bash
-mb connect cloudflare --scope user --token-stdin --metadata account_id=...
+mb connect cloudflare --scope user --metadata account_id=...
 mb connect hydrate --repo .
 ```
 
@@ -175,7 +175,7 @@ system user token, and scopes including `business_management`, `ads_management`,
 Connect through `mb` so the token stays outside the repo:
 
 ```bash
-mb connect meta --token-stdin \
+mb connect meta \
   --metadata=ad_account_id=<act_id> \
   --metadata=business_id=<business_portfolio_id>
 mb connect test meta --json

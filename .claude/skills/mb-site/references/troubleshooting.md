@@ -39,7 +39,7 @@ If `provider:cloudflare` is not `ready`, reconnect and retest before running
 Cloudflare-dependent `/mb-site` tools:
 
 ```bash
-printf '%s' "$CLOUDFLARE_API_TOKEN" | mb connect cloudflare --token-stdin --metadata token_type=account --metadata account_id=...
+mb connect cloudflare --metadata token_type=account --metadata account_id=...
 mb connect test cloudflare
 ```
 

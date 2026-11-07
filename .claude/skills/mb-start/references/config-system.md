@@ -74,8 +74,8 @@ shell profile, and never asks you to paste a key into a file or a shell line.
 
 | Variable | Tool | Store with | How to Get |
 |----------|------|------------|------------|
-| `GOOGLE_API_KEY` | Gemini | `mb connect google-ai --custom --token-stdin` | https://aistudio.google.com/apikey |
-| `XAI_API_KEY` | Grok | `mb connect xai --custom --token-stdin` | https://console.x.ai |
+| `GOOGLE_API_KEY` | Gemini | `mb connect google-ai --custom` | https://aistudio.google.com/apikey |
+| `XAI_API_KEY` | Grok | `mb connect xai --custom` | https://console.x.ai |
 | `APIFY_TOKEN` | Apify | (Usually in MCP config) | https://console.apify.com |
 
 Run a command that needs one with

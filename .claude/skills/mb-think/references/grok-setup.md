@@ -108,7 +108,7 @@ From the business repo, store the key with `mb connect`. Paste it at the prompt
 your terminal gives, never into chat, a file, or a shell line:
 
 ```bash
-mb connect xai --custom --token-stdin --account "xAI"
+mb connect xai --custom --account "xAI"
 ```
 
 Run anything that needs it through `mb connect exec`:

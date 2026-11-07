@@ -72,10 +72,10 @@ DNS, or route permissions are needed for a workers.dev copy.
 Store the token from the owner's own terminal, in the business repo:
 
 ```bash
-mb connect cloudflare-openseo --custom --token-stdin --scope repo
+mb connect cloudflare-openseo --custom --scope repo
 ```
 
-Paste the token, press Enter, then press Ctrl-D.
+Paste the token at the hidden prompt, then press Enter.
 
 **Expected:** `mb connect status cloudflare-openseo --json` reports it connected.
 The output holds no token value.

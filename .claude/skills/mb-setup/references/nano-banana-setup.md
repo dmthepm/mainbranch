@@ -31,7 +31,7 @@ From the business repo, store the key with `mb connect`. Paste it at the prompt
 your terminal gives, never into chat, screenshots, or terminal output:
 
 ```bash
-mb connect google-ai --custom --token-stdin --account "Google AI Studio"
+mb connect google-ai --custom --account "Google AI Studio"
 ```
 
 Check it without printing it:
