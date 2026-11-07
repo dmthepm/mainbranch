@@ -11,6 +11,28 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.23] - 2026-11-06
+
+### Breaking
+
+- `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
+  `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
+  subject is the person shown in the media other than whoever said yes. Only
+  `none-shown` and `agreed` clear; `check` says `subject-unknown` otherwise, and
+  `said_by` never stands in. `show` prints the subject and proof. Deals approved
+  before this keep their approval and fail only with `subject-unknown`. Engines
+  older than this release drop the subject keys on rewrite, so upgrade every
+  install that touches a business's records together.
+
+- `mb library` now refuses a field it does not know in a record, a deal or the
+  library config, and leaves the file as it was. Engines older than this release
+  drop such fields on rewrite, so upgrade every install that touches a business's
+  records together. Details under Fixed.
+
+- `mb connect remove` now exits 1 with `metadata_write_failed` when a refusal
+  happens during removal, not exit 2. A script that tested for exit 2 must test
+  for 1. Details under Fixed.
+
 ### Added
 
 - `mb card render SPEC.json OUT.jpg` draws a phone decision card from a JSON spec
@@ -46,16 +68,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   a channel with no read route is logged by hand and the gap is stated. Cases
   kept in a tracker are covered, and a synced tracker comment that emails a
   customer counts as a send.
-
-- `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
-  `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
-  subject is the person shown in the media other than whoever said yes. Only
-  `none-shown` and `agreed` clear; `check` says `subject-unknown` otherwise, and
-  `said_by` never stands in. `show` prints the subject and proof. Deals approved
-  before this keep their approval and fail only with `subject-unknown`. Engines
-  older than this release drop the subject keys on rewrite, so upgrade every
-  install that touches a business's records together.
-
 - `mb machine update [--json]` (draft): a plan for updating this one machine,
   with no business repo needed. It runs only root-owned system tools from a
   fixed list (which may touch their own caches) and changes no packages or
