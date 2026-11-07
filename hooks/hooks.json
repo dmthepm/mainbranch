@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source resume 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Start it with mb agent up <name> and verify with mb agent check.'; fi; exit 0",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source resume 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Restart it with MB_ROLE set to the role you meant.'; fi; exit 0",
             "timeout": 20
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source clear 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Start it with mb agent up <name> and verify with mb agent check.'; fi; exit 0",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source clear 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Restart it with MB_ROLE set to the role you meant.'; fi; exit 0",
             "timeout": 20
           }
         ]
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source compact 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Start it with mb agent up <name> and verify with mb agent check.'; fi; exit 0",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source compact 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Restart it with MB_ROLE set to the role you meant.'; fi; exit 0",
             "timeout": 20
           }
         ]
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source fork 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Start it with mb agent up <name> and verify with mb agent check.'; fi; exit 0",
+            "command": "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --source fork 2>/dev/null); then [ -z \"$out\" ] || printf '%s\\n' \"$out\"; elif set -- \"${CLAUDE_PROJECT_DIR:-.}\"/core/roles/*.md && { [ -e \"$1\" ] || [ -L \"$1\" ]; }; then printf '%s\\n' 'MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be running as the role you meant. Informational only, not enforcement. Restart it with MB_ROLE set to the role you meant.'; fi; exit 0",
             "timeout": 20
           }
         ]

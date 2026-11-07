@@ -41,7 +41,7 @@ _REFUSAL = (
 _WARNING = (
     "MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be "
     "running as the role you meant. Informational only, not enforcement. "
-    "Start it with mb agent up <name> and verify with mb agent check."
+    "Restart it with MB_ROLE set to the role you meant."
 )
 CODEX_HOOK_COMMAND = (
     "sh -c '"

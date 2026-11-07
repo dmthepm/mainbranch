@@ -337,8 +337,8 @@ def refusal(reason: str) -> str:
 # conversation, and hook text is not a permission boundary either way.
 WARNING = (
     "MAIN BRANCH ROLE WARNING: this session has no role ({env} is not set), so it may not be "
-    "running as the role you meant. Informational only, not enforcement. Start it with "
-    "mb agent up <name> and verify with mb agent check."
+    "running as the role you meant. Informational only, not enforcement. "
+    "Restart it with MB_ROLE set to the role you meant."
 )
 NO_ROLE_WARNING_SOURCES = ("resume", "clear", "compact", "fork")
 

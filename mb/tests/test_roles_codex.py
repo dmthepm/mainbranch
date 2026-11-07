@@ -364,6 +364,8 @@ def test_hook_when_mb_is_missing_and_a_card_exists(repo: Path, tmp_path: Path, s
         assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
     else:
         assert result.stdout.startswith("MAIN BRANCH ROLE WARNING")
+        assert "Restart it with MB_ROLE set to the role you meant." in result.stdout
+        assert "mb agent" not in result.stdout
         assert "STOP" not in result.stdout and "ROLE CHECK FAILED" not in result.stdout
 
 
