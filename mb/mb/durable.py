@@ -21,12 +21,20 @@ class CorruptStateError(ValueError):
         super().__init__(f"{path} is not valid state: {detail}")
 
 
-def read_json_object(path: Path, *, default: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Read a JSON object, distinguishing missing from corrupt state."""
+def read_json_object(
+    path: Path, *, default: dict[str, Any] | None = None, strict: bool = False
+) -> dict[str, Any]:
+    """Read a JSON object, distinguishing missing from corrupt state.
+
+    An empty file reads as the default unless ``strict``, where it is corrupt:
+    a state file that was written but came back empty is a lost write.
+    """
     if not path.exists():
         return {} if default is None else dict(default)
     raw = path.read_text(encoding="utf-8")
     if not raw.strip():
+        if strict:
+            raise CorruptStateError(path, "file is empty")
         return {} if default is None else dict(default)
     try:
         data = json.loads(raw)
@@ -37,6 +45,17 @@ def read_json_object(path: Path, *, default: dict[str, Any] | None = None) -> di
     return data
 
 
+def _fsync_directory(directory: Path) -> None:
+    """Persist a directory's entries. Errors surface; only Windows, which cannot open one, skips."""
+    if os.name == "nt":
+        return
+    fd = os.open(directory, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def atomic_write_text(
     path: Path,
     text: str,
@@ -45,7 +64,20 @@ def atomic_write_text(
     mode: int | None = None,
     newline: str | None = None,
 ) -> None:
-    """Replace a file from a same-directory temp file with its final mode already set."""
+    """Replace a file from a same-directory temp file with its final mode already set.
+
+    Durability: on return the file's contents, its name, and any parent
+    directories this call had to create are all synced, each through its own
+    parent, up to the first directory that already existed. An OSError from any
+    sync propagates. After such an error the new content may already be
+    visible but is not guaranteed to survive a crash, so treat the write as
+    failed and retry it.
+    """
+    created: list[Path] = []
+    ancestor = path.parent
+    while not ancestor.exists():
+        created.append(ancestor)
+        ancestor = ancestor.parent
     path.parent.mkdir(parents=True, exist_ok=True)
     if mode is None:
         mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
@@ -58,6 +90,9 @@ def atomic_write_text(
             os.fsync(handle.fileno())
         os.chmod(tmp, mode)
         os.replace(tmp, path)
+        _fsync_directory(path.parent)
+        for directory in created:
+            _fsync_directory(directory.parent)
     except BaseException:
         with suppress(OSError):
             tmp.unlink()
