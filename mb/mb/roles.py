@@ -332,6 +332,17 @@ def refusal(reason: str) -> str:
     )
 
 
+# One informational line for a resumed, cleared, compacted or forked session with no role.
+# Only a fresh start keeps the STOP: a session that was already running keeps its
+# conversation, and hook text is not a permission boundary either way.
+WARNING = (
+    "MAIN BRANCH ROLE WARNING: this session has no role ({env} is not set), so it may not be "
+    "running as the role you meant. Informational only, not enforcement. Start it with "
+    "mb agent up <name> and verify with mb agent check."
+)
+NO_ROLE_WARNING_SOURCES = ("resume", "clear", "compact", "fork")
+
+
 def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) -> str:
     """Text the SessionStart hook prints. Empty string means print nothing.
 
@@ -342,6 +353,8 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
         return ""
     selected = (env if env is not None else os.environ).get(ROLE_ENV, "")
     if not selected.strip():
+        if source in NO_ROLE_WARNING_SOURCES:
+            return WARNING.format(env=ROLE_ENV)
         names = ", ".join(c["name"] for c in list_cards(repo))
         return refusal(f"No role was selected ({ROLE_ENV} is not set). Role cards here: {names}.")
     if not valid_name(selected):

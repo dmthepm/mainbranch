@@ -83,7 +83,8 @@ adds the hook's stdout to the model's context.
 | Situation | What the hook prints |
 |---|---|
 | No cards in `core/roles/` | Nothing. Existing businesses see no change. |
-| Cards exist, `MB_ROLE` unset | A refusal: stop, tell the owner, ask which role. |
+| Cards exist, `MB_ROLE` unset, fresh `startup` | A refusal: stop, tell the owner, ask which role. |
+| Cards exist, `MB_ROLE` unset, `resume`, `clear`, `compact` or `fork` | One warning line, no stop. It is informational, not enforcement. |
 | `MB_ROLE` invalid, card missing, or card invalid | The same refusal with the reason. |
 | Valid card | The card and the contents of its checkpoint file (first 8 KB). |
 
@@ -96,7 +97,8 @@ Other limits:
 
 - If the hook command cannot run `mb role hook`, it cannot load the card.
   When at least one `core/roles/*.md` file exists it prints a plain refusal
-  (role could not be loaded; stop and ask, no cause claimed); with none, even
+  (role could not be loaded; stop and ask, no cause claimed) on `startup`, and one
+  informational warning line on the other sources; with none, even
   with an empty folder, it prints nothing. The command is POSIX `sh` and always exits 0.
 - With no cards at all, a set `MB_ROLE` is ignored, by design.
 - A repo-local `SessionStart` hook running `mb role hook --source <source>`

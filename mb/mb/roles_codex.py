@@ -35,14 +35,28 @@ _REFUSAL = (
     "could not be loaded. STOP. Do not start work and do not pick a role yourself. "
     "Tell the owner this message and ask them to fix the role setup. This session has no role."
 )
+# Codex has one command for every source, so the fallback reads the source from the stdin
+# payload: a fresh start keeps the STOP, a resumed session gets one informational line.
+# An unreadable or unknown source is treated as a fresh start. No single quotes in here.
+_WARNING = (
+    "MAIN BRANCH ROLE WARNING: mb could not load the role for this session, so it may not be "
+    "running as the role you meant. Informational only, not enforcement. "
+    "Start it with mb agent up <name> and verify with mb agent check."
+)
 CODEX_HOOK_COMMAND = (
     "sh -c '"
     'd=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
     '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
-    f"if command -v mb >/dev/null 2>&1 && out=$({_MARK} 2>/dev/null); "
+    "in=; [ -t 0 ] || in=$(head -c 65536); "
+    f'if command -v mb >/dev/null 2>&1 && out=$(printf "%s" "$in" | {_MARK} 2>/dev/null); '
     'then [ -z "$out" ] || printf "%s\\n" "$out"; '
     'else set -- "$d"/core/roles/*.md; '
-    f'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\''
+    'if [ -e "$1" ] || [ -L "$1" ]; then '
+    'case $(printf "%s" "$in" | tr -d " ") in '
+    '*\\"source\\":\\"resume\\"*|*\\"source\\":\\"clear\\"*|'
+    '*\\"source\\":\\"compact\\"*|*\\"source\\":\\"fork\\"*) '
+    f'printf "%s\\n" "{_WARNING}";; '
+    f'*) printf "%s\\n" "{_REFUSAL}";; esac; fi; fi; exit 0\''
 )
 
 

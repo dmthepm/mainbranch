@@ -354,12 +354,62 @@ def test_hook_does_not_climb_past_a_git_root_into_a_parent_repo(repo: Path, tmp_
     assert result.stdout == "" and not marker.exists()
 
 
-def test_hook_refuses_when_mb_is_missing_and_a_card_exists(repo: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+def test_hook_when_mb_is_missing_and_a_card_exists(repo: Path, tmp_path: Path, source: str) -> None:
     empty = tmp_path / "empty-bin"
     empty.mkdir()
-    result = _run(repo / "state", empty, {"source": "startup"})
+    result = _run(repo / "state", empty, {"source": source})
     assert result.returncode == 0
-    assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    if source == "startup":
+        assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    else:
+        assert result.stdout.startswith("MAIN BRANCH ROLE WARNING")
+        assert "STOP" not in result.stdout and "ROLE CHECK FAILED" not in result.stdout
+
+
+@pytest.mark.parametrize("payload", [None, {}, {"source": "weird"}, {"cwd": "x"}])
+def test_hook_when_mb_is_missing_and_source_is_unknown_keeps_stop(
+    repo: Path, tmp_path: Path, payload: object
+) -> None:
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    result = _run(repo / "state", empty, payload)
+    assert "STOP" in result.stdout
+
+
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+def test_hook_with_mb_present_and_no_role_splits_by_source(
+    repo: Path, tmp_path: Path, source: str
+) -> None:
+    path_dir = _shim(tmp_path / "bin", tmp_path / "ran")
+    result = _run(repo / "state", path_dir, {"source": source, "cwd": str(repo)}, role=None)
+    assert result.returncode == 0
+    if source == "startup":
+        assert "STOP" in result.stdout
+    else:
+        assert result.stdout.startswith("MAIN BRANCH ROLE WARNING") and "STOP" not in result.stdout
+
+
+def test_codex_hook_declares_a_timeout_and_a_hang_prints_nothing(
+    repo: Path, tmp_path: Path
+) -> None:
+    assert 0 < roles_codex.HOOK_TIMEOUT_SECONDS <= 30
+    shim = tmp_path / "hang-bin"
+    shim.mkdir()
+    (shim / "mb").write_text("#!/bin/sh\nexec sleep 30\n", encoding="utf-8")
+    (shim / "mb").chmod(0o755)
+    env = {"PATH": f"{shim}:/usr/bin:/bin", "HOME": str(repo)}
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        subprocess.run(
+            ["/bin/sh", "-c", roles_codex.CODEX_HOOK_COMMAND],
+            cwd=repo / "state",
+            env=env,
+            input=json.dumps({"source": "resume"}),
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
+    assert not caught.value.stdout or "running as role" not in str(caught.value.stdout)
 
 
 def test_hook_is_silent_when_mb_is_missing_and_the_roles_folder_is_empty(

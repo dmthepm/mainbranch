@@ -13,6 +13,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- Role hook source policy: a fresh `startup` with cards but no `MB_ROLE` keeps the STOP
+  refusal; `resume`, `clear`, `compact` and `fork` print one informational warning line
+  instead, for Claude Code and Codex, including when `mb` is missing. Neither is a
+  permission boundary. The Claude hook commands now declare a 20 second timeout.
 - `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
   `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
   subject is the person shown in the media other than whoever said yes. Only
