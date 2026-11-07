@@ -13,6 +13,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `/mb-support` (draft): a case now lists every conversation it covers as
+  provider ids only. The agent checks open cases for the same request and reads
+  the linked conversations before opening a case or drafting a reply, asks the
+  owner when unsure, and never merges on a guess. One reply per case unless the
+  owner approves more. A new channels register (`core/support/channels.md`)
+  records where each channel lives, who owns replies and the agent's read route;
+  a channel with no read route is logged by hand and the gap is stated. Cases
+  kept in a tracker are covered, and a synced tracker comment that emails a
+  customer counts as a send.
+
 - `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
   `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
   subject is the person shown in the media other than whoever said yes. Only
