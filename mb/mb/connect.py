@@ -4249,7 +4249,7 @@ def _is_git_top(folder: Path) -> bool:
     entry there lets the search go on to the parent. Any ``.git`` entry at all
     ends it with a repo or a refusal, never a third outcome: a gitfile without
     ``gitdir:``, a folder without a regular HEAD, a FIFO or other odd type, a
-    dangling link, and any failure or change after the lstat all refuse. A link
+    dangling link, and any failed inspection after the lstat all refuse. A link
     counts as what it resolves to. An uninspectable marker may be a nested repo,
     so the search never walks on past it.
     """

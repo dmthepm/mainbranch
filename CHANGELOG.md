@@ -22,7 +22,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `--repo` behaves as before. Only a missing `.git` counts as absent. Any `.git`
   entry ends the search with a working repo (a `gitdir:` file or a folder with a
   regular HEAD) or a refusal: an empty `.git`, a missing HEAD, a gitfile without
-  `gitdir:`, a special file, a dangling link, or one that changes mid-check stops
+  `gitdir:`, a special file, a dangling link, or one that fails inspection stops
   with `unreadable_repo_marker` (exit 2) rather than falling through to a parent
   repo's keys.
 

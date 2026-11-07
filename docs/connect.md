@@ -85,8 +85,8 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
   `.git` entry at all ends the search with a working repo (a `gitdir:` file, or
   a folder holding a regular HEAD; a link counts as what it resolves to) or a
   refusal. A `.git` that is empty, has no HEAD, is a file without `gitdir:`, is
-  a special file or a dangling link, or that cannot be fully inspected or
-  changes mid-check, stops them with `unreadable_repo_marker` (exit 2) instead
+  a special file or a dangling link, or that cannot be fully inspected,
+  stops them with `unreadable_repo_marker` (exit 2) instead
   of trying a parent: it might be a nested repo. There is no ignored marker.
   Anywhere else they stop with `no_business_repo` (exit 2). This
   chooses which folder is read, not who may read it: binding, reference and
