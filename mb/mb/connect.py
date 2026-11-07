@@ -6170,8 +6170,9 @@ def _walk_json_for_secrets(
                             "mask": f"••• ({len(value)} chars)",
                             "remediation": (
                                 "move the value into the OS keychain "
-                                "(`mb connect <provider> --token-stdin`) or a gitignored "
-                                "env.sh, then reference it as ${ENV_VAR} in this config"
+                                "(`mb connect <provider> --token-stdin`), run the command "
+                                "through `mb connect exec`, then reference it as "
+                                "${ENV_VAR} in this config"
                             ),
                             "safe_to_share": True,
                         }

@@ -65,42 +65,38 @@ Best for:
 3. Click "Create API key"
 4. Copy the key
 
-### 2. Add to Environment (1 min)
+### 2. Store the Key (1 min)
 
-Create or edit your vip env file:
+From the business repo, store the key with `mb connect`. Paste it at the prompt
+your terminal gives, never into chat, a file, or a shell line.
 
-```bash
-mkdir -p ~/.config/vip
-nano ~/.config/vip/env.sh
-```
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
 
-Add your key:
+Then run:
 
 ```bash
-export GOOGLE_API_KEY="your_key_here"
+mb connect google-ai --custom --account "Google AI Studio"
 ```
 
-Save (Ctrl+X, Y, Enter) and reload:
+Commands that need the key run through `mb connect exec`, which puts it in that
+one command's environment and nowhere else:
 
 ```bash
-source ~/.config/vip/env.sh
+mb connect exec google-ai --env GOOGLE_API_KEY -- <command>
 ```
 
-**Optional:** Add to your shell profile for persistence:
-
-```bash
-echo 'source ~/.config/vip/env.sh' >> ~/.zshrc
-```
+A key an older install already placed in your shell environment keeps working;
+it is not migrated.
 
 ---
 
 ## Verify It's Working
 
 ```bash
-test -n "$GOOGLE_API_KEY" && echo "GOOGLE_API_KEY is set" || echo "GOOGLE_API_KEY is not set"
+mb connect status google-ai --json
 ```
 
-This should confirm the key is set without printing the value.
+This confirms the key is stored without printing the value.
 
 **In Claude Code:**
 
@@ -121,10 +117,8 @@ Gemini Deep Research is now available in /mb-think.
 ## Troubleshooting
 
 **"Key not found"**
-- Did you `source ~/.config/vip/env.sh`?
-- Or restart your terminal?
-- Check presence without printing the value:
-  `test -n "$GOOGLE_API_KEY" && echo "GOOGLE_API_KEY is set" || echo "GOOGLE_API_KEY is not set"`
+- Run `mb connect status google-ai --json` from the business repo.
+- If it is not stored, repeat step 2.
 
 **"Invalid API key"**
 - Verify key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
@@ -171,5 +165,5 @@ Gemini Deep Research is now available in /mb-think.
 
 - [gemini-deep-research.md](gemini-deep-research.md) — How to use Gemini for research
 - [research-routing-quick-ref.md](research-routing-quick-ref.md) — Routing logic
-- `mb-start/references/config-system.md` — Full config file layout (local.yaml, env.sh, config.yaml)
-- `mb-setup/SKILL.md` Step 4a — How env.sh is created during initial setup
+- `mb-start/references/config-system.md` — Config file layout (legacy local.yaml, config.yaml)
+- `docs/connect.md` — `mb connect` and `mb connect exec`

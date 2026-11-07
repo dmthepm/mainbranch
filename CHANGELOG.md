@@ -67,6 +67,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `deal approve`, `deal revoke` and `source add` used to write the file back
   without that field, which silently deleted hand-entered data. Put
   business-only facts in `tags`. Closes #1318.
+- Skills no longer tell users to put a key in `~/.config/vip/env.sh`, a `.env`
+  file or a shell line. Gemini, Grok, Stripe, Cloudflare and Porkbun guidance
+  and script hints now say to store it with `mb connect` and run the command
+  through `mb connect exec`. Removed `mb-site/scripts/setup_creds.sh`, which
+  wrote Cloudflare keys into `env.sh` and was referenced by nothing, and the
+  deprecated `mb-think/scripts/detect-tools.sh`. An existing `env.sh` still
+  works for anything that sources it. A test now fails if a skill points at
+  `env.sh` again. Closes #1317.
+- `docs/json-output-contract.md` said machine doctor `scope` is only `self`; the
+  CLI also accepts `all` (`--scope`), and anything else is an error (exit 2).
 - The checks-and-review guide now shows the real repair flow,
   `mb doctor repair --plan` then `mb doctor repair --apply`. It no longer
   mentions `--yes`, which that command does not accept.

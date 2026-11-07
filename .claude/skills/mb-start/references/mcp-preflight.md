@@ -94,8 +94,8 @@ are optional and should not replace `mb connect` facts:
 | Tool | Check Method | If Missing |
 |------|--------------|------------|
 | **Apify** | `mcp__apify__search-actors` tool exists | Offer setup (important - enables YouTube + Instagram mining) |
-| **Grok** | `$XAI_API_KEY` set OR `mcp__xai__*` exists | Note, don't block (fallback: WebSearch site:x.com) |
-| **Gemini** | `$GOOGLE_API_KEY` set | Note, don't block (fallback: multi-source WebSearch) |
+| **Grok** | `mb connect status xai --json` shows a stored key OR `mcp__xai__*` exists | Note, don't block (fallback: WebSearch site:x.com) |
+| **Gemini** | `mb connect status google-ai --json` shows a stored key | Note, don't block (fallback: multi-source WebSearch) |
 | **whisper** | `mcp__whisper__*` OR `which mlx_whisper` OR `which whisper-cli` | Offer CLI fallback or manual transcription |
 
 ### Detection Order
@@ -106,11 +106,11 @@ Run only when the selected `/mb-think` path needs that runtime tool:
 # 1. Apify - check for MCP tools (most important)
 # If mcp__apify__* tools exist → Apify loaded
 
-# 2. Gemini - env var
-[ -n "$GOOGLE_API_KEY" ] && echo "Gemini available"
+# 2. Gemini - stored key
+mb connect status google-ai --json
 
-# 3. Grok - env var or MCP
-[ -n "$XAI_API_KEY" ] && echo "Grok available"
+# 3. Grok - stored key or MCP
+mb connect status xai --json
 # OR check for mcp__xai__* tools
 
 # 4. whisper - MCP or CLI (check mlx_whisper first, then whisper-cli)
