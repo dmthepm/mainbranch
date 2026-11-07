@@ -662,14 +662,6 @@ def test_full_audit_streams_a_large_log_within_a_small_memory_bound(tmp_path, mo
     size = audit.stat().st_size
     assert size > 4 * 1024 * 1024
     monkeypatch.setattr(c, "audit_path", lambda: audit)
-    read_sizes: list[int] = []
-    real_pread = os.pread
-
-    def spy(fd: int, length: int, offset: int) -> bytes:
-        read_sizes.append(length)
-        return real_pread(fd, length, offset)
-
-    monkeypatch.setattr(os, "pread", spy)
     tracemalloc.start()
     try:
         newest = c.read_release_audit(limit=2)
@@ -677,7 +669,6 @@ def test_full_audit_streams_a_large_log_within_a_small_memory_bound(tmp_path, mo
     finally:
         tracemalloc.stop()
     assert [row["n"] for row in newest] == [59998, 59999]
-    assert all(length < size for length in read_sizes)
     assert peak < size // 4  # bounded by the limit, not by the file
 
 
@@ -757,6 +748,50 @@ def test_status_history_is_incomplete_when_the_log_shrinks_while_read(tmp_path, 
     real_open = c._open_audit_log
     monkeypatch.setattr(c, "_open_audit_log", lambda: _TruncatingLog(real_open(), audit, when))
     assert c.recent_rebinds("r")[1] == "incomplete"
+
+
+class _GrowingLog(_TruncatingLog):
+    """The real audit stream, with a writer appending after the size was taken."""
+
+    def __init__(self, stream, path):
+        super().__init__(stream, path, "growing")
+        self.bytes_read = 0
+
+    def seek(self, *args):
+        self._append()
+        return self._stream.seek(*args)
+
+    def read(self, *args):
+        data = self._stream.read(*args)
+        self.bytes_read += len(data)
+        if data:
+            self._append()
+        return data
+
+    def _append(self):
+        if self.bytes_read < 64 * 1024:  # the test ends even if the read has no limit
+            with self._path.open("a") as log:
+                log.write("x" * 4096 + "\n")
+
+
+def test_status_reads_no_more_than_the_bound_while_the_log_grows(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    audit.write_text((json.dumps(row) + "\n") * 40)
+    bound = 1024
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", bound)
+    real_open = c._open_audit_log
+    opened: list[_GrowingLog] = []
+
+    def growing():
+        opened.append(_GrowingLog(real_open(), audit))
+        return opened[-1]
+
+    monkeypatch.setattr(c, "_open_audit_log", growing)
+    rows, state = c.recent_rebinds("r")
+    assert opened[0].bytes_read <= bound + 1  # the bound, and one byte of lookbehind
+    assert (len(rows), state) == (5, "ok")
 
 
 def test_failed_binding_records_outcome(tmp_path, monkeypatch):

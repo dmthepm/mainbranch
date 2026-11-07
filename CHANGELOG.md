@@ -45,7 +45,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   puts the repo metadata back when its write lands and still fails, puts
   everything back after a read-only user-scope file or a moved metadata path
   too, reads each restore back, and says everything was put back only when it
-  was. Closes #1323 and #1313.
+  was. A refusal during removal now exits 1 with `metadata_write_failed`, not
+  exit 2. Closes #1323 and #1313.
 - `mb library` now refuses a field it does not know in a record, a deal or the
   library config, by name, and leaves the file as it was. `deal propose`,
   `deal approve`, `deal revoke` and `source add` used to write the file back

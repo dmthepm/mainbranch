@@ -2580,9 +2580,9 @@ def remove_provider(
             ConfigBoundaryError,
             ConnectRefusal,
         ) as exc:
-            # Every failure here comes after the first deletion, so a refusal
-            # (a user-scope file that turned read-only) must not skip the undo
-            # or claim that nothing was changed.
+            # A failure here can follow a deletion, so a refusal (a user-scope
+            # file that turned read-only) must not skip the undo or claim that
+            # nothing was changed.
             restored = _undo_removal(undo)
             kept = (
                 "Everything was put back and read back to check."
@@ -4423,8 +4423,8 @@ def _read_audit_tail(max_bytes: int) -> tuple[list[bytes], bool, bool]:
     """The log's last ``max_bytes`` as lines, whether any were cut, and whether
     the read was whole.
 
-    The size is only a guess about a file that may change, so the stream is
-    read to its end and the read counts as whole only if as many bytes arrived
+    The size is taken once and caps the read, so a writer appending meanwhile
+    cannot stretch it. The read counts as whole only if as many bytes arrived
     as the size promised and the file did not shrink meanwhile. When the log is
     longer than the bound the read starts one byte early: the first line is
     then either the end of a cut row or empty (the cut fell on a line
@@ -4435,11 +4435,8 @@ def _read_audit_tail(max_bytes: int) -> tuple[list[bytes], bool, bool]:
         start = max(0, size - max_bytes)
         begin = max(0, start - 1)
         stream.seek(begin)
-        chunks: list[bytes] = []
-        while chunk := stream.read(1024 * 1024):
-            chunks.append(chunk)
-        data = b"".join(chunks)
-        whole = len(data) >= size - begin and os.fstat(stream.fileno()).st_size >= size
+        data = stream.read(size - begin)  # never past the size taken above
+        whole = len(data) == size - begin and os.fstat(stream.fileno()).st_size >= size
     lines = data.splitlines()
     return (lines[1:], True, whole) if start else (lines, False, whole)
 
