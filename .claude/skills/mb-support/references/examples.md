@@ -4,6 +4,8 @@ Invented for illustration. Every id, date and case here is made up. They show
 what the rules in SKILL.md and `cases.md` ask for; they are not a record of a
 run, and they say nothing about how any runtime behaves.
 
+This skill has not yet been exercised on a live business.
+
 ## Same request on two channels
 
 A customer emails about a wrong-size item, then asks again in chat.
@@ -17,13 +19,15 @@ A customer emails about a wrong-size item, then asks again in chat.
 
 ## An unsure match
 
-Two chats mention "my order is late". They may be one customer or two.
+Two chats mention "my order is late". Each was logged as its own case when it
+arrived, `C-022` for chat:c-80 and `C-023` for chat:c-83. Later the agent
+notices they may be one customer.
 
-- The agent cannot tell from the providers. It does not merge and does not open
-  a second case on a guess.
+- Both cases already existed before the match was noticed; nothing here opens a
+  case. The agent cannot tell from the providers, so it does not merge and
+  leaves both lines as they are.
 - It asks the owner: "chat:c-80 and chat:c-83 may be one request. One case or
-  two?" Until the answer, both stay as separate open lines, `C-022` and
-  `C-023`, with `waiting` on the owner.
+  two?" Until the answer, both stay open, with `waiting` on the owner.
 - A provider whose conversation id is the customer's phone number: stop and ask
   the owner for a safe provider-side reference. Do not save the number.
 
