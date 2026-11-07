@@ -75,8 +75,11 @@ def _make_parents(parent: Path) -> None:
     made: list[Path] = []
     try:
         for directory in reversed(missing):
-            directory.mkdir(exist_ok=True)
-            made.append(directory)
+            try:
+                directory.mkdir()
+                made.append(directory)
+            except FileExistsError:
+                pass  # another process made it: it exists, and is not ours to remove
             fd = _open_directory(directory.parent)
             try:
                 _fsync_fd(fd)
@@ -111,11 +114,11 @@ def atomic_write_text(
     _make_parents(path.parent)
     if mode is None:
         mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
-    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    tmp = Path(tmp_name)
-    dir_fd: int | None = None
+    dir_fd = _open_directory(path.parent)
+    tmp: Path | None = None
     try:
-        dir_fd = _open_directory(path.parent)
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+        tmp = Path(tmp_name)
         with os.fdopen(fd, "w", encoding=encoding, newline=newline) as handle:
             handle.write(text)
             handle.flush()
@@ -124,8 +127,9 @@ def atomic_write_text(
         os.replace(tmp, path)
     except BaseException:
         _close(dir_fd)
-        with suppress(OSError):
-            tmp.unlink()
+        if tmp is not None:
+            with suppress(OSError):
+                tmp.unlink()
         raise
     try:
         _fsync_fd(dir_fd)

@@ -166,3 +166,42 @@ def test_a_retry_after_a_failed_directory_sync_still_persists_every_new_ancestor
 
     assert target.read_text(encoding="utf-8") == "{}\n"
     assert set(synced) == {tmp_path / "a" / "b", tmp_path / "a", tmp_path}
+
+
+def test_a_directory_made_by_another_process_survives_a_later_sync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "a" / "b" / "state.json"
+    real_mkdir = Path.mkdir
+
+    def racing_mkdir(self: Path, *args: object, **kwargs: object) -> None:
+        if self == tmp_path / "a":
+            real_mkdir(self)  # the other process wins the race, then ours finds it there
+        real_mkdir(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "mkdir", racing_mkdir)
+    _fail_directory_fsync(monkeypatch)
+
+    with pytest.raises(OSError, match="directory fsync failed"):
+        atomic_write_text(target, "{}\n")
+
+    assert (tmp_path / "a").is_dir()
+    assert not (tmp_path / "a" / "b").exists()
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc/self/fd")
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_an_unopenable_parent_leaves_no_descriptor_behind(tmp_path: Path) -> None:
+    folder = tmp_path / "locked"
+    folder.mkdir()
+    folder.chmod(0o300)
+    before = len(os.listdir("/proc/self/fd"))
+    try:
+        for _ in range(3):
+            with pytest.raises(PermissionError):
+                atomic_write_text(folder / "state.json", "new\n")
+    finally:
+        folder.chmod(0o700)
+
+    assert len(os.listdir("/proc/self/fd")) == before
+    assert list(folder.iterdir()) == []
