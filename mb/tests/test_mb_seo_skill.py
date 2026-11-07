@@ -96,7 +96,7 @@ def test_setup_pins_and_writes_access_as_requirements() -> None:
 
 def test_setup_uses_connect_and_keeps_logs_private() -> None:
     flat = _flat(SETUP)
-    assert "mb connect cloudflare-openseo --custom --token-stdin" in flat
+    assert "mb connect cloudflare-openseo --custom --scope repo" in flat
     assert "mb connect exec cloudflare-openseo" in flat
     assert '--profile "$PROFILE" >"<PRIVATE_LOGS>/deploy.log" 2>&1' in flat
     assert "ALCHEMY_PROFILE=" not in flat
