@@ -172,14 +172,14 @@ def test_a_directory_made_by_another_process_survives_a_later_sync_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     target = tmp_path / "a" / "b" / "state.json"
-    real_mkdir = os.mkdir
+    real_mkdir = Path.mkdir
 
-    def racing_mkdir(name: str | Path, *args: object, **kwargs: object) -> None:
-        if Path(name) == tmp_path / "a":
-            real_mkdir(name, *args, **kwargs)  # type: ignore[arg-type]  # the other process wins
-        real_mkdir(name, *args, **kwargs)  # type: ignore[arg-type]
+    def racing_mkdir(self: Path, mode: int = 0o777) -> None:
+        if self == tmp_path / "a":
+            real_mkdir(self, mode)  # the other process wins
+        real_mkdir(self, mode)
 
-    monkeypatch.setattr(os, "mkdir", racing_mkdir)
+    monkeypatch.setattr(Path, "mkdir", racing_mkdir)
     _fail_directory_fsync(monkeypatch)
 
     with pytest.raises(OSError, match="directory fsync failed"):
