@@ -396,7 +396,9 @@ mb doctor repair --plan
 Use `mb status --json --peek` as the default daily briefing before routing the
 operator (readiness, drift, update state, provider signals, recent work, MoneyPath,
 ranked actions, bets, pushes, checkpoint state). It is large; `mb status --summary`
-returns ranked actions, readiness, save and update state in a few KB, so start there.
+is the few-KB first look (ranked actions, readiness, save and update state, warn and
+error drift, `runtime.codex_cli`), and the same stop rules apply to it. Run the full
+command when the summary is not enough.
 Do not replace those facts with ad hoc shell inspection unless `mb` says a section is unavailable.
 
 Read-only commands can be run without asking first. Commands that write files,

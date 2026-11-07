@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import subprocess
 from datetime import date, datetime, timezone
@@ -4558,3 +4559,50 @@ def test_status_summary_does_not_move_the_seen_marker(tmp_path: Path, monkeypatc
     assert result.exit_code == 0
     assert json.loads(result.stdout)["result_schema"]["name"] == "mainbranch.status.summary"
     assert not (repo / ".mb" / "last-status-seen.json").exists()
+
+
+def test_status_summary_keeps_the_codex_runtime_mismatch_stop(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    monkeypatch.setattr(codex_mod, "_which", _with_codex)
+    monkeypatch.setattr(
+        codex_mod,
+        "_login_shell_mb_diagnostics",
+        lambda: {
+            "checked": True,
+            "ok": False,
+            "state": "warn",
+            "path": "/old/bin/mb",
+            "version": "0.3.18",
+            "active_path": "/new/bin/mb",
+            "active_version": "0.3.29",
+            "mismatch": True,
+            "summary": "Login-shell runtime resolves a different mb than this process.",
+            "repair": "Put the current Main Branch install earlier on the login-shell PATH.",
+            "safe_to_share": True,
+        },
+    )
+    repo = tmp_path / "acme"
+    init_run(path=str(repo), name="Acme")
+
+    report = status_mod.run(path=str(repo), update_marker=False)
+    summary = status_mod.summarize(report, repo)
+
+    assert summary["runtime"]["codex_cli"] == "runtime_mismatch"
+    finding = next(i for i in summary["drift"] if i["id"] == "codex_runtime_mb_mismatch")
+    assert "login-shell PATH" in finding["repair"]
+
+
+def test_status_summary_keeps_commands_whole(tmp_path: Path) -> None:
+    repo = tmp_path / ("a long business name " * 12)
+    command = f"mb save {shlex.quote(str(repo))} --message 'x'"
+    assert len(command) > status_mod.SUMMARY_TEXT_LIMIT
+    report = {
+        "ranked_actions": [{"id": "a", "command": command, "title": "T" * 500}],
+        "update": {"command": command},
+    }
+
+    summary = status_mod.summarize(report, repo)
+
+    assert summary["ranked_actions"][0]["command"] == command
+    assert summary["update"]["command"] == command
+    assert len(summary["ranked_actions"][0]["title"]) <= status_mod.SUMMARY_TEXT_LIMIT

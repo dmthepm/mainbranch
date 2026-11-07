@@ -2421,8 +2421,10 @@ def _clip(value: Any) -> str:
 def summarize(report: dict[str, Any], repo: Path) -> dict[str, Any]:
     """The few facts an agent needs at session start, from a built report (#994).
 
-    Ranked actions, readiness, save state, and update state in a few KB. The full
-    report stays behind `full_status`.
+    Ranked actions, readiness, save state, and update state in a few KB. Warn and
+    error drift (with its repair) and the Codex runtime status ride along, since
+    generated instructions require stopping on a runtime mismatch. Commands are
+    never clipped; only prose is. The full report stays behind `full_status`.
     """
     readiness = report.get("readiness") or {}
     git = report.get("git") or {}
@@ -2435,11 +2437,24 @@ def summarize(report: dict[str, Any], repo: Path) -> dict[str, Any]:
             {
                 "id": action.get("id", ""),
                 "title": _clip(action.get("title")),
-                "command": _clip(action.get("command")),
+                "command": str(action.get("command") or ""),
                 "priority": action.get("priority", ""),
                 "reason": _clip(action.get("reason")),
             }
             for action in report.get("ranked_actions") or []
+        ],
+        "runtime": {
+            "codex_cli": (report.get("runtime") or {}).get("codex_cli", {}).get("status", "")
+        },
+        "drift": [
+            {
+                "id": item.get("id", ""),
+                "severity": item.get("severity", ""),
+                "summary": _clip(item.get("summary")),
+                "repair": str(item.get("repair") or ""),
+            }
+            for item in (report.get("drift") or {}).get("items") or []
+            if item.get("severity") in ("warn", "error")
         ],
         "readiness": {
             "level": readiness.get("level", ""),
@@ -2461,7 +2476,7 @@ def summarize(report: dict[str, Any], repo: Path) -> dict[str, Any]:
             "installed": update.get("installed", ""),
             "latest": update.get("latest", ""),
             "severity": update.get("severity", ""),
-            "command": _clip(update.get("command")),
+            "command": str(update.get("command") or ""),
         },
         "full_status": "mb status --json --peek"
         + (f" {shlex.quote(str(repo))}" if repo_flag(repo) else ""),
