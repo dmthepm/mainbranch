@@ -175,6 +175,11 @@ def _read_card(path: Path, root: Path) -> tuple[dict[str, Any] | None, str, list
         text = raw.decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return None, "", ["card could not be read as UTF-8 text"]
+    return parse_card_text(text)
+
+
+def parse_card_text(text: str) -> tuple[dict[str, Any] | None, str, list[str]]:
+    """Return ``(frontmatter, body, errors)`` for card text already read. Never raises."""
     if not text.startswith("---\n"):
         return None, text, ["card has no frontmatter"]
     end = text.find("\n---", 4)
@@ -225,6 +230,14 @@ def _validate(fm: dict[str, Any], stem: str, root: Path) -> tuple[list[str], lis
     for extra in sorted(set(fm) - set(REQUIRED_FIELDS), key=str):
         warnings.append(f"unknown field ignored: {printable(str(extra), 40)}")
     return errors, warnings
+
+
+def card_text_errors(text: str, stem: str, root: Path) -> list[str]:
+    """Why card ``text`` is not a valid card named ``stem``; empty when it is."""
+    fm, _body, errors = parse_card_text(text)
+    if fm is None:
+        return errors
+    return _validate(fm, stem, root)[0]
 
 
 def load_card(repo: str | Path, name: str) -> dict[str, Any]:

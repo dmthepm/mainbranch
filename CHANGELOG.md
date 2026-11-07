@@ -13,6 +13,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb agent check [name]` validates the `agents.json` policy and the files it names: schema,
+  card locations, profiles and the PATH list, refusing any group or world writable path
+  and any symlink on the way. Exit 0 means the policy is valid and says nothing about a
+  running agent. It launches nothing and writes no state.
 - `mb status --summary` returns ranked actions, readiness, save state and update
   state in about 2 KB, against about 380 KB for `mb status --json --peek` on the
   dogfood fixture. It implies `--json --peek`. `/mb-start` and the generated
