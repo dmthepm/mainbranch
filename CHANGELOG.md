@@ -13,6 +13,13 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb card render SPEC.json OUT.jpg` draws a phone decision card from a JSON spec
+  (`title`, `sub`, `sections` with `bullets` and lettered `options`, `footer`). The
+  tool holds the house rules: 1320 px wide, large type, numbered sections, the
+  pick marked "(my pick)", refused above 3:1 tall (split it), under 2 MB. A bad
+  spec is refused by field name. Needs the optional `pip install 'mainbranch[cards]'`
+  (Pillow); without it the command says so and nothing else in `mb` changes. Type is
+  Pillow's built-in font, so no machine fonts are used.
 - `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
   `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
   subject is the person shown in the media other than whoever said yes. Only
