@@ -32,10 +32,11 @@ Then start useful work with public evidence. Do not hold the review until setup.
 |---|---|
 | A review of the site, or does not want accounts | Run the public-site review below. |
 | Keyword or competitor data, and has no OpenSEO copy | Offer setup. Follow [references/setup.md](references/setup.md) one step at a time. |
-| Research from an existing copy | Follow [references/daily-use.md](references/daily-use.md). |
+| Research from an existing copy | Hand off to the upstream skill in [references/upstream-skills.md](references/upstream-skills.md), under the limits in [references/daily-use.md](references/daily-use.md). |
 | AI answers, ChatGPT, Claude, Perplexity, or `llms.txt` | Follow [references/ai-agents.md](references/ai-agents.md). |
 | A weekly review, "how is SEO doing", or pages losing clicks | Follow [references/search-review.md](references/search-review.md). |
 | Search Console or Analytics evidence | Use `mb google` if it is connected. For OpenSEO, follow "Later: Google" in [references/setup.md](references/setup.md). |
+| Setup durability, idle gaps, login expiry, or where SEO facts live | Read [references/durable-setup.md](references/durable-setup.md) for requirements and proof limits. |
 | An OpenSEO upgrade, backup, or rollback | Follow [references/upgrades-and-backups.md](references/upgrades-and-backups.md). |
 | Page or copy changes | Route to `/mb-site`. |
 | A keyword choice for an offer | Route to `/mb-think` keyword gate. |
@@ -78,6 +79,28 @@ evidence for each.
 show rankings, search volume, traffic, or what caused a change. Never predict a
 ranking or a traffic result.
 
+## OpenSEO's own skills
+
+OpenSEO ships 12 workflow skills. Use them for the procedure; do not rewrite or
+restate their steps here. Main Branch adds the business context before and the
+judgement after. Each handoff, and what to save, is in
+[references/upstream-skills.md](references/upstream-skills.md).
+
+`seo-coach`, `seo-project-setup`, `keyword-research`, `keyword-clustering`,
+`seo-audit`, `competitor-analysis`, `competitive-landscape`, `link-prospecting`,
+`ai-prompt-research`, `ai-visibility-audit`, `local-seo`, `seo-report`.
+
+Before each one: give it the offer, audience, voice, proof, market, goal, past SEO
+decisions, and the owner's approved limits. After each one: record source, date,
+market, actual or unknown cost, coverage, and uncertainty; reject what does not fit
+the business; save the result. Their output is evidence, not a decision.
+
+**Installing them.** The upstream plugin points its MCP entry at hosted
+`openseo.so`. For a self-hosted copy, install the skills only and wire MCP to that
+business's own endpoint. Never add the hosted entry as a shortcut. See "Install the
+skills only" in [references/setup.md](references/setup.md). Main Branch never runs
+the installer or updates third-party skills for the owner.
+
 ## Hard rules
 
 - Never promise citations or AI traffic. `llms.txt` is a map for agents sent to the
@@ -89,7 +112,10 @@ ranking or a traffic result.
   are not a spend limit. `mb` cannot enforce this, so tell the owner to keep the
   DataForSEO balance low.
 - Keep rank and AI-visibility schedules off unless the owner approves them.
-- Keep Cloudflare Access on. Never set `AUTH_MODE=password` on a copy.
+- Keep Cloudflare Access on, and follow [references/access-hardening.md](references/access-hardening.md).
+  Never set `AUTH_MODE=password` on a copy.
+- Upstream skills never override these rules: spend asks, schedules off, owner-run
+  steps. Research permission does not authorize outreach or site edits.
 - Deploy only a reviewed release SHA. Never run `alchemy destroy`.
 - Owner-run steps stay with the owner: account creation, payment, token creation,
   and browser approvals.

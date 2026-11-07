@@ -1,4 +1,8 @@
-# OpenSEO Daily Use
+# OpenSEO Spend and Schedule Limits
+
+Procedures live in OpenSEO's own skills ([upstream-skills.md](upstream-skills.md)).
+This file keeps only the spend and schedule exceptions they do not enforce. They
+were read against the v0.1.21 pin; recheck them when the pin moves.
 
 Use the MCP server named `openseo-<BIZ>` for this business. If the name does not
 match this business, stop.
@@ -81,3 +85,7 @@ them: Lighthouse is a paid DataForSEO call.
 With the owner's agreement, save findings and choices as described in
 [`SKILL.md`](../SKILL.md). Route page changes to `/mb-site`, and offer keyword
 choices to `/mb-think`. A finding that matters should survive the loss of the copy.
+
+Seen on a live copy: `run_site_audit` returns no cost field, so write down the
+estimate before running it. A rank-tracker run can stay "running" for over an hour
+with no result; check it later instead of starting another paid run.

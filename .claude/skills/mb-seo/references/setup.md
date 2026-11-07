@@ -270,8 +270,8 @@ that. The code exchange then works unchanged.
 
 Keep these limits in mind:
 
-- Do not install the upstream OpenSEO plugin. Its MCP entry points at the hosted
-  service, not this copy.
+- The upstream plugin's MCP entry points at hosted `openseo.so`, not this copy.
+  For a self-hosted copy, install skills only (next section).
 - Personal API keys do not work behind Access. An agent needs a user sign-in.
 - Settings > Connected agents is hosted-only. To remove a person, take them out of
   `ACCESS_ALLOWED_EMAILS`, redeploy, and redo step 7. Whether that ends sessions
@@ -279,6 +279,45 @@ Keep these limits in mind:
   their browser and MCP sessions now fail.
 - The Access session lasts seven days. Whether an agent stays connected past that
   is unproven.
+
+## Install the skills only
+
+Upstream documents a skills-only route, separate from MCP. Its Claude Code page
+recommends the plugin, which suits the hosted service. A self-hosted copy wants the
+skills and its own MCP entry from step 7, so skip the plugin. After the skills are
+in, check `claude mcp list` shows no hosted `openseo.so` entry.
+
+Owner-run. Main Branch does not run the installer or update the skills for them.
+
+Upstream's manual route, at the pinned release. The tag was checked to point at the
+pin's commit, and that commit holds all 12 skills under `plugins/openseo/skills/`:
+
+```bash
+git clone https://github.com/every-app/open-seo.git <SCRATCH>/open-seo
+git -C <SCRATCH>/open-seo checkout --detach beca5c1f5c728acfb243249107dbfaded0ef552e
+test "$(git -C <SCRATCH>/open-seo rev-parse HEAD)" = beca5c1f5c728acfb243249107dbfaded0ef552e
+mkdir -p .claude/skills
+cp -R <SCRATCH>/open-seo/plugins/openseo/skills/* .claude/skills/
+```
+
+Copy from the commit the business's copy is deployed at, so the skills never call
+a tool the app lacks. The example uses the v0.1.21 pin; use the deployed commit.
+
+That is project scope: the skills live in this business repo and nowhere else.
+When each business runs as its own OS user, user scope works too: copy the same
+folders into the skills folder of every Claude profile that user runs, and keep
+the copies identical. A live business set up this way had the 12 skills in both of
+its profiles and only its own MCP entry.
+
+Upstream's `npx skills add every-app/open-seo --skill '*' --agent claude-code`
+installs whatever is on the default branch. The upstream pages read did not show a
+way to pin its ref, so the ref to use with the installer is chosen at review.
+
+Record in the setup record: the ref, the 12 skill names, the scope, and the runtime.
+Then check separately: the skills are present, the MCP endpoint is this copy's, a
+free read works, and a named skill actually ran. Presence proves neither use nor
+compatibility. Keep the skill revision paired with the deployed app revision;
+change the pair only after reviewing tool compatibility.
 
 ## Later: Google
 
@@ -315,7 +354,7 @@ read returns rows for the owner's site.
 |---|---|---|
 | 304 | A deploy may clear Managed OAuth | Redo step 7 after every deploy |
 | 403 | Secrets Store Read fails | Grant Edit |
-| 226 | A deploy removes a dashboard-added custom domain | Stay on workers.dev |
+| 226 | A deploy removes a dashboard-added custom domain | Put the domain in deploy config; see [access-hardening.md](access-hardening.md) |
 | 377 | Free plan audits stop near 50 fetches and report the rest as failures | Use Workers Paid for audits |
 | 405 | The MCP warning never clears | It proves nothing; the step 7 checks decide |
 | 430 | A Shopify crawler host can be saved so it never matches | Enter the exact hostname |
