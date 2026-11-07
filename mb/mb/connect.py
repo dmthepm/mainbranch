@@ -4242,6 +4242,37 @@ def _check_exec_child(command: list[str]) -> None:
         )
 
 
+def _is_git_top(folder: Path) -> bool:
+    """A folder is a git top when ``.git`` is a gitfile or a folder holding HEAD."""
+    git = folder / ".git"
+    try:
+        if git.is_file():
+            return git.read_text(encoding="utf-8", errors="replace").startswith("gitdir:")
+        return git.is_dir() and (git / "HEAD").is_file()
+    except OSError:
+        return False
+
+
+def find_business_repo(start: str | Path = ".") -> Path:
+    """Find the business repo for a command run without ``--repo``.
+
+    Starts at the nearest git top level at or above ``start`` and goes no
+    higher: a repo cloned inside the hub is its own repo and never borrows the
+    hub's keys. That folder must hold ``.mb/connect.yaml``. This only chooses
+    which folder is read; binding and reference checks run on it as on
+    ``--repo``.
+    """
+    here = Path(start).resolve()
+    top = next((folder for folder in (here, *here.parents) if _is_git_top(folder)), None)
+    if top is not None and (top / CONFIG_RELATIVE_PATH).is_file():
+        return top
+    _refuse(
+        "no_business_repo",
+        f"No business repo here: {here} is not inside a git repo with "
+        f"{CONFIG_RELATIVE_PATH.as_posix()}. cd into the business repo or pass --repo.",
+    )
+
+
 def release_refusal_exit_code(exc: ValueError) -> int:
     if isinstance(exc, ConnectRefusal):
         if exc.rule in {"audit_unavailable", "caller_policy_invalid"}:
