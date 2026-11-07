@@ -172,14 +172,14 @@ def test_a_directory_made_by_another_process_survives_a_later_sync_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     target = tmp_path / "a" / "b" / "state.json"
-    real_mkdir = Path.mkdir
+    real_mkdir = os.mkdir
 
-    def racing_mkdir(self: Path, *args: object, **kwargs: object) -> None:
-        if self == tmp_path / "a":
-            real_mkdir(self)  # the other process wins the race, then ours finds it there
-        real_mkdir(self, *args, **kwargs)  # type: ignore[arg-type]
+    def racing_mkdir(name: str, *args: object, **kwargs: object) -> None:
+        if name == "a":
+            real_mkdir(name, *args, **kwargs)  # type: ignore[arg-type]  # the other process wins
+        real_mkdir(name, *args, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(Path, "mkdir", racing_mkdir)
+    monkeypatch.setattr(os, "mkdir", racing_mkdir)
     _fail_directory_fsync(monkeypatch)
 
     with pytest.raises(OSError, match="directory fsync failed"):
@@ -205,3 +205,44 @@ def test_an_unopenable_parent_leaves_no_descriptor_behind(tmp_path: Path) -> Non
 
     assert len(os.listdir("/proc/self/fd")) == before
     assert list(folder.iterdir()) == []
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="uses directory descriptors")
+def test_a_directory_replaced_after_our_mkdir_is_not_removed_by_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "a" / "b" / "state.json"
+    real_fsync = os.fsync
+    swapped: list[bool] = []
+
+    def fsync(fd: int) -> None:
+        if not swapped:
+            swapped.append(True)
+            os.rename(tmp_path / "a", tmp_path / "moved")  # another call takes ours away
+            os.mkdir(tmp_path / "a")  # and puts its own empty directory at the name
+            raise OSError(5, "directory fsync failed")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+
+    with pytest.raises(OSError, match="directory fsync failed"):
+        atomic_write_text(target, "{}\n")
+
+    assert (tmp_path / "a").is_dir()  # not ours any more: cleanup must leave it
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc/self/fd")
+def test_a_failure_before_fdopen_takes_ownership_closes_the_temp_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken_fdopen(fd: int, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("wrapper setup failed")  # raised before it owns fd
+
+    monkeypatch.setattr(os, "fdopen", broken_fdopen)
+    before = len(os.listdir("/proc/self/fd"))
+
+    with pytest.raises(RuntimeError, match="wrapper setup failed"):
+        atomic_write_text(tmp_path / "state.json", "new\n")
+
+    assert len(os.listdir("/proc/self/fd")) == before
+    assert list(tmp_path.iterdir()) == []

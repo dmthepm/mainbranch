@@ -64,32 +64,77 @@ def _close(fd: int | None) -> None:
         os.close(fd)
 
 
+def _close_if_open(fd: int, path: Path) -> None:
+    """Close ``fd`` unless it was already closed; it must still be the file at ``path``."""
+    try:
+        if os.path.samestat(os.fstat(fd), os.stat(path)):
+            os.close(fd)
+    except OSError:
+        pass
+
+
 def _make_parents(parent: Path) -> None:
     """Create missing directories one level at a time, each synced through its own parent.
 
     A failure removes what this call created, so a retry starts from the same
-    state and syncs every level again.
+    state and syncs every level again. Each created directory's device and
+    inode are recorded, and it is removed through the held descriptor of its
+    parent only while both still match, so a directory another process put at
+    that name is left alone. Race that remains: between that check and the
+    ``rmdir`` the name can still be swapped for an empty directory, because no
+    system call removes a directory by identity. A directory whose open failed
+    right after our ``mkdir`` is not recorded, so it is left in place. Windows
+    cannot open directories, so there the same check runs by path.
     """
     missing = [parent, *parent.parents]
     missing = missing[: next((i for i, d in enumerate(missing) if d.exists()), len(missing))]
-    made: list[Path] = []
+    if not missing:
+        return
+    held: list[int] = []
+    # (descriptor of the parent or None, path, name, device, inode)
+    made: list[tuple[int | None, Path, str, int, int]] = []
     try:
+        cur = _open_directory(missing[-1].parent)
+        if cur is not None:
+            held.append(cur)
         for directory in reversed(missing):
+            created = True
             try:
-                directory.mkdir()
-                made.append(directory)
+                if cur is None:
+                    directory.mkdir()
+                else:
+                    os.mkdir(directory.name, dir_fd=cur)
             except FileExistsError:
-                pass  # another process made it: it exists, and is not ours to remove
-            fd = _open_directory(directory.parent)
-            try:
-                _fsync_fd(fd)
-            finally:
-                _close(fd)
+                created = False  # another process made it: it exists, and is not ours to remove
+            child: int | None = None
+            if cur is not None:
+                child = os.open(
+                    directory.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=cur
+                )
+                held.append(child)
+            if created:
+                st = os.fstat(child) if child is not None else directory.stat()
+                made.append((cur, directory, directory.name, st.st_dev, st.st_ino))
+            _fsync_fd(cur)
+            cur = child
     except BaseException:
-        for directory in reversed(made):
+        for dir_fd, path, name, dev, ino in reversed(made):
             with suppress(OSError):
-                directory.rmdir()
+                st = (
+                    os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+                    if dir_fd is not None
+                    else path.stat()
+                )
+                if (st.st_dev, st.st_ino) == (dev, ino):
+                    if dir_fd is not None:
+                        os.rmdir(name, dir_fd=dir_fd)
+                    else:
+                        path.rmdir()
         raise
+    finally:
+        for fd in held:
+            with suppress(OSError):
+                os.close(fd)
 
 
 def atomic_write_text(
@@ -119,7 +164,12 @@ def atomic_write_text(
     try:
         fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
         tmp = Path(tmp_name)
-        with os.fdopen(fd, "w", encoding=encoding, newline=newline) as handle:
+        try:
+            handle = os.fdopen(fd, "w", encoding=encoding, newline=newline)
+        except BaseException:
+            _close_if_open(fd, tmp)  # fdopen owns the descriptor only once it succeeds
+            raise
+        with handle:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
