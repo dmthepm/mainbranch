@@ -12,13 +12,13 @@ skills should prefer CWD-first repo detection, `mb status --json --peek`,
 |------|----------|---------|--------------|
 | `settings.local.json` | `[repo]/.claude/` | Grants Claude Code file access to the active Main Branch package or source checkout | No (auto git-ignored by Claude Code) |
 | `local.yaml` | `~/.config/vip/` | Legacy machine-local fallback for user identity, engine path, and default repo | No |
-| `env.sh` | `~/.config/vip/` | API keys for optional research tools | No |
+| `env.sh` | `~/.config/vip/` | Legacy API-key file from older setups; no longer created | No |
 | `config.yaml` | `[repo]/.vip/` | Legacy mixed repo config that must be audited before reuse | Maybe old repos tracked it |
 
 **Key split:**
 - **Settings** = "Where is Main Branch?" (per-repo, per-machine — `.claude/settings.local.json`)
 - **Local** = "Who am I? What repo do I want?" legacy fallback (per-person, per-machine)
-- **Env** = "What API keys do I have?" (per-person, sourced by shell)
+- **Connections** = "What API keys do I have?" (`mb connect`, stored outside git)
 - **Repo** = current business truth in `core/`, `research/`, `decisions/`,
   `bets/`, `pushes/`, `log/`, `documents/`, `.mb/connect.yaml`, and generated
   repo instructions. Do not use `.vip/config.yaml` as the current shared
@@ -66,49 +66,24 @@ repair` can move to backup when they point at stale source checkouts.
 
 ---
 
-## Environment Variables (~/.config/vip/env.sh)
+## API Keys (`mb connect`)
 
-API keys for optional research tools. Created during `/mb-setup`, sourced by shell on startup.
+API keys for optional tools are stored with `mb connect` and used through
+`mb connect exec`. Setup no longer creates `~/.config/vip/env.sh` or edits your
+shell profile, and never asks you to paste a key into a file or a shell line.
 
-```bash
-cat ~/.config/vip/env.sh 2>/dev/null
-```
+| Variable | Tool | Store with | How to Get |
+|----------|------|------------|------------|
+| `GOOGLE_API_KEY` | Gemini | `mb connect google-ai --custom --token-stdin` | https://aistudio.google.com/apikey |
+| `XAI_API_KEY` | Grok | `mb connect xai --custom --token-stdin` | https://console.x.ai |
+| `APIFY_TOKEN` | Apify | (Usually in MCP config) | https://console.apify.com |
 
-```bash
-# Main Branch API Keys
-# This file is sourced by your shell. Keep it outside git repos.
+Run a command that needs one with
+`mb connect exec <provider> --env <NAME> -- <command>`. See
+`mb-think/references/gemini-setup.md` and `mb-think/references/grok-setup.md`.
 
-# === OPTIONAL RESEARCH TOOLS ===
-
-# Gemini - Deep web research (free tier available)
-# Get from: https://aistudio.google.com/apikey
-# export GOOGLE_API_KEY=""
-
-# xAI/Grok - X/Twitter sentiment analysis
-# Get from: https://console.x.ai
-# export XAI_API_KEY=""
-```
-
-| Variable | Tool | Purpose | How to Get |
-|----------|------|---------|------------|
-| `GOOGLE_API_KEY` | Gemini | Deep web research, multi-source synthesis | https://aistudio.google.com/apikey |
-| `XAI_API_KEY` | Grok | X/Twitter sentiment, real-time social | https://console.x.ai |
-| `APIFY_TOKEN` | Apify | (Usually in MCP config, not env.sh) | https://console.apify.com |
-
-**Why this file exists:**
-- Outside git repos (security — keys never committed)
-- Sourced on shell startup (always available)
-- Optional — system works without it (Apify handles most research)
-- Progressive — add keys when you need them, not before
-
-**Created by:** `/mb-setup` when optional API-key setup is needed. Tool-specific setup guides also reference this file: `mb-think/references/gemini-setup.md`, `mb-think/references/grok-setup.md`, `mb-setup/references/nano-banana-setup.md`.
-
-**Shell integration:** `/mb-setup` adds this line to `~/.zshrc` or `~/.bashrc`:
-```bash
-[ -f "$HOME/.config/vip/env.sh" ] && source "$HOME/.config/vip/env.sh"
-```
-
-**After adding a key:** Restart terminal or run `source ~/.config/vip/env.sh`.
+**Older installs:** an existing `~/.config/vip/env.sh` is left alone and keeps
+working for shells that source it. It is not migrated; do not add to it.
 
 ---
 

@@ -294,8 +294,9 @@ def _detect_registrar(explicit: str | None) -> tuple[str | None, DnsEnsureError 
         message="Cannot determine registrar; pass --registrar or set CF/Porkbun env vars.",
         suggestion=(
             "Pass --registrar=cloudflare or --registrar=porkbun. "
-            "Or set CLOUDFLARE_API_TOKEN_REGISTRAR (CF-registered) or "
-            "PORKBUN_API_KEY+PORKBUN_SECRET_KEY (Porkbun-registered) in ~/.config/vip/env.sh."
+            "Or store the registrar credential with `mb connect` and run this through "
+            "`mb connect exec` (CLOUDFLARE_API_TOKEN_REGISTRAR for CF-registered, "
+            "PORKBUN_API_KEY+PORKBUN_SECRET_KEY for Porkbun-registered)."
         ),
     )
 
@@ -363,8 +364,9 @@ def ensure(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
                 suggestion=(
-                    "Add CLOUDFLARE_API_TOKEN to ~/.config/vip/env.sh with Zone:Edit + "
-                    "DNS:Edit permissions."
+                    "Store a token with Zone:Edit + DNS:Edit permissions using "
+                    "`mb connect cloudflare --token-stdin`, then run this through "
+                    "`mb connect exec cloudflare -- <command>`."
                 ),
             ),
         )
@@ -378,7 +380,7 @@ def ensure(
                 code="cf_account_id_missing",
                 message="CF_ACCOUNT_ID not set.",
                 suggestion=(
-                    "Add CF_ACCOUNT_ID to ~/.config/vip/env.sh "
+                    "Set CF_ACCOUNT_ID for this command; it is not a secret "
                     "(find it at dash.cloudflare.com → right sidebar of any zone)."
                 ),
             ),
@@ -496,7 +498,10 @@ def ensure(
                 error=DnsEnsureError(
                     code="porkbun_unauthenticated",
                     message="PORKBUN_API_KEY/PORKBUN_SECRET_KEY not set.",
-                    suggestion="Add PORKBUN_API_KEY and PORKBUN_SECRET_KEY to ~/.config/vip/env.sh.",
+                    suggestion=(
+                        "Store the Porkbun credential with `mb connect` and run this "
+                        "through `mb connect exec`."
+                    ),
                 ),
             )
             sys.exit(emit(env))

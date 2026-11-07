@@ -553,7 +553,7 @@ def create_payment_link(
             error=StripeError(
                 code="missing_api_key",
                 message="STRIPE_API_KEY is not set in the environment.",
-                suggestion="Add `export STRIPE_API_KEY=sk_test_...` to ~/.config/vip/env.sh and `source` it.",
+                suggestion="Store the key with `mb connect stripe --token-stdin`, then run this through `mb connect exec stripe -- <command>`.",
             ),
         )
         sys.exit(emit(env))
@@ -750,7 +750,7 @@ def list_products(offer_slug: str | None, limit: int) -> None:
             error=StripeError(
                 code="missing_api_key",
                 message="STRIPE_API_KEY is not set in the environment.",
-                suggestion="Add `export STRIPE_API_KEY=sk_test_...` to ~/.config/vip/env.sh.",
+                suggestion="Store the key with `mb connect stripe --token-stdin`, then run this through `mb connect exec stripe -- <command>`.",
             ),
         )
         sys.exit(emit(env))
@@ -836,7 +836,7 @@ def archive_product(product_id: str) -> None:
             error=StripeError(
                 code="missing_api_key",
                 message="STRIPE_API_KEY is not set in the environment.",
-                suggestion="Add `export STRIPE_API_KEY=sk_test_...` to ~/.config/vip/env.sh.",
+                suggestion="Store the key with `mb connect stripe --token-stdin`, then run this through `mb connect exec stripe -- <command>`.",
             ),
         )
         sys.exit(emit(env))

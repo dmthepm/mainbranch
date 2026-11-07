@@ -595,7 +595,7 @@ def create_project(
             error=PagesCreateProjectError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Add CLOUDFLARE_API_TOKEN with Cloudflare Pages:Edit to ~/.config/vip/env.sh.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare --token-stdin`, then run this through `mb connect exec cloudflare -- <command>`.",
             ),
         )
         sys.exit(emit(env))
@@ -608,7 +608,7 @@ def create_project(
             error=PagesCreateProjectError(
                 code="cf_account_id_missing",
                 message="No Cloudflare account ID supplied.",
-                suggestion="Pass --account-id or set CF_ACCOUNT_ID in ~/.config/vip/env.sh.",
+                suggestion="Pass --account-id, or set CF_ACCOUNT_ID for this command; it is not a secret.",
             ),
         )
         sys.exit(emit(env))
@@ -807,7 +807,7 @@ def set_domain(
             error=PagesSetDomainError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Add CLOUDFLARE_API_TOKEN to ~/.config/vip/env.sh with Cloudflare Pages:Edit.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare --token-stdin`, then run this through `mb connect exec cloudflare -- <command>`.",
             ),
         )
         sys.exit(emit(env))
@@ -820,7 +820,7 @@ def set_domain(
             error=PagesSetDomainError(
                 code="cf_account_id_missing",
                 message="No Cloudflare account ID supplied.",
-                suggestion="Pass --account-id or set CF_ACCOUNT_ID in ~/.config/vip/env.sh.",
+                suggestion="Pass --account-id, or set CF_ACCOUNT_ID for this command; it is not a secret.",
             ),
         )
         sys.exit(emit(env))

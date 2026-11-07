@@ -101,7 +101,7 @@ Free tier includes limited image generation; paid credits scale up.
 ## See Also
 
 - `mb-think/references/gemini-setup.md` — Gemini research setup (same GOOGLE_API_KEY)
-- `mb-start/references/config-system.md` — Full config file layout (local.yaml, env.sh, config.yaml)
+- `mb-start/references/config-system.md` — Config file layout (legacy local.yaml, config.yaml)
 
 ## Resources
 

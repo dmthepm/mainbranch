@@ -3,7 +3,7 @@
 
 Exercises every external dependency the atoms touch, without spending money
 or making state changes. Run this after credentials are provisioned in
-~/.config/vip/env.sh to confirm all upstreams reach success before merging.
+`mb connect` to confirm all upstreams reach success before merging.
 
 Checks:
   1. domain-check brew CLI: live RDAP query (free).
@@ -11,7 +11,7 @@ Checks:
   3. Cloudflare zone lookup: GET /zones?name=<test domain> (read-only).
   4. Porkbun API auth: POST /ping with the keys (read-only; returns yourIp).
 
-Required env (load with `source ~/.config/vip/env.sh` first):
+Required env (run this script through `mb connect exec cloudflare -- python3 ...`):
   CLOUDFLARE_API_TOKEN  — Zone:Read + DNS:Read minimum (Edit preferred)
   CF_ACCOUNT_ID         — find in dash.cloudflare.com → right sidebar
   PORKBUN_API_KEY
@@ -139,13 +139,13 @@ def check_cf_auth() -> bool:
     if not token:
         _fail("CLOUDFLARE_API_TOKEN not set")
         _info("Fix: create token at https://dash.cloudflare.com/profile/api-tokens")
-        _info("     Add to ~/.config/vip/env.sh: export CLOUDFLARE_API_TOKEN=...")
+        _info("     Store it with `mb connect cloudflare --token-stdin`, then use `mb connect exec`")
         return False
 
     if not account_id:
         _fail("CF_ACCOUNT_ID not set")
         _info("Fix: find it in dash.cloudflare.com → right sidebar of any zone")
-        _info("     Add to ~/.config/vip/env.sh: export CF_ACCOUNT_ID=...")
+        _info("     Set CF_ACCOUNT_ID for this command; it is not a secret")
         return False
 
     all_pass = True
@@ -290,7 +290,7 @@ def check_porkbun_ping() -> bool | None:
 def main() -> int:
     print(f"{YELLOW}=== /mb-site atoms — live verification ==={RESET}")
     print(f"{DIM}Read-only smoke test. No state changes, no spending.{RESET}")
-    print(f"{DIM}Run after `source ~/.config/vip/env.sh`.{RESET}")
+    print(f"{DIM}Run through `mb connect exec cloudflare -- python3 ...`.{RESET}")
 
     results = [
         ("domain-check CLI", check_domain_check_cli()),

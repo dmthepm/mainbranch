@@ -12,7 +12,7 @@ snapshot, not current truth.
 
 ### Claude Code Env Var Caveat
 
-Claude Code sessions may not inherit env vars from your shell profile (`~/.zshrc`, `~/.bashrc`). If `XAI_API_KEY` isn't in the environment, the skill checks for and sources `~/.config/vip/env.sh` before giving up. If you store API keys in a different location, update the detection script in SKILL.md or export the key in `~/.config/vip/env.sh`.
+Claude Code sessions may not inherit env vars from your shell profile (`~/.zshrc`, `~/.bashrc`). Do not rely on one. Store the key with `mb connect` (step 3) and run Grok commands through `mb connect exec`, which gives the key to that one command.
 
 See `mb-start/references/config-system.md` for legacy config cleanup guidance.
 
@@ -102,15 +102,20 @@ The official xAI Python SDK supports live X search via gRPC.
 pip install xai-sdk
 ```
 
-### 3. Set Environment Variable (1 min)
+### 3. Store the Key (1 min)
 
-Add to your shell profile (`~/.zshrc` or `~/.bashrc`):
+From the business repo, store the key with `mb connect`. Paste it at the prompt
+your terminal gives, never into chat, a file, or a shell line:
 
 ```bash
-export XAI_API_KEY="your-api-key-here"
+mb connect xai --custom --token-stdin --account "xAI"
 ```
 
-Then reload: `source ~/.zshrc`
+Run anything that needs it through `mb connect exec`:
+
+```bash
+mb connect exec xai --env XAI_API_KEY -- python3 test_grok.py
+```
 
 ### 4. Test X Search
 
@@ -137,7 +142,7 @@ print(response.content)
 Run it:
 
 ```bash
-python test_grok.py
+mb connect exec xai --env XAI_API_KEY -- python3 test_grok.py
 ```
 
 If you see actual X posts with handles and timestamps, X search is working.
@@ -170,22 +175,17 @@ npm install
 npm run build
 ```
 
-### 3. Create Environment File
+### 3. Store the Key
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your API key:
-
-```
-GROK_API_KEY=your_grok_api_key_here
-```
+Store it with `mb connect` as in Option 1, step 3. Do not write it into a `.env`
+file.
 
 ### 4. Add to Claude Code
 
+The server reads `GROK_API_KEY`, so start it through `mb connect exec`:
+
 ```bash
-claude mcp add grok-x-insights --scope user -- node ~/grok-x-insights-mcp/dist/index.js
+claude mcp add grok-x-insights --scope user -- mb connect exec xai --env GROK_API_KEY -- node ~/grok-x-insights-mcp/dist/index.js
 ```
 
 ### 5. Verify
@@ -226,8 +226,8 @@ Still useful for finding popular/viral posts that have been indexed.
 
 **SDK: "ModuleNotFoundError: xai_sdk"** — Run `pip install xai-sdk`
 
-**SDK: "Invalid API key"** — Check presence without printing the value:
-`test -n "$XAI_API_KEY" && echo "XAI_API_KEY is set" || echo "XAI_API_KEY is not set"`,
+**SDK: "Invalid API key"** — Check it is stored without printing the value:
+`mb connect status xai --json`,
 then verify at [console.x.ai](https://console.x.ai)
 
 **SDK: "num_sources_used: 0"** — You're using REST API, not SDK. Make sure you're using `x_search()` tool.
