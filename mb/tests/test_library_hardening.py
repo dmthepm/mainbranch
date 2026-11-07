@@ -440,7 +440,7 @@ def test_the_library_folder_holds_only_plain_files_of_its_own(
     lib.scan()
     lib.find("")
     names = sorted(p.name for p in (biz / ".mb/private/library").iterdir())
-    assert names == ["config.yaml", "index.json", "index.lock"]
+    assert names == ["config.lock", "config.yaml", "index.json", "index.lock"]
 
 
 @needs_nonroot

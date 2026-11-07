@@ -11,6 +11,23 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- Connect repair hints name one wording for an owner at a terminal: the plain
+  `mb connect <provider>`, which opens the hidden prompt, in `status`, `doctor`,
+  `plan`, `test`, `exec`, `token`, `rotate` and the Meta and metadata refusals.
+  `--token-stdin` stays for piped use, and a legacy Google access-token
+  connection still names it. Closes #1333.
+- `test_checkpoint_verbs_scan_is_linear` compares CPU time, not wall-clock time,
+  and passes on any of three attempts, so a loaded runner no longer fails a
+  linear scan while a quadratic one (16x for 4x the input) still fails every
+  attempt. Closes #1334.
+- `mb library source add` now holds a lock from reading the library config to
+  writing it, and reads the config again once it has the lock. Before, a library
+  opened before another `source add` finished could write that source away while
+  both reported success. A change that cannot get the lock within a few seconds is
+  refused and writes nothing.
+
 ## [0.6.23] - 2026-11-06
 
 ### Breaking

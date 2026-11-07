@@ -57,6 +57,10 @@ LOCK_NAME = "index.lock"
 # cannot deadlock.
 DEALS_LOCK_NAME = "deals.lock"
 DEAL_LOCK_WAIT = 5.0  # seconds to wait for another deal change before refusing
+# `source add` reads the config, adds one entry and writes it back, so it holds
+# its own lock for that, and re-reads the config once it has it.
+CONFIG_LOCK_NAME = "config.lock"
+CONFIG_LOCK_WAIT = 5.0
 _CONFIG_KEYS = frozenset({"timezone", "records_dir", "sources"})
 _RECORD_KEYS = frozenset({"asset", "provenance", "tags", "creator", "deals"})
 _TAGS_HINT = "put business-only facts in tags"
@@ -233,8 +237,6 @@ class Library:
             raise LibraryError(
                 f"source name {name!r} must be lowercase letters, digits, - or _ (no ':' or '/')"
             )
-        if name in self.sources:
-            raise LibraryError(f"source {name!r} is already registered")
         folder = Path(path).expanduser().resolve()
         problem = library_source.root_problem(folder)
         if problem == "writable":
@@ -244,10 +246,25 @@ class Library:
             )
         if problem:
             raise LibraryError(f"{folder}: {problem}")
-        for target in (self.root / CONFIG_REL, self.root / self.records_rel):
-            refuse_overlap(target, [folder])
-        self.sources[name] = folder
-        self._save_config()
+        with (
+            self._dir(CONFIG_REL, create=False) as fd,
+            exclusive(
+                fd,
+                CONFIG_LOCK_NAME,
+                wait=CONFIG_LOCK_WAIT,
+                busy="another change to this library's sources is in progress; nothing was "
+                "changed, try again in a moment",
+            ),
+        ):
+            # Another process may have added a source since this library was opened.
+            self._config = self._parse_config(read_file(fd, "config.yaml", limit=MAX_YAML_BYTES))
+            self.sources = {name_: Path(p) for name_, p in self._config["sources"].items()}
+            if name in self.sources:
+                raise LibraryError(f"source {name!r} is already registered")
+            for target in (self.root / CONFIG_REL, self.root / self.records_rel):
+                refuse_overlap(target, [folder])
+            self.sources[name] = folder
+            self._save_config()
         return folder
 
     # -- index ------------------------------------------------------------------

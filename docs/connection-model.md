@@ -76,7 +76,7 @@ APIs, and niche SaaS tools before Main Branch has native wrappers.
    secret from its environment. They do not put tokens in child argv, echo
    them, enable shell trace, write env files, or commit raw exports.
 6. **Rotate or repair.** Missing or stale secrets report a reconnect command.
-   For custom providers, repair output includes `--custom --token-stdin`. A
+   For custom providers, repair output names `mb connect <provider> --custom`. A
    connection with a recorded `--source op://...` reference rotates with
    `mb connect rotate <provider>`, which re-reads, stores and probes.
 7. **Audit and hygiene.** `mb connect doctor`, `mb connect status --all`,

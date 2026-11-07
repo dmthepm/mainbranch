@@ -213,9 +213,7 @@ def test_meta_status_preserves_stale_metadata_but_reports_missing_secret(
 
     assert status["state"] == "missing_secret"
     assert status["connected"] is True
-    assert status["repair_command"] == (
-        "mb connect meta --token-stdin --metadata ad_account_id=<act_id>"
-    )
+    assert status["repair_command"] == ("mb connect meta --metadata ad_account_id=<act_id>")
     assert status["metadata"] == {"ad_account_id": "act_123"}
 
     aggregate = connect_mod.status_all(repo)
@@ -508,7 +506,7 @@ def test_connect_plan_human_output_uses_numbered_choices(tmp_path: Path, monkeyp
     assert result.exit_code == 0
     assert "1. GitHub (ready)" in result.stdout
     assert "2. Cloudflare (not_connected)" in result.stdout
-    assert "next: mb connect cloudflare --token-stdin" in result.stdout
+    assert "next: mb connect cloudflare" in result.stdout
     assert not (repo / ".mb" / "connect.yaml").exists()
 
 
@@ -892,7 +890,7 @@ def test_connect_status_reports_missing_secret_as_repair_not_hard_crash(
     assert status_payload["summary"]["needs_repair"] == 1
     assert status_payload["providers"][0]["secrets"]["api_token"]["present"] is False
     assert status_payload["providers"][0]["state"] == "missing_secret"
-    assert status_payload["providers"][0]["repair_command"] == "mb connect cloudflare --token-stdin"
+    assert status_payload["providers"][0]["repair_command"] == "mb connect cloudflare"
     assert status_payload["providers"][0]["safe_to_share"] is True
 
 
@@ -981,7 +979,7 @@ def test_connect_test_records_invalid_provider_without_leaking_secret(
     payload = json.loads(result.stdout)
     assert payload["ok"] is False
     assert payload["status"]["state"] == "invalid"
-    assert payload["status"]["repair_command"] == "mb connect cloudflare --token-stdin"
+    assert payload["status"]["repair_command"] == "mb connect cloudflare"
     assert "rejected the credential" in payload["status"]["validation"]["summary"]
     assert payload["validation"]["upstream"]["endpoint_family"] == "cloudflare_user_token_verify"
     assert payload["validation"]["upstream"]["http_status"] == 403
@@ -1373,7 +1371,7 @@ def test_connect_doctor_includes_github_context_and_provider_repairs(
     checks = {check["name"]: check for check in payload["checks"]}
     assert checks["github-context"]["state"] == "missing_cli"
     assert checks["provider:cloudflare"]["state"] == "missing_secret"
-    assert checks["provider:cloudflare"]["repair_command"] == "mb connect cloudflare --token-stdin"
+    assert checks["provider:cloudflare"]["repair_command"] == "mb connect cloudflare"
     assert payload["safe_to_share"] is True
 
 
@@ -1848,7 +1846,7 @@ def test_connect_token_not_connected_fails(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 1
     assert result.stdout == ""
     assert "not connected" in result.stderr
-    assert "mb connect cloudflare --token-stdin" in result.stderr
+    assert "mb connect cloudflare" in result.stderr
 
 
 def test_connect_token_missing_stored_secret_fails(tmp_path: Path, monkeypatch) -> None:
@@ -2312,7 +2310,7 @@ def test_connect_exec_refusals_and_failures(tmp_path: Path, monkeypatch) -> None
     )
     assert not_connected.exit_code == 1
     assert "not connected" in not_connected.stderr
-    assert "mb connect cloudflare --token-stdin" in not_connected.stderr
+    assert "mb connect cloudflare" in not_connected.stderr
 
     connect_mod.connect_provider("cloudflare", repo=repo, token="cf-test-token")
     no_command = runner.invoke(app, ["connect", "exec", "cloudflare", "--repo", str(repo)])
@@ -2584,7 +2582,7 @@ def test_connect_custom_provider_missing_secret_surfaces_repair(
     status_payload = json.loads(status.stdout)
     mercury = next(item for item in status_payload["providers"] if item["provider"] == "mercury")
     assert mercury["state"] == "missing_secret"
-    assert mercury["repair_command"] == "mb connect mercury --custom --token-stdin"
+    assert mercury["repair_command"] == "mb connect mercury --custom"
     assert mercury["secrets"]["api_key"]["present"] is False
     assert status_payload["summary"]["configured"] == 1
     assert status_payload["summary"]["needs_repair"] == 1
@@ -2596,22 +2594,20 @@ def test_connect_custom_provider_missing_secret_surfaces_repair(
     single_status_payload = json.loads(single_status.stdout)
     assert single_status_payload["provider"] == "mercury"
     assert single_status_payload["state"] == "missing_secret"
-    assert single_status_payload["repair_command"] == ("mb connect mercury --custom --token-stdin")
+    assert single_status_payload["repair_command"] == ("mb connect mercury --custom")
 
     token = runner.invoke(app, ["connect", "token", "mercury", "--print", "--repo", str(repo)])
     assert token.exit_code == 1
     assert token.stdout == ""
     assert "credential is missing from the secret store" in token.stderr
-    assert "repair: mb connect mercury --custom --token-stdin" in token.stderr
+    assert "repair: mb connect mercury --custom" in token.stderr
 
     doctor = runner.invoke(app, ["connect", "doctor", "--repo", str(repo), "--json"])
     assert doctor.exit_code == 1
     doctor_payload = json.loads(doctor.stdout)
     checks = {check["name"]: check for check in doctor_payload["checks"]}
     assert checks["provider:mercury"]["state"] == "missing_secret"
-    assert checks["provider:mercury"]["repair_command"] == (
-        "mb connect mercury --custom --token-stdin"
-    )
+    assert checks["provider:mercury"]["repair_command"] == ("mb connect mercury --custom")
 
     listed = runner.invoke(app, ["connect", "list", "--repo", str(repo), "--json"])
     assert listed.exit_code == 0
@@ -3117,7 +3113,7 @@ def _simulated_failing_probe(monkeypatch) -> None:
             "state": "invalid",
             "summary": "Cloudflare rejected the credential (simulated).",
             "repair": "Replace the credential.",
-            "repair_command": "mb connect cloudflare --token-stdin",
+            "repair_command": "mb connect cloudflare",
             "safe_to_share": True,
             "upstream": {
                 "endpoint_family": kwargs["endpoint_family"],
@@ -4684,7 +4680,7 @@ def test_tokenless_first_connect_with_metadata_records_no_secret_ref(
     assert result["ok"] is False
     status = result["status"]
     assert status["state"] == "missing_secret"
-    assert status["repair_command"] == "mb connect cloudflare --token-stdin"
+    assert status["repair_command"] == "mb connect cloudflare"
     assert status["connected"] is False
     assert status["configured"] is True
     assert status["secrets"]["api_token"]["ref"] == ""
@@ -4790,7 +4786,7 @@ def test_entry_written_with_a_dangling_ref_still_reads_missing_secret(
     assert status["configured"] is True
     assert status["secrets"]["api_token"]["present"] is False
     assert status["secrets"]["api_token"]["presence"] == "absent"
-    assert status["repair_command"] == "mb connect cloudflare --token-stdin"
+    assert status["repair_command"] == "mb connect cloudflare"
 
 
 # --- #973: every --json failure prints one envelope on stdout --------------------
