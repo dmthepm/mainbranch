@@ -38,9 +38,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - State files now survive a power cut after a save: the write syncs the folder
   it lands in, and any folders it had to create, each through its own parent. A
-  sync failure now raises instead of passing silently. `read_json_object` gains
-  an opt-in `strict` mode where an empty file counts as corrupt; existing
-  callers keep today's behaviour.
+  sync failure now raises instead of passing silently. If the file changed but
+  only the last folder sync failed, `mb connect` says the credential was written
+  but not confirmed (`local_file_unconfirmed`), never that nothing was stored.
+  `read_json_object` gains an opt-in `strict` mode where an empty file counts as
+  corrupt; existing callers keep today's behaviour.
 
 - `mb library` now refuses a field it does not know in a record, a deal or the
   library config, by name, and leaves the file as it was. `deal propose`,
