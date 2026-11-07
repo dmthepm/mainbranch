@@ -173,7 +173,7 @@ def test_runtime_missing_credential_messages_carry_the_owner_handoff() -> None:
     # The module docstring is never printed; the message the agent reads is.
     sys.path.insert(0, str(MB_SITE_SCRIPTS))
     try:
-        from _envelope import OWNER_HANDOFF
+        from _envelope import OWNER_HANDOFF  # type: ignore[import-not-found]
     finally:
         sys.path.remove(str(MB_SITE_SCRIPTS))
     assert OWNER_HANDOFF == HANDOFF
