@@ -12,7 +12,12 @@ fonts the machine has.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import os
+import tempfile
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -22,6 +27,10 @@ MARGIN = 64
 MAX_RATIO = 3
 MAX_BYTES = 2_000_000
 QUALITIES = (88, 80, 72, 64)
+MAX_SPEC_BYTES = 100_000
+MAX_SECTIONS = 12
+MAX_ITEMS = 12  # bullets, and options, per section
+MAX_TEXT = 1000  # characters in any one field
 
 INSTALL_HINT = "mb card needs Pillow: pip install 'mainbranch[cards]'"
 
@@ -59,6 +68,8 @@ def validate(spec: object) -> dict[str, Any]:
     sections = spec.get("sections")
     if not isinstance(sections, list) or not sections:
         raise CardError("sections must be a non-empty list")
+    if len(sections) > MAX_SECTIONS:
+        raise CardError(f"sections has {len(sections)} entries, over the limit of {MAX_SECTIONS}")
     for i, sec in enumerate(sections):
         where = f"sections[{i}]"
         if not isinstance(sec, dict):
@@ -71,6 +82,13 @@ def validate(spec: object) -> dict[str, Any]:
         options = sec.get("options", [])
         if not isinstance(options, list):
             raise CardError(f"{where}.options must be a list")
+        for what, items in (("bullets", bullets), ("options", options)):
+            if len(items) > MAX_ITEMS:
+                raise CardError(
+                    f"{where}.{what} has {len(items)} entries, over the limit of {MAX_ITEMS}"
+                )
+        for k, bullet in enumerate(bullets):
+            _check_text(bullet, f"{where}.bullets[{k}]")
         for j, opt in enumerate(options):
             ow = f"{where}.options[{j}]"
             if not isinstance(opt, dict):
@@ -87,7 +105,9 @@ def validate(spec: object) -> dict[str, Any]:
 def _only(obj: dict[str, Any], allowed: set[str], prefix: str) -> None:
     for name in obj:
         if name not in allowed:
-            raise CardError(f"unknown field {prefix}{name} (allowed: {', '.join(sorted(allowed))})")
+            raise CardError(
+                f"unknown field {prefix}{_safe(name)} (allowed: {', '.join(sorted(allowed))})"
+            )
 
 
 def _text(obj: dict[str, Any], name: str, label: str, required: bool = False) -> None:
@@ -96,6 +116,19 @@ def _text(obj: dict[str, Any], name: str, label: str, required: bool = False) ->
         return
     if not isinstance(value, str) or not value.strip():
         raise CardError(f"{label} must be a non-empty string")
+    _check_text(value, label)
+
+
+def _check_text(value: str, label: str) -> None:
+    if len(value) > MAX_TEXT:
+        raise CardError(f"{label} is {len(value)} characters, over the limit of {MAX_TEXT}")
+    if any(unicodedata.category(c) == "Cc" and c != "\n" for c in value):
+        raise CardError(f"{label} contains a control character")
+
+
+def _safe(value: object, limit: int = 200) -> str:
+    """Show caller-supplied text in a message with control characters escaped."""
+    return str(value).encode("unicode_escape").decode("ascii")[:limit]
 
 
 @dataclass
@@ -105,7 +138,13 @@ class Plan:
     section_numbers: list[int] = field(default_factory=list)
 
     def text_lines(self) -> list[str]:
-        return [op[2] for op in self.ops if op[0] in ("t", "o")]
+        lines: list[str] = []
+        for op in self.ops:
+            if op[0] == "h":
+                lines.extend(op[2])
+            elif op[0] in ("t", "o"):
+                lines.append(op[2])
+        return lines
 
 
 def _font(image_font: Any, size: int) -> Any:
@@ -113,12 +152,26 @@ def _font(image_font: Any, size: int) -> Any:
 
 
 def _wrap(text: str, font: Any, width: int, stroke: int = 0) -> list[str]:
+    """Wrap to width; a word wider than a whole line is split, never clipped."""
+
+    def fits(t: str) -> bool:
+        return bool(font.getlength(t) + 2 * stroke <= width)
+
     lines: list[str] = []
     for para in text.splitlines() or [""]:
         line = ""
         for word in para.split():
+            while not fits(word):
+                n = 1
+                while n < len(word) - 1 and fits(word[: n + 1]):
+                    n += 1
+                if line:
+                    lines.append(line)
+                    line = ""
+                lines.append(word[:n])
+                word = word[n:]
             trial = f"{line} {word}".strip()
-            if line and font.getlength(trial) + 2 * stroke > width:
+            if line and not fits(trial):
                 lines.append(line)
                 line = word
             else:
@@ -138,12 +191,28 @@ def layout(spec: dict[str, Any]) -> Plan:
     plan = Plan()
     y = MARGIN
 
-    def put(text: str, font: Any, color: Any, x: int = MARGIN, width: int = inner,
-            step: int = 78, bold: bool = False) -> None:
+    def check() -> None:
+        # Stop as soon as the card is past the limit, not after laying out the rest.
+        if y + MARGIN > MAX_RATIO * WIDTH:
+            raise CardError(
+                f"card is over {MAX_RATIO * WIDTH} px tall for {WIDTH} px wide, "
+                "over the 3:1 limit; split it into two cards or cut the words"
+            )
+
+    def put(
+        text: str,
+        font: Any,
+        color: Any,
+        x: int = MARGIN,
+        width: int = inner,
+        step: int = 78,
+        bold: bool = False,
+    ) -> None:
         nonlocal y
         for line in _wrap(text, font, width, 1 if bold else 0):
             plan.ops.append(("t", x, line, font, color, y, bold))
             y += step
+            check()
 
     put(spec["title"], big, INK, step=104, bold=True)
     y += 20
@@ -152,40 +221,96 @@ def layout(spec: dict[str, Any]) -> Plan:
     for n, sec in enumerate(spec["sections"], 1):
         plan.section_numbers.append(n)
         y += 50
-        plan.ops.append(("h", n, sec["head"], mid, INK, y, True))
-        y += 110
+        head_lines = _wrap(sec["head"], mid, inner - 110, 1)
+        plan.ops.append(("h", n, head_lines, mid, INK, y, True))
+        y += 110 + 78 * (len(head_lines) - 1)
+        check()
         for bullet in sec.get("bullets", []):
             plan.ops.append(("b", MARGIN + 14, "", None, INK, y, False))
             put(bullet, body, INK, x=MARGIN + 60, width=inner - 60)
             y += 18
+            check()
         for opt in sec.get("options", []):
             pick = bool(opt.get("rec"))
             head = f"{opt['key']}. {opt['label']}" + (" (my pick)" if pick else "")
-            head_lines = _wrap(head, mid, inner - 80, 1)
+            lines = _wrap(head, mid, inner - 80, 1)
             detail = _wrap(opt["detail"], body, inner - 80) if opt.get("detail") else []
-            height = 30 + 80 * (len(head_lines) + len(detail)) + 30
-            plan.ops.append(("o", y, head, height, pick, head_lines, detail))
+            height = 30 + 80 * (len(lines) + len(detail)) + 30
+            plan.ops.append(("o", y, head, height, pick, lines, detail))
             y += height + 24
+            check()
     if spec.get("footer"):
         y += 40
         put(spec["footer"], mid, GREY)
     plan.height = y + MARGIN
-    if plan.height > MAX_RATIO * WIDTH:
-        raise CardError(
-            f"card is {plan.height} px tall for {WIDTH} px wide, over the 3:1 limit; "
-            "split it into two cards or cut the words"
-        )
+    check()
     return plan
 
 
-def render(spec_path: Path, out_path: Path) -> tuple[int, int, int]:
-    """Write the JPG; return (width, height, bytes). Nothing is written on refusal."""
+def _read_spec(spec_path: Path) -> Any:
     try:
-        spec = json.loads(spec_path.read_text())
+        with spec_path.open("rb") as fh:
+            raw = fh.read(MAX_SPEC_BYTES + 1)
     except OSError as exc:
-        raise CardError(f"cannot read {spec_path}: {exc.strerror}") from exc
-    except ValueError as exc:
-        raise CardError(f"{spec_path} is not valid JSON: {exc}") from exc
+        raise CardError(f"cannot read {_safe(spec_path)}: {exc.strerror}") from exc
+    if len(raw) > MAX_SPEC_BYTES:
+        raise CardError(f"{_safe(spec_path)} is over {MAX_SPEC_BYTES} bytes; cut the words")
+    try:
+        return json.loads(raw)
+    except (ValueError, RecursionError) as exc:
+        raise CardError(f"{_safe(spec_path)} is not valid JSON: {_safe(exc, 200)}") from exc
+
+
+def _check_destination(spec_path: Path, out_path: Path) -> None:
+    """Refuse before any work: wrong name, the spec itself, a symlink, or an existing file."""
+    if out_path.suffix.lower() not in (".jpg", ".jpeg"):
+        raise CardError(f"output {_safe(out_path)} must end in .jpg or .jpeg")
+    if out_path.resolve() == spec_path.resolve():
+        raise CardError(f"output {_safe(out_path)} is the spec file")
+    if out_path.is_symlink():
+        raise CardError(f"output {_safe(out_path)} is a symlink; name a new file")
+    if os.path.lexists(out_path):
+        raise CardError(f"output {_safe(out_path)} already exists; name a new file")
+
+
+def _publish(data: bytes, out_path: Path) -> None:
+    """Write via a temp file and hard-link it into place: the name appears whole or not at all.
+
+    os.link refuses an existing name, so a file created after the earlier check is still safe.
+    """
+    try:
+        fd, tmp = tempfile.mkstemp(prefix=".mbcard-", suffix=".tmp", dir=out_path.parent)
+    except OSError as exc:
+        raise CardError(f"cannot write {_safe(out_path)}: {exc.strerror}") from exc
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.link(tmp, out_path)
+    except FileExistsError as exc:
+        raise CardError(f"output {_safe(out_path)} already exists; name a new file") from exc
+    except OSError as exc:
+        raise CardError(f"cannot write {_safe(out_path)}: {exc.strerror}") from exc
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+
+
+def _encode(img: Any) -> bytes:
+    size = 0
+    for quality in QUALITIES:
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality)
+        data = buf.getvalue()
+        size = len(data)
+        if size < MAX_BYTES:
+            return data
+    raise CardError(f"card is still {size} bytes at the lowest quality, over 2 MB; cut the words")
+
+
+def render(spec_path: Path, out_path: Path) -> tuple[int, int, int]:
+    """Write a new JPG; return (width, height, bytes). A refusal or failure writes nothing."""
+    _check_destination(spec_path, out_path)
+    spec = _read_spec(spec_path)
     validate(spec)
     pil = _load_pillow()
     if pil is None:
@@ -200,34 +325,45 @@ def render(spec_path: Path, out_path: Path) -> tuple[int, int, int]:
         kind = op[0]
         if kind == "t":
             _, x, line, font, color, y, bold = op
-            d.text((x, y), line, font=font, fill=color, stroke_width=1 if bold else 0,
-                   stroke_fill=color)
+            d.text(
+                (x, y),
+                line,
+                font=font,
+                fill=color,
+                stroke_width=1 if bold else 0,
+                stroke_fill=color,
+            )
         elif kind == "b":
             y = op[5]
             d.ellipse((op[1], y + 20, op[1] + 16, y + 36), fill=INK)
         elif kind == "h":
-            _, n, head, font, color, y, _bold = op
+            _, n, lines, font, color, y, _bold = op
             d.ellipse((MARGIN, y, MARGIN + 84, y + 84), fill=INK)
             d.text((MARGIN + 42, y + 42), str(n), font=font, fill="white", anchor="mm")
-            d.text((MARGIN + 110, y + 8), head, font=font, fill=color, stroke_width=1,
-                   stroke_fill=color)
+            for k, line in enumerate(lines):
+                d.text(
+                    (MARGIN + 110, y + 8 + 78 * k),
+                    line,
+                    font=font,
+                    fill=color,
+                    stroke_width=1,
+                    stroke_fill=color,
+                )
         else:
             _, y, _head, height, pick, head_lines, detail = op
-            d.rounded_rectangle((MARGIN, y, WIDTH - MARGIN, y + height), 24,
-                                fill=PICK if pick else PALE)
+            d.rounded_rectangle(
+                (MARGIN, y, WIDTH - MARGIN, y + height), 24, fill=PICK if pick else PALE
+            )
             yy = y + 30
             color = GREEN if pick else INK
             for line in head_lines:
-                d.text((MARGIN + 40, yy), line, font=mid, fill=color, stroke_width=1,
-                       stroke_fill=color)
+                d.text(
+                    (MARGIN + 40, yy), line, font=mid, fill=color, stroke_width=1, stroke_fill=color
+                )
                 yy += 80
             for line in detail:
                 d.text((MARGIN + 40, yy), line, font=body, fill=INK)
                 yy += 80
-    for quality in QUALITIES:
-        img.save(out_path, quality=quality)
-        size = out_path.stat().st_size
-        if size < MAX_BYTES:
-            return WIDTH, plan.height, size
-    out_path.unlink()
-    raise CardError(f"card is still {size} bytes at the lowest quality, over 2 MB; cut the words")
+    data = _encode(img)
+    _publish(data, out_path)
+    return WIDTH, plan.height, len(data)

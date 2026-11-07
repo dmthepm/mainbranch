@@ -48,9 +48,10 @@ jobs:
         run: python ../scripts/plugin_pin.py check
 
       - name: Install package + dev extras
+        # cards: Pillow, so the mb card render tests run instead of skipping.
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,cards]"
 
       - name: Ruff format check
         run: ruff format --check .
@@ -179,6 +180,19 @@ jobs:
           "$GITHUB_WORKSPACE/mb/.venv-min/bin/mb" skill list > skills.txt
           grep -qx "mb-start" skills.txt \
             || { echo "::error::mb skill list failed on minimum dependencies"; exit 1; }
+
+      - name: Smoke - a plain install (no cards extra) refuses mb card render cleanly
+        # Pillow is optional. Without it mb must still import and mb card render
+        # must exit 2 with the install hint, not a traceback.
+        run: |
+          cd "$(mktemp -d)"
+          echo '{"title":"T","sections":[{"head":"H"}]}' > spec.json
+          set +e
+          "$GITHUB_WORKSPACE/mb/.venv-min/bin/mb" card render spec.json out.jpg 2> err.txt
+          rc=$?
+          set -e
+          [ "$rc" -eq 2 ] && grep -q "mainbranch\[cards\]" err.txt \
+            || { echo "::error::mb card render without Pillow did not refuse cleanly (exit $rc)"; cat err.txt; exit 1; }
 
   skill-validate:
     name: SKILL.md line-count gate
