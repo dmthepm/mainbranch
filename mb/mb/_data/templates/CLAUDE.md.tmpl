@@ -26,7 +26,8 @@ mb doctor repair --plan
 
 Use `mb status --json --peek` as the default daily briefing before routing the
 operator (readiness, drift, update state, provider signals, recent work, MoneyPath,
-ranked actions, bets, pushes, checkpoint state).
+ranked actions, bets, pushes, checkpoint state). It is large; `mb status --summary`
+returns ranked actions, readiness, save and update state in a few KB, so start there.
 Do not replace those facts with ad hoc shell inspection unless `mb` says a section is unavailable.
 
 Read-only commands can be run without asking first. Commands that write files,

@@ -13,6 +13,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb status --summary` returns ranked actions, readiness, save state and update
+  state in about 2 KB, against about 380 KB for `mb status --json --peek` on the
+  dogfood fixture. It implies `--json --peek`. `/mb-start` and the generated
+  `CLAUDE.md` and `AGENTS.md` now start there; the full payload is unchanged (#994).
 - `mb library deal propose` now needs `--subject none-shown|agreed|unknown`, with
   `--subject-proof "<where the proof sits>"` for `agreed` (never a name). The
   subject is the person shown in the media other than whoever said yes. Only

@@ -4517,3 +4517,44 @@ def test_status_measurement_without_google_ads_customer_has_no_google_ads_field(
     assert "google_ads" not in measurement
     result = runner.invoke(app, ["status", str(repo)])
     assert "Google Ads:" not in result.stdout
+
+
+SUMMARY_MAX_BYTES = 6000
+
+
+def test_status_summary_stays_small_on_the_dogfood_fixture(tmp_path: Path, monkeypatch) -> None:
+    from mb.dogfood_harness import _apply_rich_multi_offer_migration_repo
+
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    repo = tmp_path / "rich"
+    init_run(path=str(repo), name="Rich")
+    _apply_rich_multi_offer_migration_repo(repo)
+
+    full = runner.invoke(app, ["status", str(repo), "--json", "--peek"])
+    summary = runner.invoke(app, ["status", str(repo), "--json", "--peek", "--summary"])
+
+    assert summary.exit_code == full.exit_code
+    payload = json.loads(summary.stdout)
+    full_payload = json.loads(full.stdout)
+    assert len(summary.stdout.encode()) <= SUMMARY_MAX_BYTES
+    assert len(summary.stdout) * 4 < len(full.stdout)
+    assert payload["result_schema"]["name"] == "mainbranch.status.summary"
+    assert set(payload) >= {"ranked_actions", "readiness", "save", "update", "full_status"}
+    assert payload["ranked_actions"]
+    assert {"id", "title", "command", "priority"} <= set(payload["ranked_actions"][0])
+    assert payload["readiness"]["level"] == full_payload["readiness"]["level"]
+    assert payload["save"]["branch"] == full_payload["git"]["branch"]
+    assert payload["update"]["severity"] == full_payload["update"]["severity"]
+    assert payload["full_status"].startswith("mb status --json --peek")
+
+
+def test_status_summary_does_not_move_the_seen_marker(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    repo = tmp_path / "acme"
+    init_run(path=str(repo), name="Acme")
+
+    result = runner.invoke(app, ["status", str(repo), "--summary"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["result_schema"]["name"] == "mainbranch.status.summary"
+    assert not (repo / ".mb" / "last-status-seen.json").exists()
