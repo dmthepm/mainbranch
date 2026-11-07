@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, BinaryIO, NoReturn
 
 import yaml
 
@@ -1855,10 +1855,25 @@ def _url_has_password(word: str, depth: int = 0) -> bool:
     except ValueError:
         # The parser rejected the URL (a bad host, say), so read the userinfo
         # by hand: a ":" before the last "@" in the authority is a password.
-        authority = re.split(r"[/?#]", text[url.end() - url.start() :], maxsplit=1)[0]
+        after_scheme = text[url.end() - url.start() :]
+        authority = re.split(r"[/?#]", after_scheme, maxsplit=1)[0]
         userinfo, at, _host = authority.rpartition("@")
-        return bool(at and ":" in userinfo)
-    return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
+        if at and ":" in userinfo:
+            return True
+        # A URL nested in the rest is judged too, within the same depth limit.
+        return _nested_url_has_password(_fully_unquote(after_scheme[len(authority) :]), depth)
+    return _nested_url_has_password(rest, depth)
+
+
+def _nested_url_has_password(rest: str, depth: int) -> bool:
+    """Judge a URL nested in ``rest``; past the depth limit, any URL left is refused.
+
+    A URL that is too deep to inspect might carry a password, so it counts as
+    one: failing open here would let four wrappers hide a credential.
+    """
+    if depth < _METADATA_URL_MAX_DEPTH:
+        return _url_has_password(rest, depth + 1)
+    return _METADATA_URL_START_RE.search(rest) is not None
 
 
 def metadata_value_rule(value: str) -> str:
@@ -2432,6 +2447,30 @@ def _restore_credential(store: SecretStore, ref: str, value: str) -> None:
         raise CredentialStoreError("keychain_unavailable")
 
 
+def _restore_repo_entry(repo: Path, provider_id: str, entry: dict[str, Any]) -> None:
+    """Write the repo metadata entry back and read it back; raise unless it is there."""
+
+    config = _read_config(repo)
+    if config["providers"].get(provider_id) == entry:
+        return  # the removal write never landed
+    config["providers"][provider_id] = entry
+    _write_config(repo, config)
+    if _read_config(repo)["providers"].get(provider_id) != entry:
+        raise OSError("repo metadata was not restored")
+
+
+def _restore_user_scope_entry(
+    repo_id: str, repo_identity: dict[str, Any], provider_id: str, entry: dict[str, Any]
+) -> None:
+    """Write the user-scope entry back and read it back; raise unless it is there."""
+
+    _write_user_scope_provider(
+        repo_id, repo_identity=repo_identity, provider_id=provider_id, entry=entry
+    )
+    if _user_scope_provider_entry(repo_id, provider_id) != entry:
+        raise OSError("user-scope metadata was not restored")
+
+
 def _undo_removal(undo: list[Callable[[], object]]) -> bool:
     """Run every undo step, newest first; True only when all of them worked."""
 
@@ -2520,18 +2559,30 @@ def remove_provider(
                 forget_stored(store.backend, ref)
             if isinstance(user_entry, dict):
                 undo.append(
-                    lambda: _write_user_scope_provider(
+                    functools.partial(
+                        _restore_user_scope_entry,
                         repo_id,
-                        repo_identity=config.get("repo_identity") or {},
-                        provider_id=provider.id,
-                        entry=user_entry,
+                        config.get("repo_identity") or {},
+                        provider.id,
+                        user_entry,
                     )
                 )
                 _remove_user_scope_provider(repo_id, provider.id)
             if isinstance(repo_entry, dict):
+                # Registered before the write: it can land and still raise.
+                undo.append(functools.partial(_restore_repo_entry, target, provider.id, repo_entry))
                 del config["providers"][provider.id]
                 _write_config(target, config)
-        except (CredentialStoreError, OSError, ConfigCorruptError) as exc:
+        except (
+            CredentialStoreError,
+            OSError,
+            ConfigCorruptError,
+            ConfigBoundaryError,
+            ConnectRefusal,
+        ) as exc:
+            # A failure here can follow a deletion, so a refusal (a user-scope
+            # file that turned read-only) must not skip the undo or claim that
+            # nothing was changed.
             restored = _undo_removal(undo)
             kept = (
                 "Everything was put back and read back to check."
@@ -2543,7 +2594,13 @@ def remove_provider(
                     "is missing."
                 )
             )
-            reason = exc.reason if isinstance(exc, CredentialStoreError) else "metadata"
+            reason = (
+                exc.reason
+                if isinstance(exc, CredentialStoreError)
+                else exc.rule
+                if isinstance(exc, ConnectRefusal)
+                else "metadata"
+            )
             raise MetadataWriteError(
                 f"Removing the {provider.name} connection failed ({reason}). {kept}"
             ) from None
@@ -4340,11 +4397,55 @@ def token_for_output(
     return result
 
 
+# `mb connect status` reads at most this many bytes from the end of the audit
+# log; `mb connect audit` reads all of it.
+AUDIT_READ_MAX_BYTES = 4 * 1024 * 1024
+
+
+def _open_audit_log() -> BinaryIO:
+    """The audit log as a binary stream, opened like the writer does.
+
+    No symlink and no blocking on a named pipe; the type is checked on the
+    opened descriptor, so a later swap of the path cannot change what is read.
+    Raises OSError for anything but a regular file.
+    """
+    fd = os.open(audit_path(), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError("audit log is not a regular file")
+        return os.fdopen(fd, "rb")
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _read_audit_tail(max_bytes: int) -> tuple[list[bytes], bool, bool]:
+    """The log's last ``max_bytes`` as lines, whether any were cut, and whether
+    the read was whole.
+
+    The size is taken once and caps the read, so a writer appending meanwhile
+    cannot stretch it. The read counts as whole only if as many bytes arrived
+    as the size promised and the file did not shrink meanwhile. When the log is
+    longer than the bound the read starts one byte early: the first line is
+    then either the end of a cut row or empty (the cut fell on a line
+    boundary), and is dropped either way, so a whole first row is kept.
+    """
+    with _open_audit_log() as stream:
+        size = os.fstat(stream.fileno()).st_size
+        start = max(0, size - max_bytes)
+        begin = max(0, start - 1)
+        stream.seek(begin)
+        data = stream.read(size - begin)  # never past the size taken above
+        whole = len(data) == size - begin and os.fstat(stream.fileno()).st_size >= size
+    lines = data.splitlines()
+    return (lines[1:], True, whole) if start else (lines, False, whole)
+
+
 def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str, Any]]:
     from mb.feedback_scrub import scrub
 
     try:
-        with audit_path().open() as stream:
+        with _open_audit_log() as stream:
             entries = (json.loads(line) for line in stream if line.strip())
             rows = list(
                 deque(
@@ -4372,35 +4473,39 @@ def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:
     rows: deque[dict[str, Any]] = deque(maxlen=5)
     state = "ok"
     try:
-        with audit_path().open("rb") as stream:
-            for line in stream:
-                if not line.strip():
+        lines, cut, whole = _read_audit_tail(AUDIT_READ_MAX_BYTES)
+        if not whole:
+            state = "incomplete"
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+                if not isinstance(entry, dict):
+                    raise ValueError("audit row must be an object")
+                if entry.get("verb") != "rebind" or entry.get("repo_id") != repo_id:
                     continue
-                try:
-                    entry = json.loads(line)
-                    if not isinstance(entry, dict):
-                        raise ValueError("audit row must be an object")
-                    if entry.get("verb") != "rebind" or entry.get("repo_id") != repo_id:
-                        continue
-                    if (
-                        not isinstance(entry.get("ts"), str)
-                        or not isinstance(entry.get("result"), str)
-                        or not isinstance(entry.get("flags"), list)
-                        or not all(isinstance(flag, str) for flag in entry["flags"])
-                    ):
-                        raise ValueError("invalid rebind row")
-                    rows.append(
-                        {
-                            key: scrub(value) if isinstance(value, str) else value
-                            for key, value in entry.items()
-                        }
-                    )
-                except (ValueError, UnicodeError, RecursionError):
-                    state = "incomplete"
+                if (
+                    not isinstance(entry.get("ts"), str)
+                    or not isinstance(entry.get("result"), str)
+                    or not isinstance(entry.get("flags"), list)
+                    or not all(isinstance(flag, str) for flag in entry["flags"])
+                ):
+                    raise ValueError("invalid rebind row")
+                rows.append(
+                    {
+                        key: scrub(value) if isinstance(value, str) else value
+                        for key, value in entry.items()
+                    }
+                )
+            except (ValueError, UnicodeError, RecursionError):
+                state = "incomplete"
     except FileNotFoundError:
         return [], "ok"
     except OSError:
         return [], "unavailable"
+    if cut and len(rows) < 5:
+        state = "incomplete"  # an older rebind may sit beyond the bound
     return list(rows), state
 
 
