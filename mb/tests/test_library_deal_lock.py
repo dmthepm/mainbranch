@@ -90,7 +90,7 @@ def _revoke(biz: Path, deal: str, role: str, events: dict[str, Any], out: Any) -
             events["blocked"].set()
             time.sleep(seconds)
 
-        files._pause = pause  # type: ignore[attr-defined]
+        files._pause = pause
     try:
         library(biz).revoke_deal(deal, "withdrawn")
         out.put((role, "ok"))
