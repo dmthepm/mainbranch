@@ -33,7 +33,7 @@ cleared; run `check` on those to see why. `--any` only widens the word match
 | What | Where | In git |
 |---|---|---|
 | Source paths, timezone | `.mb/private/library/config.yaml` | no |
-| Index of sightings | `.mb/private/library/index.json` (and `index.lock`) | no |
+| Index of sightings | `.mb/private/library/index.json` (and `index.lock`, `deals.lock`) | no |
 | Provenance, tags, creator, deals | `library/records/<asset id>.yaml` | yes |
 
 The asset id is the SHA-256 of the file's bytes, so the same photo in two
@@ -102,7 +102,10 @@ keeps saying so.
   owned by you and closed to group and others, or the library refuses. The
   index is one plain file replaced whole, with no database side files, so a
   folder swapped for a symlink mid-run cannot redirect a write. A scan holds a
-  lock; a second scan is refused while it runs. Records, index and config inside
+  lock; a second scan is refused while it runs. Deal changes (propose, approve,
+  revoke) hold their own lock from read to write, so two overlapping changes
+  both land; one that cannot get the lock within a few seconds is refused and
+  writes nothing. Scans and deal changes do not wait on each other. Records, index and config inside
   a source are refused. The folders above the business folder are resolved once,
   when the command starts.
 - Every line the `mb library` commands print themselves (results, listings, the

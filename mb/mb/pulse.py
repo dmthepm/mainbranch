@@ -65,8 +65,9 @@ case "$DATE" in
 esac
 command -v jq >/dev/null 2>&1 || fail "jq_missing"
 
-# TODO: source your env file for API tokens (never echo them), e.g.
-#   [ -f "$HOME/.config/yourbiz/env.sh" ] && { set -a; . "$HOME/.config/yourbiz/env.sh"; set +a; }
+# TODO: store the API token with `mb connect` and run this script through
+# `mb connect exec <provider> --env YOUR_API_TOKEN -- <this script>` (never echo
+# the token), then check it arrived:
 #   [ -n "${YOUR_API_TOKEN:-}" ] || fail "your_api_token_missing_from_env"
 
 # TODO: ONE read-only API pull for $DATE, shaped by jq into the numbers the

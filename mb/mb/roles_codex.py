@@ -35,14 +35,27 @@ _REFUSAL = (
     "could not be loaded. STOP. Do not start work and do not pick a role yourself. "
     "Tell the owner this message and ask them to fix the role setup. This session has no role."
 )
+# Codex has one command for every source and the shell cannot read JSON safely, so this
+# fallback never looks at the payload: it keeps the STOP on every source. The one-line warning
+# for resume, clear, compact and fork lives in the Python path (mb role hook), which parses it.
 CODEX_HOOK_COMMAND = (
     "sh -c '"
     'd=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
     '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
-    f"if command -v mb >/dev/null 2>&1 && out=$({_MARK} 2>/dev/null); "
+    "in=; [ -t 0 ] || in=$(head -c 65536); "
+    f'if command -v mb >/dev/null 2>&1 && out=$(printf "%s" "$in" | {_MARK} 2>/dev/null); '
     'then [ -z "$out" ] || printf "%s\\n" "$out"; '
     'else set -- "$d"/core/roles/*.md; '
     f'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\''
+)
+# The exact command an earlier release wrote. Still ours, so apply replaces it and remove clears it.
+_PREVIOUS_COMMANDS = (
+    'sh -c \'d=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
+    '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
+    f"if command -v mb >/dev/null 2>&1 && out=$({_MARK} 2>/dev/null); "
+    'then [ -z "$out" ] || printf "%s\\n" "$out"; '
+    'else set -- "$d"/core/roles/*.md; '
+    f'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\'',
 )
 
 
@@ -70,8 +83,11 @@ def hook_group() -> dict[str, Any]:
 
 
 def _is_ours(hook: object) -> bool:
-    """Only the exact generated command. Anything else is the owner's, even if it mentions us."""
-    return isinstance(hook, dict) and hook.get("command") == CODEX_HOOK_COMMAND
+    """Only an exact generated command, current or previous. Anything else is the owner's."""
+    return isinstance(hook, dict) and hook.get("command") in (
+        CODEX_HOOK_COMMAND,
+        *_PREVIOUS_COMMANDS,
+    )
 
 
 def _mentions_us(hook: object) -> bool:

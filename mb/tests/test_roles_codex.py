@@ -354,12 +354,146 @@ def test_hook_does_not_climb_past_a_git_root_into_a_parent_repo(repo: Path, tmp_
     assert result.stdout == "" and not marker.exists()
 
 
-def test_hook_refuses_when_mb_is_missing_and_a_card_exists(repo: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+def test_hook_when_mb_is_missing_and_a_card_exists(repo: Path, tmp_path: Path, source: str) -> None:
     empty = tmp_path / "empty-bin"
     empty.mkdir()
-    result = _run(repo / "state", empty, {"source": "startup"})
+    result = _run(repo / "state", empty, {"source": source}, role=None)
     assert result.returncode == 0
     assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    assert "ROLE WARNING" not in result.stdout
+
+
+@pytest.mark.parametrize("payload", [None, {}, {"source": "weird"}, {"cwd": "x"}])
+def test_hook_when_mb_is_missing_and_source_is_unknown_keeps_stop(
+    repo: Path, tmp_path: Path, payload: object
+) -> None:
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    result = _run(repo / "state", empty, payload, role=None)
+    assert "STOP" in result.stdout
+
+
+def _failing_mb(directory: Path) -> Path:
+    directory.mkdir()
+    shim = directory / "mb"
+    shim.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    shim.chmod(0o755)
+    return directory
+
+
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+@pytest.mark.parametrize("role", ["scout", "ghost", "Bad Name"])
+@pytest.mark.parametrize("binary", ["missing", "failing"])
+def test_hook_with_a_selected_role_never_downgrades_to_a_warning(
+    repo: Path, tmp_path: Path, source: str, role: str, binary: str
+) -> None:
+    if binary == "missing":
+        path_dir = tmp_path / "empty-bin"
+        path_dir.mkdir()
+    else:
+        path_dir = _failing_mb(tmp_path / "fail-bin")
+    result = _run(repo / "state", path_dir, {"source": source}, role=role)
+    assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    assert "ROLE WARNING" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"source":"resume",}',
+        '{"source":"resume","\\u0073ource":"startup"}',
+        '{"source":"re sume"}',
+        '{"source":"startup","metadata":{"source":"resume"}}',
+        '{"source":"resume","source":"startup"}',
+        '{"source":"resume"',
+        '{"source":"resume"}',
+    ],
+)
+def test_hook_fallback_never_reads_the_payload(repo: Path, tmp_path: Path, raw: str) -> None:
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    env = {"PATH": f"{empty}:/usr/bin:/bin", "HOME": str(repo)}
+    result = subprocess.run(
+        ["/bin/sh", "-c", roles_codex.CODEX_HOOK_COMMAND],
+        cwd=repo / "state",
+        env=env,
+        input=raw,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert "STOP" in result.stdout and "ROLE WARNING" not in result.stdout
+
+
+# The exact command `mb role codex-hook --apply` wrote before the source split.
+PREVIOUS_COMMAND = (
+    'sh -c \'d=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
+    '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
+    "if command -v mb >/dev/null 2>&1 && out=$(mb role hook --runtime codex 2>/dev/null); "
+    'then [ -z "$out" ] || printf "%s\\n" "$out"; '
+    'else set -- "$d"/core/roles/*.md; '
+    'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "MAIN BRANCH ROLE CHECK FAILED: '
+    "this repo has role cards (core/roles) but the role could not be loaded. STOP. "
+    "Do not start work and do not pick a role yourself. Tell the owner this message and ask "
+    "them to fix the role setup. This session has no role.\"; fi; fi; exit 0'"
+)
+
+
+def test_previously_generated_command_is_replaced_on_apply(codex_home: Path) -> None:
+    old = {
+        "matcher": roles_codex.CODEX_MATCHER,
+        "hooks": [{"type": "command", "command": PREVIOUS_COMMAND, "timeout": 20}],
+    }
+    _write(codex_home, {"hooks": {"SessionStart": [OTHER_GROUP, old]}})
+    assert roles_codex.plan()["action"] == "replace"
+    roles_codex.apply()
+    groups = _groups(codex_home)
+    assert groups[0] == OTHER_GROUP and groups[1:] == [roles_codex.hook_group()]
+
+
+def test_previously_generated_command_is_removed_on_remove(codex_home: Path) -> None:
+    old = {"matcher": "startup", "hooks": [{"type": "command", "command": PREVIOUS_COMMAND}]}
+    _write(codex_home, {"hooks": {"SessionStart": [OTHER_GROUP, old]}})
+    assert roles_codex.plan(remove=True)["action"] != "unchanged"
+    roles_codex.apply(remove=True)
+    assert _groups(codex_home) == [OTHER_GROUP]
+
+
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+def test_hook_with_mb_present_and_no_role_splits_by_source(
+    repo: Path, tmp_path: Path, source: str
+) -> None:
+    path_dir = _shim(tmp_path / "bin", tmp_path / "ran")
+    result = _run(repo / "state", path_dir, {"source": source, "cwd": str(repo)}, role=None)
+    assert result.returncode == 0
+    if source == "startup":
+        assert "STOP" in result.stdout
+    else:
+        assert result.stdout.startswith("MAIN BRANCH ROLE WARNING") and "STOP" not in result.stdout
+
+
+def test_codex_hook_declares_a_timeout_and_a_hang_prints_nothing(
+    repo: Path, tmp_path: Path
+) -> None:
+    assert 0 < roles_codex.HOOK_TIMEOUT_SECONDS <= 30
+    shim = tmp_path / "hang-bin"
+    shim.mkdir()
+    (shim / "mb").write_text("#!/bin/sh\nexec sleep 30\n", encoding="utf-8")
+    (shim / "mb").chmod(0o755)
+    env = {"PATH": f"{shim}:/usr/bin:/bin", "HOME": str(repo)}
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        subprocess.run(
+            ["/bin/sh", "-c", roles_codex.CODEX_HOOK_COMMAND],
+            cwd=repo / "state",
+            env=env,
+            input=json.dumps({"source": "resume"}),
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
+    assert not caught.value.stdout or "running as role" not in str(caught.value.stdout)
 
 
 def test_hook_is_silent_when_mb_is_missing_and_the_roles_folder_is_empty(

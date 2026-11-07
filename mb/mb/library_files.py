@@ -18,6 +18,7 @@ import fcntl
 import os
 import secrets
 import stat
+import time
 import unicodedata
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -166,9 +167,24 @@ def write_file(dir_fd: int, name: str, data: bytes) -> None:
         raise
 
 
+def _pause(seconds: float) -> None:
+    time.sleep(seconds)
+
+
 @contextlib.contextmanager
-def exclusive(dir_fd: int, name: str) -> Iterator[None]:
-    """Hold an advisory lock on a plain file in the checked folder; one holder at a time."""
+def exclusive(
+    dir_fd: int,
+    name: str,
+    *,
+    wait: float = 0.0,
+    busy: str = "another scan is already running here; wait for it to finish",
+) -> Iterator[None]:
+    """Hold an advisory lock on a plain file in the checked folder; one holder at a time.
+
+    The lock belongs to the open file, so the system drops it when the process
+    ends, however it ends. With `wait`, a busy lock is retried for that many
+    seconds before `busy` is raised.
+    """
     _plain(name)
     flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC
     try:
@@ -179,12 +195,15 @@ def exclusive(dir_fd: int, name: str) -> Iterator[None]:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_nlink > 1 or info.st_uid != os.geteuid():
             raise LibraryError(f"{name} is not a plain file of our own; refusing to use it")
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise LibraryError(
-                "another scan is already running here; wait for it to finish"
-            ) from None
+        give_up = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= give_up:
+                    raise LibraryError(busy) from None
+                _pause(0.05)
         yield
     finally:
         os.close(fd)

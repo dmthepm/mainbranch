@@ -663,7 +663,8 @@ command `ok`, exit codes or launch decisions, and do not repair either source.
 `mb machine doctor --json` uses `mainbranch.machine.doctor.result` version
 `1.0`, with domain `schema: mb.machine.doctor` and `schema_version: 1`.
 `safe_to_share` is false because `run_as` includes the account name. `scope`
-is currently `self`. `checks` keeps every parsed read and its coded reason;
+is `self` (the default) or `all`, chosen with `--scope`; any other value is an
+error (exit 2). `checks` keeps every parsed read and its coded reason;
 raw probe output is never included. `summary` counts each result state.
 
 Exit precedence is errors (2), failed checks (1), incomplete baseline
