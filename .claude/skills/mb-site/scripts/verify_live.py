@@ -40,7 +40,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _envelope import log  # noqa: E402
+from _envelope import OWNER_HANDOFF, log  # noqa: E402
 
 # ---------------------------------------------------------------------------
 
@@ -144,7 +144,7 @@ def check_cf_auth() -> bool:
     if not token:
         _fail("CLOUDFLARE_API_TOKEN not set")
         _info("Fix: create token at https://dash.cloudflare.com/profile/api-tokens")
-        _info("     Store it with `mb connect cloudflare` (hidden prompt), then use `mb connect exec`")
+        _info("     Store it with `mb connect cloudflare` (hidden prompt), then use `mb connect exec`. " + OWNER_HANDOFF)
         return False
 
     if not account_id:

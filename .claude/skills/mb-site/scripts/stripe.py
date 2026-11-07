@@ -53,6 +53,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
+    OWNER_HANDOFF,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -555,7 +556,7 @@ def create_payment_link(
             error=StripeError(
                 code="missing_api_key",
                 message="STRIPE_API_KEY is not set in the environment.",
-                suggestion="Store the key with `mb connect stripe`, then run this through `mb connect exec stripe -- <command>`.",
+                suggestion="Store the key with `mb connect stripe`, then run this through `mb connect exec stripe -- <command>`. " + OWNER_HANDOFF,
             ),
         )
         sys.exit(emit(env))
@@ -752,7 +753,7 @@ def list_products(offer_slug: str | None, limit: int) -> None:
             error=StripeError(
                 code="missing_api_key",
                 message="STRIPE_API_KEY is not set in the environment.",
-                suggestion="Store the key with `mb connect stripe`, then run this through `mb connect exec stripe -- <command>`.",
+                suggestion="Store the key with `mb connect stripe`, then run this through `mb connect exec stripe -- <command>`. " + OWNER_HANDOFF,
             ),
         )
         sys.exit(emit(env))
@@ -838,7 +839,7 @@ def archive_product(product_id: str) -> None:
             error=StripeError(
                 code="missing_api_key",
                 message="STRIPE_API_KEY is not set in the environment.",
-                suggestion="Store the key with `mb connect stripe`, then run this through `mb connect exec stripe -- <command>`.",
+                suggestion="Store the key with `mb connect stripe`, then run this through `mb connect exec stripe -- <command>`. " + OWNER_HANDOFF,
             ),
         )
         sys.exit(emit(env))

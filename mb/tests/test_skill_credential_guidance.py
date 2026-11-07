@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import re
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -142,3 +144,46 @@ def test_zone_retry_command_carries_account_id_and_both_keep_env_flags() -> None
     assert len(retry) == 1
     for needle in ("CF_ACCOUNT_ID=<", "--keep-env CF_ACCOUNT_ID", "--keep-env VERIFY_LIVE_CF_ZONE"):
         assert needle in retry[0], needle
+
+
+MB_SITE_SCRIPTS = SKILLS / "mb-site" / "scripts"
+CREDENTIAL_PRINTERS = ("dns.py", "pages.py", "stripe.py", "verify_live.py")
+
+
+def _missing_credential_messages(path: Path) -> list[ast.expr]:
+    # The `suggestion=` text an atom returns, or the line verify_live prints,
+    # when it tells someone to store a credential with `mb connect`.
+    found: list[ast.expr] = []
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.keyword) and node.arg == "suggestion":
+            found.append(node.value)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_info"
+            and node.args
+        ):
+            found.append(node.args[0])
+    return [
+        expr for expr in found if "mb connect" in ast.unparse(expr) and "tore" in ast.unparse(expr)
+    ]
+
+
+def test_runtime_missing_credential_messages_carry_the_owner_handoff() -> None:
+    # The module docstring is never printed; the message the agent reads is.
+    sys.path.insert(0, str(MB_SITE_SCRIPTS))
+    try:
+        from _envelope import OWNER_HANDOFF
+    finally:
+        sys.path.remove(str(MB_SITE_SCRIPTS))
+    assert OWNER_HANDOFF == HANDOFF
+
+    checked = 0
+    offenders = []
+    for name in CREDENTIAL_PRINTERS:
+        for expr in _missing_credential_messages(MB_SITE_SCRIPTS / name):
+            checked += 1
+            if not any(isinstance(n, ast.Name) and n.id == "OWNER_HANDOFF" for n in ast.walk(expr)):
+                offenders.append(f"{name}:{expr.lineno}")
+    assert checked >= 9
+    assert offenders == []

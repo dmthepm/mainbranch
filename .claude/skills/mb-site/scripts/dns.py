@@ -33,6 +33,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
+    OWNER_HANDOFF,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -298,7 +299,8 @@ def _detect_registrar(explicit: str | None) -> tuple[str | None, DnsEnsureError 
             "Pass --registrar=cloudflare or --registrar=porkbun. "
             "Or store the registrar credential with `mb connect` and run this through "
             "`mb connect exec` (CLOUDFLARE_API_TOKEN_REGISTRAR for CF-registered, "
-            "PORKBUN_API_KEY+PORKBUN_SECRET_KEY for Porkbun-registered)."
+            "PORKBUN_API_KEY+PORKBUN_SECRET_KEY for Porkbun-registered). "
+            + OWNER_HANDOFF
         ),
     )
 
@@ -368,7 +370,8 @@ def ensure(
                 suggestion=(
                     "Store a token with Zone:Edit + DNS:Edit permissions using "
                     "`mb connect cloudflare` (it prompts with hidden input), then run this through "
-                    "`mb connect exec cloudflare -- <command>`."
+                    "`mb connect exec cloudflare -- <command>`. "
+                    + OWNER_HANDOFF
                 ),
             ),
         )
@@ -504,7 +507,8 @@ def ensure(
                     message="PORKBUN_API_KEY/PORKBUN_SECRET_KEY not set.",
                     suggestion=(
                         "Store the Porkbun credential with `mb connect` and run this "
-                        "through `mb connect exec`."
+                        "through `mb connect exec`. "
+                        + OWNER_HANDOFF
                     ),
                 ),
             )

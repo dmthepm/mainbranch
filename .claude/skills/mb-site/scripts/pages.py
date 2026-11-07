@@ -39,6 +39,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
+    OWNER_HANDOFF,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -597,7 +598,7 @@ def create_project(
             error=PagesCreateProjectError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`. " + OWNER_HANDOFF,
             ),
         )
         sys.exit(emit(env))
@@ -809,7 +810,7 @@ def set_domain(
             error=PagesSetDomainError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`. " + OWNER_HANDOFF,
             ),
         )
         sys.exit(emit(env))
