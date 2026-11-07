@@ -13,6 +13,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb card render SPEC.json OUT.jpg` draws a phone decision card from a JSON spec
+  (`title`, `sub`, `sections` with `bullets` and lettered `options`, `footer`). The
+  tool holds the house rules: 1320 px wide, large type, numbered sections, the
+  pick marked "(my pick)", refused above 3:1 tall (split it), under 2 MB. A bad
+  spec is refused by field name. Needs the optional `pip install 'mainbranch[cards]'`
+  (Pillow); without it the command says so and nothing else in `mb` changes. Type is
+  Pillow's built-in font, so no machine fonts are used. OUT must be a new `.jpg` or
+  `.jpeg` name: an existing file, a symlink, or the spec itself is refused, and the
+  file appears whole or not at all. Long words and headings wrap, control characters
+  and oversized specs are refused.
 - `mb agent check [name]` validates the `agents.json` policy and the files it names: schema,
   card locations, profiles and the PATH list, refusing any group or world writable path
   and any symlink on the way. Exit 0 means the policy is valid and says nothing about a
