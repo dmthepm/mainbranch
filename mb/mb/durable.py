@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import tempfile
@@ -101,7 +102,10 @@ def _make_parents(parent: Path) -> None:
 def _write_all(fd: int, data: bytes) -> None:
     view = memoryview(data)
     while view:
-        view = view[os.write(fd, view) :]
+        written = os.write(fd, view)
+        if written <= 0:
+            raise OSError(errno.EIO, "write made no progress")
+        view = view[written:]
 
 
 def atomic_write_text(
@@ -141,8 +145,11 @@ def atomic_write_text(
         try:
             _write_all(fd, data)
             os.fsync(fd)
-        finally:
-            os.close(fd)  # the one close: this function owns fd from mkstemp on
+        except BaseException:
+            with suppress(OSError):  # a close error never replaces the pending one
+                os.close(fd)
+            raise
+        os.close(fd)  # the one close: this function owns fd from mkstemp on
         os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:

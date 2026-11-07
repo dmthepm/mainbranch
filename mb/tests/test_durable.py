@@ -273,3 +273,65 @@ def test_a_write_failure_closes_once_leaves_no_temp_and_surfaces_the_error(
     assert len(closed) == 1
     assert len(os.listdir("/proc/self/fd")) == before
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_zero_progress_write_raises_instead_of_spinning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+
+    def zero_write(fd: int, data: bytes | memoryview) -> int:
+        nonlocal calls
+        calls += 1
+        assert calls < 100, "write loop is spinning"
+        return 0
+
+    monkeypatch.setattr(os, "write", zero_write)
+
+    with pytest.raises(OSError, match="no progress"):
+        atomic_write_text(tmp_path / "state.json", "new\n")
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def _close_raising_for_files(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    real_close = os.close
+    attempts: list[int] = []
+
+    def failing_close(fd: int) -> None:
+        is_dir = stat.S_ISDIR(os.fstat(fd).st_mode)
+        real_close(fd)
+        if not is_dir:
+            attempts.append(fd)
+            raise OSError(5, "close failed")
+
+    monkeypatch.setattr(os, "close", failing_close)
+    return attempts
+
+
+def test_a_close_failure_never_replaces_a_pending_write_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken_write(fd: int, data: bytes | memoryview) -> int:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(os, "write", broken_write)
+    attempts = _close_raising_for_files(monkeypatch)
+
+    with pytest.raises(OSError, match="No space left"):
+        atomic_write_text(tmp_path / "state.json", "new\n")
+
+    assert len(attempts) == 1
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_close_failure_surfaces_when_nothing_failed_earlier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    attempts = _close_raising_for_files(monkeypatch)
+
+    with pytest.raises(OSError, match="close failed"):
+        atomic_write_text(tmp_path / "state.json", "new\n")
+
+    assert len(attempts) == 1
+    assert list(tmp_path.iterdir()) == []
