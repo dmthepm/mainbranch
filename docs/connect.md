@@ -81,7 +81,11 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
   `status`, `test` and `policy` start from the git top level of the current
   folder and use it when it holds `.mb/connect.yaml`. They never look above that
   top level, so a repo cloned inside the hub does not borrow the hub's
-  connections. Anywhere else they stop with `no_business_repo` (exit 2). This
+  connections. If a `.git` marker on the way up cannot be read, they stop with
+  `unreadable_repo_marker` (exit 2) instead of trying a parent: an unreadable
+  marker might be a nested repo. A `.git` folder with no HEAD, or a `.git` file
+  that is not a `gitdir:` pointer, is readable and ignored. Anywhere else they
+  stop with `no_business_repo` (exit 2). This
   chooses which folder is read, not who may read it: binding, reference and
   caller-policy checks run on the folder found exactly as they do with `--repo`.
 

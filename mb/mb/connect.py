@@ -4243,14 +4243,28 @@ def _check_exec_child(command: list[str]) -> None:
 
 
 def _is_git_top(folder: Path) -> bool:
-    """A folder is a git top when ``.git`` is a gitfile or a folder holding HEAD."""
+    """A folder is a git top when ``.git`` is a gitfile or a folder holding HEAD.
+
+    Absent, or an empty marker nothing reads as a repo, is False. A marker that
+    cannot be inspected is not False: it may be a nested repo, so the search
+    refuses rather than walk on to a parent.
+    """
     git = folder / ".git"
     try:
-        if git.is_file():
+        mode = git.stat().st_mode
+        if stat.S_ISREG(mode):
             return git.read_text(encoding="utf-8", errors="replace").startswith("gitdir:")
-        return git.is_dir() and (git / "HEAD").is_file()
-    except OSError:
+        if stat.S_ISDIR(mode):
+            return stat.S_ISREG((git / "HEAD").stat().st_mode)
         return False
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        _refuse(
+            "unreadable_repo_marker",
+            f"Cannot read the git marker at {git}, so I cannot tell which repo this is. "
+            "Fix its permissions, or cd into the business repo or pass --repo.",
+        )
 
 
 def find_business_repo(start: str | Path = ".") -> Path:
@@ -4258,7 +4272,8 @@ def find_business_repo(start: str | Path = ".") -> Path:
 
     Starts at the nearest git top level at or above ``start`` and goes no
     higher: a repo cloned inside the hub is its own repo and never borrows the
-    hub's keys. That folder must hold ``.mb/connect.yaml``. This only chooses
+    hub's keys. A git marker that cannot be read refuses; the search never walks
+    past it. That folder must hold ``.mb/connect.yaml``. This only chooses
     which folder is read; binding and reference checks run on it as on
     ``--repo``.
     """

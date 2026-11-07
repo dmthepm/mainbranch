@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import errno
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -204,3 +207,100 @@ def test_explicit_repo_behaves_as_before(
     # A folder that is not a repo is accepted as today: no repo search with --repo.
     result = runner.invoke(app, ["connect", "exec", "stripe", "--repo", ".", "--", *CHILD])
     assert "No business repo here" not in result.output
+
+
+# --- an uninspectable git marker refuses; discovery never walks on to a parent ---
+
+BREAKS = ["unreadable-gitfile", "unreadable-gitdir", "other-oserror"]
+
+
+def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A nested repo inside the hub whose ``.git`` cannot be inspected."""
+    nested = hub / "nested"
+    (nested / "src").mkdir(parents=True)
+    marker = nested / ".git"
+    if kind == "unreadable-gitfile":
+        marker.write_text("gitdir: /somewhere/else\n")
+    else:
+        make_git(nested)
+    if kind == "other-oserror":
+        real = Path.stat
+
+        def failing(self: Path, *args: Any, **kwargs: Any) -> Any:
+            if self == marker:
+                raise OSError(errno.EIO, "Input/output error")
+            return real(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "stat", failing)
+    else:
+        assert os.geteuid() != 0, "run as a non-root user: root can read a mode 0 marker"
+        marker.chmod(0)
+    return nested
+
+
+def _restore(nested: Path) -> None:
+    (nested / ".git").chmod(0o755)
+
+
+@pytest.mark.parametrize("kind", BREAKS)
+def test_finder_refuses_and_never_selects_the_parent(
+    hub: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    nested = _break_nested_marker(hub, kind, monkeypatch)
+    try:
+        with pytest.raises(connect.ConnectRefusal) as caught:
+            connect.find_business_repo(nested / "src")
+    finally:
+        if kind != "other-oserror":
+            _restore(nested)
+    assert caught.value.rule == "unreadable_repo_marker"
+
+
+@pytest.mark.parametrize("kind", BREAKS)
+@pytest.mark.parametrize("verb", ["exec", "token"])
+def test_cli_unreadable_marker_reads_no_key_launches_nothing_and_is_logged(
+    hub: Path, monkeypatch: pytest.MonkeyPatch, kind: str, verb: str
+) -> None:
+    nested = _break_nested_marker(hub, kind, monkeypatch)
+    reads: list[object] = []
+    launches: list[object] = []
+
+    def read_token(*args: Any, **kwargs: Any) -> str:
+        reads.append(args)
+        return SECRET
+
+    monkeypatch.setattr(connect, "read_token", read_token)
+    for owner, name in (
+        (subprocess, "run"),
+        (subprocess, "Popen"),
+        (os, "execvp"),
+        (os, "execvpe"),
+    ):
+        monkeypatch.setattr(owner, name, lambda *a, **k: launches.append(a))
+    monkeypatch.chdir(nested / "src")
+    args = ["--print"] if verb == "token" else ["--", *CHILD_PRINTS_PATH]
+    try:
+        result = runner.invoke(app, ["connect", verb, "stripe", *args])
+    finally:
+        if kind != "other-oserror":
+            _restore(nested)
+    assert result.exit_code == 2, result.output
+    assert "Cannot read the git marker" in result.stderr
+    assert SECRET not in result.output
+    assert result.stdout == ""
+    assert reads == [] and launches == []
+    (row,) = rows()
+    assert row["verb"] == verb
+    assert row["result"] == "refused"
+    assert row["reason"] == "unreadable_repo_marker"
+    assert row["exit_code"] == 2
+
+
+def test_empty_marker_is_still_ignored_not_refused(hub: Path) -> None:
+    # Deliberately ignored, and readable: a .git folder without HEAD, and a
+    # gitfile that is not a gitdir pointer. The walk goes on to the hub.
+    (hub / "a" / ".git").mkdir(parents=True)
+    (hub / "b").mkdir()
+    (hub / "b" / ".git").write_text("not a pointer\n")
+    assert connect.find_business_repo(hub / "a") == hub
+    assert connect.find_business_repo(hub / "b") == hub
