@@ -23,7 +23,9 @@ When summarizing repo state, count `pushes/` records, flag `campaigns/` as
 legacy only, and use `core/vocabulary.md` display words (real paths in commands).
 
 **CLI facts first:** Once the business repo path is known, run
-`mb status --json --peek` before asking setup or routing questions. Treat JSON
+`mb status --summary` first: ranked actions, readiness, save and update state in
+a few KB. Run `mb status --json --peek` (about 300 KB) only for a section the
+summary does not carry, before asking setup or routing questions. Treat JSON
 as source of truth for update severity, readiness, drift, onboarding,
 integrations, GitHub, team, bets, dirty git, since-last-check,
 `content_strategy`, `money_path`, `validation.file_contracts`, and

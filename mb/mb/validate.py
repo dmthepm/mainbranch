@@ -2115,7 +2115,14 @@ def render_human(report: dict[str, Any], verbose: bool = False, repo: Path | Non
 
     console = Console()
     if not report["files"]:
-        console.print("[yellow]nothing to check yet.[/yellow]")
+        scoped = [f"{str(path).rstrip('/')}/" for path in report.get("scoped_paths") or []]
+        if scoped:
+            console.print(
+                f"[yellow]nothing to check in {escape(', '.join(scoped))}: "
+                "no Main Branch records there, so this run checked nothing.[/yellow]"
+            )
+        else:
+            console.print("[yellow]nothing to check yet.[/yellow]")
         return
     by_schema: dict[str, list[dict[str, Any]]] = {}
     for f in report["files"]:

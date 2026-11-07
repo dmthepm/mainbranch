@@ -1,7 +1,11 @@
 # Weekly review
 
-Read `state/support/cases.md` and write one entry under `## Week of <date>` in
-`state/support/review.md`, then send the owner the summary.
+Read the case log: `state/support/cases.md`, or the tracker it names when cases
+live there (see `cases.md`). Write one entry under `## Week of <date>` in
+`state/support/review.md`, then send the owner the summary. The `Check:` lines
+are always in `cases.md`; the case rows are in whichever log is configured. If
+the tracker cannot be read, the entry says so on its first lines and lists no
+promises as overdue or clear: the gap is stated, never treated as no cases.
 
 ## The entry, in this order
 

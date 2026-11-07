@@ -54,15 +54,17 @@ actor shape, and no-raw-dump handling before use. Do not require or imply
 
 **Gemini:**
 ```bash
-[ -f "$HOME/.config/vip/env.sh" ] && source "$HOME/.config/vip/env.sh"
-[ -n "$GOOGLE_API_KEY" ] && echo "GEMINI=true"
+mb connect status google-ai --json
 ```
 
-**Grok:** Requires BOTH env var AND Python SDK:
+**Grok:** Requires BOTH a stored key AND the Python SDK:
 ```bash
-[ -f "$HOME/.config/vip/env.sh" ] && source "$HOME/.config/vip/env.sh"
-[ -n "$XAI_API_KEY" ] && python3 -c "import xai_sdk" 2>/dev/null && echo "GROK=true"
+mb connect status xai --json
+python3 -c "import xai_sdk" 2>/dev/null && echo "GROK_SDK=true"
 ```
+
+Keys live in `mb connect`, not the shell environment. Run a command that needs
+one through `mb connect exec <provider> --env <NAME> -- <command>`.
 
 **whisper:** Check MCP tools (`mcp__whisper__*`) OR CLI (multiple implementations exist):
 ```bash
@@ -96,8 +98,6 @@ which markitdown >/dev/null 2>&1 && echo "MARKITDOWN=true"
 which pandoc >/dev/null 2>&1 && echo "PANDOC=true"
 which marker_single >/dev/null 2>&1 && echo "MARKER=true"
 ```
-
-**Manual probe script:** `scripts/detect-tools.sh` provides a standalone CLI check for all tools. Useful for debugging outside a Claude session.
 
 ---
 

@@ -175,6 +175,11 @@ def _read_card(path: Path, root: Path) -> tuple[dict[str, Any] | None, str, list
         text = raw.decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return None, "", ["card could not be read as UTF-8 text"]
+    return parse_card_text(text)
+
+
+def parse_card_text(text: str) -> tuple[dict[str, Any] | None, str, list[str]]:
+    """Return ``(frontmatter, body, errors)`` for card text already read. Never raises."""
     if not text.startswith("---\n"):
         return None, text, ["card has no frontmatter"]
     end = text.find("\n---", 4)
@@ -225,6 +230,14 @@ def _validate(fm: dict[str, Any], stem: str, root: Path) -> tuple[list[str], lis
     for extra in sorted(set(fm) - set(REQUIRED_FIELDS), key=str):
         warnings.append(f"unknown field ignored: {printable(str(extra), 40)}")
     return errors, warnings
+
+
+def card_text_errors(text: str, stem: str, root: Path) -> list[str]:
+    """Why card ``text`` is not a valid card named ``stem``; empty when it is."""
+    fm, _body, errors = parse_card_text(text)
+    if fm is None:
+        return errors
+    return _validate(fm, stem, root)[0]
 
 
 def load_card(repo: str | Path, name: str) -> dict[str, Any]:
@@ -332,6 +345,17 @@ def refusal(reason: str) -> str:
     )
 
 
+# One informational line for a resumed, cleared, compacted or forked session with no role.
+# Only a fresh start keeps the STOP: a session that was already running keeps its
+# conversation, and hook text is not a permission boundary either way.
+WARNING = (
+    "MAIN BRANCH ROLE WARNING: this session has no role ({env} is not set), so it may not be "
+    "running as the role you meant. Informational only, not enforcement. "
+    "Restart it with MB_ROLE set to the role you meant."
+)
+NO_ROLE_WARNING_SOURCES = ("resume", "clear", "compact", "fork")
+
+
 def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) -> str:
     """Text the SessionStart hook prints. Empty string means print nothing.
 
@@ -342,6 +366,8 @@ def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) 
         return ""
     selected = (env if env is not None else os.environ).get(ROLE_ENV, "")
     if not selected.strip():
+        if source in NO_ROLE_WARNING_SOURCES:
+            return WARNING.format(env=ROLE_ENV)
         names = ", ".join(c["name"] for c in list_cards(repo))
         return refusal(f"No role was selected ({ROLE_ENV} is not set). Role cards here: {names}.")
     if not valid_name(selected):

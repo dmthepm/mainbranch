@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from mb.doctor import run as doctor_run
 
 runner = CliRunner()
 REPO_ROOT = Path(__file__).resolve().parents[2]
+MB_PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
 CARD = """---
 name: {name}
@@ -205,6 +207,38 @@ def test_hook_with_cards_but_no_selected_role_refuses_loudly(repo: Path) -> None
         out = _hook(repo, role=role)
         assert "ROLE CHECK FAILED" in out and "STOP" in out and "scout" in out
         assert "running as role" not in out
+
+
+@pytest.mark.parametrize("source", ["resume", "clear", "compact", "fork"])
+def test_hook_non_startup_without_role_warns_one_line_without_stop(repo: Path, source: str) -> None:
+    _card(repo)
+    for role in (None, "", "   "):
+        out = _hook(repo, source, role=role)
+        assert out.count("\n") == 0 and out.startswith("MAIN BRANCH ROLE WARNING")
+        assert "STOP" not in out and "ROLE CHECK FAILED" not in out
+        assert "Restart it with MB_ROLE set to the role you meant." in out and "mb agent" not in out
+        assert "running as role" not in out
+
+
+@pytest.mark.parametrize("source", ["startup", "unknown", ""])
+def test_hook_startup_and_unknown_source_without_role_keep_stop(repo: Path, source: str) -> None:
+    _card(repo)
+    out = _hook(repo, source, role=None)
+    assert "ROLE CHECK FAILED" in out and "STOP" in out
+
+
+def test_hook_warning_is_informational_not_a_permission_claim(repo: Path) -> None:
+    _card(repo)
+    out = _hook(repo, "resume", role=None).lower()
+    assert "not enforcement" in out
+    assert "permission boundary" not in out.replace("not a permission boundary", "")
+
+
+@pytest.mark.parametrize("source", ["resume", "clear", "compact", "fork"])
+def test_hook_non_startup_with_a_bad_selected_role_still_refuses(repo: Path, source: str) -> None:
+    _card(repo)
+    assert "ROLE CHECK FAILED" in _hook(repo, source, role="ghost")
+    assert "ROLE CHECK FAILED" in _hook(repo, source, role="Bad Name")
 
 
 def test_hook_never_picks_the_only_card(repo: Path) -> None:
@@ -482,28 +516,131 @@ def _old_mb(directory: Path) -> Path:
     return directory
 
 
+def _assert_split(source: str, result: subprocess.CompletedProcess[str]) -> None:
+    assert result.returncode == 0
+    if source == "startup":
+        assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
+    else:
+        assert result.stdout.startswith("MAIN BRANCH ROLE WARNING")
+        assert result.stdout.count("\n") == 1
+        assert "Restart it with MB_ROLE set to the role you meant." in result.stdout
+        assert "mb agent" not in result.stdout
+        assert "STOP" not in result.stdout and "ROLE CHECK FAILED" not in result.stdout
+
+
 @pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
-def test_hook_command_refuses_when_mb_is_missing_and_cards_dir_exists(
+def test_hook_command_when_mb_is_missing_and_cards_dir_exists(
     repo: Path, tmp_path: Path, source: str
 ) -> None:
     _card(repo)
     empty = tmp_path / "empty-bin"
     empty.mkdir()
-    result = _run_hook(source, repo, empty)
-    assert result.returncode == 0
-    assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
-    assert "could not be loaded" in result.stdout and "too old" not in result.stdout
+    result = _run_hook(source, repo, empty, role=None)
+    _assert_split(source, result)
+    assert "too old" not in result.stdout
 
 
 @pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
-def test_hook_command_refuses_when_mb_is_too_old_for_role(
-    repo: Path, tmp_path: Path, source: str
-) -> None:
+def test_hook_command_when_mb_is_too_old_for_role(repo: Path, tmp_path: Path, source: str) -> None:
     _card(repo)
-    result = _run_hook(source, repo, _old_mb(tmp_path / "old-bin"))
+    result = _run_hook(source, repo, _old_mb(tmp_path / "old-bin"), role=None)
+    _assert_split(source, result)
+    assert "No such command" not in result.stdout + result.stderr
+
+
+def _failing_mb(directory: Path) -> Path:
+    directory.mkdir()
+    shim = directory / "mb"
+    shim.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    shim.chmod(0o755)
+    return directory
+
+
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+@pytest.mark.parametrize("role", ["scout", "ghost", "Bad Name"])
+@pytest.mark.parametrize("binary", ["missing", "old", "failing"])
+def test_hook_command_with_a_selected_role_never_downgrades_to_a_warning(
+    repo: Path, tmp_path: Path, source: str, role: str, binary: str
+) -> None:
+    """A role was named but mb could not validate it: STOP on every source."""
+    _card(repo)
+    bins = {"missing": tmp_path / "empty-bin", "old": tmp_path / "old-bin"}
+    if binary == "missing":
+        bins["missing"].mkdir()
+        path_dir = bins["missing"]
+    elif binary == "old":
+        path_dir = _old_mb(bins["old"])
+    else:
+        path_dir = _failing_mb(tmp_path / "fail-bin")
+    result = _run_hook(source, repo, path_dir, role=role)
     assert result.returncode == 0
     assert "ROLE CHECK FAILED" in result.stdout and "STOP" in result.stdout
-    assert "No such command" not in result.stdout + result.stderr
+    assert "ROLE WARNING" not in result.stdout
+
+
+def test_hook_command_blank_role_counts_as_unset_in_the_fallback(
+    repo: Path, tmp_path: Path
+) -> None:
+    _card(repo)
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    env = {"PATH": str(empty), "CLAUDE_PROJECT_DIR": str(repo), roles.ROLE_ENV: "   "}
+    out = subprocess.run(
+        ["/bin/sh", "-c", _hook_commands()["resume"]],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout
+    assert out.startswith("MAIN BRANCH ROLE WARNING")
+
+
+@pytest.mark.parametrize("source", ["startup", "resume", "clear", "compact", "fork"])
+def test_hook_command_replays_real_mb_split_with_no_role(
+    repo: Path, tmp_path: Path, source: str
+) -> None:
+    """The installed `mb` on a throwaway PATH shim: same text as the unit path."""
+    _card(repo)
+    shim = tmp_path / "real-bin"
+    shim.mkdir()
+    (shim / "mb").write_text(
+        f'#!/bin/sh\nPYTHONPATH="{MB_PACKAGE_ROOT}" exec "{sys.executable}" -m mb "$@"\n',
+        encoding="utf-8",
+    )
+    (shim / "mb").chmod(0o755)
+    result = _run_hook(source, repo, shim, role=None)
+    if source == "startup":
+        assert "STOP" in result.stdout
+    else:
+        assert result.stdout.startswith("MAIN BRANCH ROLE WARNING") and "STOP" not in result.stdout
+
+
+def test_hook_commands_declare_a_timeout() -> None:
+    doc = json.loads((REPO_ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+    for group in doc["hooks"]["SessionStart"]:
+        assert 0 < group["hooks"][0]["timeout"] <= 30
+
+
+@pytest.mark.parametrize("source", ["startup", "resume"])
+def test_hook_command_that_hangs_prints_nothing_before_the_harness_timeout(
+    repo: Path, tmp_path: Path, source: str
+) -> None:
+    """A hung `mb` is cut off by the harness timeout; the hook never invents a role."""
+    _card(repo)
+    shim = tmp_path / "hang-bin"
+    shim.mkdir()
+    (shim / "mb").write_text("#!/bin/sh\nexec sleep 30\n", encoding="utf-8")
+    (shim / "mb").chmod(0o755)
+    env = {"PATH": f"{shim}:/usr/bin:/bin", "CLAUDE_PROJECT_DIR": str(repo)}
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        subprocess.run(
+            ["/bin/sh", "-c", _hook_commands()[source]],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
+    assert not caught.value.stdout or "running as role" not in str(caught.value.stdout)
 
 
 def test_hook_command_silent_when_mb_cannot_run_and_no_cards_dir(

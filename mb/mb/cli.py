@@ -20,6 +20,7 @@ import typer
 from typer.core import TyperGroup
 
 from mb import __version__
+from mb import agent_policy as agent_policy_mod
 from mb import connect as connect_mod
 from mb import doctor as doctor_mod
 from mb import feedback as feedback_mod
@@ -1876,8 +1877,16 @@ def status_cmd(
         "--peek",
         help="Read status without updating the last-status-seen marker.",
     ),
+    summary: bool = typer.Option(
+        False,
+        "--summary",
+        help="Compact JSON: actions, readiness, save and update state. Implies --json --peek.",
+    ),
 ) -> None:
     """Show a cheap daily briefing for a Main Branch repo."""
+    if summary:
+        json_out = True
+        peek = True
     try:
         report = status_mod.run(path=path, update_marker=not peek, validation_cross_refs=not peek)
     except Exception as exc:
@@ -1897,7 +1906,18 @@ def status_cmd(
     status_mod.qualify_commands(report, Path(path))
     if json_out:
         try:
-            typer.echo(_json_payload(report, command="mb status", schema_name="mainbranch.status"))
+            if summary:
+                typer.echo(
+                    _json_payload(
+                        status_mod.summarize(report, Path(path)),
+                        command="mb status",
+                        schema_name="mainbranch.status.summary",
+                    )
+                )
+            else:
+                typer.echo(
+                    _json_payload(report, command="mb status", schema_name="mainbranch.status")
+                )
         except TypeError as exc:
             typer.echo(
                 _json_error_payload(
@@ -2462,6 +2482,24 @@ def machine_update_cmd(
             else machine_update_mod.human_report(report)
         )
     raise typer.Exit(report["exit_code"])
+
+
+agent_app = typer.Typer(help="Agents on this computer: check the policy they are launched from.")
+app.add_typer(agent_app, name="agent")
+
+
+@agent_app.command("check")
+def agent_check_cmd(
+    name: str | None = typer.Argument(None, help="Only require this agent to exist."),
+) -> None:
+    """Check agents.json and the files it names. Policy only: nothing is launched or verified."""
+    try:
+        report = agent_policy_mod.check(agent_policy_mod.Host.local(), name)
+    except Exception:  # noqa: BLE001
+        typer.echo("mb: agent check: internal error; no verdict.", err=True)
+        raise typer.Exit(2) from None
+    typer.echo(agent_policy_mod.human_report(report))
+    raise typer.Exit(0 if report.ok else 2)
 
 
 role_app = typer.Typer(help="Agent role cards: list, show, check, and the session hook.")

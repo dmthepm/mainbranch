@@ -13,6 +13,7 @@ import stat
 import subprocess
 import sys
 import threading
+import tracemalloc
 from pathlib import Path
 from typing import Any
 
@@ -600,6 +601,197 @@ def test_recent_rebinds_unavailable_and_missing(tmp_path, monkeypatch):
     assert c.recent_rebinds("fixture") == ([], "ok")
     monkeypatch.setattr(c, "audit_path", lambda: tmp_path)
     assert c.recent_rebinds("fixture") == ([], "unavailable")
+
+
+def test_status_finishes_when_the_audit_path_is_a_named_pipe(tmp_path, monkeypatch):
+    business = _business(tmp_path)
+    audit = tmp_path / "audit.fifo"
+    os.mkfifo(audit)
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    outcome: list[Any] = []
+
+    def run() -> None:
+        outcome.append(runner.invoke(app, ["connect", "status", "--repo", str(business), "--json"]))
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(timeout=10)
+    if worker.is_alive():  # unblock the stuck open so the thread can end
+        fd = os.open(audit, os.O_WRONLY | os.O_NONBLOCK)
+        os.close(fd)
+        worker.join(timeout=5)
+        pytest.fail("mb connect status hung on a named pipe at the audit path")
+    assert json.loads(outcome[0].stdout)["recent_rebinds_state"] == "unavailable"
+    with pytest.raises(OSError):
+        c.read_release_audit()
+
+
+def test_audit_symlink_is_unavailable(tmp_path, monkeypatch):
+    target = tmp_path / "real.jsonl"
+    target.write_text("")
+    link = tmp_path / "audit.jsonl"
+    link.symlink_to(target)
+    monkeypatch.setattr(c, "audit_path", lambda: link)
+    assert c.recent_rebinds("fixture") == ([], "unavailable")
+    with pytest.raises(OSError):
+        c.read_release_audit()
+
+
+def test_audit_readers_read_only_the_tail_and_skip_the_cut_line(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    old = (json.dumps({**row, "result": "old"}) + "\n") * 3
+    audit.write_text(old + json.dumps(row) + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    # A window that starts inside the old rows cuts one line in half.
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", len(json.dumps(row)) + 20)
+    rows, state = c.recent_rebinds("r")
+    assert [entry["result"] for entry in rows] == ["applied"]
+    assert state == "incomplete"  # cut, and fewer than five rebinds were found
+    # The cut line was dropped, not counted as corrupt: no corrupt-row error here.
+    assert [entry["result"] for entry in c.read_release_audit()][-1] == "applied"
+
+
+def test_full_audit_streams_a_large_log_within_a_small_memory_bound(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    rows = [
+        {"verb": "token", "provider": "example-tool", "result": "released", "n": n}
+        for n in range(60000)
+    ]
+    audit.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    size = audit.stat().st_size
+    assert size > 4 * 1024 * 1024
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    tracemalloc.start()
+    try:
+        newest = c.read_release_audit(limit=2)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert [row["n"] for row in newest] == [59998, 59999]
+    assert peak < size // 4  # bounded by the limit, not by the file
+
+
+def _long_log_with_old_rebind(tmp_path, monkeypatch, *, recent_rebinds: int):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    filler = {"verb": "token", "provider": "example-tool", "repo_id": "r", "result": "released"}
+    lines = [json.dumps({**row, "result": "old", "provider": "example-tool"})]
+    lines += [json.dumps(filler)] * 6
+    lines += [json.dumps(row)] * recent_rebinds
+    audit.write_text("\n".join(lines) + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    # Room for the rebinds and one more line, but not for the old row at the top.
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", (len(json.dumps(row)) + 1) * recent_rebinds + 90)
+
+
+def test_cut_read_with_few_rebinds_is_incomplete_and_audit_reads_everything(tmp_path, monkeypatch):
+    _long_log_with_old_rebind(tmp_path, monkeypatch, recent_rebinds=1)
+    rows, state = c.recent_rebinds("r")
+    assert state == "incomplete"
+    assert [entry["result"] for entry in rows] == ["applied"]
+    old = c.read_release_audit(provider="example-tool", limit=50)
+    assert old[0]["result"] == "old"
+
+
+def test_cut_read_with_five_rebinds_stays_ok(tmp_path, monkeypatch):
+    _long_log_with_old_rebind(tmp_path, monkeypatch, recent_rebinds=5)
+    assert c.recent_rebinds("r")[1] == "ok"
+
+
+def test_cut_landing_on_a_line_boundary_keeps_the_first_whole_row(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    old = json.dumps({**row, "result": "old"})
+    audit.write_text("\n".join([old, *[json.dumps(row)] * 5]) + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    # The window starts exactly where the five newest rows start.
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", (len(json.dumps(row)) + 1) * 5)
+    rows, state = c.recent_rebinds("r")
+    assert [entry["result"] for entry in rows] == ["applied"] * 5
+    assert state == "ok"
+
+
+class _TruncatingLog:
+    """The real audit stream, with the file emptied at a chosen moment."""
+
+    def __init__(self, stream: Any, path: Path, when: str) -> None:
+        self._stream, self._path, self._when = stream, path, when
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self._stream.close()
+
+    def fileno(self):
+        return self._stream.fileno()
+
+    def seek(self, *args):
+        if self._when == "before_read":
+            os.truncate(self._path, 0)
+        return self._stream.seek(*args)
+
+    def read(self, *args):
+        data = self._stream.read(*args)
+        if self._when == "after_read" and data:
+            os.truncate(self._path, 0)
+        return data
+
+
+@pytest.mark.parametrize("when", ["before_read", "after_read"])
+def test_status_history_is_incomplete_when_the_log_shrinks_while_read(tmp_path, monkeypatch, when):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    audit.write_text((json.dumps(row) + "\n") * 6)
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    real_open = c._open_audit_log
+    monkeypatch.setattr(c, "_open_audit_log", lambda: _TruncatingLog(real_open(), audit, when))
+    assert c.recent_rebinds("r")[1] == "incomplete"
+
+
+class _GrowingLog(_TruncatingLog):
+    """The real audit stream, with a writer appending after the size was taken."""
+
+    def __init__(self, stream: Any, path: Path) -> None:
+        super().__init__(stream, path, "growing")
+        self.bytes_read = 0
+
+    def seek(self, *args):
+        self._append()
+        return self._stream.seek(*args)
+
+    def read(self, *args):
+        data = self._stream.read(*args)
+        self.bytes_read += len(data)
+        if data:
+            self._append()
+        return data
+
+    def _append(self) -> None:
+        if self.bytes_read < 64 * 1024:  # the test ends even if the read has no limit
+            with self._path.open("a") as log:
+                log.write("x" * 4096 + "\n")
+
+
+def test_status_reads_no_more_than_the_bound_while_the_log_grows(tmp_path, monkeypatch):
+    audit = tmp_path / "audit.jsonl"
+    row = {"verb": "rebind", "repo_id": "r", "ts": "t", "result": "applied", "flags": []}
+    audit.write_text((json.dumps(row) + "\n") * 40)
+    bound = 1024
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+    monkeypatch.setattr(c, "AUDIT_READ_MAX_BYTES", bound)
+    real_open = c._open_audit_log
+    opened: list[_GrowingLog] = []
+
+    def growing():
+        opened.append(_GrowingLog(real_open(), audit))
+        return opened[-1]
+
+    monkeypatch.setattr(c, "_open_audit_log", growing)
+    rows, state = c.recent_rebinds("r")
+    assert opened[0].bytes_read <= bound + 1  # the bound, and one byte of lookbehind
+    assert (len(rows), state) == (5, "ok")
 
 
 def test_failed_binding_records_outcome(tmp_path, monkeypatch):
