@@ -47,6 +47,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   too, reads each restore back, and says everything was put back only when it
   was. A refusal during removal now exits 1 with `metadata_write_failed`, not
   exit 2. Closes #1323 and #1313.
+- `mb library deal propose`, `approve` and `revoke` now hold a lock from reading
+  a record to writing it. Before, two overlapping changes could lose one while
+  both reported success, so a revocation could vanish and `check` would clear a
+  withdrawn use. A change that cannot get the lock within a few seconds is
+  refused and writes nothing. Closes #1322.
 - `mb library` now refuses a field it does not know in a record, a deal or the
   library config, by name, and leaves the file as it was. `deal propose`,
   `deal approve`, `deal revoke` and `source add` used to write the file back
