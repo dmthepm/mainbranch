@@ -24,7 +24,7 @@ If `provider:cloudflare` is not `ready`, do not run domain buy, DNS, Pages,
 custom-domain, or deploy tools. Offer the operator: connect now with
 `mb connect cloudflare --metadata token_type=account --metadata account_id=... && mb connect test cloudflare`;
 continue read-only for availability checks, naming, brief, and research only;
-or skip for now and record the blocker. User API tokens remain supported by
+or skip for now and record the blocker. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check. User API tokens remain supported by
 omitting `token_type=account`, but account-scoped tokens are preferred for
 multi-business operators.
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """stripe.py — Stripe payment-link automation atom.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Subcommands:
     create-payment-link <offer-slug>
         Idempotent: ensures a Stripe product + price + payment link exist

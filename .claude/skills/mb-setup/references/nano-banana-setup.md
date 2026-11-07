@@ -28,7 +28,11 @@ Nano Banana generates images from text prompts with Google's Gemini models, so `
 ### 2. Store the Key
 
 From the business repo, store the key with `mb connect`. Paste it at the prompt
-your terminal gives, never into chat, screenshots, or terminal output:
+your terminal gives, never into chat, screenshots, or terminal output.
+
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
+Then run:
 
 ```bash
 mb connect google-ai --custom --account "Google AI Studio"

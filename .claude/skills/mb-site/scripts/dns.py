@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """dns.py — DNS operations atom.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Subcommand:
     ensure   Idempotent: ensure a Cloudflare zone exists for <domain>, swap
              nameservers at the registrar if needed (Porkbun-registered only),

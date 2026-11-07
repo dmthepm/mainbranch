@@ -18,7 +18,7 @@ mb connect doctor --json
 ```
 
 If `provider:cloudflare` is not `ready`, connect the account token before
-continuing:
+continuing. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
 
 ```bash
 mb connect cloudflare --metadata token_type=account --metadata account_id=...

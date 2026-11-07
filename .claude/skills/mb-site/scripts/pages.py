@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """pages.py — Cloudflare Pages operations atom.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Subcommands:
     create-project  Create a Pages project, default source.type=github so
                     `git push` auto-deploys. Idempotent on re-run with

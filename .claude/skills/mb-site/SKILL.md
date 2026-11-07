@@ -164,7 +164,7 @@ Say `/mb-site` again after compaction, context loss, or switching focus. It relo
 3. When a business repo is known, run `mb status --json --peek` and use its `readiness`, `drift.items`, `integrations`, `measurement`, and `ranked_actions` facts before inventing setup, provider, or launch-readiness checks in prose.
 4. Before any domain purchase, DNS, Cloudflare Pages project, custom-domain attach, or deploy work, run `mb connect doctor --json` from the business repo and check `provider:cloudflare`.
    - If Cloudflare is not `ready`, stop before dispatching site tools and present exactly three choices:
-     - **connect now (in your own terminal; the token prompt is hidden):** `mb connect cloudflare --metadata token_type=account --metadata account_id=... && mb connect test cloudflare`
+     - **connect now (in your own terminal; the token prompt is hidden):** `mb connect cloudflare --metadata token_type=account --metadata account_id=... && mb connect test cloudflare`. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
      - **continue read-only:** availability checks, naming, brief, and research only; no buy, DNS, Pages, custom-domain, or deploy calls.
      - **skip for now:** record the blocker in the push/site notes and stage a follow-up task.
    - `cfat_` account tokens route automatically when `account_id` is present; keep `token_type=account` in examples because it is explicit and works on older `mb` versions. User API tokens remain supported as a fallback by omitting `token_type=account`.

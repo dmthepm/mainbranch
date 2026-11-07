@@ -128,7 +128,7 @@ metadata, labels, secret references, and last-check facts, and is gitignored by
 default. Do not paste tokens into markdown files, GitHub issues, screenshots,
 or committed config.
 
-Disposable workspaces can use user scope:
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check. Disposable workspaces can use user scope:
 
 ```bash
 mb connect cloudflare --scope user --metadata account_id=...
@@ -172,7 +172,7 @@ system user token, and scopes including `business_management`, `ads_management`,
 `pages_show_list`, `pages_read_engagement`, `pages_manage_ads`,
 `catalog_management`, and `read_insights`.
 
-Connect through `mb` so the token stays outside the repo:
+Connect through `mb` so the token stays outside the repo. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
 
 ```bash
 mb connect meta \

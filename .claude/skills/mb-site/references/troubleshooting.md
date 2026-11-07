@@ -36,7 +36,7 @@ mb connect doctor --json
 ```
 
 If `provider:cloudflare` is not `ready`, reconnect and retest before running
-Cloudflare-dependent `/mb-site` tools:
+Cloudflare-dependent `/mb-site` tools. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
 
 ```bash
 mb connect cloudflare --metadata token_type=account --metadata account_id=...

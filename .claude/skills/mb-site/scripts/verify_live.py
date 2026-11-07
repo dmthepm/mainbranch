@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """verify_live.py — read-only live smoke test for /mb-site atoms.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Exercises every external dependency the atoms touch, without spending money
 or making state changes. Run this after credentials are provisioned in
 `mb connect` to confirm all upstreams reach success before merging.
@@ -237,7 +239,7 @@ def check_cf_zone_lookup() -> bool:
     zones = body.get("result") or []
     if not zones:
         _info(f"No zone found for {DEFAULT_CF_ZONE} in account {account_id[:8]}…")
-        _info(f"Override with: VERIFY_LIVE_CF_ZONE=<some-domain-you-own> mb connect exec cloudflare --keep-env VERIFY_LIVE_CF_ZONE -- python3 verify_live.py")
+        _info(f"Override with: CF_ACCOUNT_ID=<id> VERIFY_LIVE_CF_ZONE=<some-domain-you-own> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID --keep-env VERIFY_LIVE_CF_ZONE -- python3 verify_live.py")
         _info("(This is informational, not a failure — the API call succeeded.)")
         _ok(f"CF zone lookup endpoint works ({latency_ms}ms, 0 results)")
         return True

@@ -105,7 +105,11 @@ pip install xai-sdk
 ### 3. Store the Key (1 min)
 
 From the business repo, store the key with `mb connect`. Paste it at the prompt
-your terminal gives, never into chat, a file, or a shell line:
+your terminal gives, never into chat, a file, or a shell line.
+
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
+Then run:
 
 ```bash
 mb connect xai --custom --account "xAI"

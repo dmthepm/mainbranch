@@ -78,7 +78,7 @@ shell profile, and never asks you to paste a key into a file or a shell line.
 | `XAI_API_KEY` | Grok | `mb connect xai --custom` | https://console.x.ai |
 | `APIFY_TOKEN` | Apify | (Usually in MCP config) | https://console.apify.com |
 
-Run a command that needs one with
+Store a key from the owner's own terminal. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check. Run a command that needs one with
 `mb connect exec <provider> --env <NAME> -- <command>`. See
 `mb-think/references/gemini-setup.md` and `mb-think/references/grok-setup.md`.
 
