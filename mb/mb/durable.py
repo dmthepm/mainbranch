@@ -98,6 +98,12 @@ def _make_parents(parent: Path) -> None:
         raise
 
 
+def _write_all(fd: int, data: bytes) -> None:
+    view = memoryview(data)
+    while view:
+        view = view[os.write(fd, view) :]
+
+
 def atomic_write_text(
     path: Path,
     text: str,
@@ -118,7 +124,10 @@ def atomic_write_text(
     was written", and a retry rewrites and syncs it.
     """
     # Encode first so no encoding failure sits between mkstemp and owning the descriptor.
-    # Newlines follow text mode: None translates to os.linesep, "" keeps as is.
+    # Newlines follow text mode: None translates to os.linesep, "" keeps as is,
+    # and anything else text mode rejected is still rejected.
+    if newline not in (None, "", "\n", "\r", "\r\n"):
+        raise ValueError(f"illegal newline value: {newline!r}")
     eol = os.linesep if newline is None else (newline or "\n")
     data = text.replace("\n", eol).encode(encoding)
     _make_parents(path.parent)
@@ -130,14 +139,10 @@ def atomic_write_text(
         fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
         tmp = Path(tmp_name)
         try:
-            handle = os.fdopen(fd, "wb")
-        except BaseException:
-            os.close(fd)  # fdopen failed before taking the descriptor, so this is the only close
-            raise
-        with handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
+            _write_all(fd, data)
+            os.fsync(fd)
+        finally:
+            os.close(fd)  # the one close: this function owns fd from mkstemp on
         os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:

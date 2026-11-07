@@ -228,18 +228,48 @@ def test_newline_translation_matches_text_mode(tmp_path: Path) -> None:
     assert (tmp_path / "c").read_bytes() == ("x\ny\n".replace("\n", os.linesep)).encode()
 
 
+def test_newline_values_text_mode_rejected_are_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="newline"):
+        atomic_write_text(tmp_path / "state.json", "x\n", newline="\n\n")
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_partial_writes_are_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    real_write = os.write
+
+    def short_write(fd: int, data: bytes | memoryview) -> int:
+        return real_write(fd, bytes(data)[:3])
+
+    monkeypatch.setattr(os, "write", short_write)
+
+    atomic_write_text(tmp_path / "state.json", "hello world\n", newline="")
+
+    assert (tmp_path / "state.json").read_bytes() == b"hello world\n"
+
+
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc/self/fd")
-def test_a_failure_before_fdopen_takes_ownership_closes_the_temp_descriptor(
+def test_a_write_failure_closes_once_leaves_no_temp_and_surfaces_the_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def broken_fdopen(fd: int, *args: object, **kwargs: object) -> None:
-        raise RuntimeError("wrapper setup failed")  # raised before it owns fd
+    real_close = os.close
+    closed: list[int] = []
 
-    monkeypatch.setattr(os, "fdopen", broken_fdopen)
+    def broken_write(fd: int, data: bytes | memoryview) -> int:
+        raise OSError(28, "No space left on device")
+
+    def counting_close(fd: int) -> None:
+        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+            closed.append(fd)
+        real_close(fd)
+
+    monkeypatch.setattr(os, "write", broken_write)
+    monkeypatch.setattr(os, "close", counting_close)
     before = len(os.listdir("/proc/self/fd"))
 
-    with pytest.raises(RuntimeError, match="wrapper setup failed"):
+    with pytest.raises(OSError, match="No space left"):
         atomic_write_text(tmp_path / "state.json", "new\n")
 
+    assert len(closed) == 1
     assert len(os.listdir("/proc/self/fd")) == before
     assert list(tmp_path.iterdir()) == []
