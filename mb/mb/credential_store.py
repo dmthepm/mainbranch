@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from mb.credential_lock import CredentialBusyError, local_store_lock
-from mb.durable import atomic_write_text
+from mb.durable import UnconfirmedWriteError, atomic_write_text
 
 SERVICE_NAME = "mainbranch"
 CREDENTIAL_HELPER_TIMEOUT_SECONDS = 8
@@ -142,6 +142,13 @@ BACKEND_REPAIRS: dict[str, dict[str, str]] = {
             "Repair or restore the local credential file before reconnecting. Main Branch "
             "refused to overwrite it."
         ),
+        "repair_command": "",
+    },
+    "local_file_unconfirmed": {
+        "summary": (
+            "The local credential file was written, but the write could not be confirmed on disk."
+        ),
+        "repair": "Check the disk, then rerun the same command to write it again.",
         "repair_command": "",
     },
     "local_file_unavailable": {
@@ -580,6 +587,8 @@ def _write_local_secrets(data: dict[str, str]) -> None:
         atomic_write_text(path, json.dumps(data, indent=2, sort_keys=True) + "\n", mode=0o600)
         with suppress(OSError):
             path.chmod(0o600)
+    except UnconfirmedWriteError as exc:
+        raise CredentialStoreError("local_file_unconfirmed") from exc
     except OSError as exc:
         raise CredentialStoreError("local_file_unavailable") from exc
 
