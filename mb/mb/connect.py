@@ -1861,9 +1861,19 @@ def _url_has_password(word: str, depth: int = 0) -> bool:
         if at and ":" in userinfo:
             return True
         # A URL nested in the rest is judged too, within the same depth limit.
-        rest = _fully_unquote(after_scheme[len(authority) :])
-        return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
-    return depth < _METADATA_URL_MAX_DEPTH and _url_has_password(rest, depth + 1)
+        return _nested_url_has_password(_fully_unquote(after_scheme[len(authority) :]), depth)
+    return _nested_url_has_password(rest, depth)
+
+
+def _nested_url_has_password(rest: str, depth: int) -> bool:
+    """Judge a URL nested in ``rest``; past the depth limit, any URL left is refused.
+
+    A URL that is too deep to inspect might carry a password, so it counts as
+    one: failing open here would let four wrappers hide a credential.
+    """
+    if depth < _METADATA_URL_MAX_DEPTH:
+        return _url_has_password(rest, depth + 1)
+    return _METADATA_URL_START_RE.search(rest) is not None
 
 
 def metadata_value_rule(value: str) -> str:
