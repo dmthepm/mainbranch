@@ -2234,10 +2234,14 @@ def _connect_provider(
                 # Fail before any metadata is written, so a backend outage
                 # cannot leave `connected: true` next to an unstored secret.
                 detail = _backend_repair(exc.reason)
+                # An unconfirmed local write did replace the file: say so.
+                outcome = (
+                    "The repo metadata is unchanged."
+                    if exc.reason == "local_file_unconfirmed"
+                    else "Nothing was stored and the repo metadata is unchanged."
+                )
                 raise KeychainError(
-                    exc.reason,
-                    f"{detail['summary']} Nothing was stored and the repo metadata is "
-                    f"unchanged. {detail['repair']}",
+                    exc.reason, f"{detail['summary']} {outcome} {detail['repair']}"
                 ) from exc
             secrets[primary] = {"ref": ref, "backend": store.backend}
         else:

@@ -45,15 +45,48 @@ def read_json_object(
     return data
 
 
-def _fsync_directory(directory: Path) -> None:
-    """Persist a directory's entries. Errors surface; only Windows, which cannot open one, skips."""
-    if os.name == "nt":
-        return
-    fd = os.open(directory, os.O_RDONLY)
-    try:
+class UnconfirmedWriteError(OSError):
+    """The new content replaced the file, but a directory sync after it failed."""
+
+
+def _open_directory(directory: Path) -> int | None:
+    """Open a directory for syncing; None on Windows, which cannot."""
+    return None if os.name == "nt" else os.open(directory, os.O_RDONLY)
+
+
+def _fsync_fd(fd: int | None) -> None:
+    if fd is not None:
         os.fsync(fd)
-    finally:
+
+
+def _close(fd: int | None) -> None:
+    if fd is not None:
         os.close(fd)
+
+
+def _make_parents(parent: Path) -> None:
+    """Create missing directories one level at a time, each synced through its own parent.
+
+    A failure removes what this call created, so a retry starts from the same
+    state and syncs every level again.
+    """
+    missing = [parent, *parent.parents]
+    missing = missing[: next((i for i, d in enumerate(missing) if d.exists()), len(missing))]
+    made: list[Path] = []
+    try:
+        for directory in reversed(missing):
+            directory.mkdir(exist_ok=True)
+            made.append(directory)
+            fd = _open_directory(directory.parent)
+            try:
+                _fsync_fd(fd)
+            finally:
+                _close(fd)
+    except BaseException:
+        for directory in reversed(made):
+            with suppress(OSError):
+                directory.rmdir()
+        raise
 
 
 def atomic_write_text(
@@ -68,35 +101,38 @@ def atomic_write_text(
 
     Durability: on return the file's contents, its name, and any parent
     directories this call had to create are all synced, each through its own
-    parent, up to the first directory that already existed. An OSError from any
-    sync propagates. After such an error the new content may already be
-    visible but is not guaranteed to survive a crash, so treat the write as
-    failed and retry it.
+    parent. Everything that can fail is done before the replace, including
+    opening the parent directory, so an error before it leaves the old file in
+    place. Only the final directory sync runs after the replace; if it fails,
+    ``UnconfirmedWriteError`` is raised: the new content is already visible but
+    is not guaranteed to survive a crash. Callers must say so, not "nothing
+    was written", and a retry rewrites and syncs it.
     """
-    created: list[Path] = []
-    ancestor = path.parent
-    while not ancestor.exists():
-        created.append(ancestor)
-        ancestor = ancestor.parent
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _make_parents(path.parent)
     if mode is None:
         mode = path.stat().st_mode & 0o777 if path.exists() else 0o644
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     tmp = Path(tmp_name)
+    dir_fd: int | None = None
     try:
+        dir_fd = _open_directory(path.parent)
         with os.fdopen(fd, "w", encoding=encoding, newline=newline) as handle:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(tmp, mode)
         os.replace(tmp, path)
-        _fsync_directory(path.parent)
-        for directory in created:
-            _fsync_directory(directory.parent)
     except BaseException:
+        _close(dir_fd)
         with suppress(OSError):
             tmp.unlink()
         raise
+    try:
+        _fsync_fd(dir_fd)
+    except OSError as exc:
+        raise UnconfirmedWriteError(exc.errno, exc.strerror or str(exc)) from exc
+    finally:
+        _close(dir_fd)
 
 
 def atomic_write_json(

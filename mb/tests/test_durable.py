@@ -9,7 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from mb.durable import CorruptStateError, atomic_write_text, read_json_object
+from mb.durable import (
+    CorruptStateError,
+    UnconfirmedWriteError,
+    atomic_write_text,
+    read_json_object,
+)
 
 
 def test_atomic_write_fsyncs_the_parent_directory_after_the_rename(
@@ -94,17 +99,70 @@ def test_a_file_fsync_failure_surfaces_and_leaves_no_temp_file(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_a_directory_fsync_failure_surfaces(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def _fail_directory_fsync(monkeypatch: pytest.MonkeyPatch, *, times: int = 99) -> list[int]:
     real_fsync = os.fsync
+    failures: list[int] = []
 
     def fsync(fd: int) -> None:
-        if stat.S_ISDIR(os.fstat(fd).st_mode):
+        if stat.S_ISDIR(os.fstat(fd).st_mode) and len(failures) < times:
+            failures.append(fd)
             raise OSError(5, "directory fsync failed")
         real_fsync(fd)
 
     monkeypatch.setattr(os, "fsync", fsync)
+    return failures
+
+
+def test_a_directory_fsync_failure_after_the_replace_is_named_unconfirmed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "state.json"
+    _fail_directory_fsync(monkeypatch)
+
+    with pytest.raises(UnconfirmedWriteError, match="directory fsync failed"):
+        atomic_write_text(target, "new\n")
+
+    assert target.read_text(encoding="utf-8") == "new\n"
+    assert [p.name for p in tmp_path.iterdir()] == ["state.json"]
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_an_unopenable_directory_fails_before_the_destination_changes(tmp_path: Path) -> None:
+    folder = tmp_path / "locked"
+    folder.mkdir()
+    target = folder / "state.json"
+    target.write_text("old\n", encoding="utf-8")
+    folder.chmod(0o300)  # write and search, but no read: the directory cannot be opened
+    try:
+        with pytest.raises(PermissionError):
+            atomic_write_text(target, "new\n")
+    finally:
+        folder.chmod(0o700)
+
+    assert target.read_text(encoding="utf-8") == "old\n"
+    assert [p.name for p in folder.iterdir()] == ["state.json"]
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="reads /proc/self/fd")
+def test_a_retry_after_a_failed_directory_sync_still_persists_every_new_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "a" / "b" / "state.json"
+    _fail_directory_fsync(monkeypatch, times=1)
 
     with pytest.raises(OSError, match="directory fsync failed"):
-        atomic_write_text(tmp_path / "state.json", "{}\n")
+        atomic_write_text(target, "{}\n")
+
+    synced: list[Path] = []
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            synced.append(Path(os.readlink(f"/proc/self/fd/{fd}")))
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    atomic_write_text(target, "{}\n")
+
+    assert target.read_text(encoding="utf-8") == "{}\n"
+    assert set(synced) == {tmp_path / "a" / "b", tmp_path / "a", tmp_path}
