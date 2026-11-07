@@ -155,13 +155,14 @@ def test_nested_git_repo_does_not_borrow_the_hub(
     assert rows()[-1]["reason"] == "no_business_repo"
 
 
-def test_stray_empty_dot_git_is_not_a_repo(hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_stray_empty_dot_git_refuses(hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     stray = hub / "stray"
     (stray / ".git").mkdir(parents=True)
     monkeypatch.chdir(stray)
-    # No HEAD, so the stray folder is not a repo; the hub above it is.
+    # A .git folder with no HEAD is a refusal, not a stray the hub above can replace.
     result = run_exec()
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 2, result.output
+    assert rows()[-1]["reason"] == "unreadable_repo_marker"
 
 
 def test_gitfile_counts_as_a_repo(
@@ -224,7 +225,13 @@ BREAKS = [
     "vanished-head",
     "fifo-marker",
     "head-folder",
+    "marker-gone",
+    "marker-regular-gitfile",
+    "marker-dangling-link",
+    "empty-marker",
+    "non-pointer-gitfile",
 ]
+CHANGES = {"marker-gone", "marker-regular-gitfile", "marker-dangling-link"}
 POST_LSTAT = {"vanished-gitfile", "gitfile-parent-gone", "vanished-head"}
 
 
@@ -233,8 +240,12 @@ def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) 
     nested = hub / "nested"
     (nested / "src").mkdir(parents=True)
     marker = nested / ".git"
-    if kind in {"unreadable-gitfile", "vanished-gitfile", "gitfile-parent-gone"}:
+    if kind == "non-pointer-gitfile":
+        marker.write_text("not a pointer\n")
+    elif kind in {"unreadable-gitfile", "vanished-gitfile", "gitfile-parent-gone"}:
         marker.write_text("gitdir: /somewhere/else\n")
+    elif kind == "empty-marker":
+        marker.mkdir()
     else:
         make_git(nested)
     if kind == "fifo-marker":
@@ -262,7 +273,7 @@ def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) 
 
         def lstat(self: Path, *args: Any, **kwargs: Any) -> Any:
             result = real_lstat(self, *args, **kwargs)
-            if self == target:
+            if self == marker:
                 seen.append(self)
             return result
 
@@ -277,6 +288,23 @@ def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) 
         monkeypatch.setattr(Path, "lstat", lstat)
         monkeypatch.setattr(Path, "stat", gone(real_stat))
         monkeypatch.setattr(Path, "read_text", gone(real_read))
+    if kind in CHANGES:
+        # The marker was a folder at lstat and stat; it changes for real just
+        # before HEAD is inspected, and the real stat then sees the new state.
+        real = Path.stat
+        done: list[bool] = []
+
+        def changing(self: Path, *args: Any, **kwargs: Any) -> Any:
+            if self == marker / "HEAD" and not done:
+                done.append(True)
+                marker.rename(nested / "saved-marker")
+                if kind == "marker-regular-gitfile":
+                    marker.write_text("gitdir: /somewhere/else\n")
+                elif kind == "marker-dangling-link":
+                    marker.symlink_to(nested / "missing-git-dir")
+            return real(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "stat", changing)
     if kind == "other-oserror":
         real = Path.stat
 
@@ -348,16 +376,6 @@ def test_cli_unreadable_marker_reads_no_key_launches_nothing_and_is_logged(
     assert row["result"] == "refused"
     assert row["reason"] == "unreadable_repo_marker"
     assert row["exit_code"] == 2
-
-
-def test_empty_marker_is_still_ignored_not_refused(hub: Path) -> None:
-    # Deliberately ignored, and readable: a .git folder without HEAD, and a
-    # gitfile that is not a gitdir pointer. The walk goes on to the hub.
-    (hub / "a" / ".git").mkdir(parents=True)
-    (hub / "b").mkdir()
-    (hub / "b" / ".git").write_text("not a pointer\n")
-    assert connect.find_business_repo(hub / "a") == hub
-    assert connect.find_business_repo(hub / "b") == hub
 
 
 def test_failing_marker_at_a_higher_level_stops_the_walk(

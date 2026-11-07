@@ -4242,45 +4242,33 @@ def _check_exec_child(command: list[str]) -> None:
         )
 
 
-def _lstat_or_none(path: Path) -> os.stat_result | None:
-    """``path`` itself without following links; None only when it is not there."""
-    try:
-        return path.lstat()
-    except (FileNotFoundError, NotADirectoryError):
-        return None
-
-
 def _is_git_top(folder: Path) -> bool:
     """A folder is a git top when ``.git`` is a gitfile or a folder holding HEAD.
 
     One lstat of ``.git`` decides whether the marker exists, and only a missing
-    entry there means absent. Once anything named ``.git`` exists, every later
-    failure refuses, whatever the error: a dangling link, a target that cannot
-    be inspected, a file that vanishes after the lstat. The same holds for HEAD
-    in a ``.git`` folder, and for a ``.git`` or HEAD that is neither a file nor,
-    for ``.git``, a folder. A readable ``.git`` folder with no HEAD, or a gitfile
-    that is not a pointer, is False. The search refuses rather than walk on to a
-    parent, because an uninspectable marker may be a nested repo.
+    entry there lets the search go on to the parent. Any ``.git`` entry at all
+    ends it with a repo or a refusal, never a third outcome: a gitfile without
+    ``gitdir:``, a folder without a regular HEAD, a FIFO or other odd type, a
+    dangling link, and any failure or change after the lstat all refuse. A link
+    counts as what it resolves to. An uninspectable marker may be a nested repo,
+    so the search never walks on past it.
     """
     git = folder / ".git"
     try:
-        if _lstat_or_none(git) is None:
-            return False
+        git.lstat()
+    except FileNotFoundError:
+        return False
     except OSError:
-        return _refuse_marker(git)
+        _refuse_marker(git)
     try:
-        mode = git.stat().st_mode
-        if stat.S_ISREG(mode):
-            return git.read_text(encoding="utf-8", errors="replace").startswith("gitdir:")
-        if stat.S_ISDIR(mode):
-            if _lstat_or_none(git / "HEAD") is None:
-                return False
-            if stat.S_ISREG((git / "HEAD").stat().st_mode):
+        if stat.S_ISREG(mode := git.stat().st_mode):
+            if git.read_text(encoding="utf-8", errors="replace").startswith("gitdir:"):
                 return True
-            return _refuse_marker(git)
-        return _refuse_marker(git)
+        elif stat.S_ISDIR(mode) and stat.S_ISREG((git / "HEAD").stat().st_mode):
+            return True
     except OSError:
-        return _refuse_marker(git)
+        pass
+    _refuse_marker(git)
 
 
 def _refuse_marker(git: Path) -> NoReturn:
