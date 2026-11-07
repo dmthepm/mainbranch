@@ -242,9 +242,10 @@ A request already refused keeps its refusal exit code if logging also fails.
 
 Read recent entries with `mb connect audit`, `mb connect audit --limit 50`,
 or `mb connect audit --provider stripe --json`. A missing log has no entries.
-`mb connect audit` reads the whole log. `mb connect status` reads only the last
-4 MiB and calls the rebind history incomplete when that could hide a rebind
-(the read was cut and fewer than five rebinds were found). A symlink or named
+`mb connect audit` streams the whole log and keeps only the rows it shows.
+`mb connect status` reads only the last 4 MiB and calls the rebind history
+incomplete when that could hide a rebind (the read was cut and fewer than five
+rebinds were found) or when the log shrank while it was read. A symlink or named
 pipe at the log path is refused, and status shows history as unavailable.
 The audit records releases by same-user processes that go through `mb`,
 not credential-store reads that bypass `mb`.
@@ -499,7 +500,7 @@ stay whole. Each part of a URL (user name, password, host labels, path
 segments, query keys and values, fragment pieces) is percent-decoded until
 stable (at most three passes) before it is split, then split on `:` and
 `=` and judged like a bare value; a URL nested in a part is judged the same
-way, up to three levels deep. So `?campaign=CloudflareR2StorageBucket`,
+way, up to three levels deep; a URL nested deeper than that is refused. So `?campaign=CloudflareR2StorageBucket`,
 `/docs/getting-started`, IP addresses and `xn--` host labels pass, and a
 token in `?token=`, `/token=`, `#token:`, a path segment, a user name, a
 host label or behind an encoded `%2F` is refused. A URL that does not
