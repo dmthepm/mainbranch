@@ -13,6 +13,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- Role hook source policy: a fresh `startup` with cards but no `MB_ROLE` keeps the STOP
+  refusal; `resume`, `clear`, `compact` and `fork` print one informational warning line
+  instead, for Claude Code and Codex. When `mb` is missing or failing, Claude Code keeps
+  that split and Codex keeps the STOP on every source. Neither is a permission boundary. A named role that cannot be loaded always keeps the STOP. The
+  Claude hook commands now declare a 20 second timeout, and `mb role codex-hook` replaces
+  or removes the hook an earlier release wrote.
 - `/mb-support` (draft): a case now lists every conversation it covers as
   provider ids only. The agent checks open cases for the same request and reads
   the linked conversations before opening a case or drafting a reply, asks the
