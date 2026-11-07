@@ -346,6 +346,54 @@ def test_write_failure_is_a_refusal_and_leaves_no_file(tmp_path, monkeypatch):
 
 
 @needs_pillow
+def test_temp_write_failure_is_a_refusal_and_leaves_no_file(tmp_path, monkeypatch):
+    def full_disk(*_args, **_kwargs):
+        raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+
+    monkeypatch.setattr(os, "write", full_disk)
+    result, out = _render(tmp_path, SPEC)
+    assert result.exit_code == 2
+    assert "cannot write" in result.output
+    assert not out.exists()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["spec.json"]
+
+
+@needs_pillow
+def test_unremovable_temp_file_is_named_not_swallowed(tmp_path, monkeypatch):
+    def stuck(*_args, **_kwargs):
+        raise OSError(errno.EBUSY, os.strerror(errno.EBUSY))
+
+    monkeypatch.setattr(os, "unlink", stuck)
+    result, out = _render(tmp_path, SPEC)
+    assert result.exit_code == 2
+    assert "could not remove temp file .mbcard-" in result.output
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.startswith(".mbcard-")]
+    assert len(leftovers) == 1
+    assert leftovers[0] in result.output
+
+
+@needs_pillow
+def test_link_goes_to_the_held_directory_even_if_the_path_is_swapped(tmp_path, monkeypatch):
+    real_link = os.link
+
+    def swap_then_link(*args, **kwargs):
+        moved = tmp_path.parent / (tmp_path.name + "-moved")
+        tmp_path.rename(moved)
+        tmp_path.mkdir()
+        (tmp_path / "spec.json").write_text("{}")
+        return real_link(*args, **kwargs)
+
+    monkeypatch.setattr(os, "link", swap_then_link)
+    spec = _write(tmp_path, SPEC)
+    out = tmp_path / "card.jpg"
+    card._publish(b"jpegbytes", out)
+    moved = tmp_path.parent / (tmp_path.name + "-moved")
+    assert (moved / "card.jpg").read_bytes() == b"jpegbytes"
+    assert sorted(p.name for p in moved.iterdir()) == ["card.jpg", spec.name]
+    assert not (tmp_path / "card.jpg").exists()
+
+
+@needs_pillow
 def test_missing_output_directory_is_a_refusal(tmp_path):
     out = tmp_path / "nope" / "card.jpg"
     result = runner.invoke(app, ["card", "render", str(_write(tmp_path, SPEC)), str(out)])

@@ -12,11 +12,10 @@ fonts the machine has.
 
 from __future__ import annotations
 
-import contextlib
 import io
 import json
 import os
-import tempfile
+import secrets
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -276,23 +275,49 @@ def _check_destination(spec_path: Path, out_path: Path) -> None:
 def _publish(data: bytes, out_path: Path) -> None:
     """Write via a temp file and hard-link it into place: the name appears whole or not at all.
 
+    The destination directory is held open and every step is relative to that descriptor, so
+    replacing or renaming the directory mid-write cannot redirect the link or strand the temp.
     os.link refuses an existing name, so a file created after the earlier check is still safe.
     """
+    name = out_path.name
     try:
-        fd, tmp = tempfile.mkstemp(prefix=".mbcard-", suffix=".tmp", dir=out_path.parent)
+        dfd = os.open(out_path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     except OSError as exc:
         raise CardError(f"cannot write {_safe(out_path)}: {exc.strerror}") from exc
+    tmp = f".mbcard-{secrets.token_hex(8)}.tmp"
+    problem: CardError | None = None
+    made = False
     try:
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(data)
-        os.link(tmp, out_path)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=dfd)
+        made = True
+        try:
+            view = memoryview(data)
+            while view:
+                view = view[os.write(fd, view) :]
+        finally:
+            os.close(fd)
+        os.link(tmp, name, src_dir_fd=dfd, dst_dir_fd=dfd, follow_symlinks=False)
     except FileExistsError as exc:
-        raise CardError(f"output {_safe(out_path)} already exists; name a new file") from exc
+        problem = CardError(f"output {_safe(out_path)} already exists; name a new file")
+        problem.__cause__ = exc
     except OSError as exc:
-        raise CardError(f"cannot write {_safe(out_path)}: {exc.strerror}") from exc
-    finally:
-        with contextlib.suppress(OSError):
-            os.unlink(tmp)
+        problem = CardError(f"cannot write {_safe(out_path)}: {exc.strerror}")
+        problem.__cause__ = exc
+    leftover = ""
+    if made:
+        try:
+            os.unlink(tmp, dir_fd=dfd)
+        except OSError as exc:
+            leftover = (
+                f"; could not remove temp file {tmp} in {_safe(out_path.parent)}: {exc.strerror}"
+            )
+    os.close(dfd)
+    if problem is not None:
+        if leftover:
+            problem = CardError(f"{problem}{leftover}")
+        raise problem
+    if leftover:
+        raise CardError(f"card written to {_safe(out_path)}{leftover}")
 
 
 def _encode(img: Any) -> bytes:
