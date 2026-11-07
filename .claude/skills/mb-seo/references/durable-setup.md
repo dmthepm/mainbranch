@@ -68,6 +68,7 @@ The following durations describe evidence, not defaults to apply to every copy.
 |---|---|---|
 | SOURCE REVIEW | Managed OAuth access token | A short token lifetime, commonly 15 minutes, can refresh silently while the grant remains valid and the client supports refresh. |
 | OBSERVED | Managed OAuth grant configuration | One inspected setup had a 336-hour grant. That is a finite human-login horizon, not an indefinite connection. |
+| OBSERVED | Managed OAuth grant lapse | One setup with a 168-hour grant lost access when the grant ended, seven days after login. The client then offered only authenticate tools, and no read ran until a person logged in again. |
 | SOURCE REVIEW | Managed OAuth grant expiry | Expiry requires identity-provider authentication again. Policy changes or revoked consent can also end access. |
 | OBSERVED | Browser app session configuration | A separately configured 24-hour session did not change the inspected OAuth grant's lifetime. |
 | SOURCE REVIEW | Access service token | Its selected expiry and renewal policy bound unattended access. A finite token cannot cover a longer idle gap without renewal. |
