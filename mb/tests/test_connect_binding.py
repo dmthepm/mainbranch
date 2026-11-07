@@ -715,7 +715,7 @@ def test_cut_landing_on_a_line_boundary_keeps_the_first_whole_row(tmp_path, monk
 class _TruncatingLog:
     """The real audit stream, with the file emptied at a chosen moment."""
 
-    def __init__(self, stream, path, when):
+    def __init__(self, stream: Any, path: Path, when: str) -> None:
         self._stream, self._path, self._when = stream, path, when
 
     def __enter__(self):
@@ -753,7 +753,7 @@ def test_status_history_is_incomplete_when_the_log_shrinks_while_read(tmp_path, 
 class _GrowingLog(_TruncatingLog):
     """The real audit stream, with a writer appending after the size was taken."""
 
-    def __init__(self, stream, path):
+    def __init__(self, stream: Any, path: Path) -> None:
         super().__init__(stream, path, "growing")
         self.bytes_read = 0
 
@@ -768,7 +768,7 @@ class _GrowingLog(_TruncatingLog):
             self._append()
         return data
 
-    def _append(self):
+    def _append(self) -> None:
         if self.bytes_read < 64 * 1024:  # the test ends even if the read has no limit
             with self._path.open("a") as log:
                 log.write("x" * 4096 + "\n")
