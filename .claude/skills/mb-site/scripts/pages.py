@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """pages.py — Cloudflare Pages operations atom.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Subcommands:
     create-project  Create a Pages project, default source.type=github so
                     `git push` auto-deploys. Idempotent on re-run with
@@ -37,6 +39,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
+    OWNER_HANDOFF,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -595,7 +598,7 @@ def create_project(
             error=PagesCreateProjectError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Add CLOUDFLARE_API_TOKEN with Cloudflare Pages:Edit to ~/.config/vip/env.sh.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`. " + OWNER_HANDOFF,
             ),
         )
         sys.exit(emit(env))
@@ -608,7 +611,7 @@ def create_project(
             error=PagesCreateProjectError(
                 code="cf_account_id_missing",
                 message="No Cloudflare account ID supplied.",
-                suggestion="Pass --account-id or set CF_ACCOUNT_ID in ~/.config/vip/env.sh.",
+                suggestion="Pass --account-id, or set CF_ACCOUNT_ID for this command; it is not a secret.",
             ),
         )
         sys.exit(emit(env))
@@ -807,7 +810,7 @@ def set_domain(
             error=PagesSetDomainError(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
-                suggestion="Add CLOUDFLARE_API_TOKEN to ~/.config/vip/env.sh with Cloudflare Pages:Edit.",
+                suggestion="Store a token with Cloudflare Pages:Edit using `mb connect cloudflare`, then run this through `mb connect exec cloudflare -- <command>`. " + OWNER_HANDOFF,
             ),
         )
         sys.exit(emit(env))
@@ -820,7 +823,7 @@ def set_domain(
             error=PagesSetDomainError(
                 code="cf_account_id_missing",
                 message="No Cloudflare account ID supplied.",
-                suggestion="Pass --account-id or set CF_ACCOUNT_ID in ~/.config/vip/env.sh.",
+                suggestion="Pass --account-id, or set CF_ACCOUNT_ID for this command; it is not a secret.",
             ),
         )
         sys.exit(emit(env))

@@ -23,6 +23,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 SCHEMA_VERSION = "0.1.0"
 
+# Appended to every missing-credential message the atoms print, so an agent
+# reading the runtime output hands off instead of trying a prompt it cannot open.
+OWNER_HANDOFF = (
+    "Credential entry happens in the owner's own terminal, because the hidden prompt "
+    "needs a real terminal; the agent hands off, then resumes its readiness check."
+)
+
 EnvelopeStatus = Literal["ok", "partial", "degraded"]
 ProviderStatus = Literal["ok", "degraded", "failed", "not_configured"]
 

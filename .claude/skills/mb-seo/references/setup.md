@@ -69,13 +69,13 @@ In the business's own Cloudflare account:
 Secrets Store Read fails, even though upstream's CI comment says Read. No zone,
 DNS, or route permissions are needed for a workers.dev copy.
 
-Store the token from the owner's own terminal, in the business repo:
+Store the token from the owner's own terminal, in the business repo. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
 
 ```bash
-mb connect cloudflare-openseo --custom --token-stdin --scope repo
+mb connect cloudflare-openseo --custom --scope repo
 ```
 
-Paste the token, press Enter, then press Ctrl-D.
+Paste the token at the hidden prompt, then press Enter.
 
 **Expected:** `mb connect status cloudflare-openseo --json` reports it connected.
 The output holds no token value.

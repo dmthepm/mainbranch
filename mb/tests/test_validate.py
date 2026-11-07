@@ -2690,3 +2690,24 @@ def test_validate_status_rollup_for_a_topology_status_has_no_stale_example(
     top = report["validation_categories"]
     assert top["top_category"] == "status_enum_mismatch"
     assert "shipped" not in top["top_operator_summary"] + top["top_repair"]
+
+
+def test_validate_scoped_to_paths_with_no_records_names_the_paths(tmp_path: Path) -> None:
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "state").mkdir()
+
+    result = runner.invoke(
+        app, ["validate", str(tmp_path), "--strict", "--paths", "tools/", "--paths", "state/"]
+    )
+
+    assert result.exit_code == 0
+    output = " ".join(result.stdout.split())
+    assert "nothing to check in tools/, state/" in output
+    assert "no Main Branch records" in output
+
+
+def test_validate_with_nothing_anywhere_still_says_nothing_to_check_yet(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["validate", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "nothing to check yet" in " ".join(result.stdout.split())

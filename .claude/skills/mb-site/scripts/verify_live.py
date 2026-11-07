@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """verify_live.py — read-only live smoke test for /mb-site atoms.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Exercises every external dependency the atoms touch, without spending money
 or making state changes. Run this after credentials are provisioned in
-~/.config/vip/env.sh to confirm all upstreams reach success before merging.
+`mb connect` to confirm all upstreams reach success before merging.
 
 Checks:
   1. domain-check brew CLI: live RDAP query (free).
@@ -11,14 +13,17 @@ Checks:
   3. Cloudflare zone lookup: GET /zones?name=<test domain> (read-only).
   4. Porkbun API auth: POST /ping with the keys (read-only; returns yourIp).
 
-Required env (load with `source ~/.config/vip/env.sh` first):
-  CLOUDFLARE_API_TOKEN  — Zone:Read + DNS:Read minimum (Edit preferred)
-  CF_ACCOUNT_ID         — find in dash.cloudflare.com → right sidebar
-  PORKBUN_API_KEY
-  PORKBUN_SECRET_KEY
+Run it as `CF_ACCOUNT_ID=<id> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID -- python3 ...`.
+`exec` drops every variable outside its allowlist, so name each one you set.
 
-Optional env:
+Required env:
+  CLOUDFLARE_API_TOKEN  — Zone:Read + DNS:Read minimum (Edit preferred)
+  CF_ACCOUNT_ID         — find in dash.cloudflare.com → right sidebar (--keep-env CF_ACCOUNT_ID)
+
+Optional env (add a --keep-env for each, or the check is skipped under exec):
   VERIFY_LIVE_CF_ZONE   — domain to lookup at Cloudflare (default: thelastbill.com)
+  PORKBUN_API_KEY, PORKBUN_SECRET_KEY — Porkbun is not an `mb connect` provider, so
+                          these must already be in your shell
 
 Exit code: 0 if all checks pass, 1 if any fail.
 """
@@ -35,7 +40,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _envelope import log  # noqa: E402
+from _envelope import OWNER_HANDOFF, log  # noqa: E402
 
 # ---------------------------------------------------------------------------
 
@@ -139,13 +144,13 @@ def check_cf_auth() -> bool:
     if not token:
         _fail("CLOUDFLARE_API_TOKEN not set")
         _info("Fix: create token at https://dash.cloudflare.com/profile/api-tokens")
-        _info("     Add to ~/.config/vip/env.sh: export CLOUDFLARE_API_TOKEN=...")
+        _info("     Store it with `mb connect cloudflare` (hidden prompt), then use `mb connect exec`. " + OWNER_HANDOFF)
         return False
 
     if not account_id:
         _fail("CF_ACCOUNT_ID not set")
         _info("Fix: find it in dash.cloudflare.com → right sidebar of any zone")
-        _info("     Add to ~/.config/vip/env.sh: export CF_ACCOUNT_ID=...")
+        _info("     It is not a secret; keep it through exec: CF_ACCOUNT_ID=<id> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID -- ...")
         return False
 
     all_pass = True
@@ -234,7 +239,7 @@ def check_cf_zone_lookup() -> bool:
     zones = body.get("result") or []
     if not zones:
         _info(f"No zone found for {DEFAULT_CF_ZONE} in account {account_id[:8]}…")
-        _info(f"Override with: VERIFY_LIVE_CF_ZONE=<some-domain-you-own> python3 verify_live.py")
+        _info(f"Override with: CF_ACCOUNT_ID=<id> VERIFY_LIVE_CF_ZONE=<some-domain-you-own> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID --keep-env VERIFY_LIVE_CF_ZONE -- python3 verify_live.py")
         _info("(This is informational, not a failure — the API call succeeded.)")
         _ok(f"CF zone lookup endpoint works ({latency_ms}ms, 0 results)")
         return True
@@ -290,7 +295,7 @@ def check_porkbun_ping() -> bool | None:
 def main() -> int:
     print(f"{YELLOW}=== /mb-site atoms — live verification ==={RESET}")
     print(f"{DIM}Read-only smoke test. No state changes, no spending.{RESET}")
-    print(f"{DIM}Run after `source ~/.config/vip/env.sh`.{RESET}")
+    print(f"{DIM}Run through `mb connect exec cloudflare -- python3 ...`.{RESET}")
 
     results = [
         ("domain-check CLI", check_domain_check_cli()),

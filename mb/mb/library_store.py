@@ -52,6 +52,11 @@ _KINDS = {
 }
 _MERGE_TAG = "tag:yaml.org,2002:merge"
 LOCK_NAME = "index.lock"
+# Deals have their own lock so a long scan never holds up a revocation, and a
+# revocation never waits on a scan. Neither takes the other's lock, so they
+# cannot deadlock.
+DEALS_LOCK_NAME = "deals.lock"
+DEAL_LOCK_WAIT = 5.0  # seconds to wait for another deal change before refusing
 _CONFIG_KEYS = frozenset({"timezone", "records_dir", "sources"})
 _RECORD_KEYS = frozenset({"asset", "provenance", "tags", "creator", "deals"})
 _TAGS_HINT = "put business-only facts in tags"
@@ -146,6 +151,7 @@ class Library:
         init: bool = False,
     ) -> None:
         self._now = now or (lambda: datetime.now(timezone.utc))
+        self._deals_held = False
         self.root = Path(root)
         if not (self.root.is_dir() and any((self.root / m).exists() for m in (".mb", ".git"))):
             raise LibraryError(
@@ -367,7 +373,32 @@ class Library:
             raise LibraryError(f"{label}: {exc}") from exc
         return Record(asset, provenance, list(tags), creator, deals)
 
+    @contextlib.contextmanager
+    def _deals_locked(self) -> Iterator[None]:
+        """Hold the deal lock from the first read to the last write of a deal change.
+
+        Every deal method runs inside this, and `_write_record` refuses to run
+        outside it, so a new deal method cannot skip the lock unnoticed.
+        """
+        with (
+            self._dir(CONFIG_REL, create=False) as fd,
+            exclusive(
+                fd,
+                DEALS_LOCK_NAME,
+                wait=DEAL_LOCK_WAIT,
+                busy="another change to this library's deals is in progress; nothing was "
+                "changed, try again in a moment",
+            ),
+        ):
+            self._deals_held = True
+            try:
+                yield
+            finally:
+                self._deals_held = False
+
     def _write_record(self, fd: int, record: Record) -> None:
+        if not self._deals_held:
+            raise RuntimeError("a record is written only while holding the deal lock")
         text = yaml.safe_dump(
             {
                 "asset": record.asset,
@@ -539,39 +570,40 @@ class Library:
         sightings: list[str] | None = None,
     ) -> rights.Deal:
         asset = self._asset_id(asset)
-        with self._index() as index:
-            current = [s for s, _, _ in self._sightings_of(index, asset)]
-        chosen = sightings if sightings else current
-        for name in chosen:
-            if name not in current:
-                raise LibraryError(f"{name} is not a sighting of this asset")
-        with self._records_fd(create=True) as fd:
-            record = self._read_record(fd, asset) or Record(asset)
-            taken = {d.id for r in self._all_records().values() for d in r.deals}
-            deal_id = secrets.token_hex(4)
-            while deal_id in taken:
+        with self._deals_locked():
+            with self._index() as index:
+                current = [s for s, _, _ in self._sightings_of(index, asset)]
+            chosen = sightings if sightings else current
+            for name in chosen:
+                if name not in current:
+                    raise LibraryError(f"{name} is not a sighting of this asset")
+            with self._records_fd(create=True) as fd:
+                record = self._read_record(fd, asset) or Record(asset)
+                taken = {d.id for r in self._all_records().values() for d in r.deals}
                 deal_id = secrets.token_hex(4)
-            try:
-                deal = rights.Deal(
-                    id=deal_id,
-                    uses=uses,
-                    platforms=platforms,
-                    from_date=from_date,
-                    to_date=to_date,
-                    perpetual=perpetual,
-                    music=music,
-                    platform_code=platform_code,
-                    said_by=said_by,
-                    evidence_hash=evidence_hash,
-                    sightings=tuple(chosen),
-                    subject=subject,
-                    subject_proof=subject_proof,
-                )
-            except ValueError as exc:
-                raise LibraryError(str(exc)) from exc
-            record.deals.append(deal)
-            self._write_record(fd, record)
-        return deal
+                while deal_id in taken:
+                    deal_id = secrets.token_hex(4)
+                try:
+                    deal = rights.Deal(
+                        id=deal_id,
+                        uses=uses,
+                        platforms=platforms,
+                        from_date=from_date,
+                        to_date=to_date,
+                        perpetual=perpetual,
+                        music=music,
+                        platform_code=platform_code,
+                        said_by=said_by,
+                        evidence_hash=evidence_hash,
+                        sightings=tuple(chosen),
+                        subject=subject,
+                        subject_proof=subject_proof,
+                    )
+                except ValueError as exc:
+                    raise LibraryError(str(exc)) from exc
+                record.deals.append(deal)
+                self._write_record(fd, record)
+            return deal
 
     def _locate(self, deal_id: str) -> tuple[Record, int]:
         for record in self._all_records().values():
@@ -590,29 +622,31 @@ class Library:
     ) -> rights.Deal:
         if not has_terminal:
             raise LibraryError("approving a deal needs a person at a terminal; none is attached")
-        record, index = self._locate(deal_id)
-        deal = record.deals[index]
-        if typed.strip() != deal.id:
-            raise LibraryError(f"to approve, type the deal id exactly: {deal.id}")
-        if deal.state == "revoked":
-            raise LibraryError(f"deal {deal.id} is revoked; propose a new deal")
-        approved = deal.approve(
-            by=approver,
-            at=self._now().isoformat(),
-            asset=record.asset,
-            provenance=record.provenance,
-        )
-        self._replace_deal(record, index, approved)
-        return approved
+        with self._deals_locked():
+            record, index = self._locate(deal_id)
+            deal = record.deals[index]
+            if typed.strip() != deal.id:
+                raise LibraryError(f"to approve, type the deal id exactly: {deal.id}")
+            if deal.state == "revoked":
+                raise LibraryError(f"deal {deal.id} is revoked; propose a new deal")
+            approved = deal.approve(
+                by=approver,
+                at=self._now().isoformat(),
+                asset=record.asset,
+                provenance=record.provenance,
+            )
+            self._replace_deal(record, index, approved)
+            return approved
 
     def revoke_deal(self, deal_id: str, reason: str) -> rights.Deal:
-        record, index = self._locate(deal_id)
-        deal = record.deals[index]
-        if deal.state == "revoked":
-            raise LibraryError(f"deal {deal.id} is already revoked")
-        revoked = deal.revoke(reason, self._now().isoformat())
-        self._replace_deal(record, index, revoked)
-        return revoked
+        with self._deals_locked():
+            record, index = self._locate(deal_id)
+            deal = record.deals[index]
+            if deal.state == "revoked":
+                raise LibraryError(f"deal {deal.id} is already revoked")
+            revoked = deal.revoke(reason, self._now().isoformat())
+            self._replace_deal(record, index, revoked)
+            return revoked
 
 
 def _load_yaml(raw: bytes, label: str) -> Any:

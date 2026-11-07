@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import subprocess
 from datetime import date, datetime, timezone
@@ -4517,3 +4518,119 @@ def test_status_measurement_without_google_ads_customer_has_no_google_ads_field(
     assert "google_ads" not in measurement
     result = runner.invoke(app, ["status", str(repo)])
     assert "Google Ads:" not in result.stdout
+
+
+SUMMARY_MAX_BYTES = 6000
+
+
+def test_status_summary_stays_small_on_the_dogfood_fixture(tmp_path: Path, monkeypatch) -> None:
+    from mb.dogfood_harness import _apply_rich_multi_offer_migration_repo
+
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    repo = tmp_path / "rich"
+    init_run(path=str(repo), name="Rich")
+    _apply_rich_multi_offer_migration_repo(repo)
+
+    full = runner.invoke(app, ["status", str(repo), "--json", "--peek"])
+    summary = runner.invoke(app, ["status", str(repo), "--json", "--peek", "--summary"])
+
+    assert summary.exit_code == full.exit_code
+    payload = json.loads(summary.stdout)
+    full_payload = json.loads(full.stdout)
+    assert len(summary.stdout.encode()) <= SUMMARY_MAX_BYTES
+    assert len(summary.stdout) * 4 < len(full.stdout)
+    assert payload["result_schema"]["name"] == "mainbranch.status.summary"
+    assert set(payload) >= {"ranked_actions", "readiness", "save", "update", "full_status"}
+    assert payload["ranked_actions"]
+    assert {"id", "title", "command", "priority"} <= set(payload["ranked_actions"][0])
+    assert payload["readiness"]["level"] == full_payload["readiness"]["level"]
+    assert payload["save"]["branch"] == full_payload["git"]["branch"]
+    assert payload["update"]["severity"] == full_payload["update"]["severity"]
+    assert payload["full_status"].startswith("mb status --json --peek")
+
+
+def test_status_summary_does_not_move_the_seen_marker(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    repo = tmp_path / "acme"
+    init_run(path=str(repo), name="Acme")
+
+    result = runner.invoke(app, ["status", str(repo), "--summary"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["result_schema"]["name"] == "mainbranch.status.summary"
+    assert not (repo / ".mb" / "last-status-seen.json").exists()
+
+
+def test_status_summary_keeps_the_codex_runtime_mismatch_stop(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(status_mod, "_which", _without_github_or_claude)
+    monkeypatch.setattr(codex_mod, "_which", _with_codex)
+    monkeypatch.setattr(
+        codex_mod,
+        "_login_shell_mb_diagnostics",
+        lambda: {
+            "checked": True,
+            "ok": False,
+            "state": "warn",
+            "path": "/old/bin/mb",
+            "version": "0.3.18",
+            "active_path": "/new/bin/mb",
+            "active_version": "0.3.29",
+            "mismatch": True,
+            "summary": "Login-shell runtime resolves a different mb than this process.",
+            "repair": "Put the current Main Branch install earlier on the login-shell PATH.",
+            "safe_to_share": True,
+        },
+    )
+    repo = tmp_path / "acme"
+    init_run(path=str(repo), name="Acme")
+
+    report = status_mod.run(path=str(repo), update_marker=False)
+    summary = status_mod.summarize(report, repo)
+
+    assert summary["runtime"]["codex_cli"]["status"] == "runtime_mismatch"
+    finding = next(i for i in summary["drift"]["items"] if i["id"] == "codex_runtime_mb_mismatch")
+    assert "login-shell PATH" in finding["repair"]
+
+
+def test_status_summary_keeps_commands_whole(tmp_path: Path) -> None:
+    repo = tmp_path / ("a long business name " * 12)
+    command = f"mb save {shlex.quote(str(repo))} --message 'x'"
+    assert len(command) > status_mod.SUMMARY_TEXT_LIMIT
+    report = {
+        "ranked_actions": [{"id": "a", "command": command, "title": "T" * 500}],
+        "update": {"command": command},
+    }
+
+    summary = status_mod.summarize(report, repo)
+
+    assert summary["ranked_actions"][0]["command"] == command
+    assert summary["update"]["command"] == command
+    assert len(summary["ranked_actions"][0]["title"]) <= status_mod.SUMMARY_TEXT_LIMIT
+
+
+def test_status_summary_over_budget_keeps_every_drift_id_and_drops_repair(tmp_path: Path) -> None:
+    repo = tmp_path / ("a long business name " * 6)
+    repair = f"mb doctor repair --plan {shlex.quote(str(repo))} --only everything"
+    items = [
+        {"id": f"drift_{n}", "severity": "warn", "summary": "S" * 300, "repair": repair}
+        for n in range(8)
+    ]
+    report = {"drift": {"items": items}, "runtime": {"codex_cli": {"status": "runtime_mismatch"}}}
+
+    summary = status_mod.summarize(report, repo)
+
+    assert len(json.dumps(summary).encode()) <= status_mod.SUMMARY_BUDGET_BYTES
+    assert [i["id"] for i in summary["drift"]["items"]] == [i["id"] for i in items]
+    assert all(i["severity"] == "warn" for i in summary["drift"]["items"])
+    assert all("repair" not in i for i in summary["drift"]["items"])
+    assert summary["full_status"] in summary["drift"]["repair_omitted"]
+    assert summary["runtime"]["codex_cli"]["status"] == "runtime_mismatch"
+
+
+def test_status_summary_under_budget_keeps_repair(tmp_path: Path) -> None:
+    items = [{"id": "d", "severity": "error", "summary": "s", "repair": "mb fix"}]
+
+    summary = status_mod.summarize({"drift": {"items": items}}, tmp_path)
+
+    assert summary["drift"]["items"][0]["repair"] == "mb fix"
+    assert "repair_omitted" not in summary["drift"]
