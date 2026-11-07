@@ -1876,8 +1876,16 @@ def status_cmd(
         "--peek",
         help="Read status without updating the last-status-seen marker.",
     ),
+    summary: bool = typer.Option(
+        False,
+        "--summary",
+        help="Compact JSON: actions, readiness, save and update state. Implies --json --peek.",
+    ),
 ) -> None:
     """Show a cheap daily briefing for a Main Branch repo."""
+    if summary:
+        json_out = True
+        peek = True
     try:
         report = status_mod.run(path=path, update_marker=not peek, validation_cross_refs=not peek)
     except Exception as exc:
@@ -1897,7 +1905,18 @@ def status_cmd(
     status_mod.qualify_commands(report, Path(path))
     if json_out:
         try:
-            typer.echo(_json_payload(report, command="mb status", schema_name="mainbranch.status"))
+            if summary:
+                typer.echo(
+                    _json_payload(
+                        status_mod.summarize(report, Path(path)),
+                        command="mb status",
+                        schema_name="mainbranch.status.summary",
+                    )
+                )
+            else:
+                typer.echo(
+                    _json_payload(report, command="mb status", schema_name="mainbranch.status")
+                )
         except TypeError as exc:
             typer.echo(
                 _json_error_payload(

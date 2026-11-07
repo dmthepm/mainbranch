@@ -2410,6 +2410,93 @@ def qualify_commands(report: dict[str, Any], repo: Path) -> dict[str, Any]:
     return report
 
 
+SUMMARY_TEXT_LIMIT = 200
+SUMMARY_BUDGET_BYTES = 4500
+
+
+def _clip(value: Any) -> str:
+    text = " ".join(str(value or "").split())
+    return text if len(text) <= SUMMARY_TEXT_LIMIT else text[: SUMMARY_TEXT_LIMIT - 3] + "..."
+
+
+def summarize(report: dict[str, Any], repo: Path) -> dict[str, Any]:
+    """The few facts an agent needs at session start, from a built report (#994).
+
+    Ranked actions, readiness, save state, and update state in a few KB. Warn and
+    error drift (with its repair) and the Codex runtime status ride along in the
+    full payload's shape (`runtime.codex_cli.status`, `drift.items[].id`), so the
+    generated stop rule reads the same on both. Commands are never clipped; only
+    prose is. Over budget, repair is left out of every drift item (ids and
+    severities stay) with a line pointing at `full_status`.
+    """
+    readiness = report.get("readiness") or {}
+    git = report.get("git") or {}
+    update = report.get("update") or {}
+    memory = (readiness.get("dimensions") or {}).get("business_memory") or {}
+    result: dict[str, Any] = {
+        "ok": report.get("ok", False),
+        "generated_at": report.get("generated_at", ""),
+        "ranked_actions": [
+            {
+                "id": action.get("id", ""),
+                "title": _clip(action.get("title")),
+                "command": str(action.get("command") or ""),
+                "priority": action.get("priority", ""),
+                "reason": _clip(action.get("reason")),
+            }
+            for action in report.get("ranked_actions") or []
+        ],
+        "runtime": {
+            "codex_cli": {
+                "status": (report.get("runtime") or {}).get("codex_cli", {}).get("status", "")
+            }
+        },
+        "drift": {
+            "items": [
+                {
+                    "id": item.get("id", ""),
+                    "severity": item.get("severity", ""),
+                    "summary": _clip(item.get("summary")),
+                    "repair": str(item.get("repair") or ""),
+                }
+                for item in (report.get("drift") or {}).get("items") or []
+                if item.get("severity") in ("warn", "error")
+            ]
+        },
+        "readiness": {
+            "level": readiness.get("level", ""),
+            "score": readiness.get("score", 0),
+            "summary": _clip(readiness.get("summary")),
+            "failing_checks": [
+                check["name"] for check in readiness.get("checks") or [] if not check.get("ok")
+            ],
+            "business_memory": memory.get("state", ""),
+        },
+        "save": {
+            "branch": git.get("branch", ""),
+            "dirty_count": git.get("dirty_count", 0),
+            "ahead": git.get("ahead"),
+            "behind": git.get("behind"),
+            "summary": _clip(git.get("summary")),
+        },
+        "update": {
+            "installed": update.get("installed", ""),
+            "latest": update.get("latest", ""),
+            "severity": update.get("severity", ""),
+            "command": str(update.get("command") or ""),
+        },
+        "full_status": "mb status --json --peek"
+        + (f" {shlex.quote(str(repo))}" if repo_flag(repo) else ""),
+        "safe_to_share": True,
+    }
+    if len(json.dumps(result).encode()) > SUMMARY_BUDGET_BYTES:
+        # Over budget: drop repair prose, never an item or a command.
+        for item in result["drift"]["items"]:
+            item.pop("repair", None)
+        result["drift"]["repair_omitted"] = f"Repair steps are in {result['full_status']}"
+    return result
+
+
 def qualify_start_commands(report: dict[str, Any], repo: Path) -> dict[str, Any]:
     """The same rule for `mb start`: its command fields and its own `next_actions`.
 

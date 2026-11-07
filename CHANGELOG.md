@@ -13,6 +13,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb status --summary` returns ranked actions, readiness, save state and update
+  state in about 2 KB, against about 380 KB for `mb status --json --peek` on the
+  dogfood fixture. It implies `--json --peek`. `/mb-start` and the generated
+  `CLAUDE.md` and `AGENTS.md` now start there; the full payload is unchanged (#994).
 - Role hook source policy: a fresh `startup` with cards but no `MB_ROLE` keeps the STOP
   refusal; `resume`, `clear`, `compact` and `fork` print one informational warning line
   instead, for Claude Code and Codex. When `mb` is missing or failing, Claude Code keeps
@@ -51,6 +55,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   Omarchy and Pro backends are tested with fakes, not on real hosts.
 ### Fixed
 
+- `mb validate --paths` with no records under the named paths now says
+  "nothing to check in tools/, state/: no Main Branch records there, so this run
+  checked nothing", instead of the bare "nothing to check yet" that lanes cited
+  as a pass. The exit code is unchanged.
 - `mb connect status` no longer hangs when the audit log path is a named pipe.
   A symlink or named pipe there is refused and history shows as unavailable.
   Status reads only the last 4 MiB and reports history as incomplete when that
