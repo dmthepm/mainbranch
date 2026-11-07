@@ -39,6 +39,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   Omarchy and Pro backends are tested with fakes, not on real hosts.
 ### Fixed
 
+- `mb validate --paths` with no records under the named paths now says
+  "nothing to check in tools/, state/: no Main Branch records there, so this run
+  checked nothing", instead of the bare "nothing to check yet" that lanes cited
+  as a pass. The exit code is unchanged.
 - `mb library` now refuses a field it does not know in a record, a deal or the
   library config, by name, and leaves the file as it was. `deal propose`,
   `deal approve`, `deal revoke` and `source add` used to write the file back
