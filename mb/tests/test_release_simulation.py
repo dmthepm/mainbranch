@@ -1580,14 +1580,16 @@ _LINEAR_SCAN_CASES: dict[str, tuple[Callable[[int], str], int]] = {
 }
 _LINEAR_SCAN_RATIO = 8.0  # linear work grows 4x for 4x the input; a quadratic scan, 16x
 _LINEAR_SCAN_FLOOR = 0.01  # seconds: grow the input until one scan takes at least this long
+_LINEAR_SCAN_ATTEMPTS = 3  # a linear scan passes any one; a quadratic one fails all
 
 
 def _best_scan_time(text: str) -> float:
+    """Best CPU time of five scans; CPU time ignores the time a loaded runner keeps us waiting."""
     best = float("inf")
     for _ in range(5):
-        started = time.perf_counter()
+        started = time.process_time()
         release_simulation.analyze_checkpoint_verbs(text)
-        best = min(best, time.perf_counter() - started)
+        best = min(best, time.process_time() - started)
     return best
 
 
@@ -1595,21 +1597,27 @@ def _best_scan_time(text: str) -> float:
 def test_checkpoint_verbs_scan_is_linear(name: str) -> None:
     """Four times the input takes about four times as long, not sixteen.
 
-    A ratio of two timings on the same machine, not a wall-clock budget, so a
-    slow or loaded runner (xdist, coverage) does not fail a linear scan while a
-    quadratic or backtracking one still does.
+    A ratio of two CPU timings on the same machine, not a wall-clock budget, and
+    judged on the best of a few attempts. A loaded runner (xdist, coverage) can
+    stretch one attempt, but it cannot make a quadratic or backtracking scan
+    pass: that one is about 16x on every attempt.
     """
-    make, size = _LINEAR_SCAN_CASES[name]
-    release_simulation.analyze_checkpoint_verbs(make(size))  # warm up imports and the registry
+    make, base = _LINEAR_SCAN_CASES[name]
+    release_simulation.analyze_checkpoint_verbs(make(base))  # warm up imports and the registry
+    size = base
     small = _best_scan_time(make(size))
-    while small < _LINEAR_SCAN_FLOOR and size < 256 * _LINEAR_SCAN_CASES[name][1]:
+    while small < _LINEAR_SCAN_FLOOR and size < 256 * base:
         size *= 2
         small = _best_scan_time(make(size))
-    large = _best_scan_time(make(4 * size))
+    ratios = []
+    for _ in range(_LINEAR_SCAN_ATTEMPTS):
+        small = _best_scan_time(make(size))
+        large = _best_scan_time(make(4 * size))
+        if large <= _LINEAR_SCAN_RATIO * small + 0.002:
+            return
+        ratios.append(f"{small * 1000:.1f} -> {large * 1000:.1f} ms")
 
-    assert large <= _LINEAR_SCAN_RATIO * small + 0.002, (
-        f"{name}: {size} -> {4 * size} units took {small * 1000:.1f} ms -> {large * 1000:.1f} ms"
-    )
+    pytest.fail(f"{name}: {size} -> {4 * size} units took {'; '.join(ratios)}")
 
 
 _DRIFT_DOC_ROOTS = (".claude", "docs", "mb/mb/_data", "workflows", "playbooks")

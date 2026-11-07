@@ -87,6 +87,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `plan`, `test`, `exec`, `token`, `rotate` and the Meta and metadata refusals.
   `--token-stdin` stays for piped use, and a legacy Google access-token
   connection still names it. Closes #1333.
+- `test_checkpoint_verbs_scan_is_linear` compares CPU time, not wall-clock time,
+  and passes on any of three attempts, so a loaded runner no longer fails a
+  linear scan while a quadratic one (16x for 4x the input) still fails every
+  attempt. Closes #1334.
 - `mb library source add` now holds a lock from reading the library config to
   writing it, and reads the config again once it has the lock. Before, a library
   opened before another `source add` finished could write that source away while
