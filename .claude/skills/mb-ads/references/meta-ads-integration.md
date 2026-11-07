@@ -50,9 +50,9 @@ The setup path follows Meta's CLI docs:
 
 1. Install the package as `meta-ads`; the binary is `meta`.
 2. Use a Meta Developer App and a system user access token for the CLI path.
-3. Use `mb connect meta --token-stdin --metadata ad_account_id=<act_id>` so
+3. Use `mb connect meta --metadata ad_account_id=<act_id>` so
    `ACCESS_TOKEN` lands in `SecretStore` and only safe metadata lands in
-   `.mb/connect.yaml`.
+   `.mb/connect.yaml`. Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
 4. Verify with `mb connect test meta --json`.
 
 The CLI uses this precedence: CLI flag, environment variable, project `.env`,

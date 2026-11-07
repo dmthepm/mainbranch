@@ -75,8 +75,10 @@ The official xAI Python SDK uses gRPC and supports X search tools that execute s
 
 ```bash
 pip install xai-sdk
-export XAI_API_KEY="your-api-key"
 ```
+
+Store the key with `mb connect` and run scripts through `mb connect exec`; see
+[grok-setup.md](grok-setup.md).
 
 ### How X Search Works
 

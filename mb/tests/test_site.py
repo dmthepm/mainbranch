@@ -59,9 +59,6 @@ def test_mb_site_skill_hard_gates_cloudflare_dependent_work() -> None:
     setup = (
         REPO_ROOT / ".claude" / "skills" / "mb-site" / "references" / "minisite-setup.md"
     ).read_text(encoding="utf-8")
-    setup_creds = (
-        REPO_ROOT / ".claude" / "skills" / "mb-site" / "scripts" / "setup_creds.sh"
-    ).read_text(encoding="utf-8")
     pages_link = (
         REPO_ROOT / ".claude" / "skills" / "mb-site" / "references" / "cloudflare-pages-link.md"
     ).read_text(encoding="utf-8")
@@ -70,7 +67,6 @@ def test_mb_site_skill_hard_gates_cloudflare_dependent_work() -> None:
     assert "continue read-only" in skill
     assert "--metadata token_type=account --metadata account_id=..." in skill
     assert "`cfat_` account tokens route automatically" in skill
-    assert "mb connect cloudflare --token-stdin --metadata token_type=account" in setup_creds
     assert "mb connect doctor --json" in pages_link
     assert "`cfat_` account tokens route automatically" in pages_link
     assert "no buy, DNS, Pages, custom-domain, or deploy calls" in setup

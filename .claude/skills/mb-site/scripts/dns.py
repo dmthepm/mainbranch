@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """dns.py — DNS operations atom.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Subcommand:
     ensure   Idempotent: ensure a Cloudflare zone exists for <domain>, swap
              nameservers at the registrar if needed (Porkbun-registered only),
@@ -31,6 +33,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
+    OWNER_HANDOFF,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -294,8 +297,10 @@ def _detect_registrar(explicit: str | None) -> tuple[str | None, DnsEnsureError 
         message="Cannot determine registrar; pass --registrar or set CF/Porkbun env vars.",
         suggestion=(
             "Pass --registrar=cloudflare or --registrar=porkbun. "
-            "Or set CLOUDFLARE_API_TOKEN_REGISTRAR (CF-registered) or "
-            "PORKBUN_API_KEY+PORKBUN_SECRET_KEY (Porkbun-registered) in ~/.config/vip/env.sh."
+            "Or store the registrar credential with `mb connect` and run this through "
+            "`mb connect exec` (CLOUDFLARE_API_TOKEN_REGISTRAR for CF-registered, "
+            "PORKBUN_API_KEY+PORKBUN_SECRET_KEY for Porkbun-registered). "
+            + OWNER_HANDOFF
         ),
     )
 
@@ -363,8 +368,10 @@ def ensure(
                 code="cf_unauthenticated",
                 message="CLOUDFLARE_API_TOKEN not set.",
                 suggestion=(
-                    "Add CLOUDFLARE_API_TOKEN to ~/.config/vip/env.sh with Zone:Edit + "
-                    "DNS:Edit permissions."
+                    "Store a token with Zone:Edit + DNS:Edit permissions using "
+                    "`mb connect cloudflare` (it prompts with hidden input), then run this through "
+                    "`mb connect exec cloudflare -- <command>`. "
+                    + OWNER_HANDOFF
                 ),
             ),
         )
@@ -378,8 +385,10 @@ def ensure(
                 code="cf_account_id_missing",
                 message="CF_ACCOUNT_ID not set.",
                 suggestion=(
-                    "Add CF_ACCOUNT_ID to ~/.config/vip/env.sh "
-                    "(find it at dash.cloudflare.com → right sidebar of any zone)."
+                    "CF_ACCOUNT_ID is not a secret (find it at dash.cloudflare.com → "
+                    "right sidebar of any zone). `mb connect exec` drops it unless "
+                    "you name it: CF_ACCOUNT_ID=<id> mb connect exec cloudflare "
+                    "--keep-env CF_ACCOUNT_ID -- <command>."
                 ),
             ),
         )
@@ -496,7 +505,11 @@ def ensure(
                 error=DnsEnsureError(
                     code="porkbun_unauthenticated",
                     message="PORKBUN_API_KEY/PORKBUN_SECRET_KEY not set.",
-                    suggestion="Add PORKBUN_API_KEY and PORKBUN_SECRET_KEY to ~/.config/vip/env.sh.",
+                    suggestion=(
+                        "Store the Porkbun credential with `mb connect` and run this "
+                        "through `mb connect exec`. "
+                        + OWNER_HANDOFF
+                    ),
                 ),
             )
             sys.exit(emit(env))
