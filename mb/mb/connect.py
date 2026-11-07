@@ -4257,7 +4257,8 @@ def _is_git_top(folder: Path) -> bool:
     entry there means absent. Once anything named ``.git`` exists, every later
     failure refuses, whatever the error: a dangling link, a target that cannot
     be inspected, a file that vanishes after the lstat. The same holds for HEAD
-    in a ``.git`` folder. A readable ``.git`` folder with no HEAD, or a gitfile
+    in a ``.git`` folder, and for a ``.git`` or HEAD that is neither a file nor,
+    for ``.git``, a folder. A readable ``.git`` folder with no HEAD, or a gitfile
     that is not a pointer, is False. The search refuses rather than walk on to a
     parent, because an uninspectable marker may be a nested repo.
     """
@@ -4274,8 +4275,10 @@ def _is_git_top(folder: Path) -> bool:
         if stat.S_ISDIR(mode):
             if _lstat_or_none(git / "HEAD") is None:
                 return False
-            return stat.S_ISREG((git / "HEAD").stat().st_mode)
-        return False
+            if stat.S_ISREG((git / "HEAD").stat().st_mode):
+                return True
+            return _refuse_marker(git)
+        return _refuse_marker(git)
     except OSError:
         return _refuse_marker(git)
 

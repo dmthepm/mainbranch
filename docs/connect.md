@@ -83,7 +83,8 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
   top level, so a repo cloned inside the hub does not borrow the hub's
   connections. Only a `.git` entry that is not there counts as absent. If
   anything named `.git` exists on the way up and cannot be fully inspected (a
-  dangling link, a file that cannot be read, one that vanishes mid-check), they
+  dangling link, a file that cannot be read, one that vanishes mid-check, a
+  special file), they
   stop with `unreadable_repo_marker` (exit 2) instead of trying a parent: an
   uninspectable marker might be a nested repo. A readable `.git` folder with no
   HEAD, or a readable `.git` file that is not a `gitdir:` pointer, is ignored.

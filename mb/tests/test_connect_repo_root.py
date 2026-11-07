@@ -222,6 +222,8 @@ BREAKS = [
     "gitfile-parent-gone",
     "dangling-head",
     "vanished-head",
+    "fifo-marker",
+    "head-folder",
 ]
 POST_LSTAT = {"vanished-gitfile", "gitfile-parent-gone", "vanished-head"}
 
@@ -235,7 +237,13 @@ def _break_nested_marker(hub: Path, kind: str, monkeypatch: pytest.MonkeyPatch) 
         marker.write_text("gitdir: /somewhere/else\n")
     else:
         make_git(nested)
-    if kind == "dangling-link":
+    if kind == "fifo-marker":
+        shutil.rmtree(marker)
+        os.mkfifo(marker)
+    elif kind == "head-folder":
+        (marker / "HEAD").unlink()
+        (marker / "HEAD").mkdir()
+    elif kind == "dangling-link":
         shutil.rmtree(marker)
         marker.symlink_to(nested / "missing-git-dir")
     elif kind == "link-loop":
