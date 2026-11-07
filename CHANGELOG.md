@@ -82,6 +82,12 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- `mb library source add` now holds a lock from reading the library config to
+  writing it, and reads the config again once it has the lock. Before, a library
+  opened before another `source add` finished could write that source away while
+  both reported success. A change that cannot get the lock within a few seconds is
+  refused and writes nothing.
+
 - State files now survive a power cut after a save: the write syncs the folder
   it lands in, and any folders it had to create, each through its own parent. A
   sync failure now raises instead of passing silently. If the file changed but

@@ -183,3 +183,50 @@ def test_a_record_cannot_be_written_without_the_deal_lock(
     record = lib._record_or_default(asset)
     with lib._records_fd(create=False) as fd, pytest.raises(RuntimeError, match="deal lock"):
         lib._write_record(fd, record)
+
+
+@needs_nonroot
+def test_two_libraries_adding_different_sources_keep_both(tmp_path: Path) -> None:
+    """A library opened before another one's `source add` must not write that source away."""
+    biz = tmp_path / "acme-candles"
+    (biz / ".mb").mkdir(parents=True)
+    one = lock(make_tree(tmp_path / "studio", {"a.jpg": b"a"}))
+    two = lock(make_tree(tmp_path / "archive", {"b.jpg": b"b"}))
+    library(biz, init=True).add_source("studio", one)
+    early, late = library(biz), library(biz)  # both opened before either adds
+    early.add_source("archive", two)
+    with pytest.raises(files.LibraryError, match="already registered"):
+        late.add_source("archive", two)
+    late2 = library(biz)
+    assert set(late2.sources) == {"studio", "archive"}
+    stale = library(biz)
+    library(biz).add_source("third", lock(make_tree(tmp_path / "third", {"c.jpg": b"c"})))
+    stale.add_source("fourth", lock(make_tree(tmp_path / "fourth", {"d.jpg": b"d"})))
+    assert set(library(biz).sources) == {"studio", "archive", "third", "fourth"}
+    unlock(one)
+    unlock(two)
+
+
+@needs_nonroot
+def test_a_busy_config_lock_refuses_source_add_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    biz = tmp_path / "acme-candles"
+    (biz / ".mb").mkdir(parents=True)
+    src = lock(make_tree(tmp_path / "studio", {"a.jpg": b"a"}))
+    seed = lock(make_tree(tmp_path / "seed", {"s.jpg": b"s"}))
+    library(biz, init=True).add_source("seed", seed)
+    lib = library(biz)
+    monkeypatch.setattr(store, "CONFIG_LOCK_WAIT", 0.1)
+    fd = files.open_dir(biz, store.CONFIG_REL, create=False)
+    try:
+        with (
+            files.exclusive(fd, store.CONFIG_LOCK_NAME),
+            pytest.raises(files.LibraryError, match="source"),
+        ):
+            lib.add_source("studio", src)
+    finally:
+        os.close(fd)
+    assert "studio" not in library(biz).sources
+    unlock(src)
+    unlock(seed)
