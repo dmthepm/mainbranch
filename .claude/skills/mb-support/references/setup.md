@@ -43,6 +43,14 @@ rule with the payer named:
 
 Blank means "ask". The owner's rules win over the agent's view of what is fair.
 
+## core/support/channels.md
+
+Ask the owner every place a customer can reach the business, and fill the
+register from [channels.md](channels.md): where it lives, who owns replies, how
+the agent reads it, and whether the agent may only read or may draft replies.
+Write `none` for a read route that does not exist; do not guess one. Ask also
+whether cases live in a tracker (see [cases.md](cases.md)).
+
 ## The clock
 
 Ask the owner how fast customers should hear back, and how often the check
