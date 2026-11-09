@@ -62,6 +62,7 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 - [`data-source-registry.md`](data-source-registry.md) — `type: data_source` records.
 - [`child-repo-descriptors.md`](child-repo-descriptors.md) — `.mainbranch/repo.json`.
 - [`fleet.md`](fleet.md) — `mb fleet`: read-only status of every site across your hubs.
+- [`agent-policy.md`](agent-policy.md) — `agents.json` fields, the card rule, and what `mb agent check` proves and does not.
 - [`checks-and-review-model.md`](checks-and-review-model.md) — local + CI + agent checks.
 - [`delivery-truth.md`](delivery-truth.md) — acceptance ≠ delivery: message ids, delivery_state, webhook + reconcile, page on failure.
 - [`provider-mutation-contract.md`](provider-mutation-contract.md) — preview → approve → apply → verify for external-account writes; sanitized plans, minimal scope, no private rows in git.

@@ -13,7 +13,12 @@ Checks:
   3. Cloudflare zone lookup: GET /zones?name=<test domain> (read-only).
   4. Porkbun API auth: POST /ping with the keys (read-only; returns yourIp).
 
-Run it as `CF_ACCOUNT_ID=<id> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID -- python3 ...`.
+Pick the checks by provider, because one `mb connect exec` run holds one provider:
+  python3 verify_live.py cloudflare   domain-check, Cloudflare scopes and zone lookup
+  python3 verify_live.py porkbun      Porkbun ping only
+  python3 verify_live.py              everything (needs both providers' variables)
+
+Run Cloudflare as `CF_ACCOUNT_ID=<id> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID -- python3 verify_live.py cloudflare`.
 `exec` drops every variable outside its allowlist, so name each one you set.
 
 Required env:
@@ -22,8 +27,11 @@ Required env:
 
 Optional env (add a --keep-env for each, or the check is skipped under exec):
   VERIFY_LIVE_CF_ZONE   — domain to lookup at Cloudflare (default: thelastbill.com)
-  PORKBUN_API_KEY, PORKBUN_SECRET_KEY — Porkbun is not an `mb connect` provider, so
-                          these must already be in your shell
+  PORKBUN_CREDENTIALS   — "<api key>:<secret key>" in one custom `mb connect` secret:
+                          Store: mb connect porkbun --custom --account "Porkbun"   (hidden prompt)
+                          Run:   mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 verify_live.py porkbun
+                          (a separate run from the Cloudflare one: one provider per exec;
+                          the API key part may not contain a colon)
 
 Exit code: 0 if all checks pass, 1 if any fail.
 """
@@ -40,7 +48,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _envelope import OWNER_HANDOFF, log  # noqa: E402
+from _envelope import OWNER_HANDOFF, log, porkbun_howto, porkbun_keys, scrub_porkbun  # noqa: E402
 
 # ---------------------------------------------------------------------------
 
@@ -251,14 +259,22 @@ def check_cf_zone_lookup() -> bool:
     return True
 
 
-def check_porkbun_ping() -> bool | None:
-    """Returns None when Porkbun keys absent (skip, not fail) — CF-registered path doesn't touch Porkbun."""
-    print(f"\n{YELLOW}[4/4] Porkbun API auth (POST /ping){RESET}")
-    api_key = os.environ.get("PORKBUN_API_KEY")
-    secret_key = os.environ.get("PORKBUN_SECRET_KEY")
+def check_porkbun_ping(required: bool = False) -> bool | None:
+    """Returns None when Porkbun keys absent (skip, not fail) — CF-registered path doesn't touch Porkbun.
 
-    if not api_key or not secret_key:
-        print(f"{DIM}  Skipped — PORKBUN_API_KEY / PORKBUN_SECRET_KEY not set.{RESET}")
+    With `required` (a Porkbun-only run) absent keys fail instead of skipping.
+    """
+    print(f"\n{YELLOW}[4/4] Porkbun API auth (POST /ping){RESET}")
+    keys = porkbun_keys()
+
+    if not keys and required:
+        _fail("PORKBUN_CREDENTIALS not set, or not <api key>:<secret key>")
+        _info(porkbun_howto("verify_live.py porkbun") + " " + OWNER_HANDOFF)
+        return False
+
+    if not keys:
+        print(f"{DIM}  Skipped — PORKBUN_CREDENTIALS not set (or not <api key>:<secret key>).{RESET}")
+        print(f"{DIM}  {porkbun_howto('verify_live.py porkbun')}{RESET}")
         print(f"{DIM}  Not needed for the CF-registered path. Add only if you want to{RESET}")
         print(f"{DIM}  exercise dns.py's Porkbun NS-swap branch.{RESET}")
         return None
@@ -267,11 +283,11 @@ def check_porkbun_ping() -> bool | None:
     try:
         resp = requests.post(
             f"{PORKBUN_API_BASE}/ping",
-            json={"apikey": api_key, "secretapikey": secret_key},
+            json={"apikey": keys[0], "secretapikey": keys[1]},
             timeout=15,
         )
     except requests.RequestException as exc:
-        _fail(f"network error: {exc}")
+        _fail(f"network error: {scrub_porkbun(exc, *keys)}")
         _info("If the URL in the error references porkbun.com (not api.porkbun.com), the host fix didn't apply.")
         return False
 
@@ -284,25 +300,37 @@ def check_porkbun_ping() -> bool | None:
         return False
 
     if body.get("status") != "SUCCESS":
-        _fail(f"Porkbun rejected ping: {body.get('message', 'unknown')}")
+        _fail(f"Porkbun rejected ping: {scrub_porkbun(body.get('message', 'unknown'), *keys)}")
         return False
 
-    _ok(f"Porkbun /ping works ({latency_ms}ms): yourIp={body.get('yourIp')}")
+    _ok(f"Porkbun /ping works ({latency_ms}ms): yourIp={scrub_porkbun(body.get('yourIp'), *keys)}")
     _ok(f"  host pinned correctly to api.porkbun.com")
     return True
 
 
-def main() -> int:
+PROVIDERS = ("cloudflare", "porkbun")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) > 1 or (args and args[0] not in PROVIDERS):
+        print(f"usage: verify_live.py [{'|'.join(PROVIDERS)}]  (no argument runs every check)")
+        return 2
+    provider = args[0] if args else None
+
     print(f"{YELLOW}=== /mb-site atoms — live verification ==={RESET}")
     print(f"{DIM}Read-only smoke test. No state changes, no spending.{RESET}")
-    print(f"{DIM}Run through `mb connect exec cloudflare -- python3 ...`.{RESET}")
+    print(f"{DIM}Run through `mb connect exec <provider> -- python3 verify_live.py <provider>`.{RESET}")
 
-    results = [
-        ("domain-check CLI", check_domain_check_cli()),
-        ("Cloudflare scopes", check_cf_auth()),
-        ("Cloudflare zone lookup", check_cf_zone_lookup()),
-        ("Porkbun ping", check_porkbun_ping()),
-    ]
+    results: list[tuple[str, bool | None]] = []
+    if provider in (None, "cloudflare"):
+        results += [
+            ("domain-check CLI", check_domain_check_cli()),
+            ("Cloudflare scopes", check_cf_auth()),
+            ("Cloudflare zone lookup", check_cf_zone_lookup()),
+        ]
+    if provider in (None, "porkbun"):
+        results.append(("Porkbun ping", check_porkbun_ping(required=provider == "porkbun")))
 
     print(f"\n{YELLOW}=== Summary ==={RESET}")
     failed = 0

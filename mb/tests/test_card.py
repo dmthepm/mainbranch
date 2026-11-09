@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import json
 import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -399,3 +400,52 @@ def test_missing_output_directory_is_a_refusal(tmp_path):
     result = runner.invoke(app, ["card", "render", str(_write(tmp_path, SPEC)), str(out)])
     assert result.exit_code == 2
     assert "cannot write" in result.output
+
+
+def _record_syncs(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str]]:
+    """Record each fsync and link in order, as ('file'|'dir', ...) and ('link',)."""
+    events: list[tuple[str]] = []
+    real_fsync, real_link = os.fsync, os.link
+
+    def fsync(fd):
+        events.append(("dir" if stat.S_ISDIR(os.fstat(fd).st_mode) else "file",))
+        return real_fsync(fd)
+
+    def link(*args, **kwargs):
+        events.append(("link",))
+        return real_link(*args, **kwargs)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    monkeypatch.setattr(os, "link", link)
+    return events
+
+
+def test_publish_syncs_the_file_before_the_link_and_the_folder_after(tmp_path, monkeypatch):
+    events = _record_syncs(monkeypatch)
+    card._publish(b"jpegbytes", tmp_path / "card.jpg")
+    assert events == [("file",), ("link",), ("dir",)]
+    assert (tmp_path / "card.jpg").read_bytes() == b"jpegbytes"
+
+
+def test_publish_does_not_link_when_the_file_sync_fails(tmp_path, monkeypatch):
+    def fail(fd):
+        raise OSError(errno.EIO, "Input/output error")
+
+    monkeypatch.setattr(os, "fsync", fail)
+    with pytest.raises(card.CardError, match="cannot write"):
+        card._publish(b"jpegbytes", tmp_path / "card.jpg")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_publish_reports_a_failed_folder_sync(tmp_path, monkeypatch):
+    real_fsync = os.fsync
+
+    def fsync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(errno.EIO, "Input/output error")
+        return real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    with pytest.raises(card.CardError, match="could not confirm it reached disk"):
+        card._publish(b"jpegbytes", tmp_path / "card.jpg")
+    assert (tmp_path / "card.jpg").read_bytes() == b"jpegbytes"

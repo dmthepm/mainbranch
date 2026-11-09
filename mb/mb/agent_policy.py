@@ -44,6 +44,8 @@ OPTIONS: dict[str, dict[str, tuple[str, ...]]] = {
     "claude": {"--permission-mode": ("default", "acceptEdits", "plan", "bypassPermissions")},
     "codex": {"--sandbox": ("read-only", "workspace-write", "danger-full-access")},
 }
+# Allowed, and never an error, but "valid" must not be read as "safe": check says so.
+MOST_PERMISSIVE = {("--permission-mode", "bypassPermissions"), ("--sandbox", "danger-full-access")}
 TOP_KEYS = {"version", "path", "profiles", "agents"}
 ROW_KEYS = {
     "name",
@@ -94,6 +96,7 @@ class Report:
     path: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -613,6 +616,7 @@ def check(host: Host, name: str | None = None) -> Report:
             if row["name"] in names:
                 c.schema(_loc(i, "name"), "repeats an earlier name")
             names.add(row["name"])
+        _note_permissive(report, i, row)
         if not sound:
             continue
         cwd = row["cwd"]
@@ -632,8 +636,22 @@ def check(host: Host, name: str | None = None) -> Report:
     return report
 
 
+def _note_permissive(report: Report, i: int, row: object) -> None:
+    """Note a most-permissive option even when the row has an unrelated schema error."""
+    if not isinstance(row, dict) or not isinstance(row.get("options"), list):
+        return
+    name = row.get("name")
+    label = roles.printable(name) if isinstance(name, str) else f"agents[{i}]"
+    for option in row["options"]:
+        if isinstance(option, str) and tuple(option.split(" ", 1)) in MOST_PERMISSIVE:
+            report.warnings.append(
+                f"{label}: {option} is the most permissive mode; allowed, not safe"
+            )
+
+
 def human_report(report: Report) -> str:
     """Success says only that the policy is valid. It claims nothing about any agent."""
+    notes = [f"  note: {w}" for w in [*report.warnings, *report.notes]]
     if report.ok:
-        return "Policy valid."
-    return "\n".join(["Policy not valid.", *[f"  {p.text()}" for p in report.problems]])
+        return "\n".join(["Policy valid.", *notes])
+    return "\n".join(["Policy not valid.", *[f"  {p.text()}" for p in report.problems], *notes])

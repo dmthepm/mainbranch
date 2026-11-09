@@ -186,10 +186,16 @@ file.
 
 ### 4. Add to Claude Code
 
-The server reads `GROK_API_KEY`, so start it through `mb connect exec`:
+The server reads `GROK_API_KEY`, so start it through `mb connect exec`. The key
+belongs to one business repo, so register the server from that repo with
+`--scope project`. `mb connect exec` finds the key from the working directory
+Claude Code launches the server in, and only inside the business repo that holds
+the `xai` connection; started from anywhere else it fails with "unknown provider
+'xai'". Launch Claude Code from the business repo:
 
 ```bash
-claude mcp add grok-x-insights --scope user -- mb connect exec xai --env GROK_API_KEY -- node ~/grok-x-insights-mcp/dist/index.js
+cd path/to/my-business
+claude mcp add grok-x-insights --scope project -- mb connect exec xai --env GROK_API_KEY -- node ~/grok-x-insights-mcp/dist/index.js
 ```
 
 ### 5. Verify

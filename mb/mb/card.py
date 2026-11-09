@@ -278,6 +278,8 @@ def _publish(data: bytes, out_path: Path) -> None:
     The destination directory is held open and every step is relative to that descriptor, so
     replacing or renaming the directory mid-write cannot redirect the link or strand the temp.
     os.link refuses an existing name, so a file created after the earlier check is still safe.
+    The file is synced before the link and the folder after it, so a power cut cannot leave a
+    name that points at empty bytes; a failed folder sync is reported, never passed off as done.
     """
     name = out_path.name
     try:
@@ -294,6 +296,7 @@ def _publish(data: bytes, out_path: Path) -> None:
             view = memoryview(data)
             while view:
                 view = view[os.write(fd, view) :]
+            os.fsync(fd)
         finally:
             os.close(fd)
         os.link(tmp, name, src_dir_fd=dfd, dst_dir_fd=dfd, follow_symlinks=False)
@@ -311,13 +314,19 @@ def _publish(data: bytes, out_path: Path) -> None:
             leftover = (
                 f"; could not remove temp file {tmp} in {_safe(out_path.parent)}: {exc.strerror}"
             )
+    unconfirmed = ""
+    if made and problem is None:
+        try:
+            os.fsync(dfd)
+        except OSError as exc:
+            unconfirmed = f"; could not confirm it reached disk: {exc.strerror}"
     os.close(dfd)
     if problem is not None:
         if leftover:
             problem = CardError(f"{problem}{leftover}")
         raise problem
-    if leftover:
-        raise CardError(f"card written to {_safe(out_path)}{leftover}")
+    if leftover or unconfirmed:
+        raise CardError(f"card written to {_safe(out_path)}{unconfirmed}{leftover}")
 
 
 def _encode(img: Any) -> bytes:

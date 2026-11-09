@@ -25,6 +25,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `gitdir:`, a special file, a dangling link, or one that fails inspection stops
   with `unreadable_repo_marker` (exit 2) rather than falling through to a parent
   repo's keys.
+- `docs/agent-policy.md`: the `agents.json` fields, the card rule, and what
+  `mb agent check` proves and does not.
 
 ### Fixed
 
@@ -68,6 +70,32 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   opened before another `source add` finished could write that source away while
   both reported success. A change that cannot get the lock within a few seconds is
   refused and writes nothing.
+- `mb agent check` adds a note for each row using `--permission-mode bypassPermissions`
+  or `--sandbox danger-full-access`, naming it as the most permissive mode. The rows stay
+  allowed; "Policy valid." is not "safe". The note is kept for a row with an unrelated
+  schema error, and the report prints the other notes (Codex card unverified, default
+  profile absent). `docs/agent-policy.md` shows `options` as a list, gives the
+  `declared_work` list shape and says what check does and does not prove.
+  A name with Unicode direction or other format controls is printed without them.
+  `docs/agent-policy.md` also says a missing `PATH` folder is skipped and listed only in
+  `skipped`, so exit 0 does not prove every listed `PATH` folder exists.
+- `mb card render` syncs the JPG to disk before linking it and the folder after, and says
+  so when the folder sync fails.
+- The Grok MCP setup registers the server with `--scope project` from the business repo,
+  so `mb connect exec xai` finds its key instead of "unknown provider 'xai'". The guide
+  says the lookup follows the working directory and the business repo.
+- `/mb-site` Porkbun: one route. Store `<api key>:<secret key>` as one custom `mb connect`
+  secret and run the scripts through `mb connect exec porkbun --env PORKBUN_CREDENTIALS`.
+  `dns.py`, `domain.py` and `verify_live.py` print that exact command, with the script
+  and domain filled in. `dns.py` also needs the Cloudflare token and account id, so its
+  command nests the two connections: `CF_ACCOUNT_ID=<id> mb connect exec cloudflare
+  --keep-env CF_ACCOUNT_ID -- mb connect exec porkbun --env PORKBUN_CREDENTIALS
+  --keep-env CLOUDFLARE_API_TOKEN --keep-env CF_ACCOUNT_ID -- python3 ...`. The API key part may not contain a colon. The old
+  `PORKBUN_API_KEY` and `PORKBUN_SECRET_KEY` variables are no longer read.
+- `verify_live.py` takes `cloudflare` or `porkbun`, so a Porkbun-only run does not run
+  the Cloudflare checks or print their repair steps. `dns.py` and `verify_live.py`
+  remove both Porkbun key parts from any provider or exception text before printing it.
+- CI pins its 11 `actions/checkout` and `actions/setup-python` references to commit SHAs.
 
 ## [0.6.23] - 2026-11-06
 
