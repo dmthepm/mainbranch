@@ -2,7 +2,9 @@
 
 Procedures live in OpenSEO's own skills ([upstream-skills.md](upstream-skills.md)).
 This file keeps only the spend and schedule exceptions they do not enforce. They
-were read against the v0.1.21 pin; recheck them when the pin moves.
+were first read against the older v0.1.21 release. The pin is now v0.1.26, and
+the tool and spend claims here are NOT VERIFIED against that source; the
+playbooks were written at v0.1.26 and win where they differ.
 
 Use the MCP server named `openseo-<BIZ>` for this business. If the name does not
 match this business, stop.
@@ -93,7 +95,7 @@ them: Lighthouse is a paid DataForSEO call.
 - Separate three things: the copy is reachable, the app works, and the data
   connection returned real rows.
 - If MCP calls return HTML or an "unexpected content type" error, check the key
-  first (setup step 7; a missing, expired or revoked key answers 401), then ask
+  first (setup step 8; a missing, expired or revoked key answers 401), then ask
   the owner for a new one. Behind Access, check Managed OAuth first.
 
 ## Save and act

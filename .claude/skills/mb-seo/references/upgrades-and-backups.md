@@ -77,7 +77,7 @@ Worker secret: if the operator secret was ever set, confirm it is still absent.
 
 Run the deploy command from setup step 5. Alchemy applies pending migrations.
 
-**Then redo the setup step 6 checks and the `initialize` canary for each key.**
+**Then redo the setup step 7 checks and the `initialize` canary for each key.**
 A passing check before the deploy proves nothing after it. With Access, redo
 Managed OAuth too, because a deploy may clear it. Save the old and new pins and
 the results.

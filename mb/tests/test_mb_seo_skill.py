@@ -19,15 +19,24 @@ DAILY = SKILL_DIR / "references/daily-use.md"
 UPGRADES = SKILL_DIR / "references/upgrades-and-backups.md"
 DECISION = ROOT / "decisions/2026-10-30-openseo-chosen-optional-seo-tool.md"
 DEPENDENCIES = ROOT / "docs/dependency-choices.md"
-PIN = "beca5c1f5c728acfb243249107dbfaded0ef552e"
+PIN = "7d89cfb3ca30b2819356c57c5b746a1048b9743f"
+HARDENING = SKILL_DIR / "references/access-hardening.md"
 
 
 def _flat(path: Path) -> str:
     return " ".join(path.read_text(encoding="utf-8").split())
 
 
+def _skill_markdown() -> list[Path]:
+    return sorted(SKILL_DIR.rglob("*.md"))
+
+
 def _all_skill_text() -> str:
-    return " ".join(_flat(path) for path in (SKILL, SETUP, DAILY, UPGRADES))
+    """Every Markdown file under the skill: references and playbooks included."""
+    paths = _skill_markdown()
+    assert {SKILL, SETUP, DAILY, UPGRADES, HARDENING} <= set(paths)
+    assert any(path.parent.name == "playbooks" for path in paths)
+    return " ".join(_flat(path) for path in paths)
 
 
 def test_skill_is_bundled_and_valid() -> None:
@@ -73,7 +82,8 @@ def test_setup_writes_password_mode_on_purpose() -> None:
     body = _flat(SETUP)
     assert "AUTH_MODE=password" in SETUP.read_text(encoding="utf-8")
     assert "grep -q '^AUTH_MODE=password$' .env.selfhost" in body
-    assert "AUTH_MODE=cloudflare_access" not in body
+    # Password mode is written only at the switch, after the owner exists.
+    assert body.index("AUTH_MODE=cloudflare_access") < body.index("grep -q '^AUTH_MODE=password$'")
     assert "Do not recopy the example env file" in _flat(UPGRADES)
 
 
@@ -253,4 +263,96 @@ def test_mb_seo_install_is_skills_only_at_a_verified_ref() -> None:
     setup = SETUP.read_text(encoding="utf-8")
     assert "Install the skills only" in setup
     assert "Do not install the upstream OpenSEO plugin" not in setup
-    assert "beca5c1f5c728acfb243249107dbfaded0ef552e" in setup
+    assert PIN in setup
+    assert "beca5c1" not in _all_skill_text()
+
+
+def test_no_command_puts_a_literal_key_in_a_header() -> None:
+    """Every `--header` carries an environment reference, never a key."""
+    header = re.compile(r"--header\s+('[^']*'|\"[^\"]*\"|\S+)")
+    seen = 0
+    for path in _skill_markdown():
+        text = path.read_text(encoding="utf-8")
+        for match in header.finditer(text):
+            seen += 1
+            value = match.group(1)
+            assert value == "'Authorization: Bearer ${OPENSEO_MCP_KEY}'", (path.name, value)
+        assert not re.search(r"oseo_[A-Za-z0-9]{8,}", text), path.name
+        assert "Bearer <KEY>" not in text, path.name
+    assert seen >= 2, "both client-wiring places must show the env-reference header"
+    for path in (SETUP, HARDENING):
+        flat = _flat(path)
+        assert "unset OPENSEO_MCP_KEY" in flat, path.name
+        assert "`claude mcp get" in flat and "literal `${OPENSEO_MCP_KEY}`" in flat, path.name
+        assert "--env OPENSEO_MCP_KEY -- claude" in flat, path.name
+        assert "missing, empty, invalid and revoked" in flat.lower(), path.name
+    flat = _flat(SETUP)
+    for text in (
+        "same operating-system user can read it",
+        "Rotation.",
+        "Custody.",
+        "`headersHelper` is a documented alternative",
+    ):
+        assert text in flat, text
+    assert flat.index("unset OPENSEO_MCP_KEY") < flat.index("claude mcp add --transport http")
+    assert flat.index("claude mcp add --transport http") < flat.index("claude mcp get")
+    assert flat.index("claude mcp get") < flat.index("--env OPENSEO_MCP_KEY -- claude")
+
+
+def test_first_owner_is_created_behind_protection_in_order() -> None:
+    flat = _flat(HARDENING)
+    assert "## First owner: protected bootstrap" in HARDENING.read_text(encoding="utf-8")
+    for cite in (
+        "src/server/standalone/sign-up.ts:13-22",
+        "src/lib/auth-mode.ts:7-11",
+    ):
+        assert cite in flat, cite
+    order = [
+        "Deploy in Access mode with a one-address allow-list",
+        "Prove it is protected before anyone signs in",
+        "The intended owner signs in once through Access",
+        "Verify the owner's identity",
+        "Switch to password login and remove Access",
+        "Prove an uninvited sign-up creates no user",
+        "Give the owner a password and the owner role",
+        "Verify owner membership",
+    ]
+    positions = [flat.index(step) for step in order]
+    assert positions == sorted(positions), "bootstrap steps are out of order"
+    assert flat.index("AUTH_MODE=cloudflare_access") < flat.index("AUTH_MODE=password")
+    setup = _flat(SETUP)
+    assert "AUTH_MODE=cloudflare_access" in setup
+    first_deploy = setup.index("## 4. Owner: fill in `.env.selfhost`")
+    assert "AUTH_MODE=password" not in setup[first_deploy : setup.index("## 5. Agent: deploy")]
+    assert "never start there" in setup
+    assert "do not expose the app" in setup.lower()
+
+
+def test_app_oauth_policy_is_stated_and_probed() -> None:
+    text = HARDENING.read_text(encoding="utf-8")
+    flat = _flat(HARDENING)
+    assert "## App OAuth in password mode" in text
+    for required in (
+        "app OAuth is kept, because it cannot be turned off by configuration",
+        "src/server.ts:224-229",
+        "does **not** cover OAuth registration",
+        "inventory of clients and grants",
+        "Revoke with readback",
+        "Rejected-token check",
+        "/api/auth/oauth2/register",
+        "/api/auth/oauth2/authorize",
+        "/api/auth/oauth2/token",
+        "/api/oauth/consent",
+    ):
+        assert required in flat, required
+    probe_table = flat[flat.index("## Signed-out probes") : flat.index("## App OAuth")]
+    for endpoint in ("/api/auth/oauth2/register", "/api/auth/oauth2/token", "/.well-known/"):
+        assert endpoint in probe_table, endpoint
+    assert "#app-oauth-in-password-mode" in _flat(SETUP)
+
+
+def test_pin_is_the_exact_release_sha_everywhere() -> None:
+    text = _all_skill_text()
+    assert text.count(PIN) >= 3
+    stale = _all_skill_text().replace("older v0.1.21", "")
+    assert "v0.1.21" not in stale
