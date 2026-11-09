@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import json
 import os
+import stat
 import tempfile
 import time
 from collections.abc import Iterator
@@ -52,12 +53,30 @@ class UnconfirmedWriteError(OSError):
 
 def _open_directory(directory: Path) -> int | None:
     """Open a directory for syncing; None on Windows, which cannot."""
-    return None if os.name == "nt" else os.open(directory, os.O_RDONLY)
+    if os.name == "nt":
+        return None
+    return os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+
+
+# A directory fsync these errnos answer means "this disk cannot sync a
+# directory". The write is carried on past it, but the rename and any new
+# parent directories are then unconfirmed across a crash.
+_UNSUPPORTED_DIRECTORY_SYNC = frozenset({errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP})
 
 
 def _fsync_fd(fd: int | None) -> None:
-    if fd is not None:
+    """Sync a directory descriptor; a disk that cannot do it is carried on past.
+
+    The error is set aside only after fstat shows ``fd`` is an open directory,
+    so a closed or wrong descriptor still raises.
+    """
+    if fd is None:
+        return
+    try:
         os.fsync(fd)
+    except OSError as exc:
+        if exc.errno not in _UNSUPPORTED_DIRECTORY_SYNC or not stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise
 
 
 def _close(fd: int | None) -> None:
@@ -118,14 +137,19 @@ def atomic_write_text(
 ) -> None:
     """Replace a file from a same-directory temp file with its final mode already set.
 
-    Durability: on return the file's contents, its name, and any parent
-    directories this call had to create are all synced, each through its own
-    parent. Everything that can fail is done before the replace, including
-    opening the parent directory, so an error before it leaves the old file in
-    place. Only the final directory sync runs after the replace; if it fails,
-    ``UnconfirmedWriteError`` is raised: the new content is already visible but
-    is not guaranteed to survive a crash. Callers must say so, not "nothing
-    was written", and a retry rewrites and syncs it.
+    A filesystem that refuses a directory sync (EINVAL, ENOTSUP, EOPNOTSUPP on
+    a descriptor that is an open directory) is carried on past; any other sync
+    error, EIO and EBADF included, still counts.
+
+    Durability: the file's contents are synced before the replace. The name and
+    any parent directories this call had to create are synced through their own
+    parents, except on a disk that cannot sync a directory: there the rename and
+    new parents are unconfirmed across a crash. Everything that can fail is done
+    before the replace, including opening the parent directory, so an error
+    before it leaves the old file in place. Only the final directory sync runs
+    after the replace; if it fails, ``UnconfirmedWriteError`` is raised: the new
+    content is already visible but is not guaranteed to survive a crash. Callers
+    must say so, not "nothing was written", and a retry rewrites and syncs it.
     """
     # Encode first so no encoding failure sits between mkstemp and owning the descriptor.
     # Newlines follow text mode: None translates to os.linesep, "" keeps as is,

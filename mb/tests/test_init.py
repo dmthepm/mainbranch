@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import errno
 import json
+import os
+import stat
 from pathlib import Path
 
 import pytest
 
 from mb import codex as codex_mod
 from mb import init as init_mod
+from mb.durable import UnconfirmedWriteError
 from mb.init import _DEFAULT_CLAUDE, DATA_FOLDERS, _read_template, run
 
 
@@ -556,3 +560,36 @@ def test_a_new_status_enum_schema_fails_the_coverage_check(
     )
     with pytest.raises(AssertionError):
         test_every_status_enum_schema_is_listed_or_excluded()
+
+
+def _directory_fsync_raises(monkeypatch: pytest.MonkeyPatch, code: int) -> None:
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(code, "directory sync refused")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+
+
+def test_init_completes_on_a_disk_that_cannot_sync_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _directory_fsync_raises(monkeypatch, errno.EINVAL)
+    target = tmp_path / "biz"
+
+    result = run(path=str(target), name="Acme Brewing")
+
+    assert "CLAUDE.md" in result["created"]
+    assert (target / "CLAUDE.md").is_file()
+    assert (target / "core").is_dir()
+
+
+def test_init_still_stops_on_a_directory_sync_input_output_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _directory_fsync_raises(monkeypatch, errno.EIO)
+
+    with pytest.raises(UnconfirmedWriteError):
+        run(path=str(tmp_path / "biz"), name="Acme Brewing")

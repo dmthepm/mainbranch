@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 from mb import connect as connect_mod
 from mb import feedback as feedback_mod
 from mb.cli import app
+from mb.durable import UnconfirmedWriteError
 
 runner = CliRunner()
 NOW = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
@@ -804,3 +805,19 @@ def test_unwritable_log_never_changes_the_refusal(
     assert result.stderr == baseline.stderr
     assert result.stdout == baseline.stdout
     assert not _log(state_home).exists()
+
+
+def test_clear_unconfirmed_write_says_rewritten_not_failed(
+    state_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    feedback_mod.record("keep me")
+
+    def unconfirmed(path: Path, text: str, **_: object) -> None:
+        raise UnconfirmedWriteError(5, "input/output error", str(path))
+
+    monkeypatch.setattr(feedback_mod, "atomic_write_text", unconfirmed)
+    result = runner.invoke(app, ["feedback", "clear", "--before", "2026-10-01", "--json"])
+
+    assert result.exit_code == 1, result.output
+    message = json.loads(result.stdout)["errors"][0]["message"]
+    assert "was rewritten, but the write could not be confirmed" in message

@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from mb import __version__, feedback_scrub
-from mb.durable import atomic_write_text, state_lock
+from mb.durable import UnconfirmedWriteError, atomic_write_text, state_lock
 
 SCHEMA_VERSION = 1
 FEEDBACK_FILENAME = "feedback.jsonl"
@@ -135,6 +135,19 @@ def _iso(moment: datetime) -> str:
 
 def _storage_error(code: str, action: str, exc: OSError, target: Path) -> dict[str, Any]:
     """A structured error for a failed read or write, with no path in it."""
+    if isinstance(exc, UnconfirmedWriteError):
+        return {
+            "ok": False,
+            "errors": [
+                {
+                    "code": code,
+                    "message": "the feedback file was rewritten, but the write could not be "
+                    "confirmed on disk; check the disk, then rerun the command",
+                }
+            ],
+            "path": display_path(target),
+            "safe_to_share": True,
+        }
     if isinstance(exc, TimeoutError):
         reason = "timed out waiting for the feedback file lock"
     else:

@@ -7,6 +7,7 @@ refused until the owner runs `mb connect rebind`.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import stat
@@ -832,3 +833,42 @@ def test_outcome_audit_failure_preserves_binding_result(tmp_path, monkeypatch, b
         assert c.rebind(borrower, apply=True)["applied"]
     text = runner.invoke(app, ["connect", "status", "--repo", str(borrower)])
     assert "unconfirmed" in text.stdout
+
+
+def _directory_fsync_raises(monkeypatch: pytest.MonkeyPatch, code: int) -> None:
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(code, "directory sync refused")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+
+
+def test_a_save_stores_on_a_disk_that_cannot_sync_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _directory_fsync_raises(monkeypatch, errno.EINVAL)
+
+    business = _business(tmp_path)
+
+    assert c.read_token("stripe", business)["token"] == KEY
+    assert c._repo_bindings_path().is_file()
+
+
+def test_an_unconfirmed_bindings_write_says_written_not_nothing_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _directory_fsync_raises(monkeypatch, errno.EIO)
+    repo = tmp_path / "business"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "remote", "add", "origin", REMOTE)
+
+    with pytest.raises(c.ConnectRefusal) as caught:
+        c.connect_provider("stripe", repo=repo, token=KEY)
+
+    message = str(caught.value)
+    assert "was written, but the write could not be confirmed" in message
+    assert "Nothing was changed" not in message

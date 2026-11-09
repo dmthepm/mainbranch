@@ -217,7 +217,7 @@ from mb.credential_store import (
     new_credential_deadline,
     select_secret_backend,
 )
-from mb.durable import atomic_write_text
+from mb.durable import UnconfirmedWriteError, atomic_write_text
 from mb.engine import repo_flag
 
 CONFIG_RELATIVE_PATH = Path(".mb") / "connect.yaml"
@@ -857,6 +857,13 @@ def _record_repo_binding(repo_id: str, basis_sha256: str) -> None:
             atomic_write_text(path, json.dumps(data, indent=2) + "\n", mode=0o600)
     except CredentialBusyError as exc:
         raise ConnectRefusal(REPO_BINDING_RECORD_RULE, str(exc)) from None
+    except UnconfirmedWriteError:
+        raise ConnectRefusal(
+            REPO_BINDING_RECORD_RULE,
+            "The Main Branch folder record of which folders may use which repo's keys was "
+            "written, but the write could not be confirmed on disk. Check the disk, then "
+            "rerun the command to write it again.",
+        ) from None
     except OSError:
         raise _bindings_unsafe("could not be written") from None
 
@@ -1619,6 +1626,15 @@ _TOKEN_CHARSET_RE = re.compile(r"^[A-Za-z0-9+/=_.\-]+$")
 _METADATA_CHUNK_SPLIT_RE = re.compile(r"[\s,;]+")
 _METADATA_LABEL_SPLIT_RE = re.compile(r"[:=]")
 _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-]*://")
+# Two checks refuse a password in a URL, and a value is refused when either
+# says so. The first reads each URL with a scheme the way urllib does. The
+# second also catches one without a scheme: strip tab, CR and LF (urllib does),
+# split at a space, `/`, `?` or `#` only (a comma, `;` or `&` can sit inside a
+# password), decode each piece, and refuse a piece whose userinfo (the text
+# before its last `@`) holds a `:`. `git@host:org/repo`, `user@host`,
+# `host:5432` and emails have no `:` before the `@`, so they pass.
+_METADATA_URL_STRIP_RE = re.compile(r"[\t\r\n]")
+_METADATA_AUTHORITY_SPLIT_RE = re.compile(r"[ /?#]+")
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
 _METADATA_URL_DECODE_PASSES = 3
@@ -1878,6 +1894,31 @@ def _nested_url_has_password(rest: str, depth: int) -> bool:
     return _METADATA_URL_START_RE.search(rest) is not None
 
 
+def _carries_password(text: str, depth: int = 0) -> bool:
+    """True when any piece of ``text`` reads as ``user:password@host``.
+
+    Each piece between URL delimiters is decoded on its own, so an encoded
+    ``/`` or ``?`` inside a password cannot split it, and the decoded piece is
+    split again for a URL that was encoded whole. An empty user name counts.
+    A piece still encoded after the decode limit is refused: it cannot be judged.
+    """
+    text = _METADATA_URL_STRIP_RE.sub("", text)
+    for piece in _METADATA_AUTHORITY_SPLIT_RE.split(text):
+        decoded = _fully_unquote(piece)
+        if urllib.parse.unquote(decoded) != decoded:
+            return True
+        userinfo, at, _host = decoded.rpartition("@")
+        if at and ":" in userinfo:
+            return True
+        if (
+            decoded != piece
+            and depth < _METADATA_URL_MAX_DEPTH
+            and _carries_password(decoded, depth + 1)
+        ):
+            return True
+    return False
+
+
 def metadata_value_rule(value: str) -> str:
     """Name the secret-shape rule a metadata value trips, or "" when it is safe.
 
@@ -1902,7 +1943,9 @@ def metadata_value_rule(value: str) -> str:
         rule = _word_secret_rule(word)
         if rule:
             return rule
-    return "url_password" if any(_url_has_password(word) for word in words) else ""
+    if any(_url_has_password(word) for word in words) or _carries_password(candidate):
+        return "url_password"
+    return ""
 
 
 # Operator input an error may quote back: short names, ids and command paths.
