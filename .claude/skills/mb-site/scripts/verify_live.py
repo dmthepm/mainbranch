@@ -22,8 +22,10 @@ Required env:
 
 Optional env (add a --keep-env for each, or the check is skipped under exec):
   VERIFY_LIVE_CF_ZONE   — domain to lookup at Cloudflare (default: thelastbill.com)
-  PORKBUN_API_KEY, PORKBUN_SECRET_KEY — Porkbun is not an `mb connect` provider, so
-                          these must already be in your shell
+  PORKBUN_CREDENTIALS   — "<api key>:<secret key>" in one custom `mb connect` secret:
+                          Store: mb connect porkbun --custom --account "Porkbun"   (hidden prompt)
+                          Run:   mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 verify_live.py
+                          (a separate run from the Cloudflare one: one provider per exec)
 
 Exit code: 0 if all checks pass, 1 if any fail.
 """
@@ -40,7 +42,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _envelope import OWNER_HANDOFF, log  # noqa: E402
+from _envelope import OWNER_HANDOFF, PORKBUN_HOWTO, log, porkbun_keys  # noqa: E402
 
 # ---------------------------------------------------------------------------
 
@@ -254,11 +256,11 @@ def check_cf_zone_lookup() -> bool:
 def check_porkbun_ping() -> bool | None:
     """Returns None when Porkbun keys absent (skip, not fail) — CF-registered path doesn't touch Porkbun."""
     print(f"\n{YELLOW}[4/4] Porkbun API auth (POST /ping){RESET}")
-    api_key = os.environ.get("PORKBUN_API_KEY")
-    secret_key = os.environ.get("PORKBUN_SECRET_KEY")
+    keys = porkbun_keys()
 
-    if not api_key or not secret_key:
-        print(f"{DIM}  Skipped — PORKBUN_API_KEY / PORKBUN_SECRET_KEY not set.{RESET}")
+    if not keys:
+        print(f"{DIM}  Skipped — PORKBUN_CREDENTIALS not set (or not <api key>:<secret key>).{RESET}")
+        print(f"{DIM}  {PORKBUN_HOWTO.replace('<script>', 'verify_live.py')}{RESET}")
         print(f"{DIM}  Not needed for the CF-registered path. Add only if you want to{RESET}")
         print(f"{DIM}  exercise dns.py's Porkbun NS-swap branch.{RESET}")
         return None
@@ -267,7 +269,7 @@ def check_porkbun_ping() -> bool | None:
     try:
         resp = requests.post(
             f"{PORKBUN_API_BASE}/ping",
-            json={"apikey": api_key, "secretapikey": secret_key},
+            json={"apikey": keys[0], "secretapikey": keys[1]},
             timeout=15,
         )
     except requests.RequestException as exc:

@@ -5,6 +5,8 @@ every atom emits exactly one Envelope-shape JSON document on stdout. Agents
 branch on `error.code` (a closed Literal per atom). Humans read `error.message`
 and act on `error.suggestion`.
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 Each atom defines its own concrete Envelope class binding:
     - `data` to its result Pydantic model
     - `error` to a per-atom EnvelopeError subclass with a closed `code` Literal
@@ -16,6 +18,7 @@ in the atom file (e.g. `domain.py`).
 from __future__ import annotations
 
 import json
+import os
 import sys
 from typing import Literal
 
@@ -29,6 +32,27 @@ OWNER_HANDOFF = (
     "Credential entry happens in the owner's own terminal, because the hidden prompt "
     "needs a real terminal; the agent hands off, then resumes its readiness check."
 )
+
+# Porkbun needs two secrets but a custom `mb connect` provider holds one, so the
+# owner stores them as one value, "<api key>:<secret key>", and runs the script
+# through this command (the same text is printed wherever Porkbun is missing).
+PORKBUN_CONNECT_STORE = 'mb connect porkbun --custom --account "Porkbun"'
+PORKBUN_CONNECT_RUN = (
+    "mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 <script> ..."
+)
+PORKBUN_HOWTO = (
+    "Both keys go in one secret, `<api key>:<secret key>`, typed at the hidden prompt: "
+    f"`{PORKBUN_CONNECT_STORE}`. Then run through `mb connect exec`: `{PORKBUN_CONNECT_RUN}`."
+)
+
+
+def porkbun_keys() -> tuple[str, str] | None:
+    """Split PORKBUN_CREDENTIALS into (api key, secret key); None when absent or malformed."""
+    api_key, sep, secret_key = os.environ.get("PORKBUN_CREDENTIALS", "").strip().partition(":")
+    if not sep or not api_key or not secret_key:
+        return None
+    return api_key, secret_key
+
 
 EnvelopeStatus = Literal["ok", "partial", "degraded"]
 ProviderStatus = Literal["ok", "degraded", "failed", "not_configured"]

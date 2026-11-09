@@ -34,11 +34,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
     OWNER_HANDOFF,
+    PORKBUN_HOWTO,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
     emit,
     log,
+    porkbun_keys,
     validate_status_consistency,
 )
 
@@ -290,7 +292,7 @@ def _detect_registrar(explicit: str | None) -> tuple[str | None, DnsEnsureError 
         return explicit, None
     if os.environ.get("CLOUDFLARE_API_TOKEN_REGISTRAR"):
         return "cloudflare", None
-    if os.environ.get("PORKBUN_API_KEY") and os.environ.get("PORKBUN_SECRET_KEY"):
+    if porkbun_keys():
         return "porkbun", None
     return None, DnsEnsureError(
         code="registrar_required",
@@ -298,8 +300,10 @@ def _detect_registrar(explicit: str | None) -> tuple[str | None, DnsEnsureError 
         suggestion=(
             "Pass --registrar=cloudflare or --registrar=porkbun. "
             "Or store the registrar credential with `mb connect` and run this through "
-            "`mb connect exec` (CLOUDFLARE_API_TOKEN_REGISTRAR for CF-registered, "
-            "PORKBUN_API_KEY+PORKBUN_SECRET_KEY for Porkbun-registered). "
+            "`mb connect exec` (CLOUDFLARE_API_TOKEN_REGISTRAR for CF-registered; "
+            "for Porkbun-registered: store the Porkbun credential with `mb connect`. "
+            + PORKBUN_HOWTO
+            + " "
             + OWNER_HANDOFF
         ),
     )
@@ -489,9 +493,8 @@ def ensure(
     # Step 3: NS swap if registrar is porkbun
     ns_swap_performed = False
     if selected_registrar == "porkbun":
-        pb_key = os.environ.get("PORKBUN_API_KEY")
-        pb_secret = os.environ.get("PORKBUN_SECRET_KEY")
-        if not pb_key or not pb_secret:
+        pb_keys = porkbun_keys()
+        if not pb_keys:
             env = DnsEnsureEnvelope(
                 status="degraded",
                 data=DnsEnsureData(
@@ -504,10 +507,11 @@ def ensure(
                 provenance=provenance,
                 error=DnsEnsureError(
                     code="porkbun_unauthenticated",
-                    message="PORKBUN_API_KEY/PORKBUN_SECRET_KEY not set.",
+                    message="PORKBUN_CREDENTIALS not set, or not in <api key>:<secret key> form.",
                     suggestion=(
-                        "Store the Porkbun credential with `mb connect` and run this "
-                        "through `mb connect exec`. "
+                        "Store the Porkbun credential with `mb connect`. "
+                        + PORKBUN_HOWTO.replace("<script>", "dns.py")
+                        + " "
                         + OWNER_HANDOFF
                     ),
                 ),
@@ -515,7 +519,7 @@ def ensure(
             sys.exit(emit(env))
 
         log(f"Updating Porkbun nameservers for {domain} → {ns_pair}")
-        ok, lat, err = _porkbun_update_ns(domain, ns_pair, pb_key, pb_secret)
+        ok, lat, err = _porkbun_update_ns(domain, ns_pair, *pb_keys)
         provenance["porkbun_update_ns"] = ProviderRunMetadata(
             status="ok" if ok else "failed",
             latency_ms=lat,

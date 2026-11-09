@@ -438,8 +438,7 @@ def test_detect_registrar_explicit_wins() -> None:
 
 def test_detect_registrar_cf_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLOUDFLARE_API_TOKEN_REGISTRAR", "fake")
-    monkeypatch.delenv("PORKBUN_API_KEY", raising=False)
-    monkeypatch.delenv("PORKBUN_SECRET_KEY", raising=False)
+    monkeypatch.delenv("PORKBUN_CREDENTIALS", raising=False)
     reg, err = _detect_registrar(None)
     assert reg == "cloudflare"
     assert err is None
@@ -447,8 +446,7 @@ def test_detect_registrar_cf_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_detect_registrar_porkbun_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CLOUDFLARE_API_TOKEN_REGISTRAR", raising=False)
-    monkeypatch.setenv("PORKBUN_API_KEY", "k")
-    monkeypatch.setenv("PORKBUN_SECRET_KEY", "s")
+    monkeypatch.setenv("PORKBUN_CREDENTIALS", "k:s")
     reg, err = _detect_registrar(None)
     assert reg == "porkbun"
     assert err is None
@@ -456,8 +454,7 @@ def test_detect_registrar_porkbun_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_detect_registrar_neither_set(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CLOUDFLARE_API_TOKEN_REGISTRAR", raising=False)
-    monkeypatch.delenv("PORKBUN_API_KEY", raising=False)
-    monkeypatch.delenv("PORKBUN_SECRET_KEY", raising=False)
+    monkeypatch.delenv("PORKBUN_CREDENTIALS", raising=False)
     reg, err = _detect_registrar(None)
     assert reg is None
     assert err is not None
@@ -1388,3 +1385,39 @@ import shutil  # placed at the bottom so prior tests don't shadow it
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ---------------------------------------------------------------------------
+# Porkbun: two secrets stored as one custom `mb connect` secret
+# ---------------------------------------------------------------------------
+
+
+def test_porkbun_keys_splits_one_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    from _envelope import porkbun_keys
+
+    monkeypatch.setenv("PORKBUN_CREDENTIALS", "pk1_fake:sk1_fake")
+    assert porkbun_keys() == ("pk1_fake", "sk1_fake")
+
+
+@pytest.mark.parametrize("value", ["", "pk1_fake", ":sk1_fake", "pk1_fake:"])
+def test_porkbun_keys_rejects_absent_or_malformed(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    from _envelope import porkbun_keys
+
+    monkeypatch.setenv("PORKBUN_CREDENTIALS", value)
+    assert porkbun_keys() is None
+
+
+def test_porkbun_guidance_is_one_working_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from _envelope import PORKBUN_HOWTO
+
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN_REGISTRAR", raising=False)
+    monkeypatch.delenv("PORKBUN_CREDENTIALS", raising=False)
+    _, err = _detect_registrar(None)
+    assert err is not None
+    assert PORKBUN_HOWTO in err.suggestion
+    assert "mb connect exec porkbun --env PORKBUN_CREDENTIALS --" in PORKBUN_HOWTO
+    assert "PORKBUN_API_KEY" not in err.suggestion

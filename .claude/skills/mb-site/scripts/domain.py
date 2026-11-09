@@ -28,11 +28,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # Allow `python3 path/to/domain.py` when run directly (script lookup).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
+    OWNER_HANDOFF,
+    PORKBUN_HOWTO,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
     emit,
     log,
+    porkbun_keys,
     validate_status_consistency,
 )
 
@@ -328,14 +331,16 @@ def _select_registrar(explicit: str | None) -> tuple[str | None, DomainBuyError 
         return explicit, None
     if os.environ.get("CLOUDFLARE_API_TOKEN_REGISTRAR"):
         return "cloudflare", None
-    if os.environ.get("PORKBUN_API_KEY") and os.environ.get("PORKBUN_SECRET_KEY"):
+    if porkbun_keys():
         return "porkbun", None
     return None, DomainBuyError(
         code="no_registrar_configured",
         message="No registrar credentials found.",
         suggestion=(
-            "Add CLOUDFLARE_API_TOKEN_REGISTRAR (preferred) or "
-            "PORKBUN_API_KEY + PORKBUN_SECRET_KEY to your local shell environment."
+            "Use CLOUDFLARE_API_TOKEN_REGISTRAR (preferred) or Porkbun: "
+            + PORKBUN_HOWTO.replace("<script>", "domain.py")
+            + " "
+            + OWNER_HANDOFF
         ),
     )
 
