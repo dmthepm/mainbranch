@@ -1626,12 +1626,11 @@ _TOKEN_CHARSET_RE = re.compile(r"^[A-Za-z0-9+/=_.\-]+$")
 _METADATA_CHUNK_SPLIT_RE = re.compile(r"[\s,;]+")
 _METADATA_LABEL_SPLIT_RE = re.compile(r"[:=]")
 _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-]*://")
-# A password with no scheme: scheme-relative `//user:pw@host` (anywhere in the
-# value) or bare `user:pw@host` (the word's start). `git@host:org/repo`,
-# `user@host` and `host:5432` have no `:` before the `@`, so they pass.
-_METADATA_SCHEMELESS_PASSWORD_RE = re.compile(
-    r"(?:^|(?<![A-Za-z0-9+.\-:]))//[^\s/?#@:]+:[^\s/?#@]+@|^[^\s/?#@:]+:[^\s/?#@]+@[^\s/?#@]"
-)
+# One rule for a password in a URL, with or without a scheme: split the value
+# at every URL delimiter, decode each piece, and refuse a piece whose userinfo
+# (the text before its last `@`) holds a `:`. `git@host:org/repo`, `user@host`,
+# `host:5432` and emails have no `:` before the `@`, so they pass.
+_METADATA_AUTHORITY_SPLIT_RE = re.compile(r"[\s,;/?#&]+")
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
 _METADATA_URL_DECODE_PASSES = 3
@@ -1796,8 +1795,6 @@ def _metadata_words(value: str) -> list[str]:
         if _METADATA_EMAIL_RE.fullmatch(chunk) or _looks_like_env_reference(chunk):
             words.append(chunk)
             continue
-        if _METADATA_SCHEMELESS_PASSWORD_RE.search(chunk):
-            words.append(chunk)
         url = _METADATA_URL_START_RE.search(chunk)
         label = chunk[: url.start()] if url else chunk
         words.extend(word for word in _METADATA_LABEL_SPLIT_RE.split(label) if word)
@@ -1858,39 +1855,28 @@ def _url_parts(reference: str, depth: int = 0) -> list[str]:
     return parts
 
 
-def _url_has_password(word: str, depth: int = 0) -> bool:
-    """True when a URL, or a URL nested in its query or path, carries a password."""
-    url = _METADATA_URL_START_RE.search(word)
-    if not url:
-        return _METADATA_SCHEMELESS_PASSWORD_RE.search(word) is not None
-    text = word[url.start() :]
-    try:
-        parsed = urllib.parse.urlsplit(text)
-        if parsed.password:
+def _carries_password(text: str, depth: int = 0) -> bool:
+    """True when any piece of ``text`` reads as ``user:password@host``.
+
+    Each piece between URL delimiters is decoded on its own, so an encoded
+    ``/`` or ``?`` inside a password cannot split it, and the decoded piece is
+    split again for a URL that was encoded whole. An empty user name counts.
+    A piece still encoded after the decode limit is refused: it cannot be judged.
+    """
+    for piece in _METADATA_AUTHORITY_SPLIT_RE.split(text):
+        decoded = _fully_unquote(piece)
+        if urllib.parse.unquote(decoded) != decoded:
             return True
-        rest = _fully_unquote(f"{parsed.path}?{parsed.query}#{parsed.fragment}")
-    except ValueError:
-        # The parser rejected the URL (a bad host, say), so read the userinfo
-        # by hand: a ":" before the last "@" in the authority is a password.
-        after_scheme = text[url.end() - url.start() :]
-        authority = re.split(r"[/?#]", after_scheme, maxsplit=1)[0]
-        userinfo, at, _host = authority.rpartition("@")
+        userinfo, at, _host = decoded.rpartition("@")
         if at and ":" in userinfo:
             return True
-        # A URL nested in the rest is judged too, within the same depth limit.
-        return _nested_url_has_password(_fully_unquote(after_scheme[len(authority) :]), depth)
-    return _nested_url_has_password(rest, depth)
-
-
-def _nested_url_has_password(rest: str, depth: int) -> bool:
-    """Judge a URL nested in ``rest``; past the depth limit, any URL left is refused.
-
-    A URL that is too deep to inspect might carry a password, so it counts as
-    one: failing open here would let four wrappers hide a credential.
-    """
-    if depth < _METADATA_URL_MAX_DEPTH:
-        return _url_has_password(rest, depth + 1)
-    return _METADATA_URL_START_RE.search(rest) is not None
+        if (
+            decoded != piece
+            and depth < _METADATA_URL_MAX_DEPTH
+            and _carries_password(decoded, depth + 1)
+        ):
+            return True
+    return False
 
 
 def metadata_value_rule(value: str) -> str:
@@ -1917,7 +1903,7 @@ def metadata_value_rule(value: str) -> str:
         rule = _word_secret_rule(word)
         if rule:
             return rule
-    return "url_password" if any(_url_has_password(word) for word in words) else ""
+    return "url_password" if _carries_password(candidate) else ""
 
 
 # Operator input an error may quote back: short names, ids and command paths.

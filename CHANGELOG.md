@@ -28,18 +28,25 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
-- A disk that cannot sync a directory (`EINVAL`, `ENOTSUP`, `EOPNOTSUPP` or
-  `EBADF`) no longer fails every save after the file is replaced: `mb init` now
-  completes instead of stopping with an unconfirmed write after `core/`, and
-  `mb connect` stores. Any other sync error, `EIO` included, still raises an
-  unconfirmed write. Where a caller used to say "Nothing was changed" (the
-  connect folder record) or print a bare error (`mb feedback clear`,
-  `mb migrate --apply`), it now says the file was written but could not be
-  confirmed on disk, matching the credential store. Closes MB-23.
-- `mb connect` metadata refuses a password in a URL with no scheme, either
-  scheme-relative `//user:pw@host:5432/x` or bare `user:pw@host`, as
-  `url_password`. `git@github.com:org/repo.git`, `user@host`, `host:5432` and
-  email addresses still pass.
+- A disk that cannot sync a directory (`EINVAL`, `ENOTSUP` or `EOPNOTSUPP`, on a
+  descriptor confirmed to be an open directory) no longer fails every save after
+  the file is replaced: `mb init` now completes instead of stopping with an
+  unconfirmed write after `core/`, and `mb connect` stores. On such a disk the
+  rename and new parent directories stay unconfirmed across a crash. Any other
+  sync error, `EIO` and `EBADF` included, still raises an unconfirmed write, and
+  directories are opened with `O_DIRECTORY` where available. Where a caller used
+  to say "Nothing was changed" (the connect folder record) or print a bare error
+  (`mb feedback clear`, `mb migrate --apply`), it now says the file was written
+  but could not be confirmed on disk, matching the credential store. `mb migrate
+  --apply` does the same for the backup manifest and schema marker, with the
+  structured error result. Closes MB-23.
+- `mb connect` metadata refuses a password in a URL as `url_password` whatever
+  its shape: with or without a scheme, an empty user name (`//:pw@host`), an
+  encoded `/`, `?` or `#` in the password, a nested or bare `user:pw@host` in a
+  query, one placed before another URL, and fully encoded forms. `git@github.com:org/repo.git`,
+  `user@host`, `host:5432`, `owner=jo@example.com`, email addresses and
+  `https://example.com/@name` still pass. `label:jo@example.com` and
+  `mailto:jo@example.com` are refused (documented in `docs/connect.md`).
 - A regression test pins that a malformed outer URL (`https://[bad]/?next=...`)
   holding a nested URL with a password is refused as `url_password` in connection
   metadata. The fix shipped in #1330. Closes #1312.

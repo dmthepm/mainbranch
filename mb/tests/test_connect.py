@@ -3857,6 +3857,39 @@ def test_metadata_refuses_password_in_a_url_without_a_scheme(value: str) -> None
     assert connect_mod.metadata_value_rule(value) == "url_password"
 
 
+# Every candidate authority is judged, so none of these hides a password.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "//:pw@host.example.invalid",
+        "https://ok.example.invalid/?next=//rowan:p%2Fw@host.example.invalid",
+        "https://ok.example.invalid/?next=//rowan:p%3Fw@host.example.invalid",
+        "https://ok.example.invalid/?next=//rowan:p%23w@host.example.invalid",
+        "https://ok.example.invalid/?next=rowan:pw@host.example.invalid",
+        "//rowan:pw@host.example.invalid?x=https://ok.example.invalid",
+        "//rowan%3Apw%40host.example.invalid",
+        "rowan%3Apw%40host.example.invalid",
+        "prefix/rowan:pw@host.example.invalid",
+        "https://ok.example.invalid/?next=" + "%25" * 6 + "rowan:pw@host",
+    ],
+)
+def test_metadata_refuses_every_password_bypass(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://example.invalid/@name",
+        "owner=rowan@example.invalid",
+        "ssh://git@host.example.invalid:22/example-org/example-repo.git",
+        "https://ok.example.invalid/?next=https://ok2.example.invalid/shop",
+    ],
+)
+def test_metadata_allows_at_signs_without_a_password(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
 @pytest.mark.parametrize(
     "value",
     [

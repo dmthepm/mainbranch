@@ -666,3 +666,25 @@ def test_migrate_apply_says_written_when_a_write_is_unconfirmed(
     assert result.exit_code == 1
     error = json.loads(result.stdout)["errors"][0]
     assert "was written, but the write could not be confirmed" in error
+
+
+@pytest.mark.parametrize("which", ["manifest.json", "schema-version"])
+def test_migrate_apply_reports_an_unconfirmed_manifest_or_marker_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, which: str
+) -> None:
+    repo = _legacy_repo(tmp_path)
+    real_write = atomic_write_text
+    marker = migrate_mod._marker_path(repo).name
+
+    def write(path: Path, text: str, **kwargs: object) -> None:
+        real_write(path, text, **kwargs)  # type: ignore[arg-type]
+        if path.name == (marker if which == "schema-version" else which):
+            raise UnconfirmedWriteError(5, "input/output error")
+
+    monkeypatch.setattr(migrate_mod, "atomic_write_text", write)
+
+    result = runner.invoke(app, ["migrate", "--repo", str(repo), "--apply", "--json"])
+
+    assert result.exit_code == 1
+    error = json.loads(result.stdout)["errors"][0]
+    assert "was written, but the write could not be confirmed" in error

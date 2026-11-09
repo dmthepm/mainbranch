@@ -521,15 +521,27 @@ token in `?token=`, `/token=`, `#token:`, a path segment, a user name, a
 host label or behind an encoded `%2F` is refused. A URL that does not
 parse, such as one with a bad port, is judged from its decoded raw pieces.
 
-A password with no scheme is refused as `url_password` too: scheme-relative
-`//user:pw@host:5432/x` and bare `user:pw@host`. Values with no `:` before the
-`@` pass: `git@github.com:org/repo.git`, `user@host`, an email address, and
-`host:5432`.
+A password in a URL is refused as `url_password` with or without a scheme.
+The value is split at every URL delimiter (space, `,` `;` `/` `?` `#` `&`),
+each piece is percent-decoded on its own, and a piece whose user part (the text
+before its last `@`) holds a `:` is refused. That covers `https://user:pw@host`,
+`//user:pw@host:5432/x`, bare `user:pw@host`, an empty user name
+(`//:pw@host`), a password with an encoded `/`, `?` or `#`, a credential in a
+query value, one placed before an ordinary URL, and a fully encoded
+`user%3Apw%40host`. A piece still encoded after three decode passes is
+refused. Values with no `:` before the `@` pass: `git@github.com:org/repo.git`,
+`user@host`, an email address, `owner=jo@example.com`, `host:5432`, and
+`https://example.com/@name`.
 
-If the disk refuses to sync a directory (error `EINVAL`, `ENOTSUP` or `EBADF`,
-as some network and FUSE filesystems do), saves carry on. Any other sync error,
-`EIO` included, still reports the write as written but not confirmed on disk;
-rerun the command to write it again.
+A labelled email such as `label:jo@example.com`, or `mailto:jo@example.com`,
+looks the same as `user:pw@host`, so it is refused too. Write the address
+without the label (`jo@example.com`) or as `owner=jo@example.com`.
+
+If the disk refuses to sync a directory (error `EINVAL`, `ENOTSUP` or
+`EOPNOTSUPP`, as some network and FUSE filesystems do), saves carry on, but the
+rename and any new parent directories are then unconfirmed across a crash.
+Any other sync error, `EIO` and `EBADF` included, reports the write as written
+but not confirmed on disk; rerun the command to write it again.
 
 Measured limits of `high_entropy`, 10,000 random values each from
 `random.Random(987)` (the test `test_metadata_high_entropy_miss_rates_match_docs`

@@ -450,6 +450,20 @@ def _apply_change(repo: Path, change: PlannedChange) -> None:
         path.symlink_to(change.target, target_is_directory=True)
 
 
+def _unconfirmed_apply(
+    result: dict[str, Any], what: str, backup_dir: Path, copied: Any
+) -> dict[str, Any]:
+    """The error result for a write that landed but could not be confirmed on disk."""
+    result["ok"] = False
+    result["errors"].append(
+        f"{what} was written, but the write could not be confirmed "
+        "on disk; check the disk, then rerun the command"
+    )
+    result["backup"] = {"path": str(backup_dir), "copied": copied}
+    result["next"] = _next_after_apply(result)
+    return result
+
+
 def apply(repo: str | Path = ".") -> dict[str, Any]:
     """Apply pending migrations after creating a repo-local backup."""
     target = Path(repo).resolve()
@@ -471,30 +485,32 @@ def apply(repo: str | Path = ".") -> dict[str, Any]:
     backup_dir = _backup_path(target, [plan.migration.id for plan in plans])
     backup_dir.mkdir(parents=True, exist_ok=False)
     copied = _backup_existing_paths(target, backup_dir, plans)
-    atomic_write_text(
-        backup_dir / "manifest.json",
-        json.dumps({"schema_version": 1, "copied": copied}, indent=2) + "\n",
-    )
+    try:
+        atomic_write_text(
+            backup_dir / "manifest.json",
+            json.dumps({"schema_version": 1, "copied": copied}, indent=2) + "\n",
+        )
+    except UnconfirmedWriteError:
+        return _unconfirmed_apply(result, "the backup manifest", backup_dir, copied)
 
     for plan in plans:
         for change in plan.changes:
             try:
                 _apply_change(target, change)
             except (OSError, MigrationApplyError) as exc:
-                result["ok"] = False
                 if isinstance(exc, UnconfirmedWriteError):
-                    result["errors"].append(
-                        f"{change.path} was written, but the write could not be confirmed "
-                        "on disk; check the disk, then rerun the command"
-                    )
-                else:
-                    result["errors"].append(str(exc))
+                    return _unconfirmed_apply(result, change.path, backup_dir, copied)
+                result["ok"] = False
+                result["errors"].append(str(exc))
                 result["backup"] = {"path": str(backup_dir), "copied": copied}
                 result["next"] = _next_after_apply(result)
                 return result
 
     marker = _marker_path(target)
-    atomic_write_text(marker, LATEST_SCHEMA_VERSION + "\n")
+    try:
+        atomic_write_text(marker, LATEST_SCHEMA_VERSION + "\n")
+    except UnconfirmedWriteError:
+        return _unconfirmed_apply(result, "the schema marker", backup_dir, copied)
 
     result["ok"] = True
     result["current_version"] = LATEST_SCHEMA_VERSION
