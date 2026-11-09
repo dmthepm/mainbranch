@@ -34,7 +34,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
     OWNER_HANDOFF,
-    PORKBUN_HOWTO,
+    porkbun_howto,
+    scrub_porkbun,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -224,7 +225,7 @@ def _porkbun_update_ns(
     except requests.Timeout:
         return False, int((time.monotonic() - start) * 1000), "timeout"
     except requests.RequestException as exc:
-        return False, int((time.monotonic() - start) * 1000), f"request_exception: {exc!s}"
+        return False, int((time.monotonic() - start) * 1000), f"request_exception: {scrub_porkbun(exc, api_key, secret_key)}"
 
     latency_ms = int((time.monotonic() - start) * 1000)
     try:
@@ -234,7 +235,7 @@ def _porkbun_update_ns(
 
     status = body_json.get("status")
     if status != "SUCCESS":
-        return False, latency_ms, body_json.get("message", "unknown_error")
+        return False, latency_ms, scrub_porkbun(body_json.get("message", "unknown_error"), api_key, secret_key)
     return True, latency_ms, None
 
 
@@ -287,7 +288,9 @@ def _wait_for_propagation(
 # ---------------------------------------------------------------------------
 
 
-def _detect_registrar(explicit: str | None) -> tuple[str | None, DnsEnsureError | None]:
+def _detect_registrar(
+    explicit: str | None, domain: str = "DOMAIN"
+) -> tuple[str | None, DnsEnsureError | None]:
     if explicit:
         return explicit, None
     if os.environ.get("CLOUDFLARE_API_TOKEN_REGISTRAR"):
@@ -302,7 +305,7 @@ def _detect_registrar(explicit: str | None) -> tuple[str | None, DnsEnsureError 
             "Or store the registrar credential with `mb connect` and run this through "
             "`mb connect exec` (CLOUDFLARE_API_TOKEN_REGISTRAR for CF-registered; "
             "for Porkbun-registered: store the Porkbun credential with `mb connect`. "
-            + PORKBUN_HOWTO
+            + porkbun_howto(f"dns.py ensure {domain} --registrar porkbun")
             + " "
             + OWNER_HANDOFF
         ),
@@ -398,7 +401,7 @@ def ensure(
         )
         sys.exit(emit(env))
 
-    selected_registrar, reg_err = _detect_registrar(registrar)
+    selected_registrar, reg_err = _detect_registrar(registrar, domain)
     if reg_err is not None:
         env = DnsEnsureEnvelope(
             status="degraded",
@@ -510,7 +513,7 @@ def ensure(
                     message="PORKBUN_CREDENTIALS not set, or not in <api key>:<secret key> form.",
                     suggestion=(
                         "Store the Porkbun credential with `mb connect`. "
-                        + PORKBUN_HOWTO.replace("<script>", "dns.py")
+                        + porkbun_howto(f"dns.py ensure {domain} --registrar porkbun")
                         + " "
                         + OWNER_HANDOFF
                     ),

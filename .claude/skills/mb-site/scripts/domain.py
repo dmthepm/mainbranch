@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
     OWNER_HANDOFF,
-    PORKBUN_HOWTO,
+    porkbun_howto,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -325,7 +325,9 @@ class DomainBuyEnvelope(BaseModel):
         return validate_status_consistency(self)  # type: ignore[return-value]
 
 
-def _select_registrar(explicit: str | None) -> tuple[str | None, DomainBuyError | None]:
+def _select_registrar(
+    explicit: str | None, domain: str = "DOMAIN"
+) -> tuple[str | None, DomainBuyError | None]:
     """Pick a registrar based on explicit flag and env vars. Returns (registrar, error)."""
     if explicit:
         return explicit, None
@@ -338,7 +340,7 @@ def _select_registrar(explicit: str | None) -> tuple[str | None, DomainBuyError 
         message="No registrar credentials found.",
         suggestion=(
             "Use CLOUDFLARE_API_TOKEN_REGISTRAR (preferred) or Porkbun: "
-            + PORKBUN_HOWTO.replace("<script>", "domain.py")
+            + porkbun_howto(f"domain.py buy {domain} --registrar porkbun")
             + " "
             + OWNER_HANDOFF
         ),
@@ -388,7 +390,7 @@ def buy(name: str, registrar: str | None, years: int, max_price: float, assume_y
         )
         sys.exit(emit(env))
 
-    selected, err = _select_registrar(registrar)
+    selected, err = _select_registrar(registrar, name)
     if err is not None:
         env = DomainBuyEnvelope(
             status="degraded",

@@ -425,7 +425,7 @@ def test_porkbun_update_ns_failure_returns_message() -> None:
     )()
 
     with patch.object(dns_module.requests, "post", return_value=fake_response):
-        ok, _, err = _porkbun_update_ns("example.com", ["a", "b"], "k", "s")
+        ok, _, err = _porkbun_update_ns("example.com", ["a", "b"], "pk1_fake", "sk1_fake")
         assert ok is False
         assert err == "invalid api key"
 
@@ -1412,12 +1412,96 @@ def test_porkbun_keys_rejects_absent_or_malformed(
 def test_porkbun_guidance_is_one_working_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from _envelope import PORKBUN_HOWTO
+    from _envelope import porkbun_howto
 
     monkeypatch.delenv("CLOUDFLARE_API_TOKEN_REGISTRAR", raising=False)
     monkeypatch.delenv("PORKBUN_CREDENTIALS", raising=False)
-    _, err = _detect_registrar(None)
+    _, err = _detect_registrar(None, "example.com")
     assert err is not None
-    assert PORKBUN_HOWTO in err.suggestion
-    assert "mb connect exec porkbun --env PORKBUN_CREDENTIALS --" in PORKBUN_HOWTO
+    exact = (
+        "mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 "
+        ".claude/skills/mb-site/scripts/dns.py ensure example.com --registrar porkbun"
+    )
+    assert exact in err.suggestion
+    assert exact in porkbun_howto("dns.py ensure example.com --registrar porkbun")
+    assert "<script>" not in err.suggestion
     assert "PORKBUN_API_KEY" not in err.suggestion
+    assert "must not contain a colon" in err.suggestion
+
+
+# ---------------------------------------------------------------------------
+# Porkbun: reflected key text is scrubbed before it is printed or stored
+# ---------------------------------------------------------------------------
+
+
+class _Resp:
+    status_code = 200
+
+    def __init__(self, body: dict) -> None:
+        self._body = body
+
+    def json(self) -> dict:
+        return self._body
+
+
+def test_porkbun_update_ns_scrubs_reflected_keys() -> None:
+    reflected = _Resp({"status": "ERROR", "message": "invalid fake_api / fake_secret"})
+    with patch.object(dns_module.requests, "post", return_value=reflected):
+        _, _, err = _porkbun_update_ns("example.com", ["a", "b"], "fake_api", "fake_secret")
+    assert err is not None
+    assert "fake_api" not in err and "fake_secret" not in err
+
+
+def test_porkbun_update_ns_scrubs_exception_text() -> None:
+    boom = dns_module.requests.RequestException("bad body fake_api fake_secret")
+    with patch.object(dns_module.requests, "post", side_effect=boom):
+        _, _, err = _porkbun_update_ns("example.com", ["a", "b"], "fake_api", "fake_secret")
+    assert err is not None
+    assert "fake_api" not in err and "fake_secret" not in err
+
+
+def _verify_live():  # type: ignore[no-untyped-def]
+    import verify_live
+
+    return verify_live
+
+
+def test_verify_live_ping_scrubs_rejection_and_exception(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    vl = _verify_live()
+    monkeypatch.setenv("PORKBUN_CREDENTIALS", "fake_api:fake_secret")
+    reflected = _Resp({"status": "ERROR", "message": "invalid fake_api / fake_secret"})
+    with patch.object(vl.requests, "post", return_value=reflected):
+        assert vl.check_porkbun_ping() is False
+    boom = vl.requests.RequestException("bad fake_api fake_secret")
+    with patch.object(vl.requests, "post", side_effect=boom):
+        assert vl.check_porkbun_ping() is False
+    out = capsys.readouterr()
+    assert "fake_api" not in out.out + out.err
+    assert "fake_secret" not in out.out + out.err
+
+
+def test_verify_live_porkbun_run_skips_cloudflare(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    vl = _verify_live()
+    monkeypatch.setenv("PORKBUN_CREDENTIALS", "fake_api:fake_secret")
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    with patch.object(vl.requests, "post", return_value=_Resp({"status": "SUCCESS", "yourIp": "192.0.2.1"})):
+        assert vl.main(["porkbun"]) == 0
+    out = capsys.readouterr().out
+    assert "Cloudflare" not in out
+    assert "dash.cloudflare.com" not in out
+
+
+def test_verify_live_porkbun_run_fails_without_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vl = _verify_live()
+    monkeypatch.delenv("PORKBUN_CREDENTIALS", raising=False)
+    assert vl.main(["porkbun"]) == 1
+
+
+def test_verify_live_rejects_unknown_provider() -> None:
+    assert _verify_live().main(["bogus"]) == 2

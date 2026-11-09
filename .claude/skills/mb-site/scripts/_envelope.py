@@ -37,13 +37,17 @@ OWNER_HANDOFF = (
 # owner stores them as one value, "<api key>:<secret key>", and runs the script
 # through this command (the same text is printed wherever Porkbun is missing).
 PORKBUN_CONNECT_STORE = 'mb connect porkbun --custom --account "Porkbun"'
-PORKBUN_CONNECT_RUN = (
-    "mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 <script> ..."
-)
-PORKBUN_HOWTO = (
-    "Both keys go in one secret, `<api key>:<secret key>`, typed at the hidden prompt: "
-    f"`{PORKBUN_CONNECT_STORE}`. Then run through `mb connect exec`: `{PORKBUN_CONNECT_RUN}`."
-)
+SCRIPTS_DIR = ".claude/skills/mb-site/scripts"
+
+
+def porkbun_howto(script_args: str) -> str:
+    """Owner guidance with one exact, runnable command (script_args: e.g. `dns.py ensure example.com`)."""
+    return (
+        "Both keys go in one secret, `<api key>:<secret key>`, typed at the hidden prompt: "
+        f"`{PORKBUN_CONNECT_STORE}`. The API key part must not contain a colon "
+        "(the secret key part may). Then run, from the repo root, through `mb connect exec`: "
+        f"`mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 {SCRIPTS_DIR}/{script_args}`."
+    )
 
 
 def porkbun_keys() -> tuple[str, str] | None:
@@ -52,6 +56,25 @@ def porkbun_keys() -> tuple[str, str] | None:
     if not sep or not api_key or not secret_key:
         return None
     return api_key, secret_key
+
+
+def scrub_porkbun(text: object, *extra_keys: str) -> str:
+    """Return text with both Porkbun key parts (and the combined value) removed.
+
+    Provider and exception text can reflect a key back; scrub it before it is
+    printed or stored. `extra_keys` covers keys passed in rather than read from env.
+    """
+    out = str(text)
+    keys = set(extra_keys)
+    combined = os.environ.get("PORKBUN_CREDENTIALS", "").strip()
+    if combined:
+        keys.add(combined)
+    pair = porkbun_keys()
+    if pair:
+        keys.update(pair)
+    for key in sorted((k for k in keys if k), key=len, reverse=True):
+        out = out.replace(key, "[redacted]")
+    return out
 
 
 EnvelopeStatus = Literal["ok", "partial", "degraded"]
@@ -107,6 +130,8 @@ def log(msg: str) -> None:
 
 __all__ = [
     "SCHEMA_VERSION",
+    "porkbun_howto",
+    "scrub_porkbun",
     "EnvelopeStatus",
     "ProviderStatus",
     "ProviderRunMetadata",
