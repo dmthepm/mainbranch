@@ -55,9 +55,22 @@ def _open_directory(directory: Path) -> int | None:
     return None if os.name == "nt" else os.open(directory, os.O_RDONLY)
 
 
+# A directory fsync these errnos answer means "this disk cannot do that", not
+# "the data may be lost": some network and FUSE filesystems refuse it outright.
+_UNSUPPORTED_DIRECTORY_SYNC = frozenset(
+    {errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EBADF}
+)
+
+
 def _fsync_fd(fd: int | None) -> None:
-    if fd is not None:
+    """Sync a directory descriptor; a disk that cannot do it is carried on past."""
+    if fd is None:
+        return
+    try:
         os.fsync(fd)
+    except OSError as exc:
+        if exc.errno not in _UNSUPPORTED_DIRECTORY_SYNC:
+            raise
 
 
 def _close(fd: int | None) -> None:
@@ -117,6 +130,9 @@ def atomic_write_text(
     newline: str | None = None,
 ) -> None:
     """Replace a file from a same-directory temp file with its final mode already set.
+
+    A filesystem that refuses a directory sync (EINVAL, ENOTSUP, EBADF) is
+    carried on past; any other sync error, EIO included, still counts.
 
     Durability: on return the file's contents, its name, and any parent
     directories this call had to create are all synced, each through its own

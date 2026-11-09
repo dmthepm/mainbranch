@@ -14,7 +14,7 @@ from typing import Any
 import yaml
 
 from mb import migrations
-from mb.durable import atomic_write_text
+from mb.durable import UnconfirmedWriteError, atomic_write_text
 from mb.engine import repo_flag
 from mb.gitignore import gitignore_problem
 from mb.migrations.base import MigrationInfo, MigrationPlan, PlannedChange
@@ -482,7 +482,13 @@ def apply(repo: str | Path = ".") -> dict[str, Any]:
                 _apply_change(target, change)
             except (OSError, MigrationApplyError) as exc:
                 result["ok"] = False
-                result["errors"].append(str(exc))
+                if isinstance(exc, UnconfirmedWriteError):
+                    result["errors"].append(
+                        f"{change.path} was written, but the write could not be confirmed "
+                        "on disk; check the disk, then rerun the command"
+                    )
+                else:
+                    result["errors"].append(str(exc))
                 result["backup"] = {"path": str(backup_dir), "copied": copied}
                 result["next"] = _next_after_apply(result)
                 return result

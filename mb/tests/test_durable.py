@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 import sys
@@ -335,3 +336,39 @@ def test_a_close_failure_surfaces_when_nothing_failed_earlier(
 
     assert len(attempts) == 1
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("code", [errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EBADF])
+def test_a_disk_that_cannot_sync_a_directory_is_carried_on_past(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(code, "directory sync not supported")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    target = tmp_path / "a" / "b" / "state.json"
+
+    atomic_write_text(target, "new\n")
+
+    assert target.read_text(encoding="utf-8") == "new\n"
+    assert [p.name for p in target.parent.iterdir()] == ["state.json"]
+
+
+def test_eio_on_a_directory_sync_is_still_unconfirmed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(errno.EIO, "input/output error")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+
+    with pytest.raises(UnconfirmedWriteError):
+        atomic_write_text(tmp_path / "state.json", "new\n")

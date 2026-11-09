@@ -521,6 +521,16 @@ token in `?token=`, `/token=`, `#token:`, a path segment, a user name, a
 host label or behind an encoded `%2F` is refused. A URL that does not
 parse, such as one with a bad port, is judged from its decoded raw pieces.
 
+A password with no scheme is refused as `url_password` too: scheme-relative
+`//user:pw@host:5432/x` and bare `user:pw@host`. Values with no `:` before the
+`@` pass: `git@github.com:org/repo.git`, `user@host`, an email address, and
+`host:5432`.
+
+If the disk refuses to sync a directory (error `EINVAL`, `ENOTSUP` or `EBADF`,
+as some network and FUSE filesystems do), saves carry on. Any other sync error,
+`EIO` included, still reports the write as written but not confirmed on disk;
+rerun the command to write it again.
+
 Measured limits of `high_entropy`, 10,000 random values each from
 `random.Random(987)` (the test `test_metadata_high_entropy_miss_rates_match_docs`
 keeps these numbers current): it misses 33 of 10,000 (0.33%) 24-character

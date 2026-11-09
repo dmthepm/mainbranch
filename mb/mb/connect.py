@@ -217,7 +217,7 @@ from mb.credential_store import (
     new_credential_deadline,
     select_secret_backend,
 )
-from mb.durable import atomic_write_text
+from mb.durable import UnconfirmedWriteError, atomic_write_text
 from mb.engine import repo_flag
 
 CONFIG_RELATIVE_PATH = Path(".mb") / "connect.yaml"
@@ -857,6 +857,13 @@ def _record_repo_binding(repo_id: str, basis_sha256: str) -> None:
             atomic_write_text(path, json.dumps(data, indent=2) + "\n", mode=0o600)
     except CredentialBusyError as exc:
         raise ConnectRefusal(REPO_BINDING_RECORD_RULE, str(exc)) from None
+    except UnconfirmedWriteError:
+        raise ConnectRefusal(
+            REPO_BINDING_RECORD_RULE,
+            "The Main Branch folder record of which folders may use which repo's keys was "
+            "written, but the write could not be confirmed on disk. Check the disk, then "
+            "rerun the command to write it again.",
+        ) from None
     except OSError:
         raise _bindings_unsafe("could not be written") from None
 
@@ -1619,6 +1626,12 @@ _TOKEN_CHARSET_RE = re.compile(r"^[A-Za-z0-9+/=_.\-]+$")
 _METADATA_CHUNK_SPLIT_RE = re.compile(r"[\s,;]+")
 _METADATA_LABEL_SPLIT_RE = re.compile(r"[:=]")
 _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-]*://")
+# A password with no scheme: scheme-relative `//user:pw@host` (anywhere in the
+# value) or bare `user:pw@host` (the word's start). `git@host:org/repo`,
+# `user@host` and `host:5432` have no `:` before the `@`, so they pass.
+_METADATA_SCHEMELESS_PASSWORD_RE = re.compile(
+    r"(?:^|(?<![A-Za-z0-9+.\-:]))//[^\s/?#@:]+:[^\s/?#@]+@|^[^\s/?#@:]+:[^\s/?#@]+@[^\s/?#@]"
+)
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
 _METADATA_URL_DECODE_PASSES = 3
@@ -1783,6 +1796,8 @@ def _metadata_words(value: str) -> list[str]:
         if _METADATA_EMAIL_RE.fullmatch(chunk) or _looks_like_env_reference(chunk):
             words.append(chunk)
             continue
+        if _METADATA_SCHEMELESS_PASSWORD_RE.search(chunk):
+            words.append(chunk)
         url = _METADATA_URL_START_RE.search(chunk)
         label = chunk[: url.start()] if url else chunk
         words.extend(word for word in _METADATA_LABEL_SPLIT_RE.split(label) if word)
@@ -1847,7 +1862,7 @@ def _url_has_password(word: str, depth: int = 0) -> bool:
     """True when a URL, or a URL nested in its query or path, carries a password."""
     url = _METADATA_URL_START_RE.search(word)
     if not url:
-        return False
+        return _METADATA_SCHEMELESS_PASSWORD_RE.search(word) is not None
     text = word[url.start() :]
     try:
         parsed = urllib.parse.urlsplit(text)

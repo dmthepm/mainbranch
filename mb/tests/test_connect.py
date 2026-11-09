@@ -3842,6 +3842,35 @@ def test_metadata_refuses_password_inside_url(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == "url_password"
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "//rowan:hunter2@db.example.invalid:5432/candles",
+        "rowan:hunter2@db.example.invalid",
+        "rowan:hunter2@db.example.invalid:5432/candles",
+        "note: //rowan:pw@db.example.invalid/x",
+        "see rowan:pw@db.example.invalid",
+        "https://example.invalid/?next=//rowan:pw@db.example.invalid/x",
+    ],
+)
+def test_metadata_refuses_password_in_a_url_without_a_scheme(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "git@github.com:example-org/example-repo.git",
+        "rowan@host",
+        "db.example.invalid:5432",
+        "rowan@example.invalid",
+        "//cdn.example.invalid/assets/logo.png",
+    ],
+)
+def test_metadata_allows_ordinary_values_that_look_a_little_like_a_login(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
 # A URL the parser rejects can still carry userinfo with a password.
 @pytest.mark.parametrize(
     "value",
