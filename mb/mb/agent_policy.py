@@ -641,7 +641,7 @@ def _note_permissive(report: Report, i: int, row: object) -> None:
     if not isinstance(row, dict) or not isinstance(row.get("options"), list):
         return
     name = row.get("name")
-    label = name if isinstance(name, str) else f"agents[{i}]"
+    label = roles.printable(name) if isinstance(name, str) else f"agents[{i}]"
     for option in row["options"]:
         if isinstance(option, str) and tuple(option.split(" ", 1)) in MOST_PERMISSIVE:
             report.warnings.append(

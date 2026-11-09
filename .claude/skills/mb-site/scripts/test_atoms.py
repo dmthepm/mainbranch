@@ -1419,11 +1419,18 @@ def test_porkbun_guidance_is_one_working_command(
     _, err = _detect_registrar(None, "example.com")
     assert err is not None
     exact = (
-        "mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 "
+        "CF_ACCOUNT_ID=<id> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID -- "
+        "mb connect exec porkbun --env PORKBUN_CREDENTIALS "
+        "--keep-env CLOUDFLARE_API_TOKEN --keep-env CF_ACCOUNT_ID -- python3 "
         ".claude/skills/mb-site/scripts/dns.py ensure example.com --registrar porkbun"
     )
     assert exact in err.suggestion
-    assert exact in porkbun_howto("dns.py ensure example.com --registrar porkbun")
+    assert exact in porkbun_howto("dns.py ensure example.com --registrar porkbun", with_cloudflare=True)
+    plain = (
+        "mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 "
+        ".claude/skills/mb-site/scripts/verify_live.py porkbun"
+    )
+    assert plain in porkbun_howto("verify_live.py porkbun")
     assert "<script>" not in err.suggestion
     assert "PORKBUN_API_KEY" not in err.suggestion
     assert "must not contain a colon" in err.suggestion
@@ -1505,3 +1512,108 @@ def test_verify_live_porkbun_run_fails_without_keys(
 
 def test_verify_live_rejects_unknown_provider() -> None:
     assert _verify_live().main(["bogus"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Porkbun DNS command: the printed command runs dns.py past the Cloudflare checks
+# ---------------------------------------------------------------------------
+
+_FAKE_CF_TOKEN = "cf-fixture-token-7731"
+_FAKE_CF_ACCOUNT = "acct0000fixture"
+_FAKE_PORKBUN = "pk1_fixtureapikey:sk1_fixture:secret"
+
+# Stands in for `python3`: runs the real script with every HTTP call answered
+# locally and logged, so nothing reaches the network.
+_PYTHON_SHIM = """\
+import json, os, runpy, sys
+import requests
+
+LOG = os.environ["DNS_TEST_LOG"] if "DNS_TEST_LOG" in os.environ else {log!r}
+
+class Reply:
+    def __init__(self, body):
+        self._body, self.status_code = body, 200
+    def json(self):
+        return self._body
+
+def answer(method, url, **kw):
+    with open(LOG, "a") as fh:
+        fh.write(json.dumps({{"method": method, "url": url, "headers": kw.get("headers"), "json": kw.get("json")}}) + "\\n")
+    if "api.cloudflare.com" in url:
+        return Reply({{"success": True, "result": [{{"id": "zone1", "name_servers": ["amy.ns.cloudflare.com", "bob.ns.cloudflare.com"]}}]}})
+    return Reply({{"status": "ERROR", "message": "fixture refused"}})
+
+requests.request = answer
+requests.post = lambda url, **kw: answer("POST", url, **kw)
+script = sys.argv[1]
+sys.argv = sys.argv[1:]
+runpy.run_path(script, run_name="__main__")
+"""
+
+
+def test_porkbun_dns_command_gets_past_cloudflare_checks(tmp_path: Path) -> None:
+    import os
+    import shlex
+    import subprocess
+
+    from _envelope import porkbun_command
+
+    worktree = Path(__file__).resolve().parents[4]
+    home = tmp_path / "home"
+    repo = tmp_path / "business"
+    bindir = tmp_path / "bin"
+    log = tmp_path / "http.jsonl"
+    for folder in (home, repo / ".claude" / "skills", bindir):
+        folder.mkdir(parents=True)
+    (repo / ".claude" / "skills" / "mb-site").symlink_to(worktree / ".claude" / "skills" / "mb-site")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+
+    # `mb` is this worktree's own, never the installed one; `python3` is the shim.
+    mb_shim = bindir / "mb"
+    mb_shim.write_text(
+        "#!/bin/sh\n"
+        f"export PYTHONPATH={shlex.quote(str(worktree / 'mb'))}\n"
+        "export MB_CONNECT_SECRET_BACKEND=local-file\n"
+        f"exec {shlex.quote(sys.executable)} -m mb \"$@\"\n"
+    )
+    (tmp_path / "shim.py").write_text(_PYTHON_SHIM.format(log=str(log)))
+    py_shim = bindir / "python3"
+    py_shim.write_text(f"#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(tmp_path / 'shim.py'))} \"$@\"\n")
+    for shim in (mb_shim, py_shim):
+        shim.chmod(0o755)
+
+    base_env = {
+        "PATH": f"{bindir}:/usr/bin:/bin",
+        "HOME": str(home),
+        "MB_CONNECT_SECRET_BACKEND": "local-file",
+        "PYTHONPATH": str(worktree / "mb"),
+    }
+    # Fake values go into the local-file key store through the worktree's own code.
+    store = (
+        "from mb import connect\n"
+        f"connect.connect_provider('cloudflare', '.', token={_FAKE_CF_TOKEN!r})\n"
+        f"connect.connect_provider('porkbun', '.', token={_FAKE_PORKBUN!r}, custom=True)\n"
+    )
+    subprocess.run([sys.executable, "-c", store], cwd=repo, env=base_env, check=True)
+
+    command = porkbun_command("dns.py ensure example.com --registrar porkbun --skip-propagation-poll", with_cloudflare=True)
+    command = command.replace("<id>", _FAKE_CF_ACCOUNT)
+    assignments, _, rest = command.partition(" mb connect")
+    assert assignments == f"CF_ACCOUNT_ID={_FAKE_CF_ACCOUNT}"
+    env = {**base_env, "CF_ACCOUNT_ID": _FAKE_CF_ACCOUNT}
+    # Nothing else is in the parent environment: exec must carry the rest.
+    proc = subprocess.run(
+        ["mb", "connect", *shlex.split(rest)],
+        cwd=repo, env=env, capture_output=True, text=True, timeout=120,
+    )
+    out = proc.stdout
+    envelope = json.loads(out[out.index("{"):])
+    assert envelope["error"]["code"] == "porkbun_ns_update_failed", (envelope, proc.stderr[-500:])
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    cloudflare = [c for c in calls if "api.cloudflare.com" in c["url"]]
+    porkbun = [c for c in calls if "api.porkbun.com" in c["url"]]
+    assert cloudflare and f"account.id={_FAKE_CF_ACCOUNT}" in cloudflare[0]["url"]
+    assert cloudflare[0]["headers"]["Authorization"] == f"Bearer {_FAKE_CF_TOKEN}"
+    assert len(porkbun) == 1 and porkbun[0]["json"]["apikey"] == "pk1_fixtureapikey"
+    assert porkbun[0]["json"]["secretapikey"] == "sk1_fixture:secret"
+    assert _FAKE_PORKBUN not in out and "sk1_fixture" not in out

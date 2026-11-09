@@ -815,6 +815,18 @@ def test_note_survives_a_row_with_odd_name_and_options(local: World) -> None:
     ]
 
 
+@pytest.mark.parametrize("control", ["\u202e", "\u202a", "\u2066", "\u200b", "\u200f", "\ufeff"])
+def test_note_label_carries_no_unicode_format_control(local: World, control: str) -> None:
+    row = local.row(name=f"spoof{control}abc", options=["--permission-mode bypassPermissions"])
+    local.write({"version": 1, "agents": [row]})
+    report = local.check()
+    assert not report.ok
+    rendered = ap.human_report(report)
+    assert "most permissive mode" in rendered
+    assert control not in rendered
+    assert "spoofabc: --permission-mode bypassPermissions" in rendered
+
+
 def test_cli_prints_the_notes_a_valid_codex_row_carries(local: World) -> None:
     (local.biz / "core" / "roles" / "planner.md").unlink()
     local.write({"version": 1, "agents": [local.row(runtime="codex")]})

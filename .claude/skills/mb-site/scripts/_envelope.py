@@ -40,13 +40,37 @@ PORKBUN_CONNECT_STORE = 'mb connect porkbun --custom --account "Porkbun"'
 SCRIPTS_DIR = ".claude/skills/mb-site/scripts"
 
 
-def porkbun_howto(script_args: str) -> str:
+def porkbun_command(script_args: str, *, with_cloudflare: bool = False) -> str:
+    """The one runnable command that gives `script_args` the Porkbun credential.
+
+    `with_cloudflare` is for dns.py, which needs the Cloudflare token and account
+    id as well. One `mb connect exec` run holds one provider, so the Cloudflare run
+    wraps the Porkbun one and each keeps exactly the names the script reads.
+    """
+    run = f"mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 {SCRIPTS_DIR}/{script_args}"
+    if not with_cloudflare:
+        return run
+    inner = run.replace(
+        "--env PORKBUN_CREDENTIALS",
+        "--env PORKBUN_CREDENTIALS --keep-env CLOUDFLARE_API_TOKEN --keep-env CF_ACCOUNT_ID",
+    )
+    return f"CF_ACCOUNT_ID=<id> mb connect exec cloudflare --keep-env CF_ACCOUNT_ID -- {inner}"
+
+
+def porkbun_howto(script_args: str, *, with_cloudflare: bool = False) -> str:
     """Owner guidance with one exact, runnable command (script_args: e.g. `dns.py ensure example.com`)."""
+    cloudflare = (
+        " It also needs the Cloudflare connection (`mb connect cloudflare`) and your "
+        "Cloudflare account id (not a secret), which replaces `<id>`."
+        if with_cloudflare
+        else ""
+    )
     return (
         "Both keys go in one secret, `<api key>:<secret key>`, typed at the hidden prompt: "
         f"`{PORKBUN_CONNECT_STORE}`. The API key part must not contain a colon "
-        "(the secret key part may). Then run, from the repo root, through `mb connect exec`: "
-        f"`mb connect exec porkbun --env PORKBUN_CREDENTIALS -- python3 {SCRIPTS_DIR}/{script_args}`."
+        "(the secret key part may)."
+        f"{cloudflare} Then run, from the repo root, through `mb connect exec`: "
+        f"`{porkbun_command(script_args, with_cloudflare=with_cloudflare)}`."
     )
 
 

@@ -305,7 +305,7 @@ def _detect_registrar(
             "Or store the registrar credential with `mb connect` and run this through "
             "`mb connect exec` (CLOUDFLARE_API_TOKEN_REGISTRAR for CF-registered; "
             "for Porkbun-registered: store the Porkbun credential with `mb connect`. "
-            + porkbun_howto(f"dns.py ensure {domain} --registrar porkbun")
+            + porkbun_howto(f"dns.py ensure {domain} --registrar porkbun", with_cloudflare=True)
             + " "
             + OWNER_HANDOFF
         ),
@@ -513,7 +513,7 @@ def ensure(
                     message="PORKBUN_CREDENTIALS not set, or not in <api key>:<secret key> form.",
                     suggestion=(
                         "Store the Porkbun credential with `mb connect`. "
-                        + porkbun_howto(f"dns.py ensure {domain} --registrar porkbun")
+                        + porkbun_howto(f"dns.py ensure {domain} --registrar porkbun", with_cloudflare=True)
                         + " "
                         + OWNER_HANDOFF
                     ),

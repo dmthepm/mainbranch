@@ -72,6 +72,11 @@ require every card or profile to exist: a Codex row may have no card, and the
 default `~/.claude` and `~/.codex` profile directories may be absent; both are
 noted, not failed.
 
+A `PATH` folder that does not exist is skipped, not failed: it appears only in the
+report's `skipped` list, which the command does not print. So exit 0
+does not prove every listed `PATH` folder exists, only that each one that does exist
+passed.
+
 It does not prove an agent is running, that its model or options work, that
 its credentials are good, that a card's instructions are wise, or that the
 agent is safe. Exit 0 means the policy is valid and nothing more; exit 2 lists
