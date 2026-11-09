@@ -40,13 +40,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   but could not be confirmed on disk, matching the credential store. `mb migrate
   --apply` does the same for the backup manifest and schema marker, with the
   structured error result. Closes MB-23.
-- `mb connect` metadata refuses a password in a URL as `url_password` whatever
-  its shape: with or without a scheme, an empty user name (`//:pw@host`), an
-  encoded `/`, `?` or `#` in the password, a nested or bare `user:pw@host` in a
-  query, one placed before another URL, and fully encoded forms. `git@github.com:org/repo.git`,
-  `user@host`, `host:5432`, `owner=jo@example.com`, email addresses and
-  `https://example.com/@name` still pass. `label:jo@example.com` and
-  `mailto:jo@example.com` are refused (documented in `docs/connect.md`).
+- `mb connect` metadata refuses a password in a URL as `url_password`. Two
+  checks run and either one refuses: the scheme-aware check reads each URL, nested
+  ones included, the way Python's URL parser does (so a comma, `;`, `&` or tab
+  inside the password is caught); the second check also catches a URL without a
+  scheme, an empty user name (`//:pw@host`), an encoded `/`, `?` or `#`, a
+  credential in a query, one placed before another URL, and fully encoded forms.
+  `git@github.com:org/repo.git`, `user@host`, `host:5432`,
+  `owner=jo@example.com`, email addresses and `https://example.com/@name` still
+  pass. `label:jo@example.com`, `mailto:jo@example.com` and a URL path with a colon
+  followed by an email are refused (listed in `docs/connect.md`).
 - A regression test pins that a malformed outer URL (`https://[bad]/?next=...`)
   holding a nested URL with a password is refused as `url_password` in connection
   metadata. The fix shipped in #1330. Closes #1312.

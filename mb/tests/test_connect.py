@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -3877,6 +3878,69 @@ def test_metadata_refuses_every_password_bypass(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == "url_password"
 
 
+# A comma, semicolon, ampersand or tab can sit inside a password; the scheme-aware
+# check reads it as urllib does, so none of these may pass.
+_SEPARATOR_PASSWORDS = [
+    "p,w",
+    "p;w",
+    "p&w",
+    "p\tw",
+    "p\nw",
+    "p\rw",
+    "p%2Cw",
+    "p%3Bw",
+    "p%26w",
+    "p%09w",
+]
+
+
+@pytest.mark.parametrize("password", _SEPARATOR_PASSWORDS)
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "https://rowan:{}@host.example.invalid",
+        "note=https://rowan:{}@host.example.invalid",
+        "//rowan:{}@host.example.invalid",
+        "rowan:{}@host.example.invalid",
+        "https://ok.example.invalid/?next=https://rowan:{}@host.example.invalid",
+        "https://ok.example.invalid/?next=//rowan:{}@host.example.invalid",
+        "https://[bad/?next=https://rowan:{}@host.example.invalid",
+    ],
+)
+def test_metadata_refuses_separators_inside_a_password(shape: str, password: str) -> None:
+    assert connect_mod.metadata_value_rule(shape.format(password)) == "url_password"
+
+
+@pytest.mark.parametrize("password", ["p,w", "p;w", "p&w", "p\tw", "p\nw", "p\rw"])
+def test_metadata_refuses_whatever_urllib_reads_as_a_password(password: str) -> None:
+    value = f"https://rowan:{password}@host.example.invalid"
+    assert urllib.parse.urlsplit(value).password
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+    assert connect_mod.metadata_value_rule(urllib.parse.quote(value, safe="")) == "url_password"
+
+
+def test_metadata_refuses_a_tab_inside_the_userinfo_split() -> None:
+    assert connect_mod.metadata_value_rule("rowan\t:pw@host.example.invalid") == "url_password"
+
+
+# The scheme-aware check of origin/main stays: nothing it refuses may pass.
+def test_metadata_never_passes_what_the_scheme_aware_check_refuses() -> None:
+    corpus = [
+        "https://rowan:hunter2@example.invalid/shop",
+        "https://example.invalid/?next=https://rowan:pw@other.example.invalid/",
+        "https://rowan:pw@[bad]/",
+        "https://[bad/?next=https://rowan:pw@example.invalid/",
+        _BAD_WRAPPER * 5 + _FAKE_PASSWORD_URL,
+        "https://example.invalid/?next=" * 5 + _FAKE_PASSWORD_URL,
+        "https://:pw@example.invalid/",
+        "HTTPS://rowan:pw@example.invalid/",
+        *(f"https://rowan:{p}@host.example.invalid" for p in _SEPARATOR_PASSWORDS),
+    ]
+    for value in corpus:
+        assert connect_mod._url_has_password(value), value
+        assert connect_mod.metadata_value_rule(value) == "url_password", value
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -3898,6 +3962,8 @@ def test_metadata_allows_at_signs_without_a_password(value: str) -> None:
         "db.example.invalid:5432",
         "rowan@example.invalid",
         "//cdn.example.invalid/assets/logo.png",
+        "owner=rowan@example.invalid",
+        "https://example.invalid/shop/@name",
     ],
 )
 def test_metadata_allows_ordinary_values_that_look_a_little_like_a_login(value: str) -> None:
@@ -5470,3 +5536,16 @@ def test_status_and_identity_hide_a_stored_credential_shaped_metadata_key(
     assert by_id["cloudflare"]["safe_to_share"] is True
     identities = {item["provider"]: item for item in json.loads(identity.stdout)["providers"]}
     assert identities["mercury"]["identity"]["role"] == "operating_cash_source"
+
+
+# Documented: an ordinary value shaped like `user:pw@host` is refused.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "label:rowan@example.invalid",
+        "mailto:rowan@example.invalid",
+        "https://example.invalid/report:rowan@example.invalid",
+    ],
+)
+def test_metadata_refuses_ordinary_values_shaped_like_a_login(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"

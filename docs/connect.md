@@ -522,20 +522,33 @@ host label or behind an encoded `%2F` is refused. A URL that does not
 parse, such as one with a bad port, is judged from its decoded raw pieces.
 
 A password in a URL is refused as `url_password` with or without a scheme.
-The value is split at every URL delimiter (space, `,` `;` `/` `?` `#` `&`),
-each piece is percent-decoded on its own, and a piece whose user part (the text
-before its last `@`) holds a `:` is refused. That covers `https://user:pw@host`,
+Two checks run and a value is refused when either says so. The first reads each
+URL with a scheme the way Python's URL parser does, nested URLs included (a URL
+nested more than three levels deep is refused), so a comma, `;`, `&` or tab
+inside the password is still a password. The second also covers a URL without a
+scheme: it drops tabs and line breaks, splits the value at a space, `/`, `?` or
+`#` only, percent-decodes each piece on its own, and refuses a piece whose user
+part (the text before its last `@`) holds a `:`. That covers `https://user:pw@host`,
 `//user:pw@host:5432/x`, bare `user:pw@host`, an empty user name
 (`//:pw@host`), a password with an encoded `/`, `?` or `#`, a credential in a
 query value, one placed before an ordinary URL, and a fully encoded
 `user%3Apw%40host`. A piece still encoded after three decode passes is
 refused. Values with no `:` before the `@` pass: `git@github.com:org/repo.git`,
-`user@host`, an email address, `owner=jo@example.com`, `host:5432`, and
-`https://example.com/@name`.
+`user@host`, an email address, `owner=jo@example.com`, `host:5432`,
+`https://example.com/@name` and a scheme-relative CDN link.
 
-A labelled email such as `label:jo@example.com`, or `mailto:jo@example.com`,
-looks the same as `user:pw@host`, so it is refused too. Write the address
-without the label (`jo@example.com`) or as `owner=jo@example.com`.
+Some ordinary values look the same as `user:pw@host` and are refused too:
+
+- a labelled email such as `label:jo@example.com`;
+- a `mailto:jo@example.com` reference;
+- a URL path with a colon followed by an email, such as
+  `https://example.com/report:jo@example.com`;
+- a value where a comma, `;` or `&` joins a colon-bearing word to an email,
+  such as `a:b,jo@example.com`.
+
+Write the address without the label (`jo@example.com`) or as
+`owner=jo@example.com`. A value wrapped in `<...>` or marked as a placeholder is
+treated as a placeholder, not judged for a password.
 
 If the disk refuses to sync a directory (error `EINVAL`, `ENOTSUP` or
 `EOPNOTSUPP`, as some network and FUSE filesystems do), saves carry on, but the
