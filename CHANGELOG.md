@@ -25,6 +25,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `gitdir:`, a special file, a dangling link, or one that fails inspection stops
   with `unreadable_repo_marker` (exit 2) rather than falling through to a parent
   repo's keys.
+- `docs/agent-policy.md`: the `agents.json` fields, the card rule, and what
+  `mb agent check` proves and does not.
 
 ### Fixed
 
@@ -68,6 +70,18 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   opened before another `source add` finished could write that source away while
   both reported success. A change that cannot get the lock within a few seconds is
   refused and writes nothing.
+- `mb agent check` adds a note for each row using `--permission-mode bypassPermissions`
+  or `--sandbox danger-full-access`, naming it as the most permissive mode. The rows stay
+  allowed; "Policy valid." is not "safe".
+- `mb card render` syncs the JPG to disk before linking it and the folder after, and says
+  so when the folder sync fails.
+- The Grok MCP setup registers the server with `--scope project` from the business repo,
+  so `mb connect exec xai` finds its key instead of "unknown provider 'xai'".
+- `/mb-site` Porkbun: one route. Store `<api key>:<secret key>` as one custom `mb connect`
+  secret and run the scripts through `mb connect exec porkbun --env PORKBUN_CREDENTIALS`.
+  `dns.py`, `domain.py` and `verify_live.py` print that command. The old
+  `PORKBUN_API_KEY` and `PORKBUN_SECRET_KEY` variables are no longer read.
+- CI pins its 11 `actions/checkout` and `actions/setup-python` references to commit SHAs.
 
 ## [0.6.23] - 2026-11-06
 
