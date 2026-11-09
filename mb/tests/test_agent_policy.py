@@ -704,6 +704,48 @@ def test_cli_valid_says_policy_valid_only(local: World) -> None:
     assert result.output == "Policy valid.\n"
 
 
+@pytest.mark.parametrize(
+    ("runtime", "option"),
+    [
+        ("claude", "--permission-mode bypassPermissions"),
+        ("codex", "--sandbox danger-full-access"),
+    ],
+)
+def test_most_permissive_mode_is_allowed_but_noted(local: World, runtime: str, option: str) -> None:
+    local.write({"version": 1, "agents": [local.row(runtime=runtime, options=[option])]})
+    assert local.check().ok
+    result = CliRunner().invoke(app, ["agent", "check"])
+    assert result.exit_code == 0
+    first, *rest = result.output.splitlines()
+    assert first == "Policy valid."
+    assert rest == [f"  note: planner: {option} is the most permissive mode; allowed, not safe"]
+
+
+@pytest.mark.parametrize(
+    ("runtime", "option"),
+    [("claude", "--permission-mode acceptEdits"), ("codex", "--sandbox workspace-write")],
+)
+def test_other_modes_carry_no_note(local: World, runtime: str, option: str) -> None:
+    local.write({"version": 1, "agents": [local.row(runtime=runtime, options=[option])]})
+    assert local.check().warnings == []
+
+
+def test_note_is_kept_when_the_policy_is_not_valid(local: World) -> None:
+    local.write(
+        {
+            "version": 1,
+            "agents": [
+                local.row(options=["--permission-mode bypassPermissions"]),
+                local.row(name="second", role="nobody"),
+            ],
+        }
+    )
+    result = CliRunner().invoke(app, ["agent", "check"])
+    assert result.exit_code == 2
+    assert "Policy not valid." in result.output
+    assert "most permissive mode" in result.output
+
+
 def test_cli_invalid_exits_2_and_names_the_problem(local: World) -> None:
     local.biz.chmod(0o777)
     result = CliRunner().invoke(app, ["agent", "check"])

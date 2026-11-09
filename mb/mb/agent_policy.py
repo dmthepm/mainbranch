@@ -44,6 +44,8 @@ OPTIONS: dict[str, dict[str, tuple[str, ...]]] = {
     "claude": {"--permission-mode": ("default", "acceptEdits", "plan", "bypassPermissions")},
     "codex": {"--sandbox": ("read-only", "workspace-write", "danger-full-access")},
 }
+# Allowed, and never an error, but "valid" must not be read as "safe": check says so.
+MOST_PERMISSIVE = {("--permission-mode", "bypassPermissions"), ("--sandbox", "danger-full-access")}
 TOP_KEYS = {"version", "path", "profiles", "agents"}
 ROW_KEYS = {
     "name",
@@ -94,6 +96,7 @@ class Report:
     path: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -615,6 +618,11 @@ def check(host: Host, name: str | None = None) -> Report:
             names.add(row["name"])
         if not sound:
             continue
+        for option in row.get("options", []):
+            if tuple(option.split(" ", 1)) in MOST_PERMISSIVE:
+                report.warnings.append(
+                    f"{row['name']}: {option} is the most permissive mode; allowed, not safe"
+                )
         cwd = row["cwd"]
         if not cwd.startswith(home + "/"):
             c.add("cwd", _loc(i, "cwd"), "must be under HOME, written as its real path")
@@ -634,6 +642,7 @@ def check(host: Host, name: str | None = None) -> Report:
 
 def human_report(report: Report) -> str:
     """Success says only that the policy is valid. It claims nothing about any agent."""
+    notes = [f"  note: {w}" for w in report.warnings]
     if report.ok:
-        return "Policy valid."
-    return "\n".join(["Policy not valid.", *[f"  {p.text()}" for p in report.problems]])
+        return "\n".join(["Policy valid.", *notes])
+    return "\n".join(["Policy not valid.", *[f"  {p.text()}" for p in report.problems], *notes])
