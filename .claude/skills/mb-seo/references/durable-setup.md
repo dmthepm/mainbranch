@@ -9,7 +9,7 @@ This file records requirements and evidence limits, not another install recipe.
 ## Read the status before acting
 
 These labels apply to every claim and requirement in its paragraph or table row.
-They describe the supplied evidence as of 4 November 2026.
+They describe the supplied evidence as of 9 November 2026.
 They are not live checks of the business you are helping.
 
 - OBSERVED means a recorded deployment or configuration read showed the result.
@@ -25,177 +25,119 @@ Keep private evidence and identifiers out of public examples.
 ## What must survive
 
 REQUIRED: give each business its own accounts, deployment state and credentials.
-Use a stable app host, such as `seo.example.com`, and its own Access team,
-such as `example-team.cloudflareaccess.com`.
-Keep the deployed code and installed upstream skills at compatible revisions.
-Keep one declared owner for every domain, policy and OAuth setting.
+Use a stable app host, such as `seo.example.com`. Keep the deployed code and
+installed upstream skills at compatible revisions. Keep one declared owner for
+every domain, rate limit, user and key.
 
-OBSERVED: a custom host survived a redeploy when deployment configuration and
-post-deploy enforcement both covered it. Declaring routes disabled in deployment
-configuration alone did not keep alternate routes disabled in that deployment.
-This is evidence for that checked setup, not a general deployment guarantee.
+OBSERVED: in password mode, a custom host, the rate-limit bindings and two agent
+keys survived a redeploy, and the keys still authenticated afterwards. Declaring
+routes disabled in deployment configuration alone did not keep alternate routes
+disabled; a post-deploy check enforced it. This is evidence for that checked
+setup, not a general deployment guarantee.
 
 SOURCE REVIEW: dashboard-only settings can disappear during reconciliation.
-A newer infrastructure dependency can support OAuth preservation even when the
-OpenSEO release in use still pins an older dependency.
-An upgrade alone is not proof that OAuth or domain reconciliation is fixed.
-
-REQUIRED: keep the stable domain in reviewed deployment configuration.
-Disable alternate public Worker and preview routes, or prove Access covers them.
-Protect a new host before attaching it to the Worker.
-Check the health endpoint too; application middleware need not protect it.
-
-OBSERVED: attaching a domain before Access covered it briefly exposed health
-output. App-route JWT checks did not protect that health endpoint.
-A later signed-out denial does not erase an earlier exposure.
+Keep the stable domain and the rate-limit bindings in reviewed deployment
+configuration, and disable the alternate Worker and preview routes.
 
 REQUIRED: preserve D1, KV, R2, workflow bindings, deployment state and encryption
 secrets across redeploys. Keep resource identity stable, not just resource names.
-Separate infrastructure continuity from login continuity in the setup record.
+Keep `BETTER_AUTH_SECRET` too: it signs sessions and encrypts stored Google tokens.
+
+OBSERVED: a Worker secret survives a redeploy that no longer sets it. Removing the
+operator secret takes an explicit delete by name and a 404 proof; see
+[access-hardening.md](access-hardening.md).
 
 SOURCE REVIEW: a D1 export omits R2, KV, chat Durable Objects and the deployment
-state store. A credentials-profile copy is not a full deployment-state backup.
+state store. A raw export also does not re-import as written: loading it needs the
+PRAGMA lines first, then every `CREATE TABLE`, then the rest in original order.
+Time Travel is the primary rollback. Migrations apply only through the deploy.
 UNPROVEN: complete service recovery has not passed a restore drill in this evidence.
 Do not promise full recovery from a database export or a Worker rollback.
 
 ## Lifetimes and login triggers
 
-SOURCE REVIEW: browser Access sessions, OAuth access tokens and OAuth grants have
-separate lifetimes. A working browser cookie does not prove the agent can refresh.
-The following durations describe evidence, not defaults to apply to every copy.
+Password mode has two credentials with different lifetimes: a browser session and
+an agent's `oseo_` key. An agent does not depend on a browser login.
 
 | Status | Item | What it means after an idle gap |
 |---|---|---|
-| SOURCE REVIEW | Managed OAuth access token | A short token lifetime, commonly 15 minutes, can refresh silently while the grant remains valid and the client supports refresh. |
-| OBSERVED | Managed OAuth grant configuration | One inspected setup had a 336-hour grant. That is a finite human-login horizon, not an indefinite connection. |
-| OBSERVED | Managed OAuth grant lapse | One setup with a 168-hour grant lost access when the grant ended, seven days after login. The client then offered only authenticate tools, and no read ran until a person logged in again. |
-| SOURCE REVIEW | Managed OAuth grant expiry | Expiry requires identity-provider authentication again. Policy changes or revoked consent can also end access. |
-| OBSERVED | Browser app session configuration | A separately configured 24-hour session did not change the inspected OAuth grant's lifetime. |
-| SOURCE REVIEW | Access service token | Its selected expiry and renewal policy bound unattended access. A finite token cannot cover a longer idle gap without renewal. |
-| UNPROVEN | Native OpenSEO API key lifetime | An omitted expiry field in the UI does not prove indefinite validity. Read actual key metadata and verify revocation behavior. |
+| OBSERVED | Agent `oseo_` key | Created with a stated expiry: the minimum is one day, the maximum 365 days. Two keys were set to one year. A key that expires answers 401 until the owner makes a new one. |
+| OBSERVED | Key revocation | Deleting a key makes the next request 401. A password reset does not revoke keys. Removing the member ends its keys. |
+| OBSERVED | Browser sessions | Version 0.1.26 has no sign-out-all control. A leftover session expires by itself, about a week after sign-in in one read. |
+| OBSERVED | Self-host MCP OAuth grant | A person who signs in with the app's own OAuth gets a 30-day grant with a refresh token. The self-hosted UI cannot revoke it; it was removed by deleting its two KV entries. |
 | SOURCE REVIEW | Google token encryption | Losing or changing `BETTER_AUTH_SECRET` prevents use of stored encrypted tokens and can force Google reconnection. |
-| SOURCE REVIEW | Google External Testing consent | Refresh tokens can expire after seven days. Review consent publishing status separately from MCP OAuth. |
+| SOURCE REVIEW | Google External Testing consent | Refresh tokens can expire after seven days. Review consent publishing status separately. |
 
-REQUIRED: preserve `BETTER_AUTH_SECRET` in approved secret custody alongside the
-Google client configuration. Never print it or save it in the business repo.
-Keep exact Google callback URLs aligned with the stable host.
-A configured Google health check proves configuration, not a successful data read.
+REQUIRED: record the next expiry action and its owner for every key. Renew before
+expiry. Never give a research agent authority to mint its own keys.
 
-SOURCE REVIEW: lost client credential caches, missing refresh support and changed
-issuer or resource URLs can interrupt MCP access before an expected grant expiry.
-An idle process restart with fresh credentials is useful evidence, but it does not
-simulate months of elapsed time. Record a later real idle-gap check separately.
+REQUIRED: keep keys in `mb connect`, and test them with the MCP `initialize`
+canary in [access-hardening.md](access-hardening.md). `mb connect test` cannot
+verify a custom provider.
 
-REQUIRED: record the next expiry action and its owner for every credential.
-For finite human grants, state when browser approval will be needed again.
-For machine credentials, record renewal and revocation ownership separately.
-Never give a research agent administrative token-renewal authority by accident.
+SOURCE REVIEW: a missing or changed `Authorization` header, a changed host, or a
+client that caches nothing can interrupt MCP access before expiry. A restart with
+fresh credentials is useful evidence but does not simulate months of elapsed time.
+Record a later real idle-gap check separately.
 
-## What the OAuth probe actually proved
+## The boundary is the user account
 
-OBSERVED: one inspected Access configuration already had Managed OAuth and dynamic
-registration enabled, with app-wide localhost and loopback callback allowances.
-No configuration change was needed for that inspection.
+REQUIRED: the operating-system user is the boundary for keys. A process running as
+the same user can read the stored key and the local Claude config that holds the
+header. Run each business under its own user, and do not run another business's
+agents or untrusted code as that user. `mb` exec scoping reduces accidents; it is
+not a defense against a same-user process.
 
-PROBE ONLY: discovery advertised the expected authorization, token and registration
-endpoints. An existing client's `http://localhost:49152/callback` authorization
-request reached Access login. No interactive login or code exchange happened.
-Full interactive sign-in and tool use were not proven by this probe.
-
-PROBE ONLY: the same existing client using `http://127.0.0.1:49152/callback`
-received an invalid-redirect response. `localhost` and `127.0.0.1` differ.
-App-wide localhost permission does not extend an existing client's registration
-to other callback hosts. Compare the exact host, port and path before changing it.
-
-OBSERVED: on one setup, an agent later completed the MCP approval and the MCP
-connection worked. This shows the current Access-mode path can work end to end.
-It does not prove another business's setup, or any behavior after an idle gap.
-
-OBSERVED: an "Invalid redirect URL" in that approval came from the agent, not from
-Access. Opening the consent URL through Chrome's `/json/new` endpoint changed the
-query encoding. Navigating to the exact URL with CDP `Page.navigate` worked three
-times out of three. Access settings were correct throughout.
-
-REQUIRED: an agent that approves MCP in a browser navigates directly to the exact
-URL. Before changing Access settings or clearing a client for this error, rule out
-the tool that opened the URL.
-
-REQUIRED: inspect dynamic registration settings and per-client callback behavior.
-An "OAuth enabled" check alone proves neither dynamic registration nor callbacks.
-Discovery advertising registration does not prove a registration succeeds.
-Do not clear a client or change policy based only on a boolean check.
-
-PROBE ONLY: signed-out requests to the root, health, MCP and an unknown path
-received Access challenges; a browser-style request reached the team's login.
-These results prove the tested requests were gated at that time.
-They do not prove allowed-user login, refused-user behavior or any tool call.
+REQUIRED: self-hosting has no meter and no cap. Before agents resume after any
+cutover or upgrade, list active schedules: rank configs that are not manual and
+AI-visibility trackers that are enabled. Pause paid calls until the owner's spend
+facts are settled, and keep schedules off without a yes.
 
 ## After every deploy
 
 REQUIRED: keep a dated receipt with pass, fail or unchecked for each item below.
 A missing check remains unchecked. Do not turn it into a pass.
-Use [setup.md](setup.md) for the checks and owner-run login steps.
+Use [setup.md](setup.md) and [access-hardening.md](access-hardening.md) for checks.
 
 | Status | Check | Evidence needed |
 |---|---|---|
-| REQUIRED | Host coverage | Inventory custom hosts, alternate Worker routes and previews, including the audit Worker. Note any route inventory that could not be read. |
-| REQUIRED | Signed-out boundary | Root, health, MCP and an unknown path receive the intended Access denial or login challenge on every live host. A bare 401 is insufficient. |
-| REQUIRED | Policy continuity | Intended people, policy precedence, app identity and audience match the approved configuration. No broad bypass appears. |
-| REQUIRED | OAuth continuity | Compare grant duration, token lifetime, registration flags and client callbacks, not only the enabled flag. |
-| REQUIRED | Allowed and refused people | A listed person reaches the app; an unlisted person is refused. Record browser proof separately from signed-out probes. |
-| REQUIRED | App and data continuity | Signed-in health matches the pin; original projects and saved histories remain. Check each Google connection separately. |
-| REQUIRED | Free MCP read | Initialize, list tools and run a saved-project read such as `list_projects`. Do not use paid research as a smoke test. |
+| REQUIRED | Host coverage | Inventory custom hosts, alternate Worker routes and previews. workers.dev and previews answer 404 or have no route. |
+| REQUIRED | Signed-out boundary | Health 200 with `authMode` `password`; `/mcp` 401; admin and import GET 404; an uninvited sign-up 403. |
+| REQUIRED | Operator secret absent | The secret name is absent from the Worker, and a POST `{}` with the old secret to admin and import is 404. |
+| REQUIRED | Rate limits | The sign-in, MCP and save-keywords bindings are present. |
+| REQUIRED | Users and keys | Only the intended users and one key per agent exist; each key is enabled, unexpired and within a year. Read ids and expiries, never key values. |
+| REQUIRED | Canary | An MCP `initialize` with each key returns 200; a missing or invalid key returns 401. |
+| REQUIRED | App and data continuity | Health matches the pin; original projects and saved histories remain. Check each Google connection separately. |
+| REQUIRED | Free MCP read | Initialize, list tools and run `list_projects`. Do not use paid research as a smoke test. |
+| REQUIRED | Schedules | No active rank schedule and no enabled AI-visibility tracker unless the owner approved it. |
 | REQUIRED | Recovery coverage | Preserve configuration, encryption-secret custody and deployment-state recovery evidence. Mark an untested restore honestly. |
 
-OBSERVED: post-deploy enforcement restored route restrictions in a recorded setup.
-OAuth settings also survived a recorded redeploy. Neither observation removes the
-need to compare desired and live state after the next deploy.
+## Option: Cloudflare Access
 
-## UNPROVEN: external Access with machine credentials
+Access is for an owner who wants a human-only app. The following was observed on
+setups that used it, and does not apply to password mode.
 
-UNPROVEN: no business has completed this move yet.
-The proposed steps must not be followed as a recipe until results are recorded.
-This section grants no exception to the skill's current authentication rules.
-Keep the current Access-mode setup until a reviewed migration passes acceptance.
-
-SOURCE REVIEW: the target puts Access under independent ownership and uses native
-OpenSEO accounts internally. Agents would send a narrowly scoped Access service
-token plus a separate native OpenSEO MCP key. Humans would pass Access and sign
-in to their app account. This composition is an inference from separate contracts.
-It has not been proved end to end.
-
-SOURCE REVIEW: current Access-mode middleware requires human identity claims.
-A service token passing the edge does not establish that app identity.
-Native API keys are not a drop-in replacement in that mode.
-Changing only the authentication mode can also strand the existing shared workspace.
-
-REQUIRED before any future migration can be accepted:
-
-- Prove a state-ownership handoff preserves the existing Access app, policies and
-  audience without provider deletion. Merely omitting tracked resources can delete
-  them. Whole-stack state clearing is not a safe handoff.
-- Capture a consistent recovery set and prove selective state restoration.
-  Preserve unrelated resources and test interruption and repeated execution.
-- Prove the same user and workspace retain projects, histories and Google
-  connections. Preserve the encryption secret and original resource identities.
-- Prove every reachable host remains gated throughout the change.
-  A missing route inventory blocks a claim of complete coverage.
-- Prove the actual MCP client can supply both Access headers and the native key
-  without saving literal secrets in tracked configuration or command arguments.
-- Prove both credentials together allow a free saved-project read. Prove either
-  credential missing, invalid or revoked denies access on a fresh connection.
-- Prove machine access cannot reach dashboard or operator endpoints under the
-  chosen path policy. Check path variants and policy precedence.
-- Prove credential expiry, replacement and revocation. Define the maximum idle
-  horizon and keep renewal authority separate from research authority.
-- Prove an unchanged redeploy makes no external Access writes and preserves data.
-  Repeat free reads after restart and record a later real idle-gap check.
-- Prove rollback preserves the gate and identities. Distinguish an offline
-  rehearsal from a rollback actually exercised against the deployed copy.
-
-REQUIRED: stop on failed ownership, identity, lifetime or recovery checks.
-Do not substitute a bypass, forged email claim or disabled JWT validation.
-No indefinite-access promise follows from a short successful test.
+- OBSERVED: attaching a domain before Access covered it briefly exposed health
+  output, and a later denial does not erase an earlier exposure. Add the host to
+  Access first.
+- SOURCE REVIEW: Managed OAuth access tokens are short, commonly 15 minutes, and
+  refresh silently while the grant lasts. Grants lapse: one 168-hour grant ended
+  seven days after login, the client then offered only authenticate tools, and no
+  read ran until a person logged in again. Record when the next browser approval
+  is due.
+- OBSERVED: each deploy may clear Managed OAuth (upstream issue 304). Compare grant
+  duration, token lifetime, registration flags and client callbacks, not only the
+  enabled flag, and rerun the signed-out probe.
+- PROBE ONLY: `localhost` and `127.0.0.1` callbacks differ; an existing client
+  registered with one is refused on the other.
+- OBSERVED: an "Invalid redirect URL" in an agent's approval came from the tool that
+  opened the URL, not from Access. Navigate directly to the exact URL.
+- SOURCE REVIEW: Access service tokens plus a native key is an unproven
+  composition. Current Access-mode middleware requires human identity claims, native
+  keys are not a drop-in there, and changing the mode can strand the existing
+  shared workspace. Do not follow it as a recipe. Moving an existing Access copy to
+  password mode needs a rehearsal on a restored copy, a claim of the existing user
+  into the workspace, and the checks above; one such move passed that way.
 
 ## One home for each SEO fact
 

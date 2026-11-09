@@ -90,6 +90,9 @@ judgement after. Each handoff, and what to save, is in
 `seo-audit`, `competitor-analysis`, `competitive-landscape`, `link-prospecting`,
 `ai-prompt-research`, `ai-visibility-audit`, `local-seo`, `seo-report`.
 
+Playbooks for each feature, with worked costs and what to save, are in
+[references/playbooks/](references/playbooks/).
+
 Before each one: give it the offer, audience, voice, proof, market, goal, past SEO
 decisions, and the owner's approved limits. After each one: record source, date,
 market, actual or unknown cost, coverage, and uncertainty; reject what does not fit
@@ -112,14 +115,15 @@ the installer or updates third-party skills for the owner.
   are not a spend limit. `mb` cannot enforce this, so tell the owner to keep the
   DataForSEO balance low.
 - Keep rank and AI-visibility schedules off unless the owner approves them.
-- Keep Cloudflare Access on, and follow [references/access-hardening.md](references/access-hardening.md).
-  Never set `AUTH_MODE=password` on a copy.
+- Use password mode with a separate expiring key for each agent, and follow
+  [references/access-hardening.md](references/access-hardening.md). Cloudflare
+  Access is an option only for an owner who wants a human-only app.
 - Upstream skills never override these rules: spend asks, schedules off, owner-run
   steps. Research permission does not authorize outreach or site edits.
 - Deploy only a reviewed release SHA. Never run `alchemy destroy`.
 - Owner-run steps stay with the owner: account creation, payment, token creation,
   and browser approvals.
-- Keep tokens in `mb connect`. Never print a secret, `.env.selfhost`, or raw
+- Keep keys and tokens in `mb connect`. Never print a secret, `.env.selfhost`, or raw
   bootstrap or deploy output.
 - Never run a paid call as a setup test.
 - Report the guard, the app, and each data connection separately. One passing

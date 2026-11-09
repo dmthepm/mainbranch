@@ -7,11 +7,26 @@ were read against the v0.1.21 pin; recheck them when the pin moves.
 Use the MCP server named `openseo-<BIZ>` for this business. If the name does not
 match this business, stop.
 
+## Standing words
+
+Each business keeps its standing words in one place: a section headed
+`Standing words` in its private OpenSEO setup record (template in
+[setup.md](setup.md)). Read it before every paid call. It holds:
+
+- the owner's monthly cap, the total across OpenSEO and DataForSEO;
+- standing approvals, each with its date and who gave it;
+- schedules the owner approved, each with its monthly estimate.
+
+It can only narrow or restate the rules in this file, never loosen them. A standing
+approval counts only as written: a call outside its words needs a fresh yes. If the
+section is missing, unreadable or unclear, treat every paid call as needing a yes.
+
 ## Before any paid call
 
 Tell the owner what you will run, why, and the most it can cost. Wait for a yes.
-Use an estimate tool when one exists. Keep a running total against the monthly spend
-cap in the setup record, and stop when the next call would pass it.
+Only a standing approval in `Standing words` that covers this exact call replaces
+it. Use an estimate tool when one exists. Keep a running total against the monthly cap in
+`Standing words`, and stop when the next call would pass it.
 
 A self-hosted copy does not show the DataForSEO balance, and tool results carry no
 cost. Ask the owner to read the balance in their DataForSEO dashboard before and
@@ -77,8 +92,9 @@ them: Lighthouse is a paid DataForSEO call.
 - Search volume and difficulty are estimates, not promised traffic.
 - Separate three things: the copy is reachable, the app works, and the data
   connection returned real rows.
-- If MCP calls return HTML or an "unexpected content type" error, check Managed
-  OAuth first (setup step 7), then ask the owner to sign in again.
+- If MCP calls return HTML or an "unexpected content type" error, check the key
+  first (setup step 7; a missing, expired or revoked key answers 401), then ask
+  the owner for a new one. Behind Access, check Managed OAuth first.
 
 ## Save and act
 

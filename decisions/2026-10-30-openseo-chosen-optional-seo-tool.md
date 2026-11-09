@@ -42,8 +42,13 @@ after 2026-11-07. Codex is not supported.
 - **Paid research asks first, with a cost.** MCP read-only hints are not a spend
   limit, and `mb` cannot enforce a cap. Rank and AI-visibility schedules stay off
   unless the owner approves them.
-- **Cloudflare Access stays on.** New OpenSEO self-hosts default to email and
-  password accounts since v0.1.17, so the skill sets Access explicitly.
+- **Password mode with per-agent keys (updated 9 Nov 2026).** Each agent gets its
+  own admin user and its own expiring `oseo_` key, stored in `mb connect`; the app
+  has no Access app, workers.dev and previews are off, and rate limits are bound.
+  One live business ran this way and passed its checks. Cloudflare Access stays an
+  option for an owner who wants a human-only app. The earlier rule that kept Access
+  on and forbade static tokens is retired, because Access cannot serve an agent
+  without a browser approval that lapses.
 - **Pinned releases.** Copies move only to a reviewed release SHA. `alchemy
   destroy` is never used.
 - **Durable findings land in the business repo.** Losing a copy should cost little.
@@ -66,10 +71,12 @@ quickly, which is why this decision pins releases and stays experimental.
 
 ## Known Risks
 
-- OpenSEO issue 304: each deploy clears Managed OAuth, so the setting is re-checked
-  after every deploy.
-- A client login can need a `resource=` value added by hand.
-- The Access session lasts seven days, and agent login past that is unproven.
+- A key lives at least one day after a leak, a password reset does not revoke keys,
+  and version 0.1.26 has no sign-out-all.
+- Self-hosting has no meter or cap, so schedules are checked before agents resume.
+- Same-user processes can read a stored key; the user account is the boundary.
+- With Access: OpenSEO issue 304 (each deploy clears Managed OAuth), and agent login
+  past the grant lifetime is unproven.
 - Workers Free stops site audits at about 40 pages.
 
 ## Exit Path
@@ -81,5 +88,5 @@ reads are unaffected.
 ## Review Trigger
 
 Revisit if the first business run or the login check fails, if upstream changes
-its license or stops shipping releases, if Managed OAuth or Access support changes,
+its license or stops shipping releases, if the password-mode key route changes,
 or if repeated use shows a read-only check can prove a useful operation.

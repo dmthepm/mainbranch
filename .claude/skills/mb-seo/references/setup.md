@@ -1,13 +1,16 @@
 # OpenSEO Setup
 
-Set up one copy for one business, one step at a time. Before each step, read the
+Set up one copy for one business, one step at a time. The recommended sign-in is
+password mode with a key per agent; Cloudflare Access is an option for a
+human-only app (see [access-hardening.md](access-hardening.md)). Before each step, read the
 setup record and skip what is done. Stop on any failed expected result.
 
 **Pin:** v0.1.21, `beca5c1f5c728acfb243249107dbfaded0ef552e`. One copy has been deployed
 by hand at this pin, following these steps, and a listed user has signed in, read
 health, and finished an MCP login in about 3 minutes. No copy has been set up from
-this skill alone. A real sign-in by an unlisted user being refused is NOT VERIFIED
-at this pin.
+this skill alone. That deploy used Access. The password-mode steps below were observed on a live
+business at v0.1.26, not at this pin: treat each as NOT VERIFIED here and report
+what happens.
 
 ## Before the first step
 
@@ -26,6 +29,19 @@ Ask for a monthly spend cap for paid research. After the owner agrees, create
 `decisions/YYYY-MM-DD-seo-openseo-setup.md` with the cap, the pin, and a checklist
 of the steps below. Update it as steps finish. Write only non-secret facts: pin,
 URL, MCP server name, plan, allowed emails, and check results.
+
+End the record with this section. Daily use reads it before every paid call; see
+[daily-use.md](daily-use.md). It can narrow the rules there, never loosen them.
+
+```markdown
+## Standing words
+
+- Monthly cap (OpenSEO and DataForSEO together): <amount> USD. Set by <who>, <date>.
+- Standing approvals (only as written; none by default):
+  - <what is covered, with its limit> — approved by <who>, <date>.
+- Approved schedules (none by default):
+  - <tracker or check, interval> — about <amount> USD a month — approved by <who>, <date>.
+```
 
 Choose `<BIZ>`, a short lowercase name for the business. Choose a private folder
 outside the business repo and outside any synced folder: `<CHECKOUT>` holds the
@@ -48,9 +64,9 @@ The owner keeps this value until step 4.
 In the business's own Cloudflare account:
 
 1. Open R2 once and add a payment method if asked.
-2. Open Zero Trust once and choose the Free plan. A deploy has failed with
-   "Access not enabled" when this was skipped. Current upstream code reuses an
-   existing team or tries to create one; only reuse has been seen working.
+2. Open Zero Trust once and choose the Free plan. A deploy at this pin has failed
+   with "Access not enabled" when this was skipped. Password mode needs no Access
+   app, but whether the pinned deploy still looks for the team is NOT VERIFIED.
 3. Copy the workers.dev subdomain from Workers & Pages.
 4. Create a custom API token limited to this account, with these Account
    permissions:
@@ -63,8 +79,8 @@ In the business's own Cloudflare account:
 | D1 | Edit |
 | Workers R2 Storage | Edit |
 | Secrets Store | Edit |
-| Access: Apps and Policies | Edit |
-| Access: Organizations, Identity Providers, and Groups | Edit |
+| Access: Apps and Policies | Edit (only if keeping Access) |
+| Access: Organizations, Identity Providers, and Groups | Edit (only if keeping Access) |
 
 Secrets Store Read fails, even though upstream's CI comment says Read. No zone,
 DNS, or route permissions are needed for a workers.dev copy.
@@ -109,39 +125,38 @@ ignored build scripts; the one recorded deploy worked without approving them.
 ## 4. Owner: fill in `.env.selfhost`
 
 The owner fills the empty file in their own editor. Do not copy
-`deploy/.env.selfhost.example`. **The template turns on password accounts**, which
-gives a public login page and no Access. Write exactly these lines:
+`deploy/.env.selfhost.example`.
+Write the lines below, so every value is chosen.
 
 ```text
-AUTH_MODE=cloudflare_access
+AUTH_MODE=password
 DATABASE_PROVIDER=d1
-ACCESS_ALLOWED_EMAILS=owner@example.com
 DATAFORSEO_API_KEY=<the Base64 credential>
 WORKERS_SUBDOMAIN=<owner-subdomain>.workers.dev
 OPENSEO_TELEMETRY_DISABLED=1
 ```
 
 The key has no `Basic ` prefix, quotes, or line break. Choose the sign-in mode
-before the first deploy; the two modes keep separate user records.
+before the first deploy; the two modes keep separate user records. Closing public
+sign-up, creating the first owner, and binding the rate limits and custom host in
+deploy config follow the pattern in [access-hardening.md](access-hardening.md);
+the variable names for them are NOT VERIFIED at this pin.
 
 The agent checks the file without showing it:
 
 ```bash
 test "$(grep -c 'AUTH_MODE' .env.selfhost)" = 1
-grep -q '^AUTH_MODE=cloudflare_access$' .env.selfhost
+grep -q '^AUTH_MODE=password$' .env.selfhost
 test "$(grep -cE "^export |[\$\"']" .env.selfhost)" = 0
-test "$(grep -cE '^(TEAM_DOMAIN|POLICY_AUD)=' .env.selfhost)" = 0
 test ! -e .env && test ! -e .env.local && test ! -e .env.selfhost.local
 test -z "${AUTH_MODE:-}"
-grep -q '^ACCESS_ALLOWED_EMAILS=..*' .env.selfhost
 grep -q '^DATAFORSEO_API_KEY=..*' .env.selfhost
 grep -q '^WORKERS_SUBDOMAIN=.*\.workers\.dev$' .env.selfhost
 grep -q '^OPENSEO_TELEMETRY_DISABLED=1$' .env.selfhost
 ```
 
-Upstream's parsers take the last assignment, so a later `AUTH_MODE=password`, or a
-line they read differently, would remove Access. That is why the file stays plain
-`KEY=value` lines.
+Upstream's parsers take the last assignment, so a later `AUTH_MODE` line would
+change the mode. That is why the file stays plain `KEY=value` lines.
 
 **Expected:** all pass. Do not deploy otherwise.
 
@@ -191,100 +206,85 @@ are no manual wrangler steps. `pnpm deploy` is a different path; do not use it.
 `--profile` has reached Alchemy this way in tests with stand-in tools; a first real
 deploy with it is NOT VERIFIED.
 
-## 6. Check the guard, then the app, then the data
+## 6. Check the app, the keys, then the data
 
 These are requirements. A failed or unchecked one blocks use of the copy.
 
-The URL is `https://open-seo-selfhost.<owner-subdomain>.workers.dev`. Check that
-exact hostname, not a similar one.
+The URL is the custom host in deploy config. Check that exact hostname, not a
+similar one. Hardening and probe detail is in
+[access-hardening.md](access-hardening.md).
 
 | Requirement | How to check | Expected result |
 |---|---|---|
-| Access mode was set on purpose | Read `AUTH_MODE` in `.env.selfhost` | It is `cloudflare_access`. Never rely on the upstream default, which is password accounts. |
-| Access guards every path | Signed out, request `/`, `/api/health`, `/mcp`, and one unknown path | Each redirects to the team's `cloudflareaccess.com` login. After step 7, `/mcp` instead returns a 401 whose challenge and issuer name that Access team. A 401 alone proves nothing. A plain OPTIONS request may get a 400 from Cloudflare. None returns app content or a 2xx. |
-| Only listed people get in | Owner signs in, then tries an unlisted email | The listed email reaches the workspace. The unlisted one is refused. |
-| The allow list is the intended one | Owner reads the Access app's policies | Only the intended emails are listed. There is no Bypass rule, no Everyone rule, and no other Access app that overrides this one for the hostname or any path. |
-| Owner's people can sign in | Owner opens the login page | A method they can use is offered. A new team may offer only Cloudflare-account login; the owner adds One-time PIN if needed. |
-| The app is healthy | A listed person signs in and opens `/api/health`. An agent cannot read it, because it sits behind Access. | `status` is `ok`, `authMode` is `cloudflare_access`, the version matches the pin, and the database check is `ok`. |
+| Password mode was set on purpose | Read `AUTH_MODE` in `.env.selfhost` | It is `password`. |
+| Signed-out boundary | Request `/api/health`, `/mcp`, the admin and import paths, and a sign-up from an uninvited address, with `Accept: */*` | Health 200 with `authMode` `password`; `/mcp` 401; admin and import 404; sign-up 403. |
+| No second door | Request the workers.dev host and any version preview | 404 or no route. No Access app covers the copy. |
+| Rate limits | Read the Worker bindings | The sign-in, MCP and save-keywords limiters are bound. |
+| Operator secret gone | Read the Worker secret names, then POST `{}` with the old secret | The name is absent; both paths answer 404. |
+| The owner can sign in | Owner signs in with the password | The workspace opens. Health shows the pin and a database check of `ok`. |
 | DataForSEO is configured | Same page | Its check is `ok`. This shows the key is present, not that a paid call works. |
 
 Worker analytics is thin in the first hour, so it does not prove the app booted.
 A long Worker binding list, including empty optional secrets, is normal.
 
-If `/api/health` is reachable signed out, Access is not protecting the app.
-Stop and tell the owner. Do not run keyword, rank, prompt, or AI checks as tests.
+If `/api/health` shows an `authMode` other than `password`, or `/mcp` answers without
+a key, stop and tell the owner. Do not run keyword, rank, prompt, or AI checks as
+tests. Rerun these checks after every deploy.
 
-Rerun the signed-out and unlisted-email checks after step 7 and after every deploy.
+## 7. Owner: give each agent a user and a key
 
-## 7. Owner: turn on Managed OAuth
+For each agent, the owner invites an admin user for it, then makes one `oseo_` key
+for that user with an expiry (one day to 365 days), signed in as that user. Read
+back only the key id and expiry. Store the key from the owner's own terminal,
+piped from a password manager so it is never echoed or typed:
 
-MCP clients need this, and it is off by default.
+```bash
+op read '<KEY_ITEM_REF>' | mb connect openseo-<AGENT> --custom --token-stdin --scope repo
+```
 
-In Zero Trust, open Access controls, then Applications, then `open-seo selfhost`,
-then Additional settings, then OAuth. Turn on Managed OAuth, allow localhost and
-loopback clients, and save. Add an HTTPS redirect URI only if a web connector
-needs it, and then only that exact URI, never a broad wildcard.
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
 
-Dynamic registration lets a client register. It does not authorize a user: only
-the Access allow list in step 6 does that.
-
-**Requirement:** the setting is on after every deploy. Upstream issue 304 reports
-that each deploy clears it. That is not yet seen here, so check, don't assume.
-
-| Requirement | How to check | Expected result |
-|---|---|---|
-| The login server is advertised | Read `/.well-known/cloudflare-access-protected-resource/mcp`, then the authorization server it names. Do not POST a registration. | It names this copy's Access team. The issuer and `registration_endpoint` are on that team's host, and `resource` is this copy's `/mcp`. |
-| An allowed user can sign in over MCP | Finish step 8 for one agent | The client connects and lists OpenSEO's tools. |
-| The guard still holds | Rerun the step 6 signed-out and unlisted-email checks | Both are still refused. |
-
-**Expected:** all three pass. A check you could not run is NOT VERIFIED, which is
-not a pass, so the copy stays out of use.
-
-The app may show a warning that MCP cannot connect (upstream issue 405). That
-warning proves nothing either way: the table above decides.
+**Expected:** `mb connect status openseo-<AGENT> --json` shows it stored. `mb connect
+test` says "stored, unverified" for a custom provider; that is not a pass. Run the
+`initialize` canary from [access-hardening.md](access-hardening.md): 200 with the
+key, 401 without. Record the key id, expiry and renewal owner in the setup record.
 
 ## 8. Connect Claude Code to this business only
 
-From the business repo, using local scope so other businesses cannot see it:
+Claude Code refuses an agent writing its own MCP config, so the owner runs one
+command from the business repo, in local scope so other businesses cannot see it:
 
 ```bash
-claude mcp add --transport http --scope local 'openseo-<BIZ>' 'https://open-seo-selfhost.<owner-subdomain>.workers.dev/mcp'
-claude mcp login 'openseo-<BIZ>'
+claude mcp add --transport http --scope local 'openseo-<BIZ>' '<URL>/mcp' \
+  --header 'Authorization: Bearer <KEY>'
 ```
 
-The owner approves in the browser.
+The key is a literal header in the local Claude config, inside the owner's user
+account. Start a new Claude Code session: an MCP server added during a session does
+not appear in it.
 
 **Expected:** `claude mcp list` shows the server connected, and `list_projects`
-returns the default project. `list_projects` costs nothing.
-
-If the printed login URL looks doubled, terminal link escapes wrapped it: cut it
-at the first BEL character and use the part before it. Pasting it whole gives
-`invalid_target`, "Multiple resources not supported".
-
-An MCP server added during a session does not appear in that session. Start a new
-Claude Code session to use its tools.
-
-**Fallback:** the login URL already carried `resource` at this pin. If Access still
-refuses it with `invalid_target`, add `&resource=<URL-encoded MCP URL>` and open
-that. The code exchange then works unchanged.
+returns the default project. `list_projects` costs nothing. A missing, empty or
+invalid key must fail to connect.
 
 Keep these limits in mind:
 
 - The upstream plugin's MCP entry points at hosted `openseo.so`, not this copy.
   For a self-hosted copy, install skills only (next section).
-- Personal API keys do not work behind Access. An agent needs a user sign-in.
-- Settings > Connected agents is hosted-only. To remove a person, take them out of
-  `ACCESS_ALLOWED_EMAILS`, redeploy, and redo step 7. Whether that ends sessions
-  already issued is NOT VERIFIED, so don't treat it as an emergency cutoff. Prove
-  their browser and MCP sessions now fail.
-- The Access session lasts seven days. Whether an agent stays connected past that
-  is unproven.
+- A password reset does not revoke keys. To remove an agent, delete its key or
+  remove its user, and confirm a 401. Version 0.1.26 has no sign-out-all and no
+  grant-revoke screen on a self-hosted copy.
+- Self-hosting has no meter or cap. Check for active schedules before agents resume.
+- Same-user processes can read the key; the operating-system user is the boundary.
+- With Access instead, MCP clients use Managed OAuth and a browser approval, and
+  personal keys do not work. That route is optional; its checks are in
+  [access-hardening.md](access-hardening.md).
 
 ## Install the skills only
 
 Upstream documents a skills-only route, separate from MCP. Its Claude Code page
 recommends the plugin, which suits the hosted service. A self-hosted copy wants the
-skills and its own MCP entry from step 7, so skip the plugin. After the skills are
+skills and its own MCP entry from step 8, so skip the plugin. After the skills are
 in, check `claude mcp list` shows no hosted `openseo.so` entry.
 
 Owner-run. Main Branch does not run the installer or update the skills for them.
@@ -340,7 +340,7 @@ Each business needs its own Google client:
    replaces dashboard values. Keep a private copy of the secret: it encrypts the
    stored Google tokens, and losing it means reconnecting Google.
 5. Agent: repeat step 4's file check, then step 5's deploy command.
-6. Owner: redo step 7. The deploy may have cleared Managed OAuth.
+6. Owner: rerun the step 6 checks and the canary after the deploy.
 7. Owner: connect Google in OpenSEO under Settings > Integrations. This stays a
    browser step. Agents can then list sites and properties and bind one to a
    project over MCP, at no charge.
@@ -352,9 +352,9 @@ read returns rows for the owner's site.
 
 | Upstream issue | Effect | What to do |
 |---|---|---|
-| 304 | A deploy may clear Managed OAuth | Redo step 7 after every deploy |
+| 304 | With Access, a deploy may clear Managed OAuth | Recheck it after every deploy; not used in password mode |
 | 403 | Secrets Store Read fails | Grant Edit |
 | 226 | A deploy removes a dashboard-added custom domain | Put the domain in deploy config; see [access-hardening.md](access-hardening.md) |
 | 377 | Free plan audits stop near 50 fetches and report the rest as failures | Use Workers Paid for audits |
-| 405 | The MCP warning never clears | It proves nothing; the step 7 checks decide |
+| 405 | The MCP warning never clears | It proves nothing; the step 7 canary decides |
 | 430 | A Shopify crawler host can be saved so it never matches | Enter the exact hostname |

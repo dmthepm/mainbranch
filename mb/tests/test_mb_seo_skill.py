@@ -60,7 +60,7 @@ def test_hard_rules_stay_in_the_skill() -> None:
         "MCP read-only hints are not a spend limit",
         "`mb` cannot enforce this",
         "Keep rank and AI-visibility schedules off unless the owner approves them",
-        "Keep Cloudflare Access on",
+        "Use password mode with a separate expiring key for each agent",
         "Deploy only a reviewed release SHA",
         "Never run `alchemy destroy`",
         "Never print a secret",
@@ -69,11 +69,11 @@ def test_hard_rules_stay_in_the_skill() -> None:
         assert rule in body, rule
 
 
-def test_setup_forces_access_over_the_password_template() -> None:
+def test_setup_writes_password_mode_on_purpose() -> None:
     body = _flat(SETUP)
-    assert "The template turns on password accounts" in body
-    assert "AUTH_MODE=cloudflare_access" in SETUP.read_text(encoding="utf-8")
-    assert "grep -q '^AUTH_MODE=cloudflare_access$' .env.selfhost" in body
+    assert "AUTH_MODE=password" in SETUP.read_text(encoding="utf-8")
+    assert "grep -q '^AUTH_MODE=password$' .env.selfhost" in body
+    assert "AUTH_MODE=cloudflare_access" not in body
     assert "Do not recopy the example env file" in _flat(UPGRADES)
 
 
@@ -84,14 +84,46 @@ def test_setup_pins_and_writes_access_as_requirements() -> None:
     assert "**Expected:**" in text
     assert "NOT VERIFIED" in text
     flat = _flat(SETUP)
-    assert "issue 304" in flat
-    assert "&resource=<URL-encoded MCP URL>" in flat
-    assert "cut it at the first BEL" in flat
-    assert "A 401 alone proves nothing." in flat
-    assert "It does not authorize a user" in flat
-    assert "never a broad wildcard" in flat
-    assert "no Bypass rule, no Everyone rule" in flat
+    assert "| 304 |" in flat
+    assert "mb connect openseo-<AGENT> --custom --token-stdin --scope repo" in flat
+    assert "Claude Code refuses an agent writing its own MCP config" in flat
+    assert '`mb connect test` says "stored, unverified"' in flat
+    assert "A password reset does not revoke keys." in flat
+    assert "Self-hosting has no meter or cap." in flat
     assert "Do not run keyword, rank, prompt, or AI checks as tests." in flat
+
+
+def test_hardening_covers_password_mode_lessons() -> None:
+    flat = _flat(SKILL_DIR / "references/access-hardening.md")
+    for text in (
+        "`AUTH_MODE=password`",
+        "workers.dev and previews off",
+        "`MCP_RATE_LIMIT`",
+        "its own `oseo_` key",
+        "The minimum is one day",
+        "`mb connect test` cannot check a custom provider",
+        "A redeploy does not remove a Worker secret.",
+        "has no sign-out-all control",
+        "Self-hosting has no meter and no cap.",
+        "Same-uid processes can read a stored key",
+        "Cloudflare Access for a human-only app",
+    ):
+        assert text in flat, text
+
+
+def test_playbooks_are_linked_from_the_skill_and_handoffs() -> None:
+    playbooks = SKILL_DIR / "references/playbooks"
+    names = sorted(path.name for path in playbooks.glob("*.md"))
+    assert len(names) == 14 and "costs.md" in names
+    handoffs = (SKILL_DIR / "references/upstream-skills.md").read_text(encoding="utf-8")
+    assert "references/playbooks/" in SKILL.read_text(encoding="utf-8")
+    for name in names:
+        assert f"playbooks/{name}" in handoffs, name
+    link = re.compile(r"\]\(([^)#\s]+)\)")
+    for path in playbooks.glob("*.md"):
+        for target in link.findall(path.read_text(encoding="utf-8")):
+            if "://" not in target:
+                assert (path.parent / target).resolve().exists(), (path.name, target)
 
 
 def test_setup_uses_connect_and_keeps_logs_private() -> None:
@@ -118,6 +150,14 @@ def test_daily_use_covers_paid_approval_and_default_schedule() -> None:
     assert "Wait for a yes." in body
     assert "`research_ai_visibility_prompts` is marked read-only and still spends" in body
     assert "New AI-visibility trackers start on a weekly schedule." in body
+
+
+def test_standing_words_have_one_home_and_cannot_loosen_rules() -> None:
+    daily = _flat(DAILY)
+    assert "`Standing words`" in daily
+    assert "never loosen them" in daily
+    assert "A standing approval counts only as written" in daily
+    assert "## Standing words" in SETUP.read_text(encoding="utf-8")
 
 
 def test_backup_limits_are_stated() -> None:
