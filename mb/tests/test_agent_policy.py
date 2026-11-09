@@ -701,7 +701,9 @@ def local(w: World, monkeypatch: pytest.MonkeyPatch) -> World:
 def test_cli_valid_says_policy_valid_only(local: World) -> None:
     result = CliRunner().invoke(app, ["agent", "check"])
     assert result.exit_code == 0
-    assert result.output == "Policy valid.\n"
+    first, *rest = result.output.splitlines()
+    assert first == "Policy valid."
+    assert all(line.startswith("  note: ") for line in rest)
 
 
 @pytest.mark.parametrize(
@@ -718,7 +720,8 @@ def test_most_permissive_mode_is_allowed_but_noted(local: World, runtime: str, o
     assert result.exit_code == 0
     first, *rest = result.output.splitlines()
     assert first == "Policy valid."
-    assert rest == [f"  note: planner: {option} is the most permissive mode; allowed, not safe"]
+    assert rest[0] == f"  note: planner: {option} is the most permissive mode; allowed, not safe"
+    assert all(line.startswith("  note: ") for line in rest)
 
 
 @pytest.mark.parametrize(
@@ -780,3 +783,42 @@ def test_agent_module_never_signals_or_launches() -> None:
     source = Path(ap.__file__).read_text()
     for banned in ("os.kill", "killpg", "subprocess", "os.exec", "os.fork", "fcntl"):
         assert banned not in source, banned
+
+
+@pytest.mark.parametrize("bad", [{"model": "bad model"}, {"effort": "extreme"}])
+def test_note_is_kept_for_a_row_with_an_unrelated_schema_error(
+    local: World, bad: dict[str, Any]
+) -> None:
+    row = local.row(options=["--permission-mode bypassPermissions"], **bad)
+    local.write({"version": 1, "agents": [row]})
+    report = local.check()
+    assert "schema" in [p.code for p in report.problems]
+    assert report.warnings == [
+        "planner: --permission-mode bypassPermissions is the most permissive mode; "
+        "allowed, not safe"
+    ]
+
+
+def test_note_survives_a_row_with_odd_name_and_options(local: World) -> None:
+    local.write(
+        {
+            "version": 1,
+            "agents": [
+                {"name": 3, "options": ["--sandbox danger-full-access", 7]},
+                {"options": "--sandbox danger-full-access"},
+                "not a row",
+            ],
+        }
+    )
+    assert local.check().warnings == [
+        "agents[0]: --sandbox danger-full-access is the most permissive mode; allowed, not safe"
+    ]
+
+
+def test_cli_prints_the_notes_a_valid_codex_row_carries(local: World) -> None:
+    (local.biz / "core" / "roles" / "planner.md").unlink()
+    local.write({"version": 1, "agents": [local.row(runtime="codex")]})
+    result = CliRunner().invoke(app, ["agent", "check"])
+    assert result.exit_code == 0
+    assert "  note: planner: card: unverified(no-adapter)" in result.output
+    assert "  note: default codex profile:" in result.output

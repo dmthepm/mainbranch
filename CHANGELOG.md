@@ -72,15 +72,23 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   refused and writes nothing.
 - `mb agent check` adds a note for each row using `--permission-mode bypassPermissions`
   or `--sandbox danger-full-access`, naming it as the most permissive mode. The rows stay
-  allowed; "Policy valid." is not "safe".
+  allowed; "Policy valid." is not "safe". The note is kept for a row with an unrelated
+  schema error, and the report prints the other notes (Codex card unverified, default
+  profile absent). `docs/agent-policy.md` shows `options` as a list, gives the
+  `declared_work` list shape and says what check does and does not prove.
 - `mb card render` syncs the JPG to disk before linking it and the folder after, and says
   so when the folder sync fails.
 - The Grok MCP setup registers the server with `--scope project` from the business repo,
-  so `mb connect exec xai` finds its key instead of "unknown provider 'xai'".
+  so `mb connect exec xai` finds its key instead of "unknown provider 'xai'". The guide
+  says the lookup follows the working directory and the business repo.
 - `/mb-site` Porkbun: one route. Store `<api key>:<secret key>` as one custom `mb connect`
   secret and run the scripts through `mb connect exec porkbun --env PORKBUN_CREDENTIALS`.
-  `dns.py`, `domain.py` and `verify_live.py` print that command. The old
+  `dns.py`, `domain.py` and `verify_live.py` print that exact command, with the script
+  and domain filled in. The API key part may not contain a colon. The old
   `PORKBUN_API_KEY` and `PORKBUN_SECRET_KEY` variables are no longer read.
+- `verify_live.py` takes `cloudflare` or `porkbun`, so a Porkbun-only run does not run
+  the Cloudflare checks or print their repair steps. `dns.py` and `verify_live.py`
+  remove both Porkbun key parts from any provider or exception text before printing it.
 - CI pins its 11 `actions/checkout` and `actions/setup-python` references to commit SHAs.
 
 ## [0.6.23] - 2026-11-06

@@ -188,8 +188,10 @@ file.
 
 The server reads `GROK_API_KEY`, so start it through `mb connect exec`. The key
 belongs to one business repo, so register the server from that repo with
-`--scope project`; a user-scope server would run elsewhere and fail with
-"unknown provider 'xai'":
+`--scope project`. `mb connect exec` finds the key from the working directory
+Claude Code launches the server in, and only inside the business repo that holds
+the `xai` connection; started from anywhere else it fails with "unknown provider
+'xai'". Launch Claude Code from the business repo:
 
 ```bash
 cd path/to/my-business
