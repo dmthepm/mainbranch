@@ -250,7 +250,7 @@ See **[references/repo-scaffolding.md](references/repo-scaffolding.md)** for:
 - Legacy `.vip` cleanup guidance
 - `.gitignore` creation
 
-Create `.gitignore`, and offer `mb connect plan` if the operator wants optional
+Check that `.gitignore` exists (`mb init` writes it), and offer `mb connect plan` if the operator wants optional
 tools. Do not create `.vip/config.yaml` for new repos.
 
 ### 5. Sort Content into Files

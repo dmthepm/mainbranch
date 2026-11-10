@@ -49,11 +49,10 @@ managed through `mb connect`. Keep credentials and machine-specific paths local.
 
 ## Create .gitignore
 
-`mb init` writes `.gitignore`. Only if the repo has none (and no `.gitignore`
-link) create it; never overwrite an existing one:
+`mb init` writes `.gitignore`. Do not write it from the shell. If the repo has
+none, show the user this template and let them create the file:
 
-```bash
-[ -e .gitignore ] || [ -L .gitignore ] || cat > .gitignore << 'EOF'
+```gitignore
 # Secrets
 .env
 *.env.local
@@ -74,7 +73,6 @@ link) create it; never overwrite an existing one:
 # Main Branch local Claude wiring
 .claude/worktrees/
 .claude/skills/mb-*
-EOF
 ```
 
 **Main Branch bridge link entries** in a repo that already had a `.gitignore`:
