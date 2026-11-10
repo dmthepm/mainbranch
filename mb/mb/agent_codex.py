@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import stat
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +24,8 @@ class Rollout:
     stamp: datetime
     path: str
     mtime: float
+    ancestors: tuple[tuple[str, int, int], ...]
+    identity: tuple[int, int, int, int]
 
 
 def timestamp(value: str) -> datetime:
@@ -49,12 +53,20 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
     count = 0
     flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
 
-    def walk(parent: int, name: str, path: str, depth: int = 0) -> None:
+    def walk(
+        parent: int,
+        name: str,
+        path: str,
+        ancestors: tuple[tuple[str, int, int], ...],
+        depth: int = 0,
+    ) -> None:
         nonlocal count
         if depth > 40:
             raise Refusal(4, "inconsistent", "Codex rollout directory depth exceeded")
         fd = os.open(name, flags | os.O_DIRECTORY, dir_fd=parent)
         try:
+            directory = os.fstat(fd)
+            ancestors += ((path, directory.st_dev, directory.st_ino),)
             with os.scandir(fd) as entries:
                 for entry in entries:
                     count += 1
@@ -65,15 +77,17 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
                     if stat.S_ISLNK(kind):
                         raise Refusal(4, "unsupported-format", "Codex rollout tree has a link")
                     if stat.S_ISDIR(kind):
-                        walk(fd, entry.name, child, depth + 1)
+                        walk(fd, entry.name, child, ancestors, depth + 1)
                     elif entry.name.endswith(".jsonl"):
                         if not stat.S_ISREG(kind):
                             raise Refusal(4, "unsupported-format", "not a regular Codex rollout")
-                        result.append(meta(fd, entry.name, child))
+                        result.append(meta(fd, entry.name, child, ancestors))
         finally:
             os.close(fd)
 
-    def meta(parent: int, name: str, path: str) -> Rollout:
+    def meta(
+        parent: int, name: str, path: str, ancestors: tuple[tuple[str, int, int], ...]
+    ) -> Rollout:
         fd = os.open(name, flags | os.O_NONBLOCK, dir_fd=parent)
         try:
             before = os.fstat(fd)
@@ -103,7 +117,15 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
                 getattr(before, k) != getattr(named, k) for k in fields
             ):
                 raise Refusal(4, "transcript-changed", "Codex rollout changed while read")
-            return Rollout(sid, payload["cwd"], stamp, path, before.st_mtime)
+            return Rollout(
+                sid,
+                payload["cwd"],
+                stamp,
+                path,
+                before.st_mtime,
+                ancestors,
+                (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns),
+            )
         except (ValueError, KeyError, TypeError):
             raise Refusal(4, "unsupported-format", "unsupported Codex session metadata") from None
         finally:
@@ -119,12 +141,64 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
                 os.stat("sessions", dir_fd=root, follow_symlinks=False)
             except FileNotFoundError:
                 return []
-            walk(root, "sessions", str(Path(profile) / "sessions"))
+            walk(
+                root,
+                "sessions",
+                str(Path(profile) / "sessions"),
+                ((profile, pinned.st_dev, pinned.st_ino),),
+            )
         finally:
             os.close(root)
     except OSError:
         raise Refusal(4, "search-incomplete", "cannot read Codex rollout tree") from None
     return result
+
+
+@contextlib.contextmanager
+def open_rollout(row: Rollout) -> Iterator[int]:
+    """Reopen without following links and bind every scanned identity through the read."""
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    expected = {path: (dev, ino) for path, dev, ino in row.ancestors}
+    try:
+        with contextlib.ExitStack() as stack:
+            parent = os.open("/", flags | os.O_DIRECTORY)
+            stack.callback(os.close, parent)
+            current = Path("/")
+            directories: list[tuple[int, str, tuple[int, int]]] = []
+            for name in Path(row.path).parts[1:-1]:
+                current /= name
+                fd = os.open(name, flags | os.O_DIRECTORY, dir_fd=parent)
+                stack.callback(os.close, fd)
+                info = os.fstat(fd)
+                identity = (info.st_dev, info.st_ino)
+                if str(current) in expected and identity != expected[str(current)]:
+                    raise Refusal(4, "transcript-changed", "Codex rollout directory changed")
+                directories.append((parent, name, identity))
+                parent = fd
+            name = Path(row.path).name
+            fd = os.open(name, flags | os.O_NONBLOCK, dir_fd=parent)
+            stack.callback(os.close, fd)
+
+            def verify() -> None:
+                info = os.fstat(fd)
+                named = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                for item in (info, named):
+                    if (
+                        not stat.S_ISREG(item.st_mode)
+                        or (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns)
+                        != row.identity
+                    ):
+                        raise Refusal(4, "transcript-changed", "Codex rollout changed")
+                for ancestor, component, identity in directories:
+                    info = os.stat(component, dir_fd=ancestor, follow_symlinks=False)
+                    if not stat.S_ISDIR(info.st_mode) or (info.st_dev, info.st_ino) != identity:
+                        raise Refusal(4, "transcript-changed", "Codex rollout directory changed")
+
+            verify()
+            yield fd
+            verify()
+    except OSError:
+        raise Refusal(4, "transcript-changed", "cannot reopen Codex rollout safely") from None
 
 
 def discover(last: dict[str, Any], cap: int) -> list[Rollout]:

@@ -179,7 +179,12 @@ def _holder_owns(owners: list[int], last: dict[str, Any]) -> bool:
 
 
 def _fresh_record(
-    path: str, session_id: str, since: datetime, runtime: str = "claude", cwd: str | None = None
+    path: str,
+    session_id: str,
+    since: datetime,
+    runtime: str = "claude",
+    cwd: str | None = None,
+    opened_fd: int | None = None,
 ) -> bool | str:
     """True when a record in the file's tail carries the id and is stamped after ``since``.
 
@@ -187,7 +192,11 @@ def _fresh_record(
     ``transcript-changed`` when it was replaced or rewritten while it was read.
     """
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+        fd = (
+            opened_fd
+            if opened_fd is not None
+            else os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+        )
     except OSError:
         return "unsupported-format"
     try:
@@ -217,7 +226,8 @@ def _fresh_record(
     except OSError:
         return "transcript-changed"
     finally:
-        os.close(fd)
+        if opened_fd is None:
+            os.close(fd)
     seen = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
     if seen != (again.st_dev, again.st_ino, again.st_size, again.st_mtime_ns) or (
         named.st_dev,
@@ -264,10 +274,23 @@ def _session(last: dict[str, Any]) -> Field:
         for row in cx.rollouts(
             last["profile_real"], tuple(expect) if expect else None, au.SEARCH_ENTRY_CAP
         ):
-            if row.sid == sid and row.cwd == last["cwd_real"]:
-                found.found.append((last["profile_real"], row.path, row.mtime))
-    else:
-        au._look(last["profile_real"], tuple(expect) if expect else None, sid, found, folder)
+            if row.sid != sid or row.cwd != last["cwd_real"]:
+                continue
+            with cx.open_rollout(row) as fd:
+                fresh = _fresh_record(
+                    row.path,
+                    sid,
+                    datetime.fromisoformat(last["utc"]),
+                    runtime,
+                    last["cwd_real"],
+                    fd,
+                )
+            if isinstance(fresh, str):
+                return Field("session", "unverified", fresh)
+            if fresh:
+                return Field("session", "match")
+        return Field("session", "unverified", "no-session-evidence")
+    au._look(last["profile_real"], tuple(expect) if expect else None, sid, found, folder)
     for _, path, _ in found.found:
         fresh = _fresh_record(
             path, sid, datetime.fromisoformat(last["utc"]), runtime, last["cwd_real"]

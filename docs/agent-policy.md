@@ -42,7 +42,11 @@ Each row:
 A row's role card is `<cwd>/core/roles/<role>.md` when `<cwd>/core/roles`
 exists, otherwise `~/.local/share/agent-role-cards/<role>.md`. Both runtimes
 require a valid card. Claude receives its path with `--append-system-prompt-file`;
-Codex receives it with the `model_instructions_file` config override.
+Codex keeps its native instructions. `up` sets `MB_ROLE` for both runtimes;
+Codex receives repo card fields through the owner-installed
+[SessionStart hook](role-cards.md#codex). Install and trust that hook in the
+selected Codex profile. The hook reads repo cards, not the fallback card folder.
+A valid fallback card alone does not make hook delivery available.
 
 ## The most permissive modes
 
@@ -163,7 +167,7 @@ Attempts are never pruned by mb.
 | runtime's own status | A real run returns the runtime's status, which can equal a code below. |
 | 0 | `--dry-run` printed. |
 | 2 | Invalid policy, `unsafe-store`, `unsafe-path`, `bad-env:<NAME>`, `unsupported-runtime`, bad arguments, root. |
-| 4 | Refused, state unknown: `holder-lost`, `lock-owner-unknown`, `lock-orphan`, `proc-denied`, `inconsistent`, `session-seen`, `no-session-evidence`, `search-incomplete`, `wrong-profile`, `corrupt-state`, `no-proc`, `wait-lost`, `store-lock-timeout` (another `up` held the store lock for 10 s). |
+| 4 | Refused, state unknown: `holder-lost`, `lock-owner-unknown`, `lock-orphan`, `proc-denied`, `inconsistent`, `session-seen`, `no-session-evidence`, `search-incomplete`, `wrong-profile`, `wrong-cwd`, `corrupt-state`, `no-proc`, `wait-lost`, `store-lock-timeout` (another `up` held the store lock for 10 s). |
 | 5 | Refused: `no-session` (no stored session, no `--new`/`--session`), `live` (a running agent), `alias` (the id belongs to another row), `record-failed` (nothing was started), `go-failed`. |
 
 Unknown is never treated as dead. `up` starts a replacement only when the earlier process is
@@ -190,12 +194,15 @@ launches force `--no-daemon`; a shared background server does not satisfy the
 assumption that the session runs in the process mb started.
 
 New command: `codex --no-daemon -m <model> -c model_reasoning_effort=<effort>
--c 'model_instructions_file="<card path>"' [options] [prompt]`.
+[options] [prompt]`.
 Resume command: `codex resume <id>` followed by those same options. The effort
-override is omitted when the row has none. The card override contains a quoted
-path, never card contents. It replaces Codex's base instructions. This is a
-launch setting, not proof that Codex loaded the text. `CODEX_HOME` is set only
-for a named profile; the default uses `~/.codex` under mb's selected HOME.
+override is omitted when the row has none. No card path or contents enter Codex
+argv. The launcher does not set `model_instructions_file`: replacing base
+instructions drops Codex's own safety guidance. Native instructions stay, and
+`MB_ROLE` selects the card through the owner-installed SessionStart hook linked
+above. `check` compares the selected card path with policy, as for Claude; it
+does not establish that the hook ran or the card text loaded. `CODEX_HOME` is
+set only for a named profile; the default uses `~/.codex` under mb's selected HOME.
 
 A new Codex attempt records a null session id with `spawned` provenance. Discovery
 never changes that attempt or the saved state. A subsequent `up` refuses with
@@ -213,8 +220,10 @@ at most 10,000 entries per profile; exceeding that limit or conflicting id field
 returns 4 `inconsistent`. Unsupported metadata, links and special rollout files
 are unknown, never accepted. Formats without both equal id fields are not supported.
 
-`--session <id>` validates the rollout under the selected profile and records
-`owner-confirmed` provenance. An absent rollout refuses with exit 2; one found
+`--session <id>` validates the rollout under the selected profile and working
+folder before recording `owner-confirmed` provenance. Both explicit and saved
+resumes refuse 4 `wrong-cwd` for a rollout from another working folder, without
+starting a process or changing saved state. An absent rollout refuses with exit 2; one found
 only under another policy or historical profile refuses 4 `wrong-profile`.
 The source uses the thread id, `payload.id`, as the resume target. Requiring it
 to equal `session_id` deliberately excludes child threads with a different root id.
@@ -223,7 +232,10 @@ saved id never starts a new session under that id.
 
 For a recorded id, a live check binds metadata to that id and working folder,
 then requires a metadata or transcript-tail timestamp after launch. File
-time alone never satisfies live evidence. For a null id, the transcript tripwire
+time alone never satisfies live evidence. Evidence is reopened component by
+component without following links, with scanned directory and file identities
+checked before and after the bounded read. Replacing a directory or rollout
+returns 4 `transcript-changed`. For a null id, the transcript tripwire
 uses discovered candidates written within the last 60 seconds; it does not scan
 command lines for a guessed id. A dead runtime with no recent evidence can still
 report ended under the stated lifetime assumption.
@@ -316,7 +328,7 @@ keystroke is sent. `mb agent check` with no name is still the policy check above
 | `identity` | The recorded pid is alive with the recorded start time, read twice with no change between. |
 | `exe` | The process still runs the recorded program (device and inode). |
 | `role` | `MB_ROLE` in the process equals the attempt's. |
-| `card` | Policy still names the card file that was launched. It is not proof the text was loaded. |
+| `card` | Policy still names the card file selected at launch. It is not proof the hook ran or the text was loaded. |
 | `profile` | The profile directory is the one recorded (device and inode). |
 | `cwd` | The process folder is the recorded one. |
 | `environment` | The variable names equal the attempt's names, and each value mb set itself is unchanged. |

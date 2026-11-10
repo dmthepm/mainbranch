@@ -37,10 +37,14 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ### Added
 
 - `mb agent up` and `check` now accept Codex rows. Launches force `--no-daemon`,
-  pass the role card as a file path and take reasoning effort from the row.
+  keep Codex's native instructions and take reasoning effort from the row.
+  `MB_ROLE` selects the repo card through the owner-installed SessionStart hook;
+  launch checks compare the card path with policy without claiming its text loaded.
   New sessions keep a null id; bounded discovery lists hints without saving or
-  choosing one. Use `--session <id>` to confirm a rollout under the row's profile.
-  Checks read Codex metadata and fresh transcript evidence, and the lifetime smoke
+  choosing one. Use `--session <id>` to confirm a rollout under the row's profile
+  and working folder. Saved resumes enforce the same folder binding.
+  Checks read Codex metadata and fresh transcript evidence with directory and file
+  identities checked through the read, and the lifetime smoke
   accepts Codex fixture rows. Cards are now required for Codex policy validation.
   Help and source were checked for Codex 0.164.0; real card loading, effective
   effort and lifetime smoke are still unverified. See `docs/agent-policy.md`.

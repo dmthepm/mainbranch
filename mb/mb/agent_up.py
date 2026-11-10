@@ -108,10 +108,6 @@ class Plan:
             argv += ["--no-daemon", "-m", row["model"]]
             if "effort" in row:
                 argv += ["-c", "model_reasoning_effort=" + row["effort"]]
-            argv += [
-                "-c",
-                "model_instructions_file=" + json.dumps(self.card_real, ensure_ascii=False),
-            ]
             for option in row.get("options", []):
                 argv += option.split(" ", 1)
             if mode != "resume" and "start_file" in row:
@@ -614,6 +610,11 @@ def decide(
     if found.incomplete:
         raise Refusal(4, "search-incomplete", found.incomplete)
     if found.under(plan.profile_real):
+        if plan.runtime == "codex" and not any(
+            r.sid == sid and r.cwd == plan.cwd_real
+            for r in cx.rollouts(plan.profile_real, plan.profile_id, SEARCH_ENTRY_CAP)
+        ):
+            raise Refusal(4, "wrong-cwd", "the rollout is not for the selected working folder")
         return Decision("resume", sid, provenance, previous)
     if found.found:
         raise Refusal(4, "wrong-profile", "the transcript is under another profile")

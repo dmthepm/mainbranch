@@ -95,8 +95,6 @@ def test_new_and_resume_argv_and_state(cu: Up) -> None:
         "codex-test",
         "-c",
         "model_reasoning_effort=high",
-        "-c",
-        "model_instructions_file=" + json.dumps(record["card_real"]),
     ]
     assert record["argv"] == expected
     assert record["session_id"] is None and record["session_provenance"] == "spawned"
@@ -142,8 +140,6 @@ def test_named_profile_only_sets_codex_home(cu: Up) -> None:
         "--no-daemon",
         "-m",
         "claude-test-1",
-        "-c",
-        "model_instructions_file=" + json.dumps(plan.card_real),
     ]
 
 
@@ -361,12 +357,31 @@ def test_explicit_codex_id_is_reserved_across_rows(cu: Up) -> None:
     assert code == 5 and "alias" in err
 
 
-def test_codex_card_path_is_a_quoted_toml_string(cu: Up) -> None:
+@pytest.mark.parametrize("mode", ["new", "resume"])
+def test_codex_keeps_native_instructions_and_selects_hook_role(cu: Up, mode: str) -> None:
     plan, _ = au.prepare(cu.host, "planner", {})
-    plan.card_real = '/invented/cards/role "é🪶".md'
-    encoded = plan.argv("new", None)[-1].split("=", 1)[1]
-    assert json.loads(encoded) == '/invented/cards/role "é🪶".md'
-    assert "é🪶" in encoded
+    argv = plan.argv(mode, SID if mode == "resume" else None)
+    assert not any("model_instructions_file" in arg for arg in argv)
+    assert plan.card_real not in argv
+    assert plan.env_set["MB_ROLE"] == plan.row["role"]
+
+
+@pytest.mark.parametrize("stored", [False, True])
+def test_codex_resume_refuses_right_profile_wrong_cwd(cu: Up, stored: bool) -> None:
+    path = rollout(cu.home / ".codex", cwd=str(cu.biz), stamp="2030-01-01T00:00:00+00:00")
+    if stored:
+        assert cu.up(session=SID)[0] == 0
+        cu.age()
+    path = rollout(
+        cu.home / ".codex", cwd="/invented/other-business", stamp="2030-01-01T00:00:00+00:00"
+    )
+    os.utime(path, (1, 1))
+    before = {str(p): p.read_bytes() for p in cu.store.rglob("*.json")}
+    runs = len(cu.runs())
+    code, _, err = cu.up(session=None if stored else SID)
+    assert code == 4 and "wrong-cwd" in err
+    assert len(cu.runs()) == runs
+    assert {str(p): p.read_bytes() for p in cu.store.rglob("*.json")} == before
 
 
 def test_named_codex_profile_reaches_fixture_child_without_inherited_overrides(cu: Up) -> None:
@@ -406,4 +421,35 @@ def test_rollout_replaced_between_search_and_evidence_cannot_match(
 
     monkeypatch.setattr(cx, "rollouts", replace)
     code, text = cv.run()
-    assert code == 4 and "unsupported-format" in text
+    assert code == 4 and "transcript-changed" in text
+
+
+@pytest.mark.parametrize("kind", ["symlink", "directory", "file"])
+def test_rollout_parent_or_file_replaced_before_evidence_is_unknown(
+    cv: Live, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    from mb import agent_codex as cx
+
+    original = cx.rollouts
+
+    def replace(*args):
+        rows = original(*args)
+        path = next(cv.profile.rglob("*.jsonl"))
+        data = path.read_bytes()
+        if kind == "file":
+            path.rename(path.with_suffix(".old"))
+            path.write_bytes(data)
+        else:
+            sessions = cv.profile / "sessions"
+            relative = path.relative_to(sessions)
+            sessions.rename(cv.profile / "old-sessions")
+            target = cv.u.floor / "outside-profile" if kind == "symlink" else sessions
+            (target / relative).parent.mkdir(parents=True)
+            (target / relative).write_bytes(data)
+            if kind == "symlink":
+                sessions.symlink_to(target, target_is_directory=True)
+        return rows
+
+    monkeypatch.setattr(cx, "rollouts", replace)
+    code, text = cv.run()
+    assert code == 4 and "transcript-changed" in text
