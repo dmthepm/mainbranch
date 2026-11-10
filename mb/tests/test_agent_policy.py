@@ -759,7 +759,9 @@ def test_cli_invalid_exits_2_and_names_the_problem(local: World) -> None:
 
 
 def test_cli_named_agent(local: World) -> None:
-    assert CliRunner().invoke(app, ["agent", "check", "planner"]).exit_code == 0
+    # a named check is the live check now: a valid row that never launched has nothing to verify
+    named = CliRunner().invoke(app, ["agent", "check", "planner"])
+    assert named.exit_code == 4 and "no recorded launch" in named.output
     result = CliRunner().invoke(app, ["agent", "check", "nobody"])
     assert result.exit_code == 2
     assert "unknown-agent" in result.output

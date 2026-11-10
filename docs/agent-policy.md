@@ -94,12 +94,27 @@ A Codex row is refused (exit 2, `unsupported-runtime`): Codex launch is not buil
 What it claims: the **launch configuration was verified at start**. The program, folder,
 role card, profile, session id and the environment names and mb-set values were the ones in
 the record. It does not check that the agent behaves like its role, and it does not
-re-check a running agent (that is `mb agent check`, a later step).
+re-check a running agent (that is `mb agent check <name>`, below).
 
 Options: `--dry-run` prints the command and the plan and writes nothing; `--new` starts a
 new session; `--session <id>` resumes a session you name, if its transcript is found.
 A Claude row with no stored session and neither flag is refused (exit 5, `no-session`), so a
 missed migration never starts a silent fresh session: the first launch needs `--new`.
+
+Where to start it: from the user's own login session or the user's service manager, so the
+agent inherits the same confinement as everything else that user runs. An administrator
+starting it for that user with `sudo -u` or `runuser` is not the same session and may skip
+that confinement; do not start agents that way.
+
+In practice:
+
+- The first launch in a new folder shows Claude's folder-trust question. `up` never types, so
+  answer it once in the pane.
+- After a session ends, wait a minute before `up` resumes it. Claude can still write the
+  transcript shortly after it exits, and `up` refuses (`session-seen`) while the transcript
+  changed in the last 60 seconds.
+- Any process of the same user whose command line holds the session id, even a `grep` for it,
+  also makes `up` refuse `session-seen`. Close such commands before resuming.
 
 ### What the child gets
 
@@ -129,8 +144,9 @@ One line each where you will meet them:
   it is still absent; a profile that went missing or changed is `search-incomplete`.
 - A transcript found only under a different profile than the row's current one is `wrong-profile`,
   for any session, including when the row's profile was changed after launch.
-- A transcript counts as found when it is a regular file whose first line is a JSON object; the real
-  Claude format is not yet confirmed (a file that fails this is `search-incomplete`).
+- A transcript counts as found when it is a regular file whose first line is a JSON object (a file
+  that fails this is `search-incomplete`). Claude Code 2.1.309 writes
+  `<profile>/projects/<folder>/<session id>.jsonl` in this form.
 - A runtime process that has exited but is not yet reaped counts as dead.
 
 ### The store
@@ -202,8 +218,7 @@ The reviewed helper list is built in and short: `/bin/sh`, `/bin/dash`, `/bin/ba
 version with the machine owner and says the first smoke produces it, so treat this one as a
 starting point. A helper that is not on it fails the smoke until it is reviewed and added.
 
-`mb agent check <name>` without the flag is still the policy check. The live check of a running
-agent is not built.
+`mb agent check <name>` without the flag is the live check, below.
 
 ### Running the real smoke (by hand, not in tests)
 
@@ -222,13 +237,87 @@ Do this on a disposable fixture row, never on a working agent, after each pinned
 
 ### Confirming the Claude flags on the installed version (by hand)
 
-`up` builds `--session-id`, `--resume`, `--append-system-prompt-file` and `--effort`. These are
-not yet confirmed against the installed Claude. Run `claude --help` and check that all four are
-listed and what they take. Then do one real run on the fixture row: start it with `--new` and a
+`up` builds `--session-id`, `--resume`, `--append-system-prompt-file` and `--effort`. Confirmed on
+Claude Code 2.1.309: all four work, a resume keeps the same session id and transcript, and the role
+card text reaches the session. That version's `--help` names `--append-system-prompt-file` only inside
+another option's text, so check it by the run below, not by the help alone. Repeat for each new
+version: run `claude --help` and check what the flags take. Then do one real run on the fixture row: start it with `--new` and a
 short `effort`, check the transcript is named with the id `up` recorded, end it, run
 `mb agent up <fixture>` again and check it resumes the same id, and look in the transcript or the
-session for the role card text. Record the version and what you saw. Until this is done the flags
-are unconfirmed.
+session for the role card text. Record the version and what you saw. Until this is done for a
+version, its flags are unconfirmed.
 
-Not built yet: the live `check` that compares a running agent with its record (`--wait`,
-`--json`, doctor), and Codex.
+## The live check: `mb agent check <name>`
+
+`mb agent check planner` asks whether a running agent still has the launch configuration it was
+given. It reads the attempt `up` recorded and compares it with what /proc shows now. It is read
+only: no lock is taken, the lock file is never created, nothing is written, and no signal or
+keystroke is sent. `mb agent check` with no name is still the policy check above.
+
+| Field | Match means |
+| --- | --- |
+| `identity` | The recorded pid is alive with the recorded start time, read twice with no change between. |
+| `exe` | The process still runs the recorded program (device and inode). |
+| `role` | `MB_ROLE` in the process equals the attempt's. |
+| `card` | Policy still names the card file that was launched. It is not proof the text was loaded. |
+| `profile` | The profile directory is the one recorded (device and inode). |
+| `cwd` | The process folder is the recorded one. |
+| `environment` | The variable names equal the attempt's names, and each value mb set itself is unchanged. |
+| `session` | A record in the session's transcript under that profile carries the id and is stamped after the launch. A recent file time alone is not evidence. |
+| `row` | The policy row is unchanged since launch (otherwise `mismatch (row)`). |
+| `argv` | The command line equals the recorded one. A difference is only `unverified (argv-rewritten)`, because runtimes may rewrite their title. |
+| `env-passed` | Always `unverified (not-stored)`. |
+
+Each field is `match`, `mismatch` or `unverified (reason)`. A required field that cannot be
+observed makes the answer 4 even when another field mismatches; 1 needs every required field
+observed. `argv`, `row` and `env-passed` never block an ok, though a `row` mismatch is itself a 1.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | ok: launch configuration verified. |
+| 1 | mismatch, fields named. No value is printed, only names such as `env:MB_ROLE`. |
+| 2 | invalid policy, `unsafe-store`, unknown agent, root, bad arguments. |
+| 3 | `ended`: the lock is free, the runtime identity is dead, and no same-user command line or fresh transcript names the session. |
+| 4 | unknown: `proc-denied`, `inconsistent`, `exe-changed`, `lock-orphan`, `lock-owner-unknown`, `holder-lost`, `session-seen`, `scan-incomplete`, `no-session-evidence`, `search-incomplete`, `unsupported-format`, `no-proc`, `corrupt-state`. An agent never launched is also 4 (`no-session-evidence`). |
+
+The lock decides what is judged. Held by the recorded holder with the runtime alive: the fields are
+judged. Held by the holder with the runtime gone: `lock-orphan`. Held by anyone else or unreadable:
+`lock-owner-unknown`. Free with the runtime alive: `holder-lost`; mb never ends it. Free and dead:
+`ended` (3) unless the tripwire fires. The tripwire is a same-user command line naming the session
+id, or a transcript written in the last 60 seconds (`session-seen`); a negative result proves
+nothing.
+
+`--wait` repeats the check every half second while the answer is 3 or 4, for `--timeout` seconds
+(default 30, at most 300), and prints the last answer. A 0, 1 or 2 ends it at once. Use it right
+after `up`, before the first transcript record exists.
+
+`--json` prints one object. `shape_version` is 1; the keys are `agent`, `result`
+(`ok`, `mismatch`, `refused`, `ended`, `unknown`), `exit_code`, `tag`, `detail`, `attempt`,
+`row_rev`, `launched`, `fields` (each `name`, `status`, `reason`, `required`), `problems`,
+`assumption`, `limits`, plus the usual result envelope. Keys are only ever added.
+
+**What ok does not prove.** It does not prove the session runs in that process: that is the
+lifetime assumption (a supported runtime keeps its session in the process mb started), which the
+smoke gives evidence for per runtime version and which every output repeats. A forked waiting
+parent can pass `check`; only the smoke sees it. It does not prove the agent behaves like its role.
+Passed values (`SSH_AUTH_SOCK`, `HEAVY_LOCK`, terminal and Herdr ids) are not stored, so a re-exec
+that changes only one of them is still ok. Anything the runtime changes in memory, files it reads
+after start, the model and effort in effect, the account and whether a hook ran are not checked.
+Another user's processes may not be readable at all (`proc-denied`, 4).
+
+The observation is a sequence of reads, not an atomic snapshot of a process that can change at any
+moment. To bound that, the runtime's identity and program are read again after everything else, the
+row lock is read again after the fields (it is opened as an existing file only, never created or
+locked, and matched by device and inode in `/proc/locks`), and a transcript whose identity, size or
+modification time changes across its read is unknown (`transcript-changed`). Any such change is 4,
+which wins over a mismatch. Session evidence comes only from
+`<profile>/projects/<folder>/<session-id>.jsonl`, where the folder is the recorded working folder's
+real path with every `/` and `.` replaced by `-` (confirmed on Claude Code 2.1.309); `up`'s own
+search of every project folder is unchanged.
+
+`mb doctor` shows one `agents` row when `agents.json` exists, from a read-only check of every
+agent: ended or unknown warns, a mismatch fails, an agent never launched is not a finding.
+
+Not built yet: Codex launch and Codex checks. The live check of a running Claude agent is built,
+and the Claude flags are confirmed on Claude Code 2.1.309 only; repeat the confirmation for each
+new version.

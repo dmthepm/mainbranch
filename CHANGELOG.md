@@ -30,17 +30,33 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   session id after a crash. `--dry-run` prints the command without any passed value. The claim is
   that the launch configuration was verified at start: it does not check that the agent behaves like
   its role, does not re-check a running agent, passed values (`HEAVY_LOCK`, `SSH_AUTH_SOCK`) are
-  not stored or compared, and the Claude flags are not yet confirmed against the installed version.
-  Codex rows are refused. See `docs/agent-policy.md`.
+  not stored or compared, and the Claude flags are confirmed on Claude Code 2.1.309 only. Start it
+  from your own login or service manager, never with `sudo -u` or `runuser`. Codex rows are refused.
+  See `docs/agent-policy.md`.
+- `mb agent check <name>` now checks a running Claude agent against the record `mb agent up` made
+  of its launch: the process identity (read twice), its program, the names in its environment and
+  the values mb set, its folder, profile directory, role card, policy row, and a transcript record
+  written after the launch. Each field says match, mismatch or unverified, and the exit says what
+  it adds up to: 0 ok, 1 mismatch, 2 invalid policy or unsafe store, 3 ended, 4 unknown. Something
+  that cannot be read is 4, never ok and never ended. `--wait` keeps checking while the answer is
+  3 or 4 (`--timeout`, at most 300 seconds), `--json` prints a versioned result, and `mb doctor`
+  shows one read-only `agents` row. The fields are read one after another, not as an atomic
+  snapshot: the runtime's identity and program are read again last, the holder's lock again after
+  the fields, and a transcript replaced or rewritten while it was read is unknown, never ok. Session
+  evidence is read only from the transcript folder of the recorded working folder. The claim is
+  launch configuration only. It does not prove the
+  session runs in that process (a forked waiting parent can pass; only the smoke sees it), does not
+  show that the agent behaves like its role, and does not compare passed values such as
+  `SSH_AUTH_SOCK`, which are not stored. `mb agent check` with no name is still the policy check.
 - `mb agent check <name> --smoke-marker <marker>` judges the lifetime smoke for a running fixture
   agent: the process that ran the smoke's tool command must sit under the recorded Claude process
   through only reviewed helpers (a short built-in list of shells and `bwrap`), and that process must
   still match its record. Helpers are approved by the program actually running, and anything that
   cannot be read, or changes during the read, is unknown (exit 4), never a pass. A program that forks, waits and lets a child do the work fails it. A pass
   is evidence for the installed version under that one observation, not proof for every session,
-  and mb does not run it at launch. The live check of a running agent is not built, `check`
-  without the flag is still the policy check, and the smoke and the Claude flag confirmation are
-  documented as manual steps that have not been run.
+  and mb does not run it at launch. The live check of a running agent is built (`mb agent check
+  <name>`), `check` with no name is still the policy check, and the Claude flags and the smoke
+  are confirmed on Claude Code 2.1.309 only. Codex launch is not built.
 
 ## [0.6.24] - 2026-11-09
 

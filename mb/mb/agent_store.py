@@ -119,6 +119,7 @@ class FileLock:
             self.close()
             raise Refusal(2, "unsafe-store", f"{path}: has a POSIX ACL")
         self.inode = info.st_ino
+        self.device = info.st_dev
 
     def try_lock(self) -> bool:
         assert self.fd is not None

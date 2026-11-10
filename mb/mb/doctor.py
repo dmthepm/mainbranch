@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from mb import agent_check as agent_check_mod
 from mb import checkpoint as checkpoint_mod
 from mb import codex as codex_mod
 from mb import connect as connect_mod
@@ -1098,6 +1099,8 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
         }
     )
     checks.append(connect_mod.doctor_check(repo, status=integration_status))
+    if (agents_check := agent_check_mod.doctor_check()) is not None:
+        checks.append(agents_check)
     onboarding = onboard_mod.onboarding_status(repo)
     onboarding_summary = onboarding["summary"]
     checks.append(
