@@ -332,6 +332,23 @@ def test_a_runtime_that_dies_during_the_read_is_unknown(
     assert code == 4 and "changed" in text
 
 
+def test_a_runtime_pid_reused_after_the_identity_check_is_unknown(
+    s: Smoke, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s.chain()
+    real = au.identity
+
+    def identity(pid: int, start: int, boot: str) -> str:
+        state = real(pid, start, boot)
+        # the recorded runtime exits and a same-program process takes its pid
+        s.proc.add(RUNTIME_PID, 1, "claude", env=s.env, start=START + 1)
+        return state
+
+    monkeypatch.setattr(au, "identity", identity)
+    code, text = s.run()
+    assert code == 4 and "changed" in text
+
+
 def test_a_runtime_that_execs_during_the_read_is_unknown(
     s: Smoke, monkeypatch: pytest.MonkeyPatch
 ) -> None:

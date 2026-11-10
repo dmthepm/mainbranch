@@ -197,6 +197,9 @@ def _verdict(host: ap.Host, name: str, marker: str, out: TextIO) -> int:
         raise Refusal(3, "ended", f"runtime pid {pid} has ended; the smoke needs it running")
     marker_pid = _marker_pid(marker)
     seen = {pid: _observe(pid)}
+    if seen[pid].start != start:
+        # The pid was reused after the identity check: bind the snapshot to the launch.
+        raise Refusal(4, "changed", f"runtime pid {pid} is no longer the recorded process")
     if seen[pid].exe != runtime_id:
         raise Refusal(4, "exe-changed", f"runtime pid {pid} no longer runs the recorded program")
     env = _environ(pid)
