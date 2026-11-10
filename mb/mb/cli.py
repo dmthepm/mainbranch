@@ -21,6 +21,7 @@ from typer.core import TyperGroup
 
 from mb import __version__
 from mb import agent_policy as agent_policy_mod
+from mb import agent_up as agent_up_mod
 from mb import connect as connect_mod
 from mb import doctor as doctor_mod
 from mb import feedback as feedback_mod
@@ -2545,7 +2546,7 @@ def machine_update_cmd(
     raise typer.Exit(report["exit_code"])
 
 
-agent_app = typer.Typer(help="Agents on this computer: check the policy they are launched from.")
+agent_app = typer.Typer(help="Agents on this computer: check the policy, start an agent from it.")
 app.add_typer(agent_app, name="agent")
 
 
@@ -2561,6 +2562,24 @@ def agent_check_cmd(
         raise typer.Exit(2) from None
     typer.echo(agent_policy_mod.human_report(report))
     raise typer.Exit(0 if report.ok else 2)
+
+
+@agent_app.command("up")
+def agent_up_cmd(
+    name: str = typer.Argument(..., help="The agent's name in agents.json."),
+    new: bool = typer.Option(False, "--new", help="Start a new session instead of resuming."),
+    session: str | None = typer.Option(None, "--session", help="Resume this session id."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the command; start nothing."),
+) -> None:
+    """Start one Claude agent from its row and wait. Launch configuration is verified at start."""
+    try:
+        code = agent_up_mod.up(
+            agent_policy_mod.Host.local(), name, new=new, session=session, dry_run=dry_run
+        )
+    except Exception:  # noqa: BLE001
+        typer.echo("mb: agent up: internal error; nothing was verified.", err=True)
+        raise typer.Exit(2) from None
+    raise typer.Exit(code)
 
 
 role_app = typer.Typer(help="Agent role cards: list, show, check, and the session hook.")

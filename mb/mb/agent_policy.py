@@ -97,6 +97,12 @@ class Report:
     skipped: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # What `mb agent up` builds from: the parsed policy and the paths check proved.
+    home: str = ""
+    store: str = ""
+    policy: dict[str, Any] = field(default_factory=dict)
+    profiles: dict[str, Any] = field(default_factory=dict)
+    cards: dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -457,6 +463,7 @@ def _check_card(
         return
     for error in roles.card_text_errors(text, role, Path(cwd)):
         c.add("card", _loc(i, "role"), error)
+    report.cards[row["name"]] = found.real
 
 
 def _check_default_profile(
@@ -567,6 +574,7 @@ def check(host: Host, name: str | None = None) -> Report:
         return report
     home = home_found.real
     store = "/".join([home, *STORE_PARTS])
+    report.home, report.store = home, store
     if _check_dir(c, host, store, owner_only=True, plain_below=home, must_exist=False) is None:
         if not report.problems:
             c.add("policy-missing", store, "no agents directory")
@@ -608,6 +616,7 @@ def check(host: Host, name: str | None = None) -> Report:
         rows = []
     _check_path_list(c, host, policy.get("path"), report)
     profiles = _check_profiles(c, host, home, policy.get("profiles"))
+    report.policy, report.profiles = policy, profiles
     names: set[str] = set()
     default_seen: set[str] = set()
     for i, row in enumerate(rows):
