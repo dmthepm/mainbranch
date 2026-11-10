@@ -138,7 +138,7 @@ One line each where you will meet them:
 `~/.local/state/mainbranch/agents/` holds `state.json`, `attempts/<id>.json` (written once, never
 edited), `locks/<name>.lock` and `.store.lock`. Folders are created 0700 and files 0600; every
 `up` refuses `unsafe-store` (exit 2, no chmod) if one is owned by someone else, has group or
-other bits, or carries an ACL. Every agent that runs as this user can read it, and so can root
+other bits, or carries an ACL (lock files included), or if mb cannot check for an ACL. Every agent that runs as this user can read it, and so can root
 and anything that copies it. Session ids and paths are private identifiers, not credentials.
 Attempts are never pruned by mb.
 
@@ -164,7 +164,9 @@ After an interruption `up` reads `state.json`, checks that it agrees with its la
 under the row's profile means `resume`. An id mb chose itself with no transcript, after a complete
 search of every profile that could hold one (at most 10,000 entries each), is run again as
 `new-retry` with the same id. An id you gave with `--session` and no transcript is refused. An
-incomplete search is `search-incomplete`, never "no transcript".
+incomplete search is `search-incomplete`, never "no transcript", including before `--new`
+and before a resume. A transcript that is not a regular file (a pipe, device or link) is never
+opened and counts as an unsupported format.
 
 Not built yet (the next part): `mb agent check --smoke-marker`, the waiting-wrapper checks and
 the live `check` that compares a running agent with its record, and confirming the flags against

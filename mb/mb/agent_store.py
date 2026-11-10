@@ -10,6 +10,7 @@ and edit all of it: that is a stated limit, not a defence.
 from __future__ import annotations
 
 import contextlib
+import errno
 import fcntl
 import json
 import os
@@ -37,11 +38,22 @@ class Refusal(Exception):
         super().__init__(f"{tag}: {detail}")
 
 
-def _has_acl(path: Path) -> bool:
+def _has_acl(target: Path | int) -> bool:
+    """True when the object carries a POSIX ACL; a descriptor binds the answer to what is open.
+
+    Only "extended attributes are not supported here" (ENOTSUP) counts as no ACL. Any other
+    failure leaves safety unestablished, so it is ``unsafe-store``.
+    """
     try:
-        return any(a in ACL_ATTRS for a in os.listxattr(path, follow_symlinks=False))
-    except OSError:
-        return False  # no extended attributes on this filesystem, so no ACL
+        if isinstance(target, int):
+            names = os.listxattr(target)
+        else:
+            names = os.listxattr(target, follow_symlinks=False)
+    except OSError as exc:
+        if exc.errno == errno.ENOTSUP:  # also EOPNOTSUPP: same value on Linux
+            return False
+        raise Refusal(2, "unsafe-store", f"cannot check ACLs: {exc.strerror}") from None
+    return any(a in ACL_ATTRS for a in names)
 
 
 def audit(path: Path, uid: int, *, directory: bool) -> bool:
@@ -59,10 +71,14 @@ def audit(path: Path, uid: int, *, directory: bool) -> bool:
         why = "owned by someone else"
     elif info.st_mode & 0o077:
         why = f"mode {info.st_mode & 0o777:04o} gives group or other access"
-    elif _has_acl(path):
-        why = "has a POSIX ACL"
     else:
-        return True
+        try:
+            acl = _has_acl(path)
+        except Refusal as refusal:
+            raise Refusal(2, "unsafe-store", f"{path}: {refusal.detail}") from None
+        if not acl:
+            return True
+        why = "has a POSIX ACL"
     raise Refusal(2, "unsafe-store", f"{path}: {why}")
 
 
@@ -94,6 +110,14 @@ class FileLock:
         if info.st_uid != uid or info.st_mode & 0o077 or not stat.S_ISREG(info.st_mode):
             self.close()
             raise Refusal(2, "unsafe-store", f"{path}: not a private regular file")
+        try:
+            acl = _has_acl(self.fd)
+        except Refusal as refusal:
+            self.close()
+            raise Refusal(2, "unsafe-store", f"{path}: {refusal.detail}") from None
+        if acl:
+            self.close()
+            raise Refusal(2, "unsafe-store", f"{path}: has a POSIX ACL")
         self.inode = info.st_ino
 
     def try_lock(self) -> bool:

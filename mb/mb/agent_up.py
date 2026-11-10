@@ -366,6 +366,9 @@ def _look(profile: str, expect: tuple[int, int] | None, session_id: str, out: Se
 
 
 def _candidate(profile: str, path: str, out: Search) -> None:
+    def unsupported() -> None:
+        out.incomplete = out.incomplete or f"unsupported transcript format: {path}"
+
     try:
         info = os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
@@ -373,16 +376,26 @@ def _candidate(profile: str, path: str, out: Search) -> None:
     except OSError as exc:
         out.incomplete = out.incomplete or f"cannot read {path}: {exc.strerror}"
         return
+    if not stat.S_ISREG(info.st_mode):  # a FIFO, device or link would block or misread
+        return unsupported()
     try:
-        with open(path, "rb") as handle:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except OSError:
+        return unsupported()
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):  # swapped after the lstat
+            return unsupported()
+        with os.fdopen(fd, "rb", closefd=False) as handle:
             first = handle.readline(65_536)
-        ok = stat.S_ISREG(info.st_mode) and isinstance(json.loads(first), dict)
+        ok = isinstance(json.loads(first), dict)
     except (OSError, ValueError):
         ok = False
+    finally:
+        os.close(fd)
     if ok:
         out.found.append((profile, path, info.st_mtime))
     else:
-        out.incomplete = out.incomplete or f"unsupported transcript format: {path}"
+        unsupported()
 
 
 def chain_of(store: Store, last: str | None) -> list[dict[str, Any]]:
@@ -511,10 +524,10 @@ def decide(
         if sid is None:
             raise Refusal(4, "corrupt-state", "a claude row has no session id")
     found = evidence(sid)
-    if found.under(plan.profile_real):
-        return Decision("resume", sid, provenance, previous)
     if found.incomplete:
         raise Refusal(4, "search-incomplete", found.incomplete)
+    if found.under(plan.profile_real):
+        return Decision("resume", sid, provenance, previous)
     if found.found:
         raise Refusal(4, "wrong-profile", "the transcript is under another profile")
     if provenance == "spawned":
@@ -530,6 +543,8 @@ def _tripwire(plan: Plan, last: dict[str, Any], seen: dict[str, Search]) -> None
     if recent or pids:
         names = [f"pid {p}" for p in pids] + recent
         raise Refusal(4, "session-seen", "; ".join(names))
+    if (why := seen[sid].incomplete) is not None:  # before --new or any resume
+        raise Refusal(4, "search-incomplete", why)
 
 
 def _reserve(plan: Plan, state: dict[str, dict[str, Any]], sid: str) -> None:

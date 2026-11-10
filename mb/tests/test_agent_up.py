@@ -8,6 +8,7 @@ in a subprocess.
 
 from __future__ import annotations
 
+import errno
 import io
 import json
 import os
@@ -421,6 +422,61 @@ def test_a_store_file_with_an_acl_is_refused(u: Up) -> None:
     assert len(u.runs()) == 1
 
 
+def _fake_listxattr(monkeypatch: pytest.MonkeyPatch, suffix: str, result: Any) -> None:
+    """Answer for one store file, by path or by descriptor; ``result`` is a list or an OSError."""
+    real = os.listxattr
+
+    def fake(path: Any, **kw: Any) -> list[str]:
+        name = os.readlink(f"/proc/self/fd/{path}") if isinstance(path, int) else str(path)
+        if not name.endswith(suffix):
+            return real(path, **kw)
+        if isinstance(result, OSError):
+            raise result
+        return list(result)
+
+    monkeypatch.setattr(os, "listxattr", fake)
+
+
+@pytest.mark.parametrize("suffix", [".store.lock", "locks/planner.lock"])
+def test_a_lock_file_with_an_acl_is_refused_before_any_fork(
+    u: Up, monkeypatch: pytest.MonkeyPatch, suffix: str
+) -> None:
+    u.up()
+    _fake_listxattr(monkeypatch, suffix, ["system.posix_acl_access"])
+    code, _, err = u.up()
+    assert code == 2 and "unsafe-store" in err and "POSIX ACL" in err
+    assert len(u.runs()) == 1
+
+
+@pytest.mark.parametrize(
+    "suffix", [".store.lock", "locks/planner.lock", "state.json", "attempts", "locks"]
+)
+def test_an_acl_inspection_error_is_refused_before_any_fork(
+    u: Up, monkeypatch: pytest.MonkeyPatch, suffix: str
+) -> None:
+    u.up()
+    _fake_listxattr(monkeypatch, suffix, OSError(errno.EACCES, "Permission denied"))
+    code, _, err = u.up()
+    assert code == 2 and "unsafe-store" in err and "ACL" in err
+    assert len(u.runs()) == 1
+
+
+def test_only_an_unsupported_xattr_error_counts_as_no_acl(
+    u: Up, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    u.up()
+    u.transcripts()
+    real = os.listxattr
+
+    def unsupported(path: Any, **kw: Any) -> list[str]:
+        raise OSError(errno.ENOTSUP, "Operation not supported")
+
+    monkeypatch.setattr(os, "listxattr", unsupported)
+    assert u.up(new=True)[0] == 0
+    monkeypatch.setattr(os, "listxattr", real)
+    assert len(u.runs()) == 2
+
+
 # --- markers: no passed value reaches anything ---------------------------------------------
 
 
@@ -464,6 +520,26 @@ def test_passed_values_arrive_but_are_never_recorded_or_printed(u: Up, tmp_path:
         "ANTHROPIC_API_KEY" in d_out.getvalue()
         and "HEAVY_LOCK (value not shown)" in d_out.getvalue()
     )
+
+
+@pytest.mark.parametrize("point", ["replace-attempt", "replace-state"])
+def test_interrupted_writes_leave_no_passed_value_even_in_temporary_files(
+    u: Up, point: str
+) -> None:
+    env = {
+        "TERM_PROGRAM_VERSION": f"v-{MARKER}-1",
+        "HERDR_PANE_ID": f"pane-{MARKER}",
+        "LANG": f"C.{MARKER}",
+        "HEAVY_LOCK": f"/tmp/{MARKER}-heavy/heavy.lock",
+    }
+    if point == "replace-state":
+        u.transcripts()
+        u.up(environ=env)
+        u.age()
+    _killed(u, point, new=True, environ=env)
+    time.sleep(0.3)
+    assert list(u.store.rglob("*.tmp")), "the killed write must have left its temporary file"
+    assert MARKER not in _all_store_text(u)
 
 
 @pytest.mark.parametrize(
@@ -618,6 +694,97 @@ def test_an_entry_cap_hit_is_search_incomplete(u: Up, monkeypatch: pytest.Monkey
     monkeypatch.setattr(au, "SEARCH_ENTRY_CAP", 2)
     code, _, err = u.up()
     assert code == 4 and "search-incomplete" in err and "entry cap" in err
+
+
+def _alt_agent(u: Up) -> Path:
+    prof = u.mkdir(u.home / "profiles/alt")
+    u.write(
+        {"version": 1, "profiles": {"alt": {"claude": str(prof)}}, "agents": [u.row(profile="alt")]}
+    )
+    return prof
+
+
+def test_new_after_an_incomplete_tripwire_search_is_search_incomplete(u: Up) -> None:
+    prof = _alt_agent(u)
+    u.up()
+    prof.rename(u.home / "profiles/moved")
+    prof.mkdir(mode=0o700)  # a recorded profile whose inode changed; nothing recent, no process
+    code, _, err = u.up(new=True)
+    assert code == 4 and "search-incomplete" in err and "profile changed" in err
+    assert len(u.runs()) == 1
+
+
+def test_resume_with_a_current_transcript_still_refuses_an_incomplete_search(u: Up) -> None:
+    prof = _alt_agent(u)
+    u.transcripts()
+    u.up()
+    sid = sid_of(u.runs()[0])
+    assert (prof / f"projects/p/{sid}.jsonl").exists()
+    other = u.mkdir(u.home / ".claude/projects/x")  # the default profile is searched too
+    (other / f"{sid}.jsonl").write_text("not json at all\n")
+    u.age()
+    code, _, err = u.up()
+    assert code == 4 and "search-incomplete" in err and "unsupported transcript format" in err
+    assert len(u.runs()) == 1
+
+
+def test_a_session_override_found_in_the_current_profile_still_refuses_an_incomplete_search(
+    u: Up,
+) -> None:
+    prof = _alt_agent(u)
+    u.up()
+    other_sid = "22222222-2222-2222-2222-222222222222"
+    mine = u.mkdir(prof / "projects/p")
+    (mine / f"{other_sid}.jsonl").write_text("{}\n")
+    odd = u.mkdir(u.home / ".claude/projects/x")
+    (odd / f"{other_sid}.jsonl").write_text("not json at all\n")
+    u.age()
+    code, _, err = u.up(session=other_sid)
+    assert code == 4 and "search-incomplete" in err
+    assert len(u.runs()) == 1
+
+
+def _no_hang(u: Up) -> tuple[int, str]:
+    proc = u.drive()
+    try:
+        return proc.wait(timeout=5), proc.stderr
+    finally:
+        proc.popen.kill()
+
+
+@pytest.mark.parametrize("via_symlink", [False, True])
+def test_a_fifo_transcript_is_search_incomplete_without_blocking(u: Up, via_symlink: bool) -> None:
+    u.up()
+    sid = sid_of(u.runs()[0])
+    slug = u.mkdir(u.home / ".claude/projects/x")
+    if via_symlink:
+        os.mkfifo(u.floor / "pipe")
+        (slug / f"{sid}.jsonl").symlink_to(u.floor / "pipe")
+    else:
+        os.mkfifo(slug / f"{sid}.jsonl")
+    u.age()
+    code, err = _no_hang(u)
+    assert code == 4 and "search-incomplete" in err and "unsupported transcript format" in err
+    assert len(u.runs()) == 1
+
+
+def test_a_candidate_swapped_for_a_fifo_after_inspection_is_not_read(
+    u: Up, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fifo, regular = str(u.floor / "pipe"), u.floor / "plain"
+    os.mkfifo(fifo)
+    regular.write_text("{}\n")
+    real = os.lstat
+    monkeypatch.setattr(os, "lstat", lambda p, **k: real(regular if str(p) == fifo else p, **k))
+    old = signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(AssertionError("hung")))
+    signal.alarm(5)
+    try:
+        out = au.Search()
+        au._candidate("profile", fifo, out)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+    assert out.found == [] and out.incomplete and "unsupported transcript format" in out.incomplete
 
 
 def test_attempt_and_state_that_disagree_are_corrupt_state(u: Up) -> None:
