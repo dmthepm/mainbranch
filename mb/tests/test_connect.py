@@ -3945,14 +3945,66 @@ def test_metadata_refuses_a_password_given_as_a_named_setting(value: str) -> Non
         "git@github.com:example-org/example-repo.git",
         "host.example.invalid:5432",
         "https://[2001:db8::1]:8443/shop",
-        "https://host.example.invalid/db?password=",
-        "https://host.example.invalid/db?password=&user=rowan",
-        "host=host.example.invalid;password=;user=rowan",
         "https://host.example.invalid/db?bypass=1&compass=north",
+        "host=host.example.invalid bypass=1 compass = north",
+        "https://host.example.invalid/db?password_hint_url=https://help.example.invalid",
+        "https://host.example.invalid/db?passport=1&passage=2&pwdx=3",
+        "the password goes in the owner terminal",
     ],
 )
 def test_metadata_passes_values_with_no_named_password(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == ""
+
+
+# Review qa0624-67e27da: shapes the first named-password check let through.
+_NAMED_PASSWORD_SHAPES = [
+    "host=db.example.invalid user=fixture password = fixture_pw",
+    "host=db.example.invalid password= 'fixture_pw'",
+    "Server=db.example.invalid;Password =fixture_pw;",
+    "https://db.example.invalid/?password==fixture_pw",
+    "https://db.example.invalid/?password=%3Dfixture_pw",
+    "https://db.example.invalid/?password=/fixture_pw",
+    "https://db.example.invalid/?password=%26fixture_pw",
+    "https://db.example.invalid/?password=%3Bfixture_pw",
+    "https://db.example.invalid/?password=%20fixture_pw",
+    "host=db.example.invalid%20password%20%3D%20fixture_pw",
+    "host%3Ddb.example.invalid%20password%20%3D%20fixture_pw",
+    "host=db.example.invalid password=''",
+    'Server=db.example.invalid;Password="";',
+    "host=db.example.invalid password=",
+    "https://db.example.invalid/?passwd=x",
+    "https://db.example.invalid/?PWD=x",
+    "host=db.example.invalid 'password' = x",
+    "https://db.example.invalid/?db_password=x",
+    "https://db.example.invalid/?password%253Dx",
+]
+
+
+@pytest.mark.parametrize("value", _NAMED_PASSWORD_SHAPES)
+def test_metadata_refuses_every_named_password_shape(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize("value", _NAMED_PASSWORD_SHAPES)
+def test_connect_refuses_a_named_password_before_writing_config(
+    value: str, tmp_path: Path, monkeypatch
+) -> None:
+    _local_secret_env(monkeypatch, tmp_path)
+    repo = tmp_path / "biz"
+    repo.mkdir()
+
+    with pytest.raises(ValueError) as caught:
+        connect_mod.connect_provider(
+            "acme-db",
+            repo=repo,
+            custom=True,
+            token="fixture-token",
+            metadata_pairs=["dsn=" + value],
+        )
+
+    assert "url_password" in str(caught.value)
+    assert "fixture_pw" not in str(caught.value)
+    assert not (repo / ".mb" / "connect.yaml").exists()
 
 
 def test_metadata_named_password_check_is_linear_time() -> None:
@@ -3962,6 +4014,11 @@ def test_metadata_named_password_check_is_linear_time() -> None:
     start = time.perf_counter()
     connect_mod.metadata_value_rule(value)
     assert time.perf_counter() - start < 2
+
+    for hostile in ("pass" + " " * 200000, "pass " * 40000, "%25" * 60000 + "password"):
+        start = time.perf_counter()
+        connect_mod.metadata_value_rule(hostile)
+        assert time.perf_counter() - start < 2
 
 
 def test_metadata_refuses_a_tab_inside_the_userinfo_split() -> None:

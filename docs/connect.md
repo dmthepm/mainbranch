@@ -523,10 +523,15 @@ host label or behind an encoded `%2F` is refused. A URL that does not
 parse, such as one with a bad port, is judged from its decoded raw pieces.
 
 A password in a URL is refused as `url_password` with or without a scheme.
-A password given as a named setting is refused too: a non-empty value for
-`password`, `pass` or `pwd` (any case, encoded or not) in a URL query, a JDBC
-string or a `key=value;key=value` string (`host=x;password=y`, libpq, ADO). A
-key named `password` with an empty value passes.
+A password given as a named setting is refused too: a setting named `password`,
+`passwd`, `pass` or `pwd` (any case) followed by optional spaces and `=`,
+anywhere in the value or in its percent-decoded form (decoded until stable, at
+most three passes). The whole string is read, so spaces, quotes and an encoded
+`=`, `&`, `;` or space around the setting do not hide it. The value does not
+matter: an empty `password=` or `password=''` is refused too, because no
+password setting belongs in shareable metadata. The name must start at a word
+boundary (letters and digits): `db_password=x` is refused, while `bypass=1`,
+`compass=north` and `password_hint_url=...` pass.
 Two checks run and a value is refused when either says so. The first reads each
 URL with a scheme the way Python's URL parser does, nested URLs included (a URL
 nested more than three levels deep is refused), so a comma, `;`, `&` or tab

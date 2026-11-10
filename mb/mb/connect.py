@@ -1635,9 +1635,14 @@ _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-
 # `host:5432` and emails have no `:` before the `@`, so they pass.
 _METADATA_URL_STRIP_RE = re.compile(r"[\t\r\n]")
 _METADATA_AUTHORITY_SPLIT_RE = re.compile(r"[ /?#]+")
-# A setting named password, pass or pwd with a value: ``?password=x``,
-# ``;password=x``, ``host=h password=x``. An empty value carries nothing.
-_METADATA_NAMED_PASSWORD_RE = re.compile(r"(?<![A-Za-z0-9])(?:password|pass|pwd)=[^&;\s=]", re.I)
+# A setting named password, passwd, pass or pwd followed by `=`: ``?password=x``,
+# ``;Password =x``, ``host=h password = 'x'``. The name must start at a word
+# boundary (letters and digits; `_` and `-` do not count, so ``db_password=`` is
+# a password and ``bypass=`` is not) and the value never matters, so an empty
+# one is refused too. Matched on the whole string, never on pieces.
+_METADATA_NAMED_PASSWORD_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:password|passwd|pass|pwd)[\"']?\s*=", re.I
+)
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
 _METADATA_URL_DECODE_PASSES = 3
@@ -1897,13 +1902,25 @@ def _nested_url_has_password(rest: str, depth: int) -> bool:
     return _METADATA_URL_START_RE.search(rest) is not None
 
 
+def _has_named_password(text: str) -> bool:
+    """True when ``text``, raw or percent-decoded (at most three passes), has a
+    setting named ``password``, ``passwd``, ``pass`` or ``pwd`` before an ``=``."""
+    for _ in range(_METADATA_URL_DECODE_PASSES + 1):
+        if _METADATA_NAMED_PASSWORD_RE.search(text):
+            return True
+        decoded = urllib.parse.unquote(text)
+        if decoded == text:
+            return False
+        text = decoded
+    return False
+
+
 def _carries_password(text: str, depth: int = 0) -> bool:
     """True when any piece of ``text`` reads as ``user:password@host``.
 
     Each piece between URL delimiters is decoded on its own, so an encoded
     ``/`` or ``?`` inside a password cannot split it, and the decoded piece is
-    split again for a URL that was encoded whole. An empty user name counts, and
-    so does a non-empty value for a setting named ``password``, ``pass`` or ``pwd``.
+    split again for a URL that was encoded whole. An empty user name counts.
     A piece still encoded after the decode limit is refused: it cannot be judged.
     """
     text = _METADATA_URL_STRIP_RE.sub("", text)
@@ -1912,7 +1929,7 @@ def _carries_password(text: str, depth: int = 0) -> bool:
         if urllib.parse.unquote(decoded) != decoded:
             return True
         userinfo, at, _host = decoded.rpartition("@")
-        if (at and ":" in userinfo) or _METADATA_NAMED_PASSWORD_RE.search(decoded):
+        if at and ":" in userinfo:
             return True
         if (
             decoded != piece
@@ -1947,7 +1964,11 @@ def metadata_value_rule(value: str) -> str:
         rule = _word_secret_rule(word)
         if rule:
             return rule
-    if any(_url_has_password(word) for word in words) or _carries_password(candidate):
+    if (
+        _has_named_password(candidate)
+        or any(_url_has_password(word) for word in words)
+        or _carries_password(candidate)
+    ):
         return "url_password"
     return ""
 

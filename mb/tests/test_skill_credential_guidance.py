@@ -110,6 +110,8 @@ HANDOFF_EXEMPT = {
     ".claude/skills/mb-think/references/research-depth-ladder.md",
     ".claude/skills/mb-think/references/tool-detection.md",
     ".claude/skills/mb-think/references/tool-surfacing.md",
+    # Defines OWNER_HANDOFF; a test below checks it equals HANDOFF.
+    ".claude/skills/mb-site/scripts/_envelope.py",
 }
 
 

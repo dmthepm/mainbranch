@@ -85,6 +85,8 @@ VERIFIED: report every result.
 
 ## The setup
 
+Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
+
 1. **Password mode, no Access app.** `AUTH_MODE=password` in `.env.selfhost` is set
    by the bootstrap above, never on an empty database, and the Access application
    is gone after it. Existing Access users are carried over by
@@ -112,8 +114,9 @@ VERIFIED: report every result.
    one day (86400) and the library maximum is 365 days, so a one-hour test key is
    refused with `EXPIRES_IN_IS_TOO_SMALL`. Read back only the key id and expiry,
    never the key. Record the renewal date and its owner.
-6. **Keys live in `mb connect`.** The owner pipes the key in from a
-   password manager, so it never sits in argv, scrollback or shell history:
+6. **Keys live in `mb connect`.** This is the same owner-terminal route: the
+   owner may pipe the key in from a password manager there instead of typing it,
+   so it never sits in argv, scrollback or shell history:
 
    ```bash
    op read '<KEY_ITEM_REF>' | mb connect openseo-<AGENT> --custom --token-stdin --scope repo

@@ -17,9 +17,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   and `token` now answer "not connected" and show the repair steps instead of stopping with "No
   business repo here". They stop that way only outside a git repo. A repo cloned inside another
   still never borrows its keys.
-- The check that keeps a password out of shareable connection details now also catches a password
-  given as a named setting (`?password=`, `pass=`, `pwd=`, in URLs, JDBC strings and
-  `host=x;password=y` strings), in any case and when encoded. An empty value still passes.
+- The check that keeps a password out of shareable connection details now also catches a setting
+  named `password`, `passwd`, `pass` or `pwd` followed by `=` (in URLs, JDBC strings and
+  `host=x;password=y` strings), in any case, with spaces or quotes around it, and when encoded.
+  The value does not matter, so an empty one is refused too.
 - `mb card` no longer reports a failure when the disk cannot sync a folder at all; real I/O errors
   are still reported.
 - The Main Branch site skill's domain step says up front that buying a domain is not wired in this
