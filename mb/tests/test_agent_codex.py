@@ -194,17 +194,20 @@ def test_discovery_does_not_search_another_profile(cv: Live) -> None:
     assert SID not in cv.run()[1]
 
 
-def test_discovery_cap_and_conflicting_ids_are_unknown(
-    cv: Live, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_discovery_cap_is_unknown(cv: Live, monkeypatch: pytest.MonkeyPatch) -> None:
     null_session(cv)
     monkeypatch.setattr(au, "SEARCH_ENTRY_CAP", 1)
     code, text = cv.run()
     assert code == 4 and "inconsistent" in text
-    monkeypatch.setattr(au, "SEARCH_ENTRY_CAP", 10_000)
-    rollout(cv.profile, cwd=cv.record["cwd_real"], stamp=cv.record["utc"], other_id=SID2)
+
+
+def test_a_subagent_rollout_in_the_profile_is_not_a_candidate(cv: Live) -> None:
+    # Codex 0.164 writes a subagent's thread with its own id and its root's
+    # session_id. A real profile holds these; they must not spoil the check.
+    rollout(cv.profile, SID2, cwd=cv.record["cwd_real"], stamp=cv.record["utc"], other_id=SID)
     code, text = cv.run()
-    assert code == 4 and "inconsistent" in text
+    assert code == 0, text
+    assert SID2 not in text
 
 
 def test_codex_check_match_mismatch_unknown_and_ended(cv: Live) -> None:

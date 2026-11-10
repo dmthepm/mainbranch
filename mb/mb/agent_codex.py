@@ -81,13 +81,15 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
                     elif entry.name.endswith(".jsonl"):
                         if not stat.S_ISREG(kind):
                             raise Refusal(4, "unsupported-format", "not a regular Codex rollout")
-                        result.append(meta(fd, entry.name, child, ancestors))
+                        found = meta(fd, entry.name, child, ancestors)
+                        if found is not None:
+                            result.append(found)
         finally:
             os.close(fd)
 
     def meta(
         parent: int, name: str, path: str, ancestors: tuple[tuple[str, int, int], ...]
-    ) -> Rollout:
+    ) -> Rollout | None:
         fd = os.open(name, flags | os.O_NONBLOCK, dir_fd=parent)
         try:
             before = os.fstat(fd)
@@ -103,7 +105,9 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
             if record["type"] != "session_meta" or not isinstance(sid, str):
                 raise ValueError("not session metadata")
             if sid != payload["session_id"]:
-                raise Refusal(4, "inconsistent", "Codex metadata id and session_id differ")
+                # A subagent's thread: its own id, its root's session_id. Never a
+                # session mb starts or resumes, so it is not a candidate.
+                return None
             # Local import keeps the UUID rule shared with the launcher's explicit-session parser.
             from mb.agent_up import UUID_RE
 
