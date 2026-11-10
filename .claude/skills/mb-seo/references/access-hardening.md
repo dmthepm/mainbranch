@@ -112,7 +112,7 @@ VERIFIED: report every result.
    one day (86400) and the library maximum is 365 days, so a one-hour test key is
    refused with `EXPIRES_IN_IS_TOO_SMALL`. Read back only the key id and expiry,
    never the key. Record the renewal date and its owner.
-6. **Keys live in `mb connect`.** Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check. The owner pipes the key in from a
+6. **Keys live in `mb connect`.** The owner pipes the key in from a
    password manager, so it never sits in argv, scrollback or shell history:
 
    ```bash
@@ -140,6 +140,9 @@ VERIFIED: report every result.
          --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{},\"clientInfo\":{\"name\":\"canary\",\"version\":\"0\"}}}" \
          "<URL>/mcp"'
    ```
+
+   The canary's "a shell expands the credential variable" warning is expected
+   here: `printf` is a shell builtin, so the key never reaches argv.
 
    **Expected:** 200 with the key. A missing, empty, invalid or revoked key gets
    401. The key gives no app session. Then run `list_projects` once, which costs

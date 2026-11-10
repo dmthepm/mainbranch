@@ -3919,6 +3919,51 @@ def test_metadata_refuses_whatever_urllib_reads_as_a_password(password: str) -> 
     assert connect_mod.metadata_value_rule(urllib.parse.quote(value, safe="")) == "url_password"
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://host.example.invalid/db?password=hunter2",
+        "https://host.example.invalid/db?user=rowan&PASS=hunter2",
+        "https://host.example.invalid/db?Pwd=hunter2&x=1",
+        "https://host.example.invalid/db?%70assword=hunter2",
+        "https://host.example.invalid/db?password%3Dhunter2",
+        "jdbc:postgresql://host.example.invalid:5432/shop?user=rowan&password=hunter2",
+        "jdbc:sqlserver://host.example.invalid;user=rowan;password=hunter2;",
+        "host=host.example.invalid;password=hunter2",
+        "host=host.example.invalid user=rowan password=hunter2",
+        "Server=host.example.invalid;Password=hunter2",
+    ],
+)
+def test_metadata_refuses_a_password_given_as_a_named_setting(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "rowan@example.invalid",
+        "git@github.com:example-org/example-repo.git",
+        "host.example.invalid:5432",
+        "https://[2001:db8::1]:8443/shop",
+        "https://host.example.invalid/db?password=",
+        "https://host.example.invalid/db?password=&user=rowan",
+        "host=host.example.invalid;password=;user=rowan",
+        "https://host.example.invalid/db?bypass=1&compass=north",
+    ],
+)
+def test_metadata_passes_values_with_no_named_password(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
+def test_metadata_named_password_check_is_linear_time() -> None:
+    import time
+
+    value = "password" * 20000 + "=" * 20000
+    start = time.perf_counter()
+    connect_mod.metadata_value_rule(value)
+    assert time.perf_counter() - start < 2
+
+
 def test_metadata_refuses_a_tab_inside_the_userinfo_split() -> None:
     assert connect_mod.metadata_value_rule("rowan\t:pw@host.example.invalid") == "url_password"
 

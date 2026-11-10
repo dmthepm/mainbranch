@@ -449,3 +449,17 @@ def test_publish_reports_a_failed_folder_sync(tmp_path, monkeypatch):
     with pytest.raises(card.CardError, match="could not confirm it reached disk"):
         card._publish(b"jpegbytes", tmp_path / "card.jpg")
     assert (tmp_path / "card.jpg").read_bytes() == b"jpegbytes"
+
+
+@pytest.mark.parametrize("code", [errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP])
+def test_publish_carries_on_past_a_disk_that_cannot_sync_a_folder(tmp_path, monkeypatch, code):
+    real_fsync = os.fsync
+
+    def fsync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(code, "Operation not supported")
+        return real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    card._publish(b"jpegbytes", tmp_path / "card.jpg")
+    assert (tmp_path / "card.jpg").read_bytes() == b"jpegbytes"

@@ -136,12 +136,15 @@ def test_json_failure_state(hub: Path, tmp_path: Path, monkeypatch: pytest.Monke
     assert payload["state"] == "no_business_repo"
 
 
-def test_git_repo_without_connect_yaml_is_refused(
+def test_git_repo_without_connect_yaml_is_the_repo(
     hub: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     plain = make_git(tmp_path / "plain")
     monkeypatch.chdir(plain)
-    _assert_no_business_repo(run_exec(), plain)
+    result = run_exec()
+    assert result.exit_code == 1, result.output
+    assert "is not connected" in result.output
+    assert "No business repo here" not in result.stderr
 
 
 def test_nested_git_repo_does_not_borrow_the_hub(
@@ -151,8 +154,10 @@ def test_nested_git_repo_does_not_borrow_the_hub(
     (tool / "src").mkdir()
     monkeypatch.chdir(tool / "src")
     result = run_exec()
-    _assert_no_business_repo(result, tool)
-    assert rows()[-1]["reason"] == "no_business_repo"
+    assert result.exit_code == 1, result.output
+    assert "is not connected" in result.output
+    assert SECRET not in result.output
+    assert connect.find_business_repo(tool / "src") == tool
 
 
 def test_stray_empty_dot_git_refuses(hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -411,3 +416,44 @@ def test_failing_marker_at_a_higher_level_stops_the_walk(
         ("exec", "refused", "unreadable_repo_marker"),
         ("token", "refused", "unreadable_repo_marker"),
     ]
+
+
+@pytest.fixture()
+def fresh(tmp_path: Path, hub: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A git repo with no .mb/connect.yaml, as `mb init` leaves it."""
+    repo = make_git(tmp_path / "fresh")
+    monkeypatch.chdir(repo)
+    return repo
+
+
+@pytest.mark.parametrize(
+    "args",
+    [["status"], ["status", "stripe"], ["test", "stripe"], ["policy"]],
+)
+def test_fresh_repo_answers_not_connected_instead_of_no_business_repo(
+    fresh: Path, args: list[str]
+) -> None:
+    result = runner.invoke(app, ["connect", *args, "--json"])
+    assert "no_business_repo" not in result.output, result.output
+    assert "No business repo here" not in result.output
+
+
+def test_fresh_repo_status_reports_none_configured(fresh: Path) -> None:
+    result = runner.invoke(app, ["connect", "status", "--json"])
+    assert result.exit_code == 0, result.output
+    assert "no_business_repo" not in result.output
+
+
+@pytest.mark.parametrize("verb", ["exec", "token"])
+def test_fresh_repo_exec_and_token_answer_not_connected(fresh: Path, verb: str) -> None:
+    args = ["--print"] if verb == "token" else ["--", *CHILD]
+    result = runner.invoke(app, ["connect", verb, "stripe", *args])
+    assert result.exit_code == 1, result.output
+    assert "is not connected" in result.output
+    assert "No business repo here" not in result.stderr
+    assert result.stdout == ""
+    assert SECRET not in result.output
+
+
+def test_finder_returns_a_git_top_without_connect_yaml(fresh: Path) -> None:
+    assert connect.find_business_repo(fresh) == fresh

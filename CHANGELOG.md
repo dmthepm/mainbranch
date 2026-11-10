@@ -13,6 +13,19 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Fixed
 
+- In a fresh business repo with no connections yet, `mb connect status`, `test`, `policy`, `exec`
+  and `token` now answer "not connected" and show the repair steps instead of stopping with "No
+  business repo here". They stop that way only outside a git repo. A repo cloned inside another
+  still never borrows its keys.
+- The check that keeps a password out of shareable connection details now also catches a password
+  given as a named setting (`?password=`, `pass=`, `pwd=`, in URLs, JDBC strings and
+  `host=x;password=y` strings), in any case and when encoded. An empty value still passes.
+- `mb card` no longer reports a failure when the disk cannot sync a folder at all; real I/O errors
+  are still reported.
+- The Main Branch site skill's domain step says up front that buying a domain is not wired in this
+  build, and no longer prints the Porkbun key setup steps for it.
+- Removed a stray hand-off sentence pasted into a site-skill module docstring and the SEO access
+  hardening guide, and noted why the canary's shell-expansion warning is expected there.
 - `mb skill link` (also run by `mb update`, `mb init` and `mb doctor repair --apply --only claude`)
   no longer adds a `.gitignore` line for every Main Branch skill. One line, `.claude/skills/mb-*`,
   covers them all, so a release that adds a skill no longer leaves a change to commit or restore

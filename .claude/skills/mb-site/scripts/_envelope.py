@@ -5,8 +5,6 @@ every atom emits exactly one Envelope-shape JSON document on stdout. Agents
 branch on `error.code` (a closed Literal per atom). Humans read `error.message`
 and act on `error.suggestion`.
 
-Credential entry happens in the owner's own terminal, because the hidden prompt needs a real terminal; the agent hands off, then resumes its readiness check.
-
 Each atom defines its own concrete Envelope class binding:
     - `data` to its result Pydantic model
     - `error` to a per-atom EnvelopeError subclass with a closed `code` Literal

@@ -1617,3 +1617,20 @@ def test_porkbun_dns_command_gets_past_cloudflare_checks(tmp_path: Path) -> None
     assert len(porkbun) == 1 and porkbun[0]["json"]["apikey"] == "pk1_fixtureapikey"
     assert porkbun[0]["json"]["secretapikey"] == "sk1_fixture:secret"
     assert _FAKE_PORKBUN not in out and "sk1_fixture" not in out
+
+
+def test_domain_buy_without_credentials_says_buying_is_not_wired(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from domain import _select_registrar
+
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN_REGISTRAR", raising=False)
+    monkeypatch.delenv("PORKBUN_CREDENTIALS", raising=False)
+    monkeypatch.delenv("PORKBUN_API_KEY", raising=False)
+    reg, err = _select_registrar(None, "example.com")
+    assert reg is None
+    assert err is not None
+    assert "not wired in this build" in err.message
+    text = f"{err.message} {err.suggestion}".lower()
+    assert "porkbun" not in text
+    assert "terminal" not in text

@@ -79,7 +79,8 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
 - `--repo` selects the business repo, and a user-scoped connection resolves
   from a worktree as it does for `status`. Without `--repo`, `exec`, `token`,
   `status`, `test` and `policy` start from the git top level of the current
-  folder and use it when it holds `.mb/connect.yaml`. They never look above that
+  folder and use it, even when it has no `.mb/connect.yaml` yet (a fresh repo
+  then answers "not connected" with the repair steps). They never look above that
   top level, so a repo cloned inside the hub does not borrow the hub's
   connections. Only a `.git` entry that is not there counts as absent. Any
   `.git` entry at all ends the search with a working repo (a `gitdir:` file, or
@@ -88,7 +89,7 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
   a special file or a dangling link, or that cannot be fully inspected,
   stops them with `unreadable_repo_marker` (exit 2) instead
   of trying a parent: it might be a nested repo. There is no ignored marker.
-  Anywhere else they stop with `no_business_repo` (exit 2). This
+  Outside any git repo they stop with `no_business_repo` (exit 2). This
   chooses which folder is read, not who may read it: binding, reference and
   caller-policy checks run on the folder found exactly as they do with `--repo`.
 
@@ -522,6 +523,10 @@ host label or behind an encoded `%2F` is refused. A URL that does not
 parse, such as one with a bad port, is judged from its decoded raw pieces.
 
 A password in a URL is refused as `url_password` with or without a scheme.
+A password given as a named setting is refused too: a non-empty value for
+`password`, `pass` or `pwd` (any case, encoded or not) in a URL query, a JDBC
+string or a `key=value;key=value` string (`host=x;password=y`, libpq, ADO). A
+key named `password` with an empty value passes.
 Two checks run and a value is refused when either says so. The first reads each
 URL with a scheme the way Python's URL parser does, nested URLs included (a URL
 nested more than three levels deep is refused), so a comma, `;`, `&` or tab

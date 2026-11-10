@@ -1635,6 +1635,9 @@ _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-
 # `host:5432` and emails have no `:` before the `@`, so they pass.
 _METADATA_URL_STRIP_RE = re.compile(r"[\t\r\n]")
 _METADATA_AUTHORITY_SPLIT_RE = re.compile(r"[ /?#]+")
+# A setting named password, pass or pwd with a value: ``?password=x``,
+# ``;password=x``, ``host=h password=x``. An empty value carries nothing.
+_METADATA_NAMED_PASSWORD_RE = re.compile(r"(?<![A-Za-z0-9])(?:password|pass|pwd)=[^&;\s=]", re.I)
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
 _METADATA_URL_DECODE_PASSES = 3
@@ -1899,7 +1902,8 @@ def _carries_password(text: str, depth: int = 0) -> bool:
 
     Each piece between URL delimiters is decoded on its own, so an encoded
     ``/`` or ``?`` inside a password cannot split it, and the decoded piece is
-    split again for a URL that was encoded whole. An empty user name counts.
+    split again for a URL that was encoded whole. An empty user name counts, and
+    so does a non-empty value for a setting named ``password``, ``pass`` or ``pwd``.
     A piece still encoded after the decode limit is refused: it cannot be judged.
     """
     text = _METADATA_URL_STRIP_RE.sub("", text)
@@ -1908,7 +1912,7 @@ def _carries_password(text: str, depth: int = 0) -> bool:
         if urllib.parse.unquote(decoded) != decoded:
             return True
         userinfo, at, _host = decoded.rpartition("@")
-        if at and ":" in userinfo:
+        if (at and ":" in userinfo) or _METADATA_NAMED_PASSWORD_RE.search(decoded):
             return True
         if (
             decoded != piece
@@ -4328,18 +4332,19 @@ def find_business_repo(start: str | Path = ".") -> Path:
     Starts at the nearest git top level at or above ``start`` and goes no
     higher: a repo cloned inside the hub is its own repo and never borrows the
     hub's keys. A git marker that cannot be read refuses; the search never walks
-    past it. That folder must hold ``.mb/connect.yaml``. This only chooses
-    which folder is read; binding and reference checks run on it as on
-    ``--repo``.
+    past it. A repo with no ``.mb/connect.yaml`` yet is still the repo: the
+    verbs then answer "not connected" and show the repair hints. Only a folder
+    with no git top refuses. This only chooses which folder is read; binding and
+    reference checks run on it as on ``--repo``.
     """
     here = Path(start).resolve()
     top = next((folder for folder in (here, *here.parents) if _is_git_top(folder)), None)
-    if top is not None and (top / CONFIG_RELATIVE_PATH).is_file():
+    if top is not None:
         return top
     _refuse(
         "no_business_repo",
-        f"No business repo here: {here} is not inside a git repo with "
-        f"{CONFIG_RELATIVE_PATH.as_posix()}. cd into the business repo or pass --repo.",
+        f"No business repo here: {here} is not inside a git repo. "
+        "cd into the business repo or pass --repo.",
     )
 
 
