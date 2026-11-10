@@ -308,10 +308,15 @@ def lock_owner(lock: FileLock) -> int | None:
     return None
 
 
-def cmdline_hits(session_id: str, uid: int) -> list[int]:
-    """Same-uid processes whose command line names the session id (a tripwire, not proof)."""
+def cmdline_scan(session_id: str, uid: int) -> tuple[list[int], list[int]]:
+    """Same-uid processes naming the session id, and the pids that could not be read.
+
+    A process that exited mid-scan is not unreadable. Any other failure to stat a candidate or
+    read its command line leaves that pid in the second list: the scan is then incomplete.
+    """
     needle = session_id.encode()
     hits: list[int] = []
+    unreadable: list[int] = []
     for entry in os.listdir(PROC):
         if not entry.isdigit() or int(entry) == os.getpid():
             continue
@@ -320,9 +325,16 @@ def cmdline_hits(session_id: str, uid: int) -> list[int]:
                 continue
             if needle in Path(f"{PROC}/{entry}/cmdline").read_bytes():
                 hits.append(int(entry))
-        except OSError:
+        except (FileNotFoundError, ProcessLookupError):
             continue
-    return hits
+        except OSError:
+            unreadable.append(int(entry))
+    return hits, unreadable
+
+
+def cmdline_hits(session_id: str, uid: int) -> list[int]:
+    """Same-uid processes whose command line names the session id (a tripwire, not proof)."""
+    return cmdline_scan(session_id, uid)[0]
 
 
 # --- finding a transcript: the finite search ----------------------------------------------

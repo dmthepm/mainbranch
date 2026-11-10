@@ -259,6 +259,132 @@ def test_another_process_carrying_the_session_id_is_session_seen(s: Smoke) -> No
     assert code == 4 and "session-seen" in text and "40200" in text
 
 
+# --- facts that fail to read, or change while read, are unknown (4), never a pass --------
+
+
+def _denied(monkeypatch: pytest.MonkeyPatch, pid: int, exc: type[OSError]) -> None:
+    real = os.stat
+
+    def stat(path: Any, *a: Any, **k: Any) -> os.stat_result:
+        if str(path) == f"{au.PROC}/{pid}/exe":
+            raise exc(13, "injected")
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(os, "stat", stat)
+
+
+@pytest.mark.parametrize("exc", [PermissionError, FileNotFoundError])
+def test_a_helper_exe_that_cannot_be_statted_is_unknown(
+    s: Smoke, monkeypatch: pytest.MonkeyPatch, exc: type[OSError]
+) -> None:
+    s.chain(("sh", "shell"))
+    _denied(monkeypatch, MARKER_PID + 10, exc)
+    code, text = s.run()
+    assert code == 4 and "smoke ok" not in text
+
+
+def test_a_same_user_cmdline_that_cannot_be_read_makes_the_scan_incomplete(s: Smoke) -> None:
+    s.chain()
+    s.proc.add(40200, 1, "other")
+    (s.proc.root / "40200" / "cmdline").chmod(0)
+    code, text = s.run()
+    (s.proc.root / "40200" / "cmdline").chmod(0o600)
+    assert code == 4 and "scan-incomplete" in text
+
+
+def test_a_process_that_exits_mid_scan_does_not_block_a_pass(s: Smoke) -> None:
+    s.chain()
+    s.proc.add(40200, 1, "other")
+    (s.proc.root / "40200" / "cmdline").unlink()
+    assert s.run()[0] == 0
+
+
+def test_cmdline_hits_keeps_its_old_reading_of_an_unreadable_process(s: Smoke) -> None:
+    s.chain()
+    s.proc.add(40200, 1, "other", cmdline=s.sid)
+    (s.proc.root / "40200" / "cmdline").chmod(0)
+    try:
+        assert 40200 not in au.cmdline_hits(s.sid, os.getuid())
+        assert au.cmdline_scan(s.sid, os.getuid())[1] == [40200]
+    finally:
+        (s.proc.root / "40200" / "cmdline").chmod(0o600)
+
+
+def _during_read(monkeypatch: pytest.MonkeyPatch, change: Any) -> None:
+    """Run ``change`` once, after the chain's first facts were read and before the final check."""
+    real = au.cmdline_scan
+
+    def scan(*a: Any) -> tuple[list[int], list[int]]:
+        change()
+        return real(*a)
+
+    monkeypatch.setattr(au, "cmdline_scan", scan)
+
+
+def test_a_runtime_that_dies_during_the_read_is_unknown(
+    s: Smoke, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s.chain()
+    _during_read(
+        monkeypatch, lambda: s.proc.add(RUNTIME_PID, 1, "claude", env=s.env, start=START + 1)
+    )
+    code, text = s.run()
+    assert code == 4 and "changed" in text
+
+
+def test_a_runtime_that_execs_during_the_read_is_unknown(
+    s: Smoke, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s.chain()
+
+    def swap() -> None:
+        link = s.proc.root / str(RUNTIME_PID) / "exe"
+        link.unlink()
+        link.symlink_to(s.proc.exe("another-program"))
+
+    _during_read(monkeypatch, swap)
+    assert s.run()[0] == 4
+
+
+def test_a_middle_process_that_execs_during_the_read_is_unknown(
+    s: Smoke, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s.chain(("sh", "shell"))
+    _during_read(monkeypatch, lambda: s.proc.add(MARKER_PID + 10, RUNTIME_PID, "node"))
+    assert s.run()[0] == 4
+
+
+def test_a_chain_pid_reused_between_its_parent_read_and_exe_read_is_unknown(
+    s: Smoke, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s.chain(("sh", "shell"))
+    middle, real = MARKER_PID + 10, sm._exe_id
+    done: list[int] = []
+
+    def exe_id(pid: int) -> tuple[int, int]:
+        if pid == middle and not done:
+            done.append(1)  # the old process is gone and a new one took the pid
+            s.proc.add(middle, RUNTIME_PID, "sh", start=999)
+        return real(pid)
+
+    monkeypatch.setattr(sm, "_exe_id", exe_id)
+    assert s.run()[0] == 4
+
+
+def test_an_unlisted_path_replaced_by_a_link_to_a_listed_shell_fails_closed(
+    s: Smoke, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s.chain(("node", "unlisted program"))
+    real = sm._link
+
+    def link(pid: int, name: str) -> str:  # the saved path now resolves to the listed shell
+        return str(s.proc.exe("sh")) if (pid, name) == (MARKER_PID + 10, "exe") else real(pid, name)
+
+    monkeypatch.setattr(sm, "_link", link)
+    code, text = s.run()
+    assert code == 4 and "helper-mismatch" in text
+
+
 # --- inputs and refusals -----------------------------------------------------------------
 
 

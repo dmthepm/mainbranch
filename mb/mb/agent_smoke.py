@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, NamedTuple, TextIO
 
 from mb import agent_policy as ap
 from mb import agent_up as au
@@ -59,12 +59,39 @@ def _link(pid: int, name: str) -> str:
         raise Refusal(4, "inconsistent", f"/proc/{pid}/{name} disappeared") from None
 
 
-def _parent(pid: int) -> int:
+class Seen(NamedTuple):
+    """One process as one observation saw it: the parent it named, when it started, its program."""
+
+    ppid: int
+    start: int
+    exe: tuple[int, int]
+
+
+def _exe_id(pid: int) -> tuple[int, int]:
+    try:
+        info = os.stat(f"{au.PROC}/{pid}/exe")
+    except PermissionError:
+        raise Refusal(4, "proc-denied", f"cannot read /proc/{pid}/exe") from None
+    except OSError:
+        raise Refusal(4, "inconsistent", f"/proc/{pid}/exe disappeared") from None
+    return (info.st_dev, info.st_ino)
+
+
+def _observe(pid: int) -> Seen:
     text = _read(pid, "stat").decode(errors="replace")
     try:
-        return int(text[text.rindex(")") + 2 :].split()[1])
+        rest = text[text.rindex(")") + 2 :].split()
+        ppid, start = int(rest[1]), int(rest[19])
     except (ValueError, IndexError):
         raise Refusal(4, "inconsistent", f"/proc/{pid}/stat is unreadable as a process") from None
+    return Seen(ppid, start, _exe_id(pid))
+
+
+def _unchanged(seen: dict[int, Seen]) -> None:
+    """Every process read above is still the same one: same parent, start time and program."""
+    for pid, before in seen.items():
+        if _observe(pid) != before:
+            raise Refusal(4, "changed", f"pid {pid} changed while the smoke was reading it")
 
 
 def _marker_pid(marker: str) -> int:
@@ -96,12 +123,34 @@ def _attempt(host: ap.Host, name: str) -> dict[str, Any]:
     return store.read_attempt(row["last_attempt"])
 
 
-def _chain(marker: int, runtime: int, runtime_real: str, runtime_id: tuple[int, int]) -> list[str]:
-    """Why the tool command is not the session's own child chain; empty when it is."""
-    helpers = {os.path.realpath(p) for p in HELPERS}
+def _helper_ids() -> dict[tuple[int, int], set[str]]:
+    """Listed helpers by the device/inode their real path has now. A missing one is not approved."""
+    ids: dict[tuple[int, int], set[str]] = {}
+    for listed in HELPERS:
+        real = os.path.realpath(listed)
+        try:
+            info = os.stat(real)
+        except OSError:
+            continue
+        ids.setdefault((info.st_dev, info.st_ino), set()).add(real)
+    return ids
+
+
+def _chain(
+    marker: int,
+    runtime: int,
+    runtime_real: str,
+    runtime_id: tuple[int, int],
+    seen: dict[int, Seen],
+) -> list[str]:
+    """Why the tool command is not the session's own child chain; empty when it is.
+
+    Every pid read lands in ``seen`` so the caller can check none of them changed.
+    """
     cur, links, between = marker, 0, []
     while True:
-        parent = _parent(cur)
+        seen[cur] = _observe(cur)
+        parent = seen[cur].ppid
         links += 1
         if parent == runtime:
             break
@@ -111,19 +160,20 @@ def _chain(marker: int, runtime: int, runtime_real: str, runtime_id: tuple[int, 
             return [f"marker pid {marker} is over {MAX_LINKS} links below runtime pid {runtime}"]
         between.append(parent)
         cur = parent
+    helpers = _helper_ids()
+    listed = {path for paths in helpers.values() for path in paths}
     problems = []
     for pid in between:
         exe = os.path.realpath(_link(pid, "exe"))
         shown = roles.printable(exe, 120)
-        try:
-            info = os.stat(f"{au.PROC}/{pid}/exe")
-            same = (info.st_dev, info.st_ino) == runtime_id
-        except OSError:
-            same = False
-        if same or exe == runtime_real:
+        if seen[pid].exe == runtime_id or exe == runtime_real:
             problems.append(f"pid {pid} between them is the runtime itself ({shown})")
-        elif exe not in helpers:
+        elif seen[pid].exe not in helpers and exe not in listed:
             problems.append(f"pid {pid} between them ({shown}) is not a reviewed helper")
+        elif exe not in helpers.get(seen[pid].exe, set()):
+            raise Refusal(
+                4, "helper-mismatch", f"pid {pid}: the path ({shown}) and the program run disagree"
+            )
     return problems
 
 
@@ -146,23 +196,24 @@ def _verdict(host: ap.Host, name: str, marker: str, out: TextIO) -> int:
     if state == "dead":
         raise Refusal(3, "ended", f"runtime pid {pid} has ended; the smoke needs it running")
     marker_pid = _marker_pid(marker)
-    try:
-        info = os.stat(f"{au.PROC}/{pid}/exe")
-    except PermissionError:
-        raise Refusal(4, "proc-denied", f"cannot read /proc/{pid}/exe") from None
-    except OSError:
-        raise Refusal(4, "inconsistent", f"/proc/{pid}/exe disappeared") from None
-    if (info.st_dev, info.st_ino) != runtime_id:
+    seen = {pid: _observe(pid)}
+    if seen[pid].exe != runtime_id:
         raise Refusal(4, "exe-changed", f"runtime pid {pid} no longer runs the recorded program")
     env = _environ(pid)
     cwd = _link(pid, "cwd")
     env_set: dict[str, str] = attempt["env_set"]
     passed: list[str] = attempt["env_passed"]
     sid = attempt["session_id"]
-    others = [p for p in au.cmdline_hits(sid, host.uid) if p not in (pid, attempt["holder_pid"])]
+    chain = _chain(marker_pid, pid, attempt["runtime_real"], runtime_id, seen)
+    hits, unreadable = au.cmdline_scan(sid, host.uid)
+    if unreadable:
+        raise Refusal(
+            4, "scan-incomplete", f"could not read the command line of {unreadable}; not a pass"
+        )
+    others = [p for p in hits if p not in (pid, attempt["holder_pid"])]
     if others:
         raise Refusal(4, "session-seen", f"another process carries the session id: {others}")
-    chain = _chain(marker_pid, pid, attempt["runtime_real"], runtime_id)
+    _unchanged(seen)
     fields = []
     if set(env) != set(env_set) | set(passed) or any(env.get(k) != v for k, v in env_set.items()):
         fields.append("environ")

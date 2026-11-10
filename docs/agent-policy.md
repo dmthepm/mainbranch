@@ -179,15 +179,22 @@ installed version, not a proof for every session or mode. mb does not run it at 
 The verdict reads /proc and passes only if all of these hold:
 
 - the marker pid's parent chain reaches the recorded runtime pid within 8 links;
-- every process strictly between them has an exe on the reviewed helper list, and none is the
-  runtime's own program (a forked child that never exec'd shows the runtime's exe);
+- every process strictly between them runs a reviewed helper, approved by the device and inode
+  of the program it is executing (it must equal that of a listed helper's real path now, and the
+  path must agree), and none is the runtime's own program (a forked child that never exec'd shows
+  the runtime's exe);
 - the recorded pid's exe is still the recorded program, its environment has the attempt's names
   and mb-set values, and its folder is the attempt's;
-- no other process of this user carries the session id on its command line.
+- no other process of this user carries the session id on its command line, and every such
+  command line could be read (a process that exited mid-scan does not count);
+- the runtime and every process in the chain still have the same parent, start time and program
+  after all the reads. A fact that could not be read, or changed while it was read, is unknown
+  (4), never a pass.
 
 Exits: 0 pass; 1 fail, naming `not-session-process` (the chain) or `mismatch` (`environ`,
 `cwd`); 3 the runtime has ended; 4 unknown (`no-marker`, `no-session-evidence`, `proc-denied`,
-`inconsistent`, `exe-changed`, `session-seen`); 2 invalid policy or no agent name. Passed values
+`inconsistent`, `exe-changed`, `session-seen`, `scan-incomplete`, `changed`,
+`helper-mismatch`); 2 invalid policy or no agent name. Passed values
 are not stored and not compared, and no value is printed.
 
 The reviewed helper list is built in and short: `/bin/sh`, `/bin/dash`, `/bin/bash`,
