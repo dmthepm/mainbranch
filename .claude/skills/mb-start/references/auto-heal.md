@@ -86,38 +86,22 @@ done
 ## Step 2.5: Update .gitignore
 
 Main Branch machine-local files and skill bridge links must not be committed.
-After creating links, ensure `.gitignore` covers only missing entries.
+`mb skill link --repo "$REPO_PATH"` adds these lines when missing, under the
+header `# Main Branch local Claude wiring`, and refuses a `.gitignore` that is a
+symlink. Without the CLI, do not write `.gitignore` from the shell: show the
+user these three lines and let them add any that are missing.
 
-```bash
-GITIGNORE="$REPO_PATH/.gitignore"
-
-ensure_gitignore_entry() {
-  entry="$1"
-  grep -qxF "$entry" "$GITIGNORE" 2>/dev/null || echo "$entry" >> "$GITIGNORE"
-}
-
-if ! grep -q "MAIN BRANCH MACHINE-LOCAL" "$GITIGNORE" 2>/dev/null; then
-  cat >> "$GITIGNORE" << 'GITIGNORE_BLOCK'
-
-# === MAIN BRANCH MACHINE-LOCAL (do not commit) ===
-GITIGNORE_BLOCK
-fi
-
-ensure_gitignore_entry ".claude/settings.local.json"
-ensure_gitignore_entry ".claude/worktrees/"
-
-# Add each Main Branch skill symlink individually (preserves custom skill tracking)
-for d in "$ENGINE_PATH"/.claude/skills/*/; do
-  [ -d "$d" ] || continue
-  n=$(basename "$d")
-  ensure_gitignore_entry ".claude/skills/$n"
-done
+```gitignore
+# Main Branch local Claude wiring
+.claude/settings.local.json
+.claude/worktrees/
+.claude/skills/mb-*
 ```
 
-**Why per-skill entries (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked. Ignoring the whole folder would hide those. We only ignore the Main Branch-linked ones.
+**Why `.claude/skills/mb-*` (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked. Ignoring the whole folder would hide those. Every Main Branch skill is named `mb-*`, so one line covers them, and a release that adds a skill adds no line. The line also ignores anything else named `mb-*` there, so the `mb-` prefix is reserved for Main Branch skills; files already tracked stay tracked. Older repos may keep per-skill lines such as `.claude/skills/start`; link never removes lines, so delete one by hand if you want to reuse that name for your own skill.
 
-**Idempotent:** Every entry is checked before appending so freshly templated
-repos do not duplicate existing `.gitignore` lines.
+**Idempotent:** link adds only missing lines and never removes any, so
+existing `.gitignore` lines are not duplicated.
 
 ---
 
