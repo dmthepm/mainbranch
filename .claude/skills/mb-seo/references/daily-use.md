@@ -1,13 +1,34 @@
-# OpenSEO Daily Use
+# OpenSEO Spend and Schedule Limits
+
+Procedures live in OpenSEO's own skills ([upstream-skills.md](upstream-skills.md)).
+This file keeps only the spend and schedule exceptions they do not enforce. They
+were first read against the older v0.1.21 release. The pin is now v0.1.26, and
+the tool and spend claims here are NOT VERIFIED against that source; the
+playbooks were written at v0.1.26 and win where they differ.
 
 Use the MCP server named `openseo-<BIZ>` for this business. If the name does not
 match this business, stop.
 
+## Standing words
+
+Each business keeps its standing words in one place: a section headed
+`Standing words` in its private OpenSEO setup record (template in
+[setup.md](setup.md)). Read it before every paid call. It holds:
+
+- the owner's monthly cap, the total across OpenSEO and DataForSEO;
+- standing approvals, each with its date and who gave it;
+- schedules the owner approved, each with its monthly estimate.
+
+It can only narrow or restate the rules in this file, never loosen them. A standing
+approval counts only as written: a call outside its words needs a fresh yes. If the
+section is missing, unreadable or unclear, treat every paid call as needing a yes.
+
 ## Before any paid call
 
 Tell the owner what you will run, why, and the most it can cost. Wait for a yes.
-Use an estimate tool when one exists. Keep a running total against the monthly spend
-cap in the setup record, and stop when the next call would pass it.
+Only a standing approval in `Standing words` that covers this exact call replaces
+it. Use an estimate tool when one exists. Keep a running total against the monthly cap in
+`Standing words`, and stop when the next call would pass it.
 
 A self-hosted copy does not show the DataForSEO balance, and tool results carry no
 cost. Ask the owner to read the balance in their DataForSEO dashboard before and
@@ -73,11 +94,16 @@ them: Lighthouse is a paid DataForSEO call.
 - Search volume and difficulty are estimates, not promised traffic.
 - Separate three things: the copy is reachable, the app works, and the data
   connection returned real rows.
-- If MCP calls return HTML or an "unexpected content type" error, check Managed
-  OAuth first (setup step 7), then ask the owner to sign in again.
+- If MCP calls return HTML or an "unexpected content type" error, check the key
+  first (setup step 8; a missing, expired or revoked key answers 401), then ask
+  the owner for a new one. Behind Access, check Managed OAuth first.
 
 ## Save and act
 
 With the owner's agreement, save findings and choices as described in
 [`SKILL.md`](../SKILL.md). Route page changes to `/mb-site`, and offer keyword
 choices to `/mb-think`. A finding that matters should survive the loss of the copy.
+
+Seen on a live copy: `run_site_audit` returns no cost field, so write down the
+estimate before running it. A rank-tracker run can stay "running" for over an hour
+with no result; check it later instead of starting another paid run.

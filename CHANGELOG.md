@@ -13,6 +13,17 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `/mb-seo` now recommends password mode for a self-hosted OpenSEO copy: no Access
+  app, workers.dev and previews off, rate limits bound, a separate admin user and
+  expiring `oseo_` key per agent, keys in `mb connect` (`--custom --token-stdin`),
+  and an MCP `initialize` canary because `mb connect test` cannot check custom
+  providers. It also records what to know: delete the operator secret by name and
+  prove it with a 404, a key lasts at least one day, a password reset does not
+  revoke keys, 0.1.26 has no sign-out-all, self-hosting has no meter or cap, and
+  same-user processes can read keys. Cloudflare Access remains an option for a
+  human-only app, and the "no static tokens" rule is gone.
+- `/mb-seo` playbooks in `references/playbooks/`: thirteen per-feature procedures
+  and `costs.md`, linked from the upstream-skill handoff table.
 - `mb connect exec`, `token`, `status`, `test` and `policy` find the business repo
   from the git top level of the current folder when `--repo` is not given, so a
   command run in a subfolder of the hub works. Outside a git repo with
@@ -301,6 +312,13 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   (#1306).
 - The Main Branch plugin is now pinned to the exact 0.6.21 release commit. New
   installs get that release, and owners move only when a new release is pinned.
+- `/mb-seo` is now the business layer around OpenSEO's own 12 skills. It names
+  each one with a short before-and-after handoff instead of restating their steps.
+  For a self-hosted copy it documents a skills-only install at a verified pin, in
+  place of the blanket "do not install the plugin" rule, and adds a hardening
+  checklist for the Access guard. A durability reference separates observed checks
+  from unproven authentication changes and assigns one home to each SEO fact.
+  Still experimental.
 
 ### Fixed
 

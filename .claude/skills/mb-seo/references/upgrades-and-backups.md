@@ -61,8 +61,8 @@ mb connect exec cloudflare-openseo --repo "<BUSINESS_REPO>" \
 
 ## Upgrade
 
-Do not recopy the example env file. It would turn on password accounts, and a
-deploy in that mode removes the Access application.
+Do not recopy the example env file. Keep the existing `.env.selfhost`: changing
+`AUTH_MODE` strands the users of the other mode.
 
 ```bash
 cd "<CHECKOUT>"
@@ -72,13 +72,15 @@ test "$(git rev-parse HEAD)" = "<REVIEWED_SHA>"
 pnpm install --frozen-lockfile
 ```
 
-Check `AUTH_MODE` is not `password`. A copy with no `AUTH_MODE` line stays on
-Access, because that is the default when the value is unset.
+Check `AUTH_MODE` is unchanged from the setup record. A deploy does not remove a
+Worker secret: if the operator secret was ever set, confirm it is still absent.
 
 Run the deploy command from setup step 5. Alchemy applies pending migrations.
 
-**Then redo setup steps 6 and 7.** Managed OAuth is cleared by every deploy, so
-it is never skipped. Save the old and new pins and the results.
+**Then redo the setup step 7 checks and the `initialize` canary for each key.**
+A passing check before the deploy proves nothing after it. With Access, redo
+Managed OAuth too, because a deploy may clear it. Save the old and new pins and
+the results.
 
 Moving a copy from a release before v0.1.13 with a Shopify signature: add
 `CRAWLER_ACCESS_SECRET`, deploy, and save the signature again.
