@@ -457,3 +457,89 @@ def test_fresh_repo_exec_and_token_answer_not_connected(fresh: Path, verb: str) 
 
 def test_finder_returns_a_git_top_without_connect_yaml(fresh: Path) -> None:
     assert connect.find_business_repo(fresh) == fresh
+
+
+REPO_COMMANDS = [
+    [],
+    ["list"],
+    ["plan"],
+    ["doctor"],
+    ["hygiene"],
+    ["identity"],
+    ["rotate", "stripe"],
+    ["hydrate"],
+    ["remove", "stripe"],
+    ["rebind"],
+]
+
+
+@pytest.mark.parametrize("args", REPO_COMMANDS)
+@pytest.mark.parametrize("nested", [False, True])
+def test_repo_commands_match_explicit_root_from_subfolder(
+    hub: Path, monkeypatch: pytest.MonkeyPatch, args: list[str], nested: bool
+) -> None:
+    root = make_git(hub / "clone") if nested else hub
+    sub = root / "notes" / "deep"
+    sub.mkdir(parents=True)
+    monkeypatch.chdir(sub)
+    expected = runner.invoke(app, ["connect", *args, "--repo", str(root), "--json"])
+    result = runner.invoke(app, ["connect", *args, "--json"])
+    assert result.exit_code == expected.exit_code, result.output
+    assert json.loads(result.stdout) == json.loads(expected.stdout)
+    assert SECRET not in result.output
+
+
+@pytest.mark.parametrize("args", [*REPO_COMMANDS, ["repair", "--keychain"]])
+def test_repo_commands_refuse_outside_git(
+    hub: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, args: list[str]
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    result = runner.invoke(app, ["connect", *args, "--json"])
+    assert result.exit_code == 2, result.output
+    assert json.loads(result.stdout)["state"] == "no_business_repo"
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_repair_selects_current_repo_from_subfolder(
+    hub: Path, monkeypatch: pytest.MonkeyPatch, nested: bool
+) -> None:
+    root = make_git(hub / "clone") if nested else hub
+    sub = root / "notes"
+    sub.mkdir()
+    monkeypatch.chdir(sub)
+    monkeypatch.setattr("typer.testing._NamedTextIOWrapper.isatty", lambda self: True)
+
+    def repair(repo: str, *, interactive: bool) -> dict[str, Any]:
+        assert interactive
+        return {"ok": True, "repo": str(Path(repo).resolve())}
+
+    # Exercise discovery without opening a machine keychain dialog.
+    monkeypatch.setattr(connect, "repair_keychain", repair)
+    result = runner.invoke(app, ["connect", "repair", "--keychain", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["repo"] == str(root)
+
+
+def test_hygiene_scans_root_config_from_subfolder(
+    hub: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (hub / ".mcp.json").write_text('{"mcpServers": {}}\n')
+    sub = hub / "notes"
+    sub.mkdir()
+    monkeypatch.chdir(sub)
+    result = runner.invoke(app, ["connect", "hygiene", "--json"])
+    assert result.exit_code == 0, result.output
+    assert ".mcp.json" in json.loads(result.stdout)["surfaces_scanned"]
+
+
+def test_audit_reads_machine_log_outside_git(
+    hub: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    result = runner.invoke(app, ["connect", "audit", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == []

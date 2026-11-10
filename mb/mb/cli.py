@@ -506,8 +506,27 @@ def _connect_failure(
 
 
 # Verbs that read a business repo's connections. Without --repo they start from
-# the git top level of the current folder; every other verb keeps ".".
-_CONNECT_REPO_ROOT_VERBS = frozenset({"exec", "token", "status", "test", "policy"})
+# the git top level of the current folder. Audit reads a machine-wide log.
+_CONNECT_REPO_ROOT_VERBS = frozenset(
+    {
+        "",
+        "list",
+        "plan",
+        "status",
+        "doctor",
+        "hygiene",
+        "identity",
+        "test",
+        "exec",
+        "rotate",
+        "token",
+        "policy",
+        "hydrate",
+        "rebind",
+        "remove",
+        "repair",
+    }
+)
 
 
 def _connect_default_repo(target: str, provider: str, *, json_out: bool, flags: list[str]) -> str:
@@ -1247,7 +1266,8 @@ def connect_cmd(
         "--repo",
         help=(
             "Business repo whose metadata is updated. Default: the git repo you are in "
-            "(exec, token, status, test, policy), otherwise the current folder."
+            "for repo-reading subcommands; provider setup uses the current folder. "
+            "Audit reads the machine-wide log."
         ),
     ),
     account_label: str | None = typer.Option(

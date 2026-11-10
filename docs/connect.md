@@ -77,8 +77,8 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
   `GOOGLE_OAUTH_TOKEN`. Custom ids and providers with no registered variable,
   such as GA4, get `MB_SECRET`. `--env` overrides it.
 - `--repo` selects the business repo, and a user-scoped connection resolves
-  from a worktree as it does for `status`. Without `--repo`, `exec`, `token`,
-  `status`, `test` and `policy` start from the git top level of the current
+  from a worktree as it does for `status`. Without `--repo`, repo-reading
+  subcommands, including the default list, start from the git top level of the current
   folder and use it, even when it has no `.mb/connect.yaml` yet (a fresh repo
   then answers "not connected" with the repair steps). They never look above that
   top level, so a repo cloned inside the hub does not borrow the hub's
@@ -92,6 +92,8 @@ mb connect exec mercury --env MERCURY_TOKEN -- python3 scripts/import.py
   Outside any git repo they stop with `no_business_repo` (exit 2). This
   chooses which folder is read, not who may read it: binding, reference and
   caller-policy checks run on the folder found exactly as they do with `--repo`.
+  Provider setup keeps using the current folder. `audit` reads the machine-wide
+  audit log, independent of the current folder or `--repo`.
 
 By default the command receives only these parent variables when present:
 `PATH HOME USER LOGNAME SHELL TERM LANG LANGUAGE TZ TMPDIR XDG_RUNTIME_DIR
