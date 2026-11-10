@@ -12,6 +12,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -441,7 +442,11 @@ def test_the_built_in_helper_list_is_short_and_names_shells_and_the_sandbox_help
 def test_the_cli_requires_a_name_with_the_flag_and_keeps_the_policy_check_without_it() -> None:
     result = CliRunner().invoke(app, ["agent", "check", "--smoke-marker", "/nowhere/marker"])
     assert result.exit_code == 2 and "agent name" in result.output
-    assert "--smoke-marker" in CliRunner().invoke(app, ["agent", "check", "--help"]).output
+    # CI renders help in colour; strip the escapes so the flag name is one string.
+    help_text = re.sub(
+        r"\x1b\[[0-9;]*m", "", CliRunner().invoke(app, ["agent", "check", "--help"]).output
+    )
+    assert "--smoke-marker" in help_text
 
 
 # --- the holder starts with odd signal state and the runtime still sees defaults ---------
