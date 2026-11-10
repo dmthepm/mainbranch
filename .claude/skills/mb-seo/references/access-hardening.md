@@ -69,8 +69,10 @@ skipped or reordered:
    `src/server/standalone/admin.ts` sets the email and password and writes an
    `owner` membership in `shared-workspace`.
 8. **Verify owner membership.** Rerun step 4 with
-   `SELECT userId, organizationId, role FROM member`: one row, that user, role
-   `owner`. Then the owner signs in with the password and opens Team settings.
+   `SELECT user_id, organization_id, role FROM member` (database column names, from
+   `drizzle/sqlite/0003_light_sage.sql:35-43`): exactly one row, `user_id` equal to
+   the user ID from step 4, `organization_id` equal to `shared-workspace`, and role
+   `owner`. Any other result: stop. Then the owner signs in with the password and opens Team settings.
 9. Only now continue with the setup below: shutdown of the other host, limiters,
    per-agent users and keys, then removal of the operator secret.
 
@@ -255,17 +257,40 @@ unauthorised access: a token needs a signed-in user's consent. Owner requirement
      pnpm exec wrangler kv key list --namespace-id <OAUTH_KV_ID> --remote
    ```
 
-   The record kinds are the OAuth library's `client:`, `grant:` and `token:` key
-   prefixes (NOT VERIFIED here; the library is not in the checkout). Compare the
-   clients and grants against the people and tools the owner expects. A live
-   business removed one grant by deleting its two KV entries.
-5. **Revoke with readback.** Delete the unexpected client and grant keys with
-   `wrangler kv key delete --namespace-id <OAUTH_KV_ID> --remote '<KEY>'`, rerun the
-   list, and confirm the keys are gone. Record the date and key names, not values.
-6. **Rejected-token check.** After a revocation, the revoked client's next
-   `list_projects` must fail and ask for sign-in, and a made-up bearer on `/mcp`
-   must give 401. A signed-out `/mcp` 401 alone does not prove the other endpoints
-   are controlled.
+   The key layout is in OpenSEO's own account-deletion code
+   (`src/server/account-deletion/storage.ts:57-93`): a grant is
+   `grant:<userId>:<grantId>`, and each of its tokens is
+   `token:<userId>:<grantId>:<...>`. Client records are separate. List with
+   `--prefix`. That code pages through every result; confirm your listing is
+   complete too before deleting, and never stop at a first page.
+   Compare the clients and grants against the people and tools the owner expects.
+5. **Revoke one grant with readback.** For the grant being revoked:
+   1. List `token:<userId>:<grantId>:` with `--prefix`, all pages, and delete
+      every key it returns.
+   2. Delete `grant:<userId>:<grantId>`.
+   3. Rerun both lists and confirm nothing is left for that grant.
+
+   ```bash
+   mb connect exec cloudflare-openseo --repo "<BUSINESS_REPO>" --env CLOUDFLARE_API_TOKEN -- \
+     pnpm exec wrangler kv key list --namespace-id <OAUTH_KV_ID> --remote \
+     --prefix 'token:<USER_ID>:<GRANT_ID>:'
+   mb connect exec cloudflare-openseo --repo "<BUSINESS_REPO>" --env CLOUDFLARE_API_TOKEN -- \
+     pnpm exec wrangler kv key delete --namespace-id <OAUTH_KV_ID> --remote '<KEY>'
+   ```
+
+   Deleting a client record is a separate step: it stops new sign-ins by that
+   client and does not remove grants or tokens already issued. Revoke its grants
+   first. Record the date and key names, never values.
+6. **Rejected-token check.** Use the revoked client itself, so no token value is
+   printed or copied:
+   - its next MCP call with the old access token must fail with 401 and ask for
+     sign-in;
+   - its next refresh must fail, and it must not receive a new access token.
+
+   A made-up bearer on `/mcp` must also give 401. Refresh tokens live for
+   `MCP_REFRESH_TOKEN_TTL_SECONDS` (`src/server/mcp/oauth-provider.ts:47,308-309`),
+   so an access-token refusal alone does not prove revocation. A signed-out `/mcp`
+   401 does not prove the other endpoints are controlled.
 
 ## What a key cannot do
 

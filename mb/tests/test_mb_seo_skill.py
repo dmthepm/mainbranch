@@ -337,7 +337,11 @@ def test_app_oauth_policy_is_stated_and_probed() -> None:
         "src/server.ts:224-229",
         "does **not** cover OAuth registration",
         "inventory of clients and grants",
-        "Revoke with readback",
+        "Revoke one grant with readback",
+        "token:<userId>:<grantId>:",
+        "src/server/account-deletion/storage.ts:57-93",
+        "its next refresh must fail",
+        "Deleting a client record is a separate step",
         "Rejected-token check",
         "/api/auth/oauth2/register",
         "/api/auth/oauth2/authorize",
@@ -349,6 +353,14 @@ def test_app_oauth_policy_is_stated_and_probed() -> None:
     for endpoint in ("/api/auth/oauth2/register", "/api/auth/oauth2/token", "/.well-known/"):
         assert endpoint in probe_table, endpoint
     assert "#app-oauth-in-password-mode" in _flat(SETUP)
+
+
+def test_owner_check_uses_database_column_names() -> None:
+    flat = _flat(HARDENING)
+    assert "SELECT user_id, organization_id, role FROM member" in flat
+    assert "userId, organizationId" not in flat
+    for required in ("shared-workspace", "role `owner`", "Any other result: stop"):
+        assert required in flat, required
 
 
 def test_pin_is_the_exact_release_sha_everywhere() -> None:
