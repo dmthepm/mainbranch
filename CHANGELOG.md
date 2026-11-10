@@ -11,6 +11,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- `mb skill link` (also run by `mb update`, `mb init` and `mb doctor repair --apply --only claude`)
+  no longer adds a `.gitignore` line for every Main Branch skill. One line, `.claude/skills/mb-*`,
+  covers them all, so a release that adds a skill no longer leaves a change to commit or restore
+  in each hub and fresh worktree. Link only adds missing lines and never removes any: an older
+  per-skill block stays as it is, and a hub's tracked `.gitignore` changes at most once more. The
+  `mb-` skill prefix is reserved for Main Branch. Closes #1341.
+
 ### Added
 
 - `mb agent up <name>` starts a Claude agent from its `agents.json` row and waits for it,

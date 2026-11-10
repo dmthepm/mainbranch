@@ -3123,7 +3123,7 @@ def test_plan_link_skills_writes_nothing_and_names_gitignore(business_repo: Path
     assert plan["ok"] is True
     assert plan["tracked_writes"] == [".gitignore"]
     assert ".claude/skills/mb-start" in plan["linked"]
-    assert ".claude/skills/mb-start" in plan["gitignore_add"]
+    assert ".claude/skills/mb-*" in plan["gitignore_add"]
 
 
 # --- #1008 item 4: always fetch the new version after a release --------------

@@ -59,6 +59,8 @@ RETIRED_PROJECT_SKILL_LINK_NAMES = (
 )
 ENGINE_MARKER = Path(".claude") / "skills" / PRIMARY_SKILL / "SKILL.md"
 GITIGNORE_HEADER = "# Main Branch local Claude wiring"
+# Every bundled skill is named mb-*; one ignore line covers them all (#1341).
+SKILL_LINK_WILDCARD = ".claude/skills/mb-*"
 
 
 def _is_engine_root(path: Path) -> bool:
@@ -680,18 +682,20 @@ def inspect_personal_skill_conflicts(
 
 
 def _link_gitignore_entries() -> tuple[list[str], list[str]]:
-    """The `.gitignore` lines `link_skills` keeps, and the retired ones it drops."""
+    """The `.gitignore` lines `link_skills` ensures, and the ones it drops (none).
+
+    One wildcard covers every bundled `mb-*` skill, so a release that adds a skill
+    adds no line (#1341). Lines are only ever added, never removed: a hub's tracked
+    `.gitignore` changes at most once. A bundled skill outside the prefix still
+    gets its own line.
+    """
     entries = [
         ".claude/settings.local.json",
         ".claude/worktrees/",
-        *[f".claude/skills/{name}" for name in bundled_skills()],
+        SKILL_LINK_WILDCARD,
+        *[f".claude/skills/{name}" for name in bundled_skills() if not name.startswith("mb-")],
     ]
-    retired = [
-        f".claude/skills/{name}"
-        for name in sorted(set(LEGACY_SKILL_NAMES) | set(RETIRED_PROJECT_SKILL_LINK_NAMES))
-        if name not in bundled_skills()
-    ]
-    return entries, retired
+    return entries, []
 
 
 class _TrackedIndex:

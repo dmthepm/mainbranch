@@ -90,17 +90,14 @@ fi
 ensure_gitignore_entry ".claude/settings.local.json"
 ensure_gitignore_entry ".claude/worktrees/"
 
-# Add each Main Branch skill symlink individually (preserves custom skill tracking)
-for d in "$ENGINE_PATH"/.claude/skills/*/; do
-  [ -d "$d" ] || continue
-  n=$(basename "$d")
-  ensure_gitignore_entry ".claude/skills/$n"
-done
+# One line covers every Main Branch skill link: they are all named mb-*.
+# Your own skills under other names stay tracked.
+ensure_gitignore_entry ".claude/skills/mb-*"
 ```
 
 **Why `.claude/settings.local.json` is git-ignored:** Claude Code auto-ignores this file, but we add it explicitly for safety. It contains machine-specific absolute paths to Main Branch (`additionalDirectories`) that differ per computer.
 
-**Why per-skill entries (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked in git. Ignoring the whole folder would hide those. We only ignore the Main Branch-linked symlinks. Old clone-based `.claude/lenses/` and `.claude/reference/` dirs are legacy link dirs; repair them with `mb doctor repair` instead of teaching them as current setup.
+**Why `.claude/skills/mb-*` (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked in git. Ignoring the whole folder would hide those. Every Main Branch skill is named `mb-*`, so one line ignores exactly the linked ones, and a release that adds a skill adds no line. The `mb-` prefix is reserved for Main Branch skills. Old clone-based `.claude/lenses/` and `.claude/reference/` dirs are legacy link dirs; repair them with `mb doctor repair` instead of teaching them as current setup.
 
 **Why legacy `.vip/local.yaml` is git-ignored:** Older repos may have stored
 session state like `current_offer` there. Treat it as audit input, not durable

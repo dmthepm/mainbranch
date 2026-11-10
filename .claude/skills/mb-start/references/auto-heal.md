@@ -106,15 +106,12 @@ fi
 ensure_gitignore_entry ".claude/settings.local.json"
 ensure_gitignore_entry ".claude/worktrees/"
 
-# Add each Main Branch skill symlink individually (preserves custom skill tracking)
-for d in "$ENGINE_PATH"/.claude/skills/*/; do
-  [ -d "$d" ] || continue
-  n=$(basename "$d")
-  ensure_gitignore_entry ".claude/skills/$n"
-done
+# One line covers every Main Branch skill link: they are all named mb-*.
+# Your own skills under other names stay tracked.
+ensure_gitignore_entry ".claude/skills/mb-*"
 ```
 
-**Why per-skill entries (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked. Ignoring the whole folder would hide those. We only ignore the Main Branch-linked ones.
+**Why `.claude/skills/mb-*` (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked. Ignoring the whole folder would hide those. Every Main Branch skill is named `mb-*`, so one line ignores exactly the linked ones, and a release that adds a skill adds no line. The `mb-` prefix is reserved for Main Branch skills.
 
 **Idempotent:** Every entry is checked before appending so freshly templated
 repos do not duplicate existing `.gitignore` lines.

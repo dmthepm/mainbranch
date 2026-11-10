@@ -208,7 +208,7 @@ def test_link_skills_refuses_to_clobber_corrupt_local_settings(tmp_path: Path, m
     assert not (repo / ".claude" / "skills" / "mb-start").exists()
 
 
-def test_link_skills_removes_retired_project_symlinks_and_gitignore_entries(
+def test_link_skills_removes_retired_project_symlinks_and_keeps_gitignore_lines(
     tmp_path: Path, monkeypatch
 ) -> None:
     repo = tmp_path / "biz"
@@ -242,10 +242,10 @@ def test_link_skills_removes_retired_project_symlinks_and_gitignore_entries(
     assert ".claude/skills/mb-pull" in result["removed_legacy"]
     assert not (skills / "mb-vsl").exists()
     assert not (skills / "mb-pull").exists()
-    gitignore = (repo / ".gitignore").read_text(encoding="utf-8")
-    assert ".claude/skills/mb-start" in gitignore
-    assert ".claude/skills/mb-vsl" not in gitignore
-    assert ".claude/skills/mb-pull" not in gitignore
+    # Lines are never removed (#1341): a retired line is harmless, a tracked edit is not.
+    gitignore = (repo / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert ".claude/skills/mb-*" in gitignore
+    assert ".claude/skills/mb-vsl" in gitignore and ".claude/skills/mb-pull" in gitignore
 
 
 def test_link_skills_ignores_claude_code_worktrees(tmp_path: Path, monkeypatch) -> None:
@@ -259,7 +259,7 @@ def test_link_skills_ignores_claude_code_worktrees(tmp_path: Path, monkeypatch) 
     gitignore = (repo / ".gitignore").read_text(encoding="utf-8")
     assert ".claude/settings.local.json" in gitignore
     assert ".claude/worktrees/" in gitignore
-    assert ".claude/skills/mb-start" in gitignore
+    assert ".claude/skills/mb-*" in gitignore
 
 
 def test_link_skills_removes_stale_mainbranch_engine_paths(tmp_path: Path) -> None:
