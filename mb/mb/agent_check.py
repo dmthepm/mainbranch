@@ -30,7 +30,7 @@ from mb import agent_policy as ap
 from mb import agent_smoke as sm
 from mb import agent_up as au
 from mb import roles
-from mb.agent_store import Refusal, Store, audit
+from mb.agent_store import Refusal, Store, _has_acl, audit
 from mb.json_result import envelope
 
 SCHEMA = "mainbranch.agent.check"
@@ -135,14 +135,33 @@ def _try(fn: Any, *args: Any) -> tuple[Any, str | None]:
 
 
 def _lock_owners(store: Store, name: str) -> list[int]:
-    """Pids holding the row lock. Never creates the lock file and never takes the lock."""
-    if not audit(store.locks / f"{name}.lock", store.uid, directory=False):
-        return []
-    lock = store.row_lock(name)
+    """Pids holding the row lock. Opens the existing file only: never creates it, never locks it.
+
+    Absent both at the audit and at the open is a free lock. A file that vanishes or appears
+    between the two is a changed store: unknown.
+    """
+    path = store.locks / f"{name}.lock"
+    present = audit(path, store.uid, directory=False)
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
     try:
-        owners = au.lock_owners(lock)
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        if present:
+            raise Refusal(4, "lock-changed", f"{path.name} disappeared while it was read") from None
+        return []
+    except OSError as exc:
+        raise Refusal(2, "unsafe-store", f"{path}: {exc.strerror}") from None
+    try:
+        if not present:
+            raise Refusal(4, "lock-changed", f"{path.name} appeared while it was read")
+        info = os.fstat(fd)
+        if info.st_uid != store.uid or info.st_mode & 0o077 or not stat.S_ISREG(info.st_mode):
+            raise Refusal(2, "unsafe-store", f"{path}: not a private regular file")
+        if _has_acl(fd):
+            raise Refusal(2, "unsafe-store", f"{path}: has a POSIX ACL")
+        owners = au.owners_of(info.st_dev, info.st_ino)
     finally:
-        lock.close()
+        os.close(fd)
     if owners is None:
         raise Refusal(4, "lock-owner-unknown", "cannot read /proc/locks")
     return owners
@@ -157,23 +176,35 @@ def _holder_owns(owners: list[int], last: dict[str, Any]) -> bool:
 # --- the fields -----------------------------------------------------------------------------
 
 
-def _fresh_record(path: str, session_id: str, since: datetime) -> bool | None:
-    """True when a record in the file's tail carries the id and is stamped after ``since``."""
+def _fresh_record(path: str, session_id: str, since: datetime) -> bool | str:
+    """True when a record in the file's tail carries the id and is stamped after ``since``.
+
+    A string is the reason the file cannot be used: ``unsupported-format``, or
+    ``transcript-changed`` when it was replaced or rewritten while it was read.
+    """
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
     except OSError:
-        return None
+        return "unsupported-format"
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
-            return None
+            return "unsupported-format"
         offset = max(0, info.st_size - TAIL_BYTES)
         os.lseek(fd, offset, os.SEEK_SET)
         data = os.read(fd, TAIL_BYTES)
+        again = os.fstat(fd)
+        named = os.lstat(path)
     except OSError:
-        return None
+        return "transcript-changed"
     finally:
         os.close(fd)
+    seen = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+    if seen != (again.st_dev, again.st_ino, again.st_size, again.st_mtime_ns) or (
+        named.st_dev,
+        named.st_ino,
+    ) != (info.st_dev, info.st_ino):
+        return "transcript-changed"
     lines = data.split(b"\n")
     for raw in lines[1:] if offset else lines:  # the first line of a tail may be cut
         try:
@@ -188,15 +219,21 @@ def _fresh_record(path: str, session_id: str, since: datetime) -> bool | None:
     return False
 
 
+def project_slug(cwd: str) -> str:
+    """Claude Code's transcript folder for a working folder: ``/`` and ``.`` become ``-``."""
+    return cwd.replace("/", "-").replace(".", "-")
+
+
 def _session(last: dict[str, Any]) -> Field:
     sid = last["session_id"]
     expect = last.get("profile_id")
     found = au.Search()
-    au._look(last["profile_real"], tuple(expect) if expect else None, sid, found)
+    folder = project_slug(last["cwd_real"])
+    au._look(last["profile_real"], tuple(expect) if expect else None, sid, found, folder)
     for _, path, _ in found.found:
         fresh = _fresh_record(path, sid, datetime.fromisoformat(last["utc"]))
-        if fresh is None:
-            return Field("session", "unverified", "unsupported-format")
+        if isinstance(fresh, str):
+            return Field("session", "unverified", fresh)
         if fresh:
             return Field("session", "match")
     if found.found:
@@ -241,7 +278,6 @@ def _live_fields(report: ap.Report, host: ap.Host, last: dict[str, Any]) -> list
     env, env_tag = _try(sm._environ, pid)
     cwd, cwd_tag = _try(sm._link, pid, "cwd")
     cmdline, cmd_tag = _try(sm._read, pid, "cmdline")
-    after, _ = _try(sm._observe, pid)
     by_name: dict[str, Field] = {}
 
     def put(item: Field) -> None:
@@ -251,7 +287,7 @@ def _live_fields(report: ap.Report, host: ap.Host, last: dict[str, Any]) -> list
         put(Field("identity", "unverified", tag or "inconsistent"))
         put(Field("exe", "unverified", tag or "inconsistent"))
     else:
-        reused = before.start != start or after != before
+        reused = before.start != start
         put(
             Field("identity", "unverified", "inconsistent")
             if reused
@@ -291,6 +327,10 @@ def _live_fields(report: ap.Report, host: ap.Host, last: dict[str, Any]) -> list
             else Field("argv", "unverified", "argv-rewritten", False)
         )
     put(Field("env-passed", "unverified", "not-stored", False))
+    after, _ = _try(sm._observe, pid)  # last, so the identity covers the whole collection
+    if before is not None and after != before:
+        put(Field("identity", "unverified", "inconsistent"))
+        put(Field("exe", "unverified", "inconsistent"))
     return [*(by_name[n] for n in REQUIRED), *(by_name[n] for n in ("row", "argv", "env-passed"))]
 
 
@@ -316,6 +356,16 @@ def _ended(report: ap.Report, host: ap.Host, store: Store, last: dict[str, Any])
     return Result(3, last["name"], "ended", f"runtime pid {pid} has ended; the lock is free")
 
 
+def _still_held(store: Store, name: str, last: dict[str, Any]) -> None:
+    """After the fields: the holder still owns the lock. The runtime's own identity and program
+    are read last inside ``_live_fields``."""
+    owners = _lock_owners(store, name)
+    if not owners:
+        raise Refusal(4, "holder-lost", "nothing holds the lock any more")
+    if not _holder_owns(owners, last):
+        raise Refusal(4, "lock-owner-unknown", f"lock held by pid {owners[0]}, not the holder")
+
+
 def _judge(report: ap.Report, host: ap.Host, store: Store, name: str) -> Result:
     state = store.read_state().get(name)
     if state is None:
@@ -339,6 +389,7 @@ def _judge(report: ap.Report, host: ap.Host, store: Store, name: str) -> Result:
     if not owners:
         raise Refusal(4, "holder-lost", f"runtime pid {pid} lives and nothing holds the lock")
     fields = _live_fields(report, host, last)
+    _still_held(store, name, last)
     unknown = [f for f in fields if f.required and f.status == "unverified"]
     bad = [f for f in fields if f.status == "mismatch"]
     code = 4 if unknown else 1 if bad else 0

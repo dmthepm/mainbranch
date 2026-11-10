@@ -21,6 +21,7 @@ from typer.testing import CliRunner
 from mb import agent_check as ac
 from mb import agent_policy as ap
 from mb import agent_smoke as sm
+from mb import agent_store as store_mod
 from mb import agent_up as au
 from mb import doctor
 from mb.cli import app
@@ -64,6 +65,10 @@ class Live:
         path.write_text(json.dumps(self.record))
 
     @property
+    def slug(self) -> str:
+        return str(Path(self.record["cwd_real"]).resolve()).replace("/", "-").replace(".", "-")
+
+    @property
     def sid(self) -> str:
         return str(self.record["session_id"])
 
@@ -74,13 +79,19 @@ class Live:
         self.proc.add(RUNTIME_PID, HOLDER_PID, "claude", start=START, **kw)
 
     def lock(self, *pids: int) -> None:
+        info = os.stat(self.u.store / "locks" / "planner.lock")
+        self.lock_table(pids, f"{os.major(info.st_dev):02x}:{os.minor(info.st_dev):02x}")
+
+    def lock_table(self, pids: tuple[int, ...], device: str) -> None:
         inode = os.stat(self.u.store / "locks" / "planner.lock").st_ino
-        lines = [f"{i}: FLOCK  ADVISORY  WRITE {p} 08:01:{inode} 0 EOF" for i, p in enumerate(pids)]
+        lines = [
+            f"{i}: FLOCK  ADVISORY  WRITE {p} {device}:{inode} 0 EOF" for i, p in enumerate(pids)
+        ]
         (self.proc.root / "locks").write_text("\n".join(lines) + "\n")
 
     def transcript(self, *, at: timedelta = timedelta(seconds=5), sid: str | None = None) -> Path:
         stamp = datetime.fromisoformat(self.record["utc"]) + at
-        path = self.profile / "projects" / "p" / f"{self.sid}.jsonl"
+        path = self.profile / "projects" / self.slug / f"{self.sid}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         record = {"sessionId": sid or self.sid, "timestamp": stamp.isoformat()}
         path.write_text(json.dumps(record) + "\n")
@@ -650,3 +661,181 @@ def test_the_agent_module_still_sends_no_signals() -> None:
     assert not any(
         word in text for word in ("os.kill", "os.killpg", "pthread_kill", "pidfd_send_signal")
     )
+
+
+# --- M3-A: what changes while the fields are being collected is 4 --------------------------
+
+
+def test_a_lock_that_loses_its_holder_while_the_fields_are_read_is_4(
+    lv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = ac._environment
+
+    def environment(env: dict[str, str], last: dict[str, Any]) -> tuple[ac.Field, ac.Field]:
+        (lv.proc.root / "locks").write_text("")  # the holder exits mid-observation
+        return real(env, last)
+
+    monkeypatch.setattr(ac, "_environment", environment)
+    code, text = lv.run()
+    assert code == 4 and "holder-lost" in text
+
+
+def test_a_pid_reused_while_the_session_is_read_is_4(
+    lv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = ac._session
+
+    def session(last: dict[str, Any]) -> ac.Field:
+        lv.proc.add(RUNTIME_PID, 1, "claude", env=lv.env, start=START + 7)
+        return real(last)
+
+    monkeypatch.setattr(ac, "_session", session)
+    assert lv.run()[0] == 4
+
+
+def test_a_change_during_collection_beats_a_mismatch_found_in_the_same_pass(
+    lv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lv.runtime(cwd="/elsewhere")  # a mismatch on its own would be 1
+    real = ac._session
+
+    def session(last: dict[str, Any]) -> ac.Field:
+        (lv.proc.root / "locks").write_text("")
+        return real(last)
+
+    monkeypatch.setattr(ac, "_session", session)
+    assert lv.run()[0] == 4
+
+
+def test_a_transcript_rewritten_after_its_tail_was_read_is_4(
+    lv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = lv.transcript()
+    real, done = os.read, list[int]()
+
+    def read(fd: int, n: int) -> bytes:
+        data = real(fd, n)
+        if not done and data.startswith(b'{"sessionId"'):
+            done.append(1)
+            path.write_text("{}\n")
+        return data
+
+    monkeypatch.setattr(os, "read", read)
+    code, text = lv.run()
+    assert code == 4 and "transcript-changed" in text
+
+
+def test_a_transcript_replaced_by_another_file_after_the_read_is_4(
+    lv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = lv.transcript()
+    real, done = os.read, list[int]()
+
+    def read(fd: int, n: int) -> bytes:
+        data = real(fd, n)
+        if not done and data.startswith(b'{"sessionId"'):
+            done.append(1)
+            other = path.with_name("other")
+            other.write_bytes(data)
+            os.replace(other, path)  # same bytes and size, a different file
+        return data
+
+    monkeypatch.setattr(os, "read", read)
+    assert lv.run()[0] == 4
+
+
+# --- M3-B: observing the row lock never creates it -----------------------------------------
+
+
+def test_a_row_lock_removed_after_the_audit_is_not_recreated_and_is_4(
+    lv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lock = lv.u.store / "locks" / "planner.lock"
+    real = store_mod.audit
+
+    def audit(path: Path, uid: int, *, directory: bool) -> bool:
+        found = real(path, uid, directory=directory)
+        if path == lock:
+            lock.unlink()
+        return found
+
+    monkeypatch.setattr(ac, "audit", audit)
+    code, _ = lv.run()
+    assert not lock.exists()
+    assert code == 4
+
+
+def test_a_row_lock_that_is_consistently_absent_is_free_and_not_created(lv: Live) -> None:
+    lock = lv.u.store / "locks" / "planner.lock"
+    lock.unlink()
+    lv.end()
+    assert lv.run()[0] in (3, 4)
+    assert not lock.exists()
+
+
+# --- M3-C: a lock is identified by device and inode ----------------------------------------
+
+
+def test_a_lock_on_another_device_with_the_same_inode_is_not_this_lock(lv: Live) -> None:
+    lv.lock_table((HOLDER_PID,), "ff:ff")
+    code, text = lv.run()
+    assert code == 4 and "holder-lost" in text
+
+
+def test_a_lock_on_another_device_does_not_hide_the_holder(lv: Live) -> None:
+    info = os.stat(lv.u.store / "locks" / "planner.lock")
+    inode = info.st_ino
+    here = f"{os.major(info.st_dev):02x}:{os.minor(info.st_dev):02x}"
+    (lv.proc.root / "locks").write_text(
+        f"0: FLOCK  ADVISORY  WRITE {OTHER_PID} ff:ff:{inode} 0 EOF\n"
+        f"1: FLOCK  ADVISORY  WRITE {HOLDER_PID} {here}:{inode} 0 EOF\n"
+    )
+    assert lv.run()[0] == 0
+
+
+def test_the_shared_helper_compares_both_device_parts_in_hex(lv: Live, tmp_path: Path) -> None:
+    lock = store_mod.FileLock(lv.u.store / "locks" / "planner.lock", os.getuid())
+    try:
+        info = os.fstat(lock.fd or 0)
+        assert lock.device == info.st_dev and lock.inode == info.st_ino
+        lv.lock_table((HOLDER_PID,), f"{os.major(info.st_dev):x}:{os.minor(info.st_dev):x}")
+        assert au.lock_owners(lock) == [HOLDER_PID]
+        lv.lock_table((HOLDER_PID,), "ff:ff")
+        assert au.lock_owners(lock) == []
+    finally:
+        lock.close()
+
+
+# --- M3-D: tests never resolve the real password-database home ----------------------------
+
+
+def test_doctor_without_a_host_never_resolves_the_real_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pwd
+
+    real_home = tmp_path / "pretend-real-home"
+    store = real_home.joinpath(*ap.STORE_PARTS)
+    store.mkdir(parents=True)
+    (store / "agents.json").write_text("{}")  # present, so a doctor that reads it reports a row
+    entry = pwd.getpwuid(os.getuid())
+    monkeypatch.setattr(pwd, "getpwuid", lambda uid: entry._replace(pw_dir=str(real_home)))  # type: ignore[attr-defined]
+    assert ac.doctor_check() is None
+    assert str(real_home) not in ap.Host.local().home
+
+
+# --- M3-E: session evidence is bound to the recorded folder -------------------------------
+
+
+def test_a_transcript_in_another_projects_folder_is_not_evidence(lv: Live) -> None:
+    path = lv.transcript()
+    other = lv.profile / "projects" / "-some-other-folder"
+    other.mkdir()
+    os.replace(path, other / path.name)
+    code, text = lv.run()
+    assert code == 4 and "no-session-evidence" in text
+
+
+def test_the_folder_slug_replaces_slashes_and_dots_with_dashes(lv: Live) -> None:
+    assert "." not in lv.slug and "/" not in lv.slug and lv.slug.startswith("-")
+    assert ac.project_slug("/home/u/.local/state/x") == "-home-u--local-state-x"

@@ -305,7 +305,19 @@ that changes only one of them is still ok. Anything the runtime changes in memor
 after start, the model and effort in effect, the account and whether a hook ran are not checked.
 Another user's processes may not be readable at all (`proc-denied`, 4).
 
+The observation is a sequence of reads, not an atomic snapshot of a process that can change at any
+moment. To bound that, the runtime's identity and program are read again after everything else, the
+row lock is read again after the fields (it is opened as an existing file only, never created or
+locked, and matched by device and inode in `/proc/locks`), and a transcript whose identity, size or
+modification time changes across its read is unknown (`transcript-changed`). Any such change is 4,
+which wins over a mismatch. Session evidence comes only from
+`<profile>/projects/<folder>/<session-id>.jsonl`, where the folder is the recorded working folder's
+real path with every `/` and `.` replaced by `-` (confirmed on Claude Code 2.1.309); `up`'s own
+search of every project folder is unchanged.
+
 `mb doctor` shows one `agents` row when `agents.json` exists, from a read-only check of every
 agent: ended or unknown warns, a mismatch fails, an agent never launched is not a finding.
 
-Not built yet: Codex, and confirming the Claude flags on the installed version.
+Not built yet: Codex launch and Codex checks. The live check of a running Claude agent is built,
+and the Claude flags are confirmed on Claude Code 2.1.309 only; repeat the confirmation for each
+new version.

@@ -40,7 +40,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   it adds up to: 0 ok, 1 mismatch, 2 invalid policy or unsafe store, 3 ended, 4 unknown. Something
   that cannot be read is 4, never ok and never ended. `--wait` keeps checking while the answer is
   3 or 4 (`--timeout`, at most 300 seconds), `--json` prints a versioned result, and `mb doctor`
-  shows one read-only `agents` row. The claim is launch configuration only. It does not prove the
+  shows one read-only `agents` row. The fields are read one after another, not as an atomic
+  snapshot: the runtime's identity and program are read again last, the holder's lock again after
+  the fields, and a transcript replaced or rewritten while it was read is unknown, never ok. Session
+  evidence is read only from the transcript folder of the recorded working folder. The claim is
+  launch configuration only. It does not prove the
   session runs in that process (a forked waiting parent can pass; only the smoke sees it), does not
   show that the agent behaves like its role, and does not compare passed values such as
   `SSH_AUTH_SOCK`, which are not stored. `mb agent check` with no name is still the policy check.
@@ -50,9 +54,9 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   still match its record. Helpers are approved by the program actually running, and anything that
   cannot be read, or changes during the read, is unknown (exit 4), never a pass. A program that forks, waits and lets a child do the work fails it. A pass
   is evidence for the installed version under that one observation, not proof for every session,
-  and mb does not run it at launch. The live check of a running agent is not built, `check`
-  without the flag is still the policy check, and the smoke and the Claude flag confirmation are
-  documented as manual steps that have not been run.
+  and mb does not run it at launch. The live check of a running agent is built (`mb agent check
+  <name>`), `check` with no name is still the policy check, and the Claude flags and the smoke
+  are confirmed on Claude Code 2.1.309 only. Codex launch is not built.
 
 ## [0.6.24] - 2026-11-09
 

@@ -52,6 +52,24 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def isolated_agent_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point ``Host.local`` at a disposable home so no test reads the real agent policy or store.
+
+    Production keeps the password-database home; ``doctor`` and ``mb agent`` resolve it through
+    ``Host.local``, which ``HOME`` alone does not move.
+    """
+
+    from mb import agent_policy
+
+    home = str(tmp_path / "isolated-home")
+    monkeypatch.setattr(
+        agent_policy.Host,
+        "local",
+        classmethod(lambda cls: cls(home=home, uid=os.getuid())),
+    )
+
+
+@pytest.fixture(autouse=True)
 def neutral_terminal_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep help and human output independent of the host's terminal settings.
 
