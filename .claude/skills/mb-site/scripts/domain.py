@@ -28,8 +28,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # Allow `python3 path/to/domain.py` when run directly (script lookup).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _envelope import (  # noqa: E402
-    OWNER_HANDOFF,
-    porkbun_howto,
     SCHEMA_VERSION,
     EnvelopeStatus,
     ProviderRunMetadata,
@@ -337,12 +335,10 @@ def _select_registrar(
         return "porkbun", None
     return None, DomainBuyError(
         code="no_registrar_configured",
-        message="No registrar credentials found.",
+        message="Buying a domain is not wired in this build.",
         suggestion=(
-            "Use CLOUDFLARE_API_TOKEN_REGISTRAR (preferred) or Porkbun: "
-            + porkbun_howto(f"domain.py buy {domain} --registrar porkbun")
-            + " "
-            + OWNER_HANDOFF
+            f"Buy {domain} in the registrar dashboard, then rerun `/mb-site` "
+            "after you own the full domain."
         ),
     )
 

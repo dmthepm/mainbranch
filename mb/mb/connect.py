@@ -1635,6 +1635,14 @@ _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-
 # `host:5432` and emails have no `:` before the `@`, so they pass.
 _METADATA_URL_STRIP_RE = re.compile(r"[\t\r\n]")
 _METADATA_AUTHORITY_SPLIT_RE = re.compile(r"[ /?#]+")
+# A setting named password, passwd, pass or pwd followed by `=`: ``?password=x``,
+# ``;Password =x``, ``host=h password = 'x'``. The name must start at a word
+# boundary (letters and digits; `_` and `-` do not count, so ``db_password=`` is
+# a password and ``bypass=`` is not) and the value never matters, so an empty
+# one is refused too. Matched on the whole string, never on pieces.
+_METADATA_NAMED_PASSWORD_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:password|passwd|pass|pwd)[\"']?\s*=", re.I
+)
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
 _METADATA_URL_DECODE_PASSES = 3
@@ -1894,6 +1902,23 @@ def _nested_url_has_password(rest: str, depth: int) -> bool:
     return _METADATA_URL_START_RE.search(rest) is not None
 
 
+def _has_named_password(text: str) -> bool:
+    """True when ``text``, raw or percent-decoded (at most three passes), has a
+    setting named ``password``, ``passwd``, ``pass`` or ``pwd`` before an ``=``.
+
+    Tab, CR and LF are removed first at each pass, as a URL parser does, so
+    ``pass<tab>word=`` cannot hide the name."""
+    for _ in range(_METADATA_URL_DECODE_PASSES + 1):
+        text = _METADATA_URL_STRIP_RE.sub("", text)
+        if _METADATA_NAMED_PASSWORD_RE.search(text):
+            return True
+        decoded = urllib.parse.unquote(text)
+        if decoded == text:
+            return False
+        text = decoded
+    return False
+
+
 def _carries_password(text: str, depth: int = 0) -> bool:
     """True when any piece of ``text`` reads as ``user:password@host``.
 
@@ -1943,7 +1968,11 @@ def metadata_value_rule(value: str) -> str:
         rule = _word_secret_rule(word)
         if rule:
             return rule
-    if any(_url_has_password(word) for word in words) or _carries_password(candidate):
+    if (
+        _has_named_password(candidate)
+        or any(_url_has_password(word) for word in words)
+        or _carries_password(candidate)
+    ):
         return "url_password"
     return ""
 
@@ -4328,18 +4357,19 @@ def find_business_repo(start: str | Path = ".") -> Path:
     Starts at the nearest git top level at or above ``start`` and goes no
     higher: a repo cloned inside the hub is its own repo and never borrows the
     hub's keys. A git marker that cannot be read refuses; the search never walks
-    past it. That folder must hold ``.mb/connect.yaml``. This only chooses
-    which folder is read; binding and reference checks run on it as on
-    ``--repo``.
+    past it. A repo with no ``.mb/connect.yaml`` yet is still the repo: the
+    verbs then answer "not connected" and show the repair hints. Only a folder
+    with no git top refuses. This only chooses which folder is read; binding and
+    reference checks run on it as on ``--repo``.
     """
     here = Path(start).resolve()
     top = next((folder for folder in (here, *here.parents) if _is_git_top(folder)), None)
-    if top is not None and (top / CONFIG_RELATIVE_PATH).is_file():
+    if top is not None:
         return top
     _refuse(
         "no_business_repo",
-        f"No business repo here: {here} is not inside a git repo with "
-        f"{CONFIG_RELATIVE_PATH.as_posix()}. cd into the business repo or pass --repo.",
+        f"No business repo here: {here} is not inside a git repo. "
+        "cd into the business repo or pass --repo.",
     )
 
 

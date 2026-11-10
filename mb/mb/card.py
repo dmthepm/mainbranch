@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from mb.durable import _fsync_fd
+
 WIDTH = 1320
 MARGIN = 64
 MAX_RATIO = 3
@@ -280,6 +282,7 @@ def _publish(data: bytes, out_path: Path) -> None:
     os.link refuses an existing name, so a file created after the earlier check is still safe.
     The file is synced before the link and the folder after it, so a power cut cannot leave a
     name that points at empty bytes; a failed folder sync is reported, never passed off as done.
+    A disk that cannot sync a folder at all is carried on past, as in durable.
     """
     name = out_path.name
     try:
@@ -317,7 +320,7 @@ def _publish(data: bytes, out_path: Path) -> None:
     unconfirmed = ""
     if made and problem is None:
         try:
-            os.fsync(dfd)
+            _fsync_fd(dfd)
         except OSError as exc:
             unconfirmed = f"; could not confirm it reached disk: {exc.strerror}"
     os.close(dfd)
