@@ -30,7 +30,7 @@ See `mb-start/references/config-system.md` for legacy config cleanup guidance.
 
 The legacy `search: true` failure is the removed Live Search feature, not a limit of REST. Use `/v1/responses`.
 
-**Checked against xAI's X Search docs on 10 November 2026** (docs.x.ai/developers/tools/x-search). Their examples use `grok-4.7`. Main Branch has not tested REST `x_search` or any model: **not tested by Main Branch**. Older notes here (January 2026) said server-side tools need the grok-4 family and that grok-3 returns `INVALID_ARGUMENT`; treat that as history and check xAI's models page for the current name.
+**Checked against xAI's X Search docs on 10 November 2026** (docs.x.ai/developers/tools/x-search). Their examples use `grok-4.7`. Main Branch has not tested REST `x_search` or `grok-4.7`: **not tested by Main Branch**. The SDK route above was tested in January 2026; that is history, not a current check. Older notes here (January 2026) said server-side tools need the grok-4 family and that grok-3 returns `INVALID_ARGUMENT`; treat that as history and check xAI's models page for the current name.
 
 ---
 

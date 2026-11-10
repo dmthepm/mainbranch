@@ -126,7 +126,9 @@ Do not commit to the hub, and never to a public repo, issue or doc:
 A real recording or transcript that the team needs can live in the private hub
 under the where-data-lives rule. For anything larger or more sensitive, write
 raw output to OS temp or ignored local scratch first and commit only
-synthesized findings, unless the operator approves a short excerpt.
+synthesized findings. A short excerpt may be committed when the operator
+approves it and it is sanitized first. No approval lets credentials, sensitive
+categories or customers' customers' data into a commit.
 
 ## Step 5: Route Durable Output
 
