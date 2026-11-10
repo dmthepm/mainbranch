@@ -2614,7 +2614,10 @@ def agent_up_cmd(
     session: str | None = typer.Option(None, "--session", help="Resume this session id."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the command; start nothing."),
 ) -> None:
-    """Start one Claude agent from its row and wait. Launch configuration is verified at start."""
+    """Start one Claude or Codex agent from its row and wait.
+
+    Launch configuration is verified at start.
+    """
     try:
         code = agent_up_mod.up(
             agent_policy_mod.Host.local(), name, new=new, session=session, dry_run=dry_run

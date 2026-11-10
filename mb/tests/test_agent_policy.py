@@ -394,12 +394,12 @@ def test_shared_card_when_cwd_has_no_roles_dir(w: World) -> None:
     assert w.check().ok
 
 
-def test_codex_without_card_is_not_an_error(w: World) -> None:
+def test_codex_requires_a_card(w: World) -> None:
     (w.biz / "core" / "roles" / "planner.md").unlink()
     w.write({"version": 1, "agents": [w.row(runtime="codex")]})
     report = w.check()
-    assert report.ok
-    assert any("no-adapter" in n for n in report.notes)
+    assert not report.ok
+    assert [p.code for p in report.problems] == ["card"]
 
 
 def test_codex_card_that_exists_is_still_validated(w: World) -> None:
@@ -830,9 +830,8 @@ def test_note_label_carries_no_unicode_format_control(local: World, control: str
 
 
 def test_cli_prints_the_notes_a_valid_codex_row_carries(local: World) -> None:
-    (local.biz / "core" / "roles" / "planner.md").unlink()
     local.write({"version": 1, "agents": [local.row(runtime="codex")]})
     result = CliRunner().invoke(app, ["agent", "check"])
     assert result.exit_code == 0
-    assert "  note: planner: card: unverified(no-adapter)" in result.output
+    assert "no-adapter" not in result.output
     assert "  note: default codex profile:" in result.output

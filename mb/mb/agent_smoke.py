@@ -208,7 +208,7 @@ def _verdict(host: ap.Host, name: str, marker: str, out: TextIO) -> int:
     passed: list[str] = attempt["env_passed"]
     sid = attempt["session_id"]
     chain = _chain(marker_pid, pid, attempt["runtime_real"], runtime_id, seen)
-    hits, unreadable = au.cmdline_scan(sid, host.uid)
+    hits, unreadable = au.cmdline_scan(sid, host.uid) if sid else ([], [])
     if unreadable:
         raise Refusal(
             4, "scan-incomplete", f"could not read the command line of {unreadable}; not a pass"

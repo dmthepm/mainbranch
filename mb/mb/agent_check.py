@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TextIO
 
+from mb import agent_codex as cx
 from mb import agent_policy as ap
 from mb import agent_smoke as sm
 from mb import agent_up as au
@@ -121,6 +122,7 @@ class Scope:
     home: str
     profile_real: str
     policy_profiles: list[str]
+    runtime: str = "claude"
 
 
 def _try(fn: Any, *args: Any) -> tuple[Any, str | None]:
@@ -176,7 +178,9 @@ def _holder_owns(owners: list[int], last: dict[str, Any]) -> bool:
 # --- the fields -----------------------------------------------------------------------------
 
 
-def _fresh_record(path: str, session_id: str, since: datetime) -> bool | str:
+def _fresh_record(
+    path: str, session_id: str, since: datetime, runtime: str = "claude", cwd: str | None = None
+) -> bool | str:
     """True when a record in the file's tail carries the id and is stamped after ``since``.
 
     A string is the reason the file cannot be used: ``unsupported-format``, or
@@ -190,6 +194,21 @@ def _fresh_record(path: str, session_id: str, since: datetime) -> bool | str:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
             return "unsupported-format"
+        meta_fresh = False
+        if runtime == "codex":
+            try:
+                header = json.loads(os.read(fd, cx.META_BYTES).split(b"\n", 1)[0])
+                payload = header["payload"]
+                if (
+                    header["type"] != "session_meta"
+                    or payload["id"] != session_id
+                    or payload["session_id"] != session_id
+                    or payload["cwd"] != cwd
+                ):
+                    return "unsupported-format"
+                meta_fresh = cx.timestamp(payload["timestamp"]) > since
+            except (ValueError, KeyError, TypeError):
+                return "unsupported-format"
         offset = max(0, info.st_size - TAIL_BYTES)
         os.lseek(fd, offset, os.SEEK_SET)
         data = os.read(fd, TAIL_BYTES)
@@ -205,16 +224,24 @@ def _fresh_record(path: str, session_id: str, since: datetime) -> bool | str:
         named.st_ino,
     ) != (info.st_dev, info.st_ino):
         return "transcript-changed"
+    if meta_fresh:
+        return True
     lines = data.split(b"\n")
     for raw in lines[1:] if offset else lines:  # the first line of a tail may be cut
         try:
             record = json.loads(raw)
-            stamp = datetime.fromisoformat(str(record.get("timestamp", "")).replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
+            stamp = (
+                cx.timestamp(record["timestamp"])
+                if runtime == "codex"
+                else datetime.fromisoformat(str(record.get("timestamp", "")).replace("Z", "+00:00"))
+            )
+        except (ValueError, AttributeError, KeyError, TypeError):
             continue
         if stamp.tzinfo is None:
             stamp = stamp.replace(tzinfo=timezone.utc)
-        if record.get("sessionId") == session_id and stamp > since:
+        if (runtime == "codex" and stamp > since) or (
+            runtime == "claude" and record.get("sessionId") == session_id and stamp > since
+        ):
             return True
     return False
 
@@ -226,12 +253,25 @@ def project_slug(cwd: str) -> str:
 
 def _session(last: dict[str, Any]) -> Field:
     sid = last["session_id"]
+    runtime = last.get("runtime", "claude")
+    if sid is None:
+        hint = cx.hints(cx.discover(last, au.SEARCH_ENTRY_CAP)) if runtime == "codex" else ""
+        return Field("session", "unverified", "no-session-evidence" + ("; " + hint if hint else ""))
     expect = last.get("profile_id")
     found = au.Search()
     folder = project_slug(last["cwd_real"])
-    au._look(last["profile_real"], tuple(expect) if expect else None, sid, found, folder)
+    if runtime == "codex":
+        for row in cx.rollouts(
+            last["profile_real"], tuple(expect) if expect else None, au.SEARCH_ENTRY_CAP
+        ):
+            if row.sid == sid and row.cwd == last["cwd_real"]:
+                found.found.append((last["profile_real"], row.path, row.mtime))
+    else:
+        au._look(last["profile_real"], tuple(expect) if expect else None, sid, found, folder)
     for _, path, _ in found.found:
-        fresh = _fresh_record(path, sid, datetime.fromisoformat(last["utc"]))
+        fresh = _fresh_record(
+            path, sid, datetime.fromisoformat(last["utc"]), runtime, last["cwd_real"]
+        )
         if isinstance(fresh, str):
             return Field("session", "unverified", fresh)
         if fresh:
@@ -340,11 +380,21 @@ def _live_fields(report: ap.Report, host: ap.Host, last: dict[str, Any]) -> list
 def _ended(report: ap.Report, host: ap.Host, store: Store, last: dict[str, Any]) -> Result:
     """Lock free and the identity dead: ended, unless the tripwire sees the session elsewhere."""
     sid = last["session_id"]
-    profiles = [d["claude"] for d in report.profiles.values() if "claude" in d]
-    scope = Scope(report.home, last["profile_real"], profiles)
-    found = au.search(scope, au.chain_of(store, last["id"]), sid)
-    recent = [f for _, f, mtime in found.found if au._now() - mtime < au.TRIPWIRE_SECONDS]
-    hits, unreadable = au.cmdline_scan(sid, host.uid)
+    runtime = last.get("runtime", "claude")
+    profiles = [d[runtime] for d in report.profiles.values() if runtime in d]
+    scope = Scope(report.home, last["profile_real"], profiles, runtime)
+    hint = ""
+    if sid is None:
+        rows = cx.discover(last, au.SEARCH_ENTRY_CAP) if runtime == "codex" else []
+        hint = cx.hints(rows)
+        recent = [r.path for r in rows if au._now() - r.mtime < au.TRIPWIRE_SECONDS]
+        found = au.Search()
+        hits: list[int] = []
+        unreadable: list[int] = []
+    else:
+        found = au.search(scope, au.chain_of(store, last["id"]), sid)
+        recent = [f for _, f, mtime in found.found if au._now() - mtime < au.TRIPWIRE_SECONDS]
+        hits, unreadable = au.cmdline_scan(sid, host.uid)
     if recent or hits:
         names = [f"pid {p}" for p in hits] + recent
         raise Refusal(4, "session-seen", "; ".join(names))
@@ -353,7 +403,9 @@ def _ended(report: ap.Report, host: ap.Host, store: Store, last: dict[str, Any])
     if found.incomplete:
         raise Refusal(4, "search-incomplete", found.incomplete)
     pid = last["runtime_pid"]
-    return Result(3, last["name"], "ended", f"runtime pid {pid} has ended; the lock is free")
+    return Result(
+        3, last["name"], "ended", f"runtime pid {pid} has ended; the lock is free. {hint}"
+    )
 
 
 def _still_held(store: Store, name: str, last: dict[str, Any]) -> None:
@@ -371,7 +423,7 @@ def _judge(report: ap.Report, host: ap.Host, store: Store, name: str) -> Result:
     if state is None:
         return Result(4, name, "no-session-evidence", "no recorded launch to check", launched=False)
     last = au._cross_check(store, name, state)
-    if last is None or last["session_id"] is None:
+    if last is None or (last["session_id"] is None and last.get("runtime") != "codex"):
         raise Refusal(4, "no-session-evidence", "the attempt has no session id to check")
     identity = au.identity(last["runtime_pid"], last["runtime_start"], last["boot_id"])
     if identity.startswith("unknown"):
@@ -393,7 +445,7 @@ def _judge(report: ap.Report, host: ap.Host, store: Store, name: str) -> Result:
     unknown = [f for f in fields if f.required and f.status == "unverified"]
     bad = [f for f in fields if f.status == "mismatch"]
     code = 4 if unknown else 1 if bad else 0
-    tag = unknown[0].reason if unknown else None
+    tag = unknown[0].reason.split(";", 1)[0] if unknown else None
     detail = {0: "launch configuration verified", 1: "differs from the attempt", 4: "not observed"}
     return Result(code, name, tag, detail[code], last["id"], last["row_rev"], True, fields)
 
@@ -431,7 +483,8 @@ def render(result: Result, out: TextIO) -> None:
     tag = f" ({result.tag})" if result.tag else ""
     lines = [f"agent {result.agent}: {head}{tag}"]
     if result.detail and result.exit_code != 0:
-        lines.append(f"  {roles.printable(result.detail, 300)}")
+        limit = len(result.detail) if "discovered (not adopted)" in result.detail else 300
+        lines.append(f"  {roles.printable(result.detail, limit)}")
     lines += [f"  {roles.printable(p, 300)}" for p in result.problems]
     if result.attempt:
         lines.append(f"  attempt {result.attempt}, row {str(result.row_rev)[:12]}")
