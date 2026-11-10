@@ -3977,6 +3977,13 @@ _NAMED_PASSWORD_SHAPES = [
     "host=db.example.invalid 'password' = x",
     "https://db.example.invalid/?db_password=x",
     "https://db.example.invalid/?password%253Dx",
+    # A URL parser drops tab, CR and LF, so a control inside the name still
+    # reads as the name.
+    *[
+        f"https://db.example.invalid/?{name}=fixture_pw"
+        for name in ("pass\tword", "pass\rword", "pass\nword", "pass\twd", "pa\nss", "p\rwd")
+    ],
+    "https://db.example.invalid/?pass%09word=fixture_pw",
 ]
 
 

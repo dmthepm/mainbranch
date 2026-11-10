@@ -1904,8 +1904,12 @@ def _nested_url_has_password(rest: str, depth: int) -> bool:
 
 def _has_named_password(text: str) -> bool:
     """True when ``text``, raw or percent-decoded (at most three passes), has a
-    setting named ``password``, ``passwd``, ``pass`` or ``pwd`` before an ``=``."""
+    setting named ``password``, ``passwd``, ``pass`` or ``pwd`` before an ``=``.
+
+    Tab, CR and LF are removed first at each pass, as a URL parser does, so
+    ``pass<tab>word=`` cannot hide the name."""
     for _ in range(_METADATA_URL_DECODE_PASSES + 1):
+        text = _METADATA_URL_STRIP_RE.sub("", text)
         if _METADATA_NAMED_PASSWORD_RE.search(text):
             return True
         decoded = urllib.parse.unquote(text)
