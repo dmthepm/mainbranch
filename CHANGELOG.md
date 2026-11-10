@@ -11,55 +11,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
-### Fixed
+## [0.6.25] - 2026-11-10
 
-- In a fresh business repo with no connections yet, `mb connect status`, `test`, `policy`, `exec`
-  and `token` now answer "not connected" and show the repair steps instead of stopping with "No
-  business repo here". They stop that way only outside a git repo. A repo cloned inside another
-  still never borrows its keys.
-- The check that keeps a password out of shareable connection details now also catches a setting
-  named `password`, `passwd`, `pass` or `pwd` followed by `=` (in URLs, JDBC strings and
-  `host=x;password=y` strings), in any case, with spaces or quotes around it, and when encoded.
-  The value does not matter, so an empty one is refused too.
-- `mb card` no longer reports a failure when the disk cannot sync a folder at all; real I/O errors
-  are still reported.
-- The Main Branch site skill's domain step says up front that buying a domain is not wired in this
-  build, and no longer prints the Porkbun key setup steps for it.
-- Removed a stray hand-off sentence pasted into a site-skill module docstring and the SEO access
-  hardening guide, and noted why the canary's shell-expansion warning is expected there.
+### Breaking
+
 - `mb skill link` (also run by `mb update`, `mb init` and `mb doctor repair --apply --only claude`)
   no longer adds a `.gitignore` line for every Main Branch skill. One line, `.claude/skills/mb-*`,
   covers them all, so a release that adds a skill no longer leaves a change to commit or restore
   in each hub and fresh worktree. Link only adds missing lines and never removes any: an older
   per-skill block stays as it is, and a hub's tracked `.gitignore` changes at most once more. The
   `mb-` skill prefix is reserved for Main Branch. Closes #1341.
-
-### Added
-
-- `mb agent up` and `check` now accept Codex rows. Launches force `--no-daemon`,
-  keep Codex's native instructions and take reasoning effort from the row.
-  `MB_ROLE` selects the repo card through the owner-installed SessionStart hook;
-  launch checks compare the card path with policy without claiming its text loaded.
-  New sessions keep a null id; bounded discovery lists hints without saving or
-  choosing one. Use `--session <id>` to confirm a rollout under the row's profile
-  and working folder. Saved resumes enforce the same folder binding.
-  Checks read Codex metadata and fresh transcript evidence with directory and file
-  identities checked through the read, and the lifetime smoke
-  accepts Codex fixture rows. Cards are now required for Codex policy validation.
-  Help and source were checked for Codex 0.164.0; real card loading, effective
-  effort and lifetime smoke are still unverified. See `docs/agent-policy.md`.
-
-- `mb agent up <name>` starts a Claude agent from its `agents.json` row and waits for it,
-  exiting with Claude's own status. It builds the environment from nothing (dropping
-  `ANTHROPIC_*`, `OPENAI_*` and the rest), records the program, folder, role card, profile, session
-  id and launch plan in a private store before Claude starts (and nothing if that record cannot be
-  written), takes a per-agent lock so two cooperative starts never both run, and resumes or reruns the same
-  session id after a crash. `--dry-run` prints the command without any passed value. The claim is
-  that the launch configuration was verified at start: it does not check that the agent behaves like
-  its role, does not re-check a running agent, passed values (`HEAVY_LOCK`, `SSH_AUTH_SOCK`) are
-  not stored or compared, and the Claude flags are confirmed on Claude Code 2.1.309 only. Start it
-  from your own login or service manager, never with `sudo -u` or `runuser`.
-  See `docs/agent-policy.md`.
 - `mb agent check <name>` now checks a running Claude agent against the record `mb agent up` made
   of its launch: the process identity (read twice), its program, the names in its environment and
   the values mb set, its folder, profile directory, role card, policy row, and a transcript record
@@ -75,6 +36,40 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   session runs in that process (a forked waiting parent can pass; only the smoke sees it), does not
   show that the agent behaves like its role, and does not compare passed values such as
   `SSH_AUTH_SOCK`, which are not stored. `mb agent check` with no name is still the policy check.
+- In a fresh business repo with no connections yet, `mb connect status`, `test`, `policy`, `exec`
+  and `token` now answer "not connected" and show the repair steps instead of stopping with "No
+  business repo here". They stop that way only outside a git repo. A repo cloned inside another
+  still never borrows its keys.
+- The check that keeps a password out of shareable connection details now also catches a setting
+  named `password`, `passwd`, `pass` or `pwd` followed by `=` (in URLs, JDBC strings and
+  `host=x;password=y` strings), in any case, with spaces or quotes around it, and when encoded.
+  The value does not matter, so an empty one is refused too.
+
+### Added
+
+- `mb agent up` and `check` now accept Codex rows. Launches force `--no-daemon`,
+  keep Codex's native instructions and take reasoning effort from the row.
+  `MB_ROLE` selects the repo card through the owner-installed SessionStart hook;
+  launch checks compare the card path with policy without claiming its text loaded.
+  New sessions keep a null id; bounded discovery lists hints without saving or
+  choosing one. Use `--session <id>` to confirm a rollout under the row's profile
+  and working folder. Saved resumes enforce the same folder binding.
+  Checks read Codex metadata and fresh transcript evidence with directory and file
+  identities checked through the read, and the lifetime smoke
+  accepts Codex fixture rows. Cards are now required for Codex policy validation.
+  Help and source were checked for Codex 0.164.0; real card loading, effective
+  effort and lifetime smoke are still unverified. See `docs/agent-policy.md`.
+- `mb agent up <name>` starts a Claude agent from its `agents.json` row and waits for it,
+  exiting with Claude's own status. It builds the environment from nothing (dropping
+  `ANTHROPIC_*`, `OPENAI_*` and the rest), records the program, folder, role card, profile, session
+  id and launch plan in a private store before Claude starts (and nothing if that record cannot be
+  written), takes a per-agent lock so two cooperative starts never both run, and resumes or reruns the same
+  session id after a crash. `--dry-run` prints the command without any passed value. The claim is
+  that the launch configuration was verified at start: it does not check that the agent behaves like
+  its role, does not re-check a running agent, passed values (`HEAVY_LOCK`, `SSH_AUTH_SOCK`) are
+  not stored or compared, and the Claude flags are confirmed on Claude Code 2.1.309 only. Start it
+  from your own login or service manager, never with `sudo -u` or `runuser`.
+  See `docs/agent-policy.md`.
 - `mb agent check <name> --smoke-marker <marker>` judges the lifetime smoke for a running fixture
   agent: the process that ran the smoke's tool command must sit under the recorded Claude process
   through only reviewed helpers (a short built-in list of shells and `bwrap`), and that process must
@@ -84,6 +79,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   and mb does not run it at launch. The live check of a running agent is built (`mb agent check
   <name>`), `check` with no name is still the policy check, and the Claude flags and the smoke
   are confirmed on Claude Code 2.1.309 only. Codex runtime smoke remains unverified.
+
+### Fixed
+
+- `mb card` no longer reports a failure when the disk cannot sync a folder at all; real I/O errors
+  are still reported.
+- The Main Branch site skill's domain step says up front that buying a domain is not wired in this
+  build, and no longer prints the Porkbun key setup steps for it.
+- Removed a stray hand-off sentence pasted into a site-skill module docstring and the SEO access
+  hardening guide, and noted why the canary's shell-expansion warning is expected there.
 
 ## [0.6.24] - 2026-11-09
 
