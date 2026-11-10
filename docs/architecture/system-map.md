@@ -84,7 +84,7 @@ flowchart TB
 
   subgraph views["Viewing surfaces"]
     obsidian["Obsidian<br/>optional local graph/backlinks viewer"]
-    dashboard["future dashboard<br/>view over repo, GitHub, provider facts"]
+    dashboard["local read-only dashboard (richer views planned)<br/>view over repo, GitHub, provider facts"]
     sites["sites, wiki, blog, public pages<br/>ship surfaces from approved content"]
   end
 
@@ -206,7 +206,7 @@ flowchart TB
 | Linear | Visual board, mirrored planning, release grouping, private/internal notes when needed. | Public durable issue truth or GitHub closure semantics. | [AGENTS](../../AGENTS.md#branches-issues-and-releases) |
 | Cloudflare | Site, DNS, and Pages deploy rail where smoke-tested. | Source history, default repo hosting, or hidden business memory. | [Dependency choices](../dependency-choices.md#concrete-applications), [Repo visibility rubric](../repo-visibility-rubric.md) |
 | hledger and books vault | Authoritative bookkeeping journal and raw finance sources. | Team-visible business memory by default. | [Books](../books.md), [mb books decision](../../decisions/2026-05-11-mb-books-foundation.md) |
-| Obsidian and future dashboard | Views over repo, GitHub, graph, provider, and safe summary facts. | Source of truth, enforcement layer, or hidden database of record. | [Obsidian decision](../../decisions/2026-05-09-obsidian-first-class-viewer.md), [Roadmap](../roadmap.md) |
+| Obsidian and the local read-only dashboard (`mb dashboard build`; richer and hosted views are future) | Views over repo, GitHub, graph, provider, and safe summary facts. | Source of truth, enforcement layer, or hidden database of record. | [Obsidian decision](../../decisions/2026-05-09-obsidian-first-class-viewer.md), [Roadmap](../roadmap.md) |
 
 ## Current Stance
 
@@ -240,10 +240,10 @@ Sources: [Data-source registry](../data-source-registry.md),
 
 | Loop | Main Branch surfaces | External rails and views |
 | --- | --- | --- |
-| Sense | `mb status`, `mb start`, `mb doctor`, `mb graph`, `mb connect status`, core files, MoneyPath readiness, data-source records, GitHub activity. | Provider APIs, scheduled sync, Obsidian, future dashboard. |
+| Sense | `mb status`, `mb start`, `mb doctor`, `mb graph`, `mb connect status`, core files, MoneyPath readiness, data-source records, GitHub activity. | Provider APIs, scheduled sync, Obsidian, local dashboard. |
 | Decide | `/mb-start`, `/mb-think`, ranked actions, MoneyPath blockers, decisions, bets, GitHub issues. | Linear board, provider readiness signals, roadmap lanes. |
 | Ship | `/mb-site`, `/mb-ads`, `/mb-organic`, `mb connect`, `mb update`, `mb issue open`, `mb checkpoint`, pushes, playbooks. | Cloudflare Pages/DNS, GitHub PRs/checks, provider dashboards, scheduling rails. |
-| Reflect | `/mb-end`, bet close/narrate, retros, CHANGELOG, release notes, checkpoint history. | GitHub Releases, PyPI verification, Linear releases, dashboard/history views. |
+| Reflect | `/mb-end`, bet close/narrate, retros, CHANGELOG, release notes, checkpoint history. | GitHub Releases, PyPI verification, Linear releases, local dashboard/history views. |
 
 ## Release And Validation Map
 

@@ -7,11 +7,14 @@ loops: [sense, reflect]
 # Books
 
 Use this skill for books repo setup, monthly close review, reconciliation review,
-and CPA handoff preparation. Keep the ledger in its separate private repo.
+and CPA handoff preparation. The ledger never lives in the business hub's
+tracked files: solo owners keep it in the ignored local vault, teams in a
+separate private repo (see `docs/books.md` storage modes).
 
 **CLI facts first:** In the business hub, run `mb books check . --json` before
-advice. Discover the books repo from `books_repo` in `core/finance/books.md`;
-if it is absent, ask the operator for the repo location. Run
+advice. Discover the books location from `books_repo` or `vault_location` in
+`core/finance/books.md`; if neither is set, ask the operator where the books
+live. Run
 `mb books doctor --repo "$BOOKS_REPO" --json` and use its safe aggregate facts.
 The human form `mb books doctor --repo "$BOOKS_REPO"` is available for an
 operator at their terminal. Do not relay raw command output.

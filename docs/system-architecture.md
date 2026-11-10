@@ -97,8 +97,9 @@ repo `.mainbranch/source.json` files remain compatibility links.
 | `archive` | Inert imports, legacy projects, or cold storage | Read-only unless revived |
 
 `mb status --json`, `mb graph --json`, and `mb doctor repair --plan --json`
-expose topology facts today. A future dashboard rendering this topology in
-business language is direction, not current behavior; see
+expose topology facts today. The local read-only dashboard
+(`mb dashboard build`) exists; a richer topology view in business language is
+direction, not current behavior; see
 [roadmap.md](roadmap.md).
 
 ## Primitive Contracts
@@ -595,7 +596,7 @@ External or optional state:
 - local SQLite sidecars;
 - private analytics or finance repos;
 - exported CSVs in private storage;
-- future dashboard indexes (direction, not shipped).
+- richer dashboard indexes (direction, not shipped).
 
 Secrets, bearer tokens, OAuth refresh tokens, service-account JSON, customer
 exports, raw member data, and sensitive finance/legal data do not belong in
@@ -604,8 +605,8 @@ public examples or committed business repo files.
 ## Provider, Sidecar, and Dashboard Boundary
 
 Provider systems record live operational facts. Sidecars can enrich Main
-Branch with structured data. A future local dashboard could render repo and
-provider truth without owning it. None of these replace the main business record.
+Branch with structured data. The local read-only dashboard renders repo and
+provider truth without owning it; richer and hosted views are future. None of these replace the main business record.
 
 Main Branch does not claim blanket provider mutation. A provider rail can mutate
 external systems only when that exact workflow has preview behavior, operator
@@ -620,7 +621,7 @@ pushes/2026-05-06-workshop-waitlist/push.md
   provider_refs.meta_ads.campaign_id -> provider object
   metrics_sources[] -> sidecar/cache/private analytics source
 
-mb status / future dashboard
+mb status / local dashboard
   reads push.md, graph, git, GitHub, and provider-safe summaries
 ```
 

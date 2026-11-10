@@ -8,8 +8,10 @@
 
 | Tier | Status | Notes |
 |------|--------|-------|
-| **Tier 1** | **TESTED** | Flash API works via REST endpoint |
-| **Tier 2** | **TESTED** | Deep Research API works via REST (verified 2026-01-26) |
+| **Tier 1** | **TESTED (January 2026, old model)** | Flash API worked via REST with `gemini-2.0-flash`, which Google shut down on 1 June 2026. Not retested. |
+| **Tier 2** | **TESTED (2026-01-26, old agent)** | Deep Research worked via REST with `deep-research-pro-preview-12-2025`, which Google lists as shut down 23 October 2026. Not retested. |
+
+Checked against Google's deprecations page on 10 November 2026: it names `gemini-3.6-flash` (listed Stable) as the replacement for `gemini-2.0-flash`, and `deep-research-preview-04-2026` (preview) for the old agent. Main Branch has not tested either: **not tested by Main Branch**. Check the page for the current model before you use one.
 
 ---
 
@@ -21,7 +23,7 @@ Two tiers of Gemini research:
 - Standard API calls via `generate_content`
 - 30-60 second response times
 - Good for most questions
-- Tested model: `gemini-2.0-flash`
+- Model: pick a current Flash model from Google's models page (see Verification Status); `gemini-2.0-flash` is shut down
 
 **Tier 2: Deep Research (Pay-as-you-go)** - VERIFIED WORKING
 - Agentic multi-step research via Interactions API (REST, no SDK needed)

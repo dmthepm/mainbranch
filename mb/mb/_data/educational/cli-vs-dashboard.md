@@ -57,9 +57,11 @@ step.
 numbered choices. Power users get quiet commands and JSON output. The control
 plane stays the same.
 
-## Where dashboards fit later
+## Where dashboards fit
 
-A future Main Branch dashboard should show existing truth:
+Main Branch has a local, read-only dashboard today: `mb dashboard build` writes
+an HTML file and `mb dashboard open` shows it. A richer or hosted dashboard is
+future work. Any dashboard should show existing truth:
 
 - repo health from `mb status`;
 - graph relationships from `mb graph`;
@@ -72,6 +74,6 @@ It should not become a second database that the files have to chase.
 
 ## What Main Branch does not claim
 
-Main Branch does not ship a hosted SaaS dashboard today. Any future dashboard
+Main Branch does not ship a hosted SaaS dashboard today. Any richer dashboard
 must stay optional, local-first or self-hostable, and honest about which files,
 GitHub threads, commits, and provider facts it is reading.

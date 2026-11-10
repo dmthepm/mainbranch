@@ -73,15 +73,19 @@ def books_doctor_cmd(
     plan: bool = typer.Option(
         False,
         "--plan",
-        help="Print a non-mutating repair plan. Required; apply is not implemented.",
+        help="Print a non-mutating setup plan. Apply is not implemented.",
     ),
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
-    books_repo: str = typer.Option("", "--repo", help="Books repo to inspect."),
+    books_repo: str = typer.Option(
+        "",
+        "--repo",
+        help="Books repo to inspect (default: books_repo or vault_location in books.md).",
+    ),
     doctor_timeout: int = typer.Option(
         600, "--doctor-timeout", help="Declared doctor timeout in seconds."
     ),
 ) -> None:
-    """Plan safe books setup repairs without touching real ledger contents."""
+    """Inspect a private books repo, or with --plan print a setup plan; never repairs."""
     from mb import books_repo as books_repo_mod
 
     if books_repo and plan:

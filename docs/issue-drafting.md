@@ -47,6 +47,12 @@ The scrubber is a guardrail, not a guarantee. Before submitting, review the
 draft and remove private business data, customer/member data, account details,
 raw files, screenshots with private information, and secrets.
 
+This rule is for public GitHub issues. Your own team's private tracker can hold
+real recordings and examples under
+[where data lives](../.claude/skills/mb-setup/references/where-data-lives.md);
+a public issue never does. Describe the case with invented values in the same
+shape.
+
 ## Skill Convention
 
 Skills should suggest `mb issue draft` only when the operator hits reproducible

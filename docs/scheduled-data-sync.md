@@ -16,9 +16,10 @@ fresh. It is the operator-facing companion to
   secrets. They never live in repo files.
 - Last-run logs and timestamps live under `.mb/private/sync/` and are
   not tracked by the business repo.
-- `mb doctor` and `mb status` read freshness from `source.md` and from
-  the local run summary. They tell you what is stale; they do not claim
-  Main Branch ran the sync.
+- **Planned:** `mb doctor` and `mb status` reading freshness from
+  `source.md` and the local run summary. No code reads `.mb/private/sync/`
+  today, so nothing reports a source as stale. Keep `freshness` honest in
+  `source.md` yourself.
 - The `mb data sync` and `mb data status` commands are **planned**, not
   shipped. The pattern works today with a hand-rolled cron entry.
 - Real bookkeeping data (bank, processor, payroll, tax) does **not**
@@ -47,12 +48,11 @@ cron / launchd / Task Scheduler / .github/workflows/<provider>.yml
 repo links through. The sync pattern just keeps its `freshness` and
 `storage.snapshots` fields honest.
 
-**Add `.mb/private/` to your `.gitignore` before you start syncing.**
-The default `mb onboard` gitignore template does not yet include it —
-the [`mb books` foundation](books.md) named the template update as a
-follow-up and the scheduled-sync slice did not change the template
-either. Until that follow-up lands, an operator who skips this step
-will commit run logs and the last-run JSON to their business repo.
+**Confirm `.mb/private/` is in your `.gitignore` before you start syncing.**
+New folders from `mb onboard` or `mb init` already ignore it. A folder
+created earlier may not, so open its `.gitignore` and check the actual rule.
+An operator who skips this will commit run logs and the last-run JSON to
+their business repo.
 
 ## Pick A Schedule Shape
 
