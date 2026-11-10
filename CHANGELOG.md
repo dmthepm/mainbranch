@@ -11,19 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
-### Added
+## [0.6.24] - 2026-11-09
 
-- `/mb-seo` now recommends password mode for a self-hosted OpenSEO copy: no Access
-  app, workers.dev and previews off, rate limits bound, a separate admin user and
-  expiring `oseo_` key per agent, keys in `mb connect` (`--custom --token-stdin`),
-  and an MCP `initialize` canary because `mb connect test` cannot check custom
-  providers. It also records what to know: delete the operator secret by name and
-  prove it with a 404, a key lasts at least one day, a password reset does not
-  revoke keys, 0.1.26 has no sign-out-all, self-hosting has no meter or cap, and
-  same-user processes can read keys. Cloudflare Access remains an option for a
-  human-only app, and the "no static tokens" rule is gone.
-- `/mb-seo` playbooks in `references/playbooks/`: thirteen per-feature procedures
-  and `costs.md`, linked from the upstream-skill handoff table.
+### Breaking
+
 - `mb connect exec`, `token`, `status`, `test` and `policy` find the business repo
   from the git top level of the current folder when `--repo` is not given, so a
   command run in a subfolder of the hub works. Outside a git repo with
@@ -36,10 +27,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   `gitdir:`, a special file, a dangling link, or one that fails inspection stops
   with `unreadable_repo_marker` (exit 2) rather than falling through to a parent
   repo's keys.
-- `docs/agent-policy.md`: the `agents.json` fields, the card rule, and what
-  `mb agent check` proves and does not.
-
-### Fixed
 
 - A disk that cannot sync a directory (`EINVAL`, `ENOTSUP` or `EOPNOTSUPP`, on a
   descriptor confirmed to be an open directory) no longer fails every save after
@@ -53,6 +40,25 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   but could not be confirmed on disk, matching the credential store. `mb migrate
   --apply` does the same for the backup manifest and schema marker, with the
   structured error result. Closes MB-23.
+
+### Added
+
+- `/mb-seo` now recommends password mode for a self-hosted OpenSEO copy: no Access
+  app, workers.dev and previews off, rate limits bound, a separate admin user and
+  expiring `oseo_` key per agent, keys in `mb connect` (`--custom --token-stdin`),
+  and an MCP `initialize` canary because `mb connect test` cannot check custom
+  providers. It also records what to know: delete the operator secret by name and
+  prove it with a 404, a key lasts at least one day, a password reset does not
+  revoke keys, 0.1.26 has no sign-out-all, self-hosting has no meter or cap, and
+  same-user processes can read keys. Cloudflare Access remains an option for a
+  human-only app, and the "no static tokens" rule is gone.
+- `/mb-seo` playbooks in `references/playbooks/`: thirteen per-feature procedures
+  and `costs.md`, linked from the upstream-skill handoff table.
+- `docs/agent-policy.md`: the `agents.json` fields, the card rule, and what
+  `mb agent check` proves and does not.
+
+### Fixed
+
 - `mb connect` metadata refuses a password in a URL as `url_password`. Two
   checks run and either one refuses: the scheme-aware check reads each URL, nested
   ones included, the way Python's URL parser does (so a comma, `;`, `&` or tab
