@@ -137,10 +137,17 @@ class Up(World):
     # --- running
     def up(self, name: str = "planner", **kw: Any) -> tuple[int, str, str]:
         out, err = io.StringIO(), io.StringIO()
+        if self.fresh(kw):
+            kw["new"] = True  # a first launch must ask for a new session
         code = au.up(self.host, name, out=out, err=err, **{"environ": {}, **kw})
         return code, out.getvalue(), err.getvalue()
 
+    def fresh(self, kw: dict[str, Any]) -> bool:
+        return not (self.store / "state.json").exists() and not (kw.get("new") or kw.get("session"))
+
     def drive(self, name: str = "planner", **cfg: Any) -> Proc:
+        if self.fresh(cfg):
+            cfg["new"] = True
         self.n += 1
         out, err = self.floor / f"drv{self.n}.out", self.floor / f"drv{self.n}.err"
         cfg = {
@@ -947,5 +954,30 @@ def test_cli_dry_run_goes_through_the_real_command(u: Up, monkeypatch: pytest.Mo
     from mb.cli import app
 
     monkeypatch.setattr(ap.Host, "local", classmethod(lambda cls: u.host))
-    result = CliRunner().invoke(app, ["agent", "up", "planner", "--dry-run"])
+    result = CliRunner().invoke(app, ["agent", "up", "planner", "--new", "--dry-run"])
     assert result.exit_code == 0 and "Dry run" in result.stdout
+
+
+def test_a_row_with_no_state_and_no_flag_refuses_no_session(u: Up) -> None:
+    out, err = io.StringIO(), io.StringIO()
+    code = au.up(u.host, "planner", environ={}, out=out, err=err)
+    assert code == 5 and "no-session" in err.getvalue()
+    dry = au.up(u.host, "planner", dry_run=True, environ={}, out=out, err=err)
+    assert dry == 5
+    assert u.runs() == [] and u.attempt_files() == []
+    assert not (u.store / "state.json").exists()
+    assert u.up()[0] == 0  # with --new (added by the helper) it starts
+
+
+def test_a_store_lock_that_stays_held_is_store_lock_timeout(
+    u: Up, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    held = store_mod.FileLock(u.store / ".store.lock", os.getuid())
+    assert held.try_lock()
+    monkeypatch.setattr(store_mod, "STORE_LOCK_WAIT", 0.1)
+    try:
+        code, _, err = u.up()
+    finally:
+        held.close()
+    assert code == 4 and "store-lock-timeout" in err
+    assert u.runs() == []

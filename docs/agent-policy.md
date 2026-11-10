@@ -98,6 +98,8 @@ re-check a running agent (that is `mb agent check`, a later step).
 
 Options: `--dry-run` prints the command and the plan and writes nothing; `--new` starts a
 new session; `--session <id>` resumes a session you name, if its transcript is found.
+A Claude row with no stored session and neither flag is refused (exit 5, `no-session`), so a
+missed migration never starts a silent fresh session: the first launch needs `--new`.
 
 ### What the child gets
 
@@ -118,6 +120,19 @@ new session; `--session <id>` resumes a session you name, if its transcript is f
 - The program must be an ELF file reached through checked folders. Scripts (including npm's
   node wrappers), shell wrappers and mise shims are refused (`unsupported-runtime`).
 
+One line each where you will meet them:
+
+- `start_file` is sent as the prompt for a new session and for a `new-retry`, never on `resume`.
+- The store check covers what mb creates (`state.json`, `attempts/`, `locks/`, `.store.lock`), not
+  `agents.json`, which slice 1 already checks.
+- If the default profile folder did not exist at launch, a later search counts it as empty only if
+  it is still absent; a profile that went missing or changed is `search-incomplete`.
+- A transcript found only under a different profile than the row's current one is `wrong-profile`,
+  for any session, including when the row's profile was changed after launch.
+- A transcript counts as found when it is a regular file whose first line is a JSON object; the real
+  Claude format is not yet confirmed (a file that fails this is `search-incomplete`).
+- A runtime process that has exited but is not yet reaped counts as dead.
+
 ### The store
 
 `~/.local/state/mainbranch/agents/` holds `state.json`, `attempts/<id>.json` (written once, never
@@ -134,8 +149,8 @@ Attempts are never pruned by mb.
 | runtime's own status | A real run returns Claude's status, which can equal a code below. |
 | 0 | `--dry-run` printed. |
 | 2 | Invalid policy, `unsafe-store`, `unsafe-path`, `bad-env:<NAME>`, `unsupported-runtime`, bad arguments, root. |
-| 4 | Refused, state unknown: `holder-lost`, `lock-owner-unknown`, `lock-orphan`, `proc-denied`, `inconsistent`, `session-seen`, `no-session-evidence`, `search-incomplete`, `wrong-profile`, `corrupt-state`, `no-proc`, `wait-lost`. |
-| 5 | Refused: `live` (a running agent), `alias` (the id belongs to another row), `record-failed` (nothing was started), `go-failed`. |
+| 4 | Refused, state unknown: `holder-lost`, `lock-owner-unknown`, `lock-orphan`, `proc-denied`, `inconsistent`, `session-seen`, `no-session-evidence`, `search-incomplete`, `wrong-profile`, `corrupt-state`, `no-proc`, `wait-lost`, `store-lock-timeout` (another `up` held the store lock for 10 s). |
+| 5 | Refused: `no-session` (no stored session, no `--new`/`--session`), `live` (a running agent), `alias` (the id belongs to another row), `record-failed` (nothing was started), `go-failed`. |
 
 Unknown is never treated as dead. `up` starts a replacement only when the earlier process is
 shown dead and no same-user process names its session id. Known limit: a runtime that starts a

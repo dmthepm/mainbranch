@@ -108,7 +108,7 @@ class FileLock:
         deadline = time.monotonic() + wait
         while not self.try_lock():
             if time.monotonic() >= deadline:
-                raise Refusal(4, "lock-owner-unknown", f"{self.path.name} is held; try again")
+                raise Refusal(4, "store-lock-timeout", f"{self.path.name} stayed held; try again")
             time.sleep(0.02)
 
     def close(self) -> None:

@@ -499,8 +499,10 @@ def decide(
             seen[sid] = search(plan, chain, sid)
         return seen[sid]
 
-    if new or (row is None and session is None):
+    if new:
         return Decision("new", str(uuid.uuid4()), "spawned", previous)
+    if row is None and session is None:
+        raise Refusal(5, "no-session", "no stored session for this agent; use --new or --session")
     if session is not None and (row is None or row["session_id"] != session):
         sid, provenance = session, "owner-confirmed"
     else:
