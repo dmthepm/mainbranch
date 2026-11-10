@@ -101,6 +101,21 @@ new session; `--session <id>` resumes a session you name, if its transcript is f
 A Claude row with no stored session and neither flag is refused (exit 5, `no-session`), so a
 missed migration never starts a silent fresh session: the first launch needs `--new`.
 
+Where to start it: from the user's own login session or the user's service manager, so the
+agent inherits the same confinement as everything else that user runs. An administrator
+starting it for that user with `sudo -u` or `runuser` is not the same session and may skip
+that confinement; do not start agents that way.
+
+In practice:
+
+- The first launch in a new folder shows Claude's folder-trust question. `up` never types, so
+  answer it once in the pane.
+- After a session ends, wait a minute before `up` resumes it. Claude can still write the
+  transcript shortly after it exits, and `up` refuses (`session-seen`) while the transcript
+  changed in the last 60 seconds.
+- Any process of the same user whose command line holds the session id, even a `grep` for it,
+  also makes `up` refuse `session-seen`. Close such commands before resuming.
+
 ### What the child gets
 
 - **Command:** `claude --model <model> [--effort <e>] [options] --append-system-prompt-file
@@ -129,8 +144,9 @@ One line each where you will meet them:
   it is still absent; a profile that went missing or changed is `search-incomplete`.
 - A transcript found only under a different profile than the row's current one is `wrong-profile`,
   for any session, including when the row's profile was changed after launch.
-- A transcript counts as found when it is a regular file whose first line is a JSON object; the real
-  Claude format is not yet confirmed (a file that fails this is `search-incomplete`).
+- A transcript counts as found when it is a regular file whose first line is a JSON object (a file
+  that fails this is `search-incomplete`). Claude Code 2.1.309 writes
+  `<profile>/projects/<folder>/<session id>.jsonl` in this form.
 - A runtime process that has exited but is not yet reaped counts as dead.
 
 ### The store
@@ -221,13 +237,15 @@ Do this on a disposable fixture row, never on a working agent, after each pinned
 
 ### Confirming the Claude flags on the installed version (by hand)
 
-`up` builds `--session-id`, `--resume`, `--append-system-prompt-file` and `--effort`. These are
-not yet confirmed against the installed Claude. Run `claude --help` and check that all four are
-listed and what they take. Then do one real run on the fixture row: start it with `--new` and a
+`up` builds `--session-id`, `--resume`, `--append-system-prompt-file` and `--effort`. Confirmed on
+Claude Code 2.1.309: all four work, a resume keeps the same session id and transcript, and the role
+card text reaches the session. That version's `--help` names `--append-system-prompt-file` only inside
+another option's text, so check it by the run below, not by the help alone. Repeat for each new
+version: run `claude --help` and check what the flags take. Then do one real run on the fixture row: start it with `--new` and a
 short `effort`, check the transcript is named with the id `up` recorded, end it, run
 `mb agent up <fixture>` again and check it resumes the same id, and look in the transcript or the
-session for the role card text. Record the version and what you saw. Until this is done the flags
-are unconfirmed.
+session for the role card text. Record the version and what you saw. Until this is done for a
+version, its flags are unconfirmed.
 
 ## The live check: `mb agent check <name>`
 
