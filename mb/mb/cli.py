@@ -20,6 +20,7 @@ import typer
 from typer.core import TyperGroup
 
 from mb import __version__
+from mb import agent_check as agent_check_mod
 from mb import agent_policy as agent_policy_mod
 from mb import agent_smoke as agent_smoke_mod
 from mb import agent_up as agent_up_mod
@@ -2553,30 +2554,52 @@ app.add_typer(agent_app, name="agent")
 
 @agent_app.command("check")
 def agent_check_cmd(
-    name: str | None = typer.Argument(None, help="Only require this agent to exist."),
+    name: str | None = typer.Argument(
+        None, help="The running agent to check. Without a name, only agents.json is checked."
+    ),
     smoke_marker: str | None = typer.Option(
         None,
         "--smoke-marker",
         help="Lifetime smoke verdict: the file the smoke's tool command wrote its pid to.",
     ),
+    wait: bool = typer.Option(False, "--wait", help="Keep checking while the answer is 3 or 4."),
+    timeout: int = typer.Option(
+        agent_check_mod.WAIT_DEFAULT, "--timeout", help="Seconds --wait may take (1 to 300)."
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Machine-readable result."),
 ) -> None:
-    """Check agents.json and the files it names. Policy only: nothing is launched or verified.
+    """Check a running agent against its launch record, or agents.json when no name is given.
 
-    With --smoke-marker, judge the lifetime smoke for a running fixture agent instead. The live
-    check of a running agent is not built yet.
+    Exit 0 ok, 1 mismatch, 2 invalid policy or unsafe store, 3 ended, 4 unknown. Read only: it
+    takes no lock, writes nothing and sends no signal. The claim is launch configuration, not role.
     """
-    if smoke_marker is not None:
-        if name is None:
-            typer.echo("mb agent check --smoke-marker needs an agent name.", err=True)
-            raise typer.Exit(2)
-        try:
-            code = agent_smoke_mod.smoke(agent_policy_mod.Host.local(), name, smoke_marker)
-        except Exception:  # noqa: BLE001
-            typer.echo("mb: agent check: internal error; no verdict.", err=True)
-            raise typer.Exit(2) from None
-        raise typer.Exit(code)
+    if name is None and (smoke_marker is not None or wait or json_out):
+        typer.echo(
+            "mb agent check: --smoke-marker, --wait and --json need an agent name.", err=True
+        )
+        raise typer.Exit(2)
+    if smoke_marker is not None and (wait or json_out):
+        typer.echo(
+            "mb agent check: --smoke-marker cannot be combined with --wait or --json.", err=True
+        )
+        raise typer.Exit(2)
+    if not 1 <= timeout <= agent_check_mod.WAIT_MAX:
+        typer.echo(
+            f"mb agent check: --timeout is 1 to {agent_check_mod.WAIT_MAX} seconds.", err=True
+        )
+        raise typer.Exit(2)
     try:
-        report = agent_policy_mod.check(agent_policy_mod.Host.local(), name)
+        host = agent_policy_mod.Host.local()
+        if name is not None and smoke_marker is not None:
+            raise typer.Exit(agent_smoke_mod.smoke(host, name, smoke_marker))
+        if name is not None:
+            code = agent_check_mod.check(
+                host, name, wait=timeout if wait else None, as_json=json_out
+            )
+            raise typer.Exit(code)
+        report = agent_policy_mod.check(host, name)
+    except typer.Exit:
+        raise
     except Exception:  # noqa: BLE001
         typer.echo("mb: agent check: internal error; no verdict.", err=True)
         raise typer.Exit(2) from None

@@ -7,8 +7,8 @@ agent behaves like its role. Nothing here sends a signal, and the holder neither
 the tty while the runtime runs. The attempt records mb-set values and the *names* of passed
 variables, never a passed value.
 
-The smoke verdict lives in ``agent_smoke``. Not built: the live ``check`` that reads /proc against
-the attempt, and confirming flags on the installed claude version (a manual step in the docs).
+The smoke verdict lives in ``agent_smoke`` and the live ``check`` in ``agent_check``. Not built:
+confirming flags on the installed claude version (a manual step in the docs).
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Protocol, TextIO
 
 from mb import agent_policy as ap
 from mb import roles
@@ -291,12 +291,13 @@ def identity(pid: int, start: int, boot: str) -> str:
         return "unknown:proc-denied"
 
 
-def lock_owner(lock: FileLock) -> int | None:
-    """The pid /proc/locks lists for this lock file's inode; None when unreadable or absent."""
+def lock_owners(lock: FileLock) -> list[int] | None:
+    """The pids /proc/locks lists for this lock file's inode; None when it cannot be read."""
     try:
         lines = Path(f"{PROC}/locks").read_text().splitlines()
     except OSError:
         return None
+    owners: list[int] = []
     for line in lines:
         parts = line.split()
         if (
@@ -304,8 +305,14 @@ def lock_owner(lock: FileLock) -> int | None:
             and parts[1] == "FLOCK"
             and parts[5].rsplit(":", 1)[-1] == str(lock.inode)
         ):
-            return int(parts[4])
-    return None
+            owners.append(int(parts[4]))
+    return owners
+
+
+def lock_owner(lock: FileLock) -> int | None:
+    """The first pid /proc/locks lists for this lock file; None when unreadable or absent."""
+    owners = lock_owners(lock)
+    return owners[0] if owners else None
 
 
 def cmdline_scan(session_id: str, uid: int) -> tuple[list[int], list[int]]:
@@ -338,6 +345,14 @@ def cmdline_hits(session_id: str, uid: int) -> list[int]:
 
 
 # --- finding a transcript: the finite search ----------------------------------------------
+
+
+class Where(Protocol):
+    """What the search needs to know: ``Plan`` for ``up``, a small record for ``check``."""
+
+    home: str
+    profile_real: str
+    policy_profiles: list[str]
 
 
 @dataclass
@@ -422,7 +437,7 @@ def chain_of(store: Store, last: str | None) -> list[dict[str, Any]]:
     return chain
 
 
-def search(plan: Plan, chain: list[dict[str, Any]], session_id: str) -> Search:
+def search(plan: Where, chain: list[dict[str, Any]], session_id: str) -> Search:
     """Profiles of this id's attempts, every policy profile for the runtime, and default."""
     out = Search()
     seen: set[str] = set()

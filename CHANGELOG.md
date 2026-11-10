@@ -32,6 +32,17 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   its role, does not re-check a running agent, passed values (`HEAVY_LOCK`, `SSH_AUTH_SOCK`) are
   not stored or compared, and the Claude flags are not yet confirmed against the installed version.
   Codex rows are refused. See `docs/agent-policy.md`.
+- `mb agent check <name>` now checks a running Claude agent against the record `mb agent up` made
+  of its launch: the process identity (read twice), its program, the names in its environment and
+  the values mb set, its folder, profile directory, role card, policy row, and a transcript record
+  written after the launch. Each field says match, mismatch or unverified, and the exit says what
+  it adds up to: 0 ok, 1 mismatch, 2 invalid policy or unsafe store, 3 ended, 4 unknown. Something
+  that cannot be read is 4, never ok and never ended. `--wait` keeps checking while the answer is
+  3 or 4 (`--timeout`, at most 300 seconds), `--json` prints a versioned result, and `mb doctor`
+  shows one read-only `agents` row. The claim is launch configuration only. It does not prove the
+  session runs in that process (a forked waiting parent can pass; only the smoke sees it), does not
+  show that the agent behaves like its role, and does not compare passed values such as
+  `SSH_AUTH_SOCK`, which are not stored. `mb agent check` with no name is still the policy check.
 - `mb agent check <name> --smoke-marker <marker>` judges the lifetime smoke for a running fixture
   agent: the process that ran the smoke's tool command must sit under the recorded Claude process
   through only reviewed helpers (a short built-in list of shells and `bwrap`), and that process must
