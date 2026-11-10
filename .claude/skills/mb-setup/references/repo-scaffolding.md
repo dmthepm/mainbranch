@@ -49,8 +49,11 @@ managed through `mb connect`. Keep credentials and machine-specific paths local.
 
 ## Create .gitignore
 
+`mb init` writes `.gitignore`. Only if the repo has none (and no `.gitignore`
+link) create it; never overwrite an existing one:
+
 ```bash
-cat > .gitignore << 'EOF'
+[ -e .gitignore ] || [ -L .gitignore ] || cat > .gitignore << 'EOF'
 # Secrets
 .env
 *.env.local
@@ -67,37 +70,30 @@ cat > .gitignore << 'EOF'
 # Editor
 .vscode/
 .idea/
+
+# Main Branch local Claude wiring
+.claude/worktrees/
+.claude/skills/mb-*
 EOF
 ```
 
-**Then add Main Branch bridge link entries** (dynamic, based on which engine skills exist):
+**Main Branch bridge link entries** in a repo that already had a `.gitignore`:
 
-```bash
-GITIGNORE="$REPO_PATH/.gitignore"
+`mb skill link --repo "$REPO_PATH"` adds these lines when missing, under the
+header `# Main Branch local Claude wiring`, and refuses a `.gitignore` that is a
+symlink. Without the CLI, do not write `.gitignore` from the shell: show the
+user these three lines and let them add any that are missing.
 
-ensure_gitignore_entry() {
-  entry="$1"
-  grep -qxF "$entry" "$GITIGNORE" 2>/dev/null || echo "$entry" >> "$GITIGNORE"
-}
-
-if ! grep -q "MAIN BRANCH MACHINE-LOCAL" "$GITIGNORE" 2>/dev/null; then
-  cat >> "$GITIGNORE" << 'GITIGNORE_BLOCK'
-
-# === MAIN BRANCH MACHINE-LOCAL (do not commit) ===
-GITIGNORE_BLOCK
-fi
-
-ensure_gitignore_entry ".claude/settings.local.json"
-ensure_gitignore_entry ".claude/worktrees/"
-
-# One line covers every Main Branch skill link: they are all named mb-*.
-# Your own skills under other names stay tracked.
-ensure_gitignore_entry ".claude/skills/mb-*"
+```gitignore
+# Main Branch local Claude wiring
+.claude/settings.local.json
+.claude/worktrees/
+.claude/skills/mb-*
 ```
 
 **Why `.claude/settings.local.json` is git-ignored:** Claude Code auto-ignores this file, but we add it explicitly for safety. It contains machine-specific absolute paths to Main Branch (`additionalDirectories`) that differ per computer.
 
-**Why `.claude/skills/mb-*` (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked in git. Ignoring the whole folder would hide those. Every Main Branch skill is named `mb-*`, so one line ignores exactly the linked ones, and a release that adds a skill adds no line. The `mb-` prefix is reserved for Main Branch skills. Old clone-based `.claude/lenses/` and `.claude/reference/` dirs are legacy link dirs; repair them with `mb doctor repair` instead of teaching them as current setup.
+**Why `.claude/skills/mb-*` (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked in git. Ignoring the whole folder would hide those. Every Main Branch skill is named `mb-*`, so one line covers them, and a release that adds a skill adds no line. The line also ignores anything else named `mb-*` there, so the `mb-` prefix is reserved for Main Branch skills; files already tracked stay tracked. Older repos may keep per-skill lines such as `.claude/skills/start`; link never removes lines, so delete one by hand if you want to reuse that name for your own skill. Old clone-based `.claude/lenses/` and `.claude/reference/` dirs are legacy link dirs; repair them with `mb doctor repair` instead of teaching them as current setup.
 
 **Why legacy `.vip/local.yaml` is git-ignored:** Older repos may have stored
 session state like `current_offer` there. Treat it as audit input, not durable
