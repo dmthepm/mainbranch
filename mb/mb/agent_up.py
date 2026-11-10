@@ -1,4 +1,4 @@
-"""mb agent up, slice 2a: start one Claude agent from one agents.json row, and say what it got.
+"""mb agent up: start one Claude or Codex agent from one agents.json row, and say what it got.
 
 ``up`` is a small holder. It takes the row lock, forks one child, records the child's identity,
 commits the attempt and state, lets the child exec the runtime, then waits and exits with the
@@ -7,8 +7,8 @@ agent behaves like its role. Nothing here sends a signal, and the holder neither
 the tty while the runtime runs. The attempt records mb-set values and the *names* of passed
 variables, never a passed value.
 
-The smoke verdict lives in ``agent_smoke`` and the live ``check`` in ``agent_check``. Not built:
-confirming flags on the installed claude version (a manual step in the docs).
+The smoke verdict lives in ``agent_smoke`` and the live ``check`` in ``agent_check``.
+Runtime flag and lifetime confirmation remain manual steps in the docs.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol, TextIO
 
+from mb import agent_codex as cx
 from mb import agent_policy as ap
 from mb import roles
 from mb.agent_store import FileLock, Refusal, Store
@@ -93,8 +94,26 @@ class Plan:
     env_passed: list[str]
     dropped: dict[str, list[str]] = field(default_factory=dict)
 
-    def argv(self, mode: str, session_id: str) -> list[str]:
+    @property
+    def runtime(self) -> str:
+        return str(self.row["runtime"])
+
+    def argv(self, mode: str, session_id: str | None) -> list[str]:
         row = self.row
+        if self.runtime == "codex":
+            argv = ["codex"]
+            if mode == "resume":
+                assert session_id is not None
+                argv += ["resume", session_id]
+            argv += ["--no-daemon", "-m", row["model"]]
+            if "effort" in row:
+                argv += ["-c", "model_reasoning_effort=" + row["effort"]]
+            for option in row.get("options", []):
+                argv += option.split(" ", 1)
+            if mode != "resume" and "start_file" in row:
+                argv.append(f"Read {row['start_file']} first.")
+            return argv
+        assert session_id is not None
         argv = [RUNTIME, "--model", row["model"]]
         if "effort" in row:
             argv += ["--effort", row["effort"]]
@@ -169,10 +188,12 @@ def _stat_id(path: str) -> tuple[int, int] | None:
     return info.st_dev, info.st_ino
 
 
-def _resolve_runtime(host: ap.Host, dirs: list[str]) -> tuple[str, tuple[int, int]]:
-    """The first claude in the executed PATH, reached safely and an ELF."""
+def _resolve_runtime(
+    host: ap.Host, dirs: list[str], runtime: str = RUNTIME
+) -> tuple[str, tuple[int, int]]:
+    """The first selected runtime in the executed PATH, reached safely and an ELF."""
     for directory in dirs:
-        candidate = f"{directory}/{RUNTIME}"
+        candidate = f"{directory}/{runtime}"
         try:
             found = ap._walk(candidate, host)
         except ap._Unsafe as exc:
@@ -187,7 +208,7 @@ def _resolve_runtime(host: ap.Host, dirs: list[str]) -> tuple[str, tuple[int, in
         if not is_elf(found.real):
             raise Refusal(2, "unsupported-runtime", f"{found.real} is not an ELF program")
         return found.real, (found.st.st_dev, found.st.st_ino)
-    raise Refusal(2, "unsupported-runtime", f"no {RUNTIME} in the policy PATH")
+    raise Refusal(2, "unsupported-runtime", f"no {runtime} in the policy PATH")
 
 
 def is_elf(path: str) -> bool:
@@ -207,14 +228,13 @@ def prepare(host: ap.Host, name: str, environ: Mapping[str, str]) -> tuple[Plan,
     if not report.ok:
         raise PolicyInvalid(report)
     row = next(r for r in report.policy["agents"] if r["name"] == name)
-    if row["runtime"] != RUNTIME:
-        raise Refusal(2, "unsupported-runtime", "only claude rows can be started so far")
+    runtime = row["runtime"]
     home = report.home
     if row["profile"] == ap.DEFAULT:
-        profile = f"{home}/.claude"
+        profile = f"{home}/.{runtime}"
     else:
-        profile = report.profiles[row["profile"]][RUNTIME]
-    runtime_real, runtime_id = _resolve_runtime(host, report.path)
+        profile = report.profiles[row["profile"]][runtime]
+    runtime_real, runtime_id = _resolve_runtime(host, report.path, runtime)
     passed = _passed_env(host, environ)
     pw = pwd.getpwuid(host.uid)
     env_set = {
@@ -226,7 +246,7 @@ def prepare(host: ap.Host, name: str, environ: Mapping[str, str]) -> tuple[Plan,
         "MB_ROLE": row["role"],
     }
     if row["profile"] != ap.DEFAULT:
-        env_set["CLAUDE_CONFIG_DIR"] = profile
+        env_set["CLAUDE_CONFIG_DIR" if runtime == "claude" else "CODEX_HOME"] = profile
     kept = set(env_set) | set(passed)
     dropped: dict[str, list[str]] = {}
     for key in sorted(set(environ) - kept):
@@ -244,7 +264,7 @@ def prepare(host: ap.Host, name: str, environ: Mapping[str, str]) -> tuple[Plan,
         card_real=report.cards[name],
         profile_real=profile,
         profile_id=_stat_id(profile),
-        policy_profiles=[d[RUNTIME] for d in report.profiles.values() if RUNTIME in d],
+        policy_profiles=[d[runtime] for d in report.profiles.values() if runtime in d],
         env_set=env_set,
         env_passed=sorted(passed),
         dropped=dropped,
@@ -367,6 +387,9 @@ class Where(Protocol):
     profile_real: str
     policy_profiles: list[str]
 
+    @property
+    def runtime(self) -> str: ...
+
 
 @dataclass
 class Search:
@@ -383,6 +406,7 @@ def _look(
     session_id: str,
     out: Search,
     folder: str | None = None,
+    runtime: str = RUNTIME,
 ) -> None:
     """Candidates under the profile's projects; with ``folder``, only that one project folder."""
     try:
@@ -396,6 +420,11 @@ def _look(
         return
     if not stat.S_ISDIR(info.st_mode) or (expect and expect != (info.st_dev, info.st_ino)):
         out.incomplete = out.incomplete or f"profile changed: {profile}"
+        return
+    if runtime == "codex":
+        for row in cx.rollouts(profile, expect, SEARCH_ENTRY_CAP):
+            if row.sid == session_id:
+                out.found.append((profile, row.path, row.mtime))
         return
     if folder is not None:
         _candidate(profile, f"{profile}/projects/{folder}/{session_id}.jsonl", out)
@@ -470,12 +499,12 @@ def search(plan: Where, chain: list[dict[str, Any]], session_id: str) -> Search:
             seen.add(record["profile_real"])
             expect = record.get("profile_id")
             scope.append((record["profile_real"], tuple(expect) if expect else None))
-    for profile in [*plan.policy_profiles, plan.profile_real, f"{plan.home}/.claude"]:
+    for profile in [*plan.policy_profiles, plan.profile_real, f"{plan.home}/.{plan.runtime}"]:
         if profile not in seen:
             seen.add(profile)
             scope.append((profile, None))
     for profile, expect in scope:
-        _look(profile, expect, session_id, out)
+        _look(profile, expect, session_id, out, runtime=plan.runtime)
     return out
 
 
@@ -485,7 +514,7 @@ def search(plan: Where, chain: list[dict[str, Any]], session_id: str) -> Search:
 @dataclass
 class Decision:
     mode: str
-    session_id: str
+    session_id: str | None
     provenance: str
     previous: str | None
 
@@ -563,7 +592,8 @@ def decide(
         return seen[sid]
 
     if new:
-        return Decision("new", str(uuid.uuid4()), "spawned", previous)
+        sid = None if plan.runtime == "codex" else str(uuid.uuid4())
+        return Decision("new", sid, "spawned", previous)
     if row is None and session is None:
         raise Refusal(5, "no-session", "no stored session for this agent; use --new or --session")
     if session is not None and (row is None or row["session_id"] != session):
@@ -572,21 +602,41 @@ def decide(
         assert row is not None
         sid, provenance = row["session_id"], row["session_provenance"]
         if sid is None:
+            if plan.runtime == "codex":
+                hint = cx.hints(cx.discover(chain[0], SEARCH_ENTRY_CAP)) if chain else ""
+                raise Refusal(5, "no-session", "use --session <id> or --new; " + hint)
             raise Refusal(4, "corrupt-state", "a claude row has no session id")
     found = evidence(sid)
     if found.incomplete:
         raise Refusal(4, "search-incomplete", found.incomplete)
     if found.under(plan.profile_real):
+        if plan.runtime == "codex" and not any(
+            r.sid == sid and r.cwd == plan.cwd_real
+            for r in cx.rollouts(plan.profile_real, plan.profile_id, SEARCH_ENTRY_CAP)
+        ):
+            raise Refusal(4, "wrong-cwd", "the rollout is not for the selected working folder")
         return Decision("resume", sid, provenance, previous)
     if found.found:
         raise Refusal(4, "wrong-profile", "the transcript is under another profile")
     if provenance == "spawned":
         return Decision("new-retry", sid, provenance, previous)
+    if plan.runtime == "codex" and session is not None:
+        raise Refusal(2, "no-session-evidence", "no rollout under the selected Codex profile")
     raise Refusal(4, "no-session-evidence", "no transcript for an id mb did not create")
 
 
 def _tripwire(plan: Plan, last: dict[str, Any], seen: dict[str, Search]) -> None:
     sid = last["session_id"]
+    if sid is None:
+        if plan.runtime == "codex":
+            recent = [
+                r.path
+                for r in cx.discover(last, SEARCH_ENTRY_CAP)
+                if _now() - r.mtime < TRIPWIRE_SECONDS
+            ]
+            if recent:
+                raise Refusal(4, "session-seen", "; ".join(recent))
+        return
     seen[sid] = search(plan, chain_of(plan.store, last["id"]), sid)
     recent = [f for _, f, mtime in seen[sid].found if _now() - mtime < TRIPWIRE_SECONDS]
     pids = cmdline_hits(sid, plan.store.uid)
@@ -597,7 +647,9 @@ def _tripwire(plan: Plan, last: dict[str, Any], seen: dict[str, Search]) -> None
         raise Refusal(4, "search-incomplete", why)
 
 
-def _reserve(plan: Plan, state: dict[str, dict[str, Any]], sid: str) -> None:
+def _reserve(plan: Plan, state: dict[str, dict[str, Any]], sid: str | None) -> None:
+    if sid is None:
+        return
     for other, row in state.items():
         if other == plan.name:
             continue
@@ -636,6 +688,7 @@ def _record(
     return {
         "id": f"{plan.name}.{utc:%Y%m%dT%H%M%SZ}.{secrets.token_hex(4)}",
         "name": plan.name,
+        "runtime": plan.runtime,
         "row_rev": plan.row_rev,
         "utc": utc.isoformat(),
         "mode": decision.mode,
@@ -745,7 +798,7 @@ def up(
     except Refusal as exc:
         print(
             f"mb: agent up: refused ({exc.exit_code} {exc.tag}): "
-            + roles.printable(exc.detail, 300),
+            + roles.printable(exc.detail, len(exc.detail) if exc.tag == "no-session" else 300),
             file=err,
         )
         return exc.exit_code
@@ -827,7 +880,7 @@ def _dry_run(plan: Plan, decision: Decision, out: TextIO) -> None:
     argv = plan.argv(decision.mode, sid)
     lines = [
         "Dry run: nothing started, nothing written, no lock taken.",
-        f"agent: {plan.name} (role {plan.row['role']}, {RUNTIME})",
+        f"agent: {plan.name} (role {plan.row['role']}, {plan.runtime})",
         f"mode: {decision.mode} ({decision.provenance} session)",
         "command: " + shlex.join([plan.runtime_real, *argv[1:]]),
         f"cwd: {plan.cwd_real}",

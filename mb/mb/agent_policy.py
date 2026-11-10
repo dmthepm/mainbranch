@@ -431,7 +431,7 @@ def _check_dir(
 def _check_card(
     c: _Collect, host: Host, i: int, row: dict[str, Any], cwd: str, home: str, report: Report
 ) -> None:
-    role, runtime = row["role"], row["runtime"]
+    role = row["role"]
     if os.path.lexists(f"{cwd}/core/roles"):
         folder = f"{cwd}/core/roles"
     else:
@@ -443,10 +443,7 @@ def _check_card(
         c.unsafe(path, exc)
         return
     if found is None:
-        if runtime == "claude":
-            c.add("card", _loc(i, "role"), "no role card at the fixed location")
-        else:
-            report.notes.append(f"{row['name']}: card: unverified(no-adapter)")
+        c.add("card", _loc(i, "role"), "no role card at the fixed location")
         return
     try:
         raw = _read_file(found.real, host, roles.MAX_CARD_BYTES, caller_only=False)

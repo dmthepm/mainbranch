@@ -40,9 +40,13 @@ Each row:
 ## The card rule
 
 A row's role card is `<cwd>/core/roles/<role>.md` when `<cwd>/core/roles`
-exists, otherwise `~/.local/share/agent-role-cards/<role>.md`. A Claude row
-without a valid card is a problem. A Codex row without one is only noted
-(`card: unverified(no-adapter)`), and a card that exists is still validated.
+exists, otherwise `~/.local/share/agent-role-cards/<role>.md`. Both runtimes
+require a valid card. Claude receives its path with `--append-system-prompt-file`;
+Codex keeps its native instructions. `up` sets `MB_ROLE` for both runtimes;
+Codex receives repo card fields through the owner-installed
+[SessionStart hook](role-cards.md#codex). Install and trust that hook in the
+selected Codex profile. The hook reads repo cards, not the fallback card folder.
+A valid fallback card alone does not make hook delivery available.
 
 ## The most permissive modes
 
@@ -59,8 +63,8 @@ The note appears whether or not the policy is valid, and also for a row that has
 an unrelated error, as long as its `options` list names the mode. "Valid" is never
 "safe".
 
-The report also prints its other notes, such as a Codex card that is unverified or
-a default profile directory that is absent. A note does not fail the check.
+The report also prints its other notes, such as an absent default profile
+directory. A note does not fail the check.
 
 ## What check proves, and what it does not
 
@@ -68,9 +72,8 @@ It proves the file is well formed and every path it checks is owned by the user 
 root, with no group or world writable directory on the way and no symlink hiding a
 path that must be plain. The paths it checks are the cards and profiles that are
 present or required, each start file and each `PATH` directory. It does not
-require every card or profile to exist: a Codex row may have no card, and the
-default `~/.claude` and `~/.codex` profile directories may be absent; both are
-noted, not failed.
+require the default `~/.claude` and `~/.codex` profile directories to exist;
+an absent default profile is noted. Cards and named profiles are required.
 
 A `PATH` folder that does not exist is skipped, not failed: it appears only in the
 report's `skipped` list, which the command does not print. So exit 0
@@ -82,23 +85,22 @@ its credentials are good, that a card's instructions are wise, or that the
 agent is safe. Exit 0 means the policy is valid and nothing more; exit 2 lists
 what is wrong.
 
-## Starting a Claude agent: `mb agent up <name>`
+## Starting an agent: `mb agent up <name>`
 
-`mb agent up planner` starts the Claude agent named in `agents.json` and waits for it.
+`mb agent up planner` starts the agent named in `agents.json` and waits for it.
 It is a small holder: it takes the agent's lock, starts one child, records that child
-and the launch plan, then lets the child become Claude. When Claude ends, `up` exits
-with Claude's own exit status. It never sends a signal, never types into the session,
-and never reads or writes the terminal while Claude runs. Ctrl-C reaches Claude only.
-A Codex row is refused (exit 2, `unsupported-runtime`): Codex launch is not built yet.
+and the launch plan, then lets the child become the runtime. When it ends, `up` exits
+with the runtime's exit status. It never sends a signal, never types into the session,
+and never reads or writes the terminal while the runtime runs. Ctrl-C reaches the runtime only.
 
 What it claims: the **launch configuration was verified at start**. The program, folder,
-role card, profile, session id and the environment names and mb-set values were the ones in
+role card, profile, session id when known and the environment names and mb-set values were the ones in
 the record. It does not check that the agent behaves like its role, and it does not
 re-check a running agent (that is `mb agent check <name>`, below).
 
 Options: `--dry-run` prints the command and the plan and writes nothing; `--new` starts a
 new session; `--session <id>` resumes a session you name, if its transcript is found.
-A Claude row with no stored session and neither flag is refused (exit 5, `no-session`), so a
+A row with no stored session and neither flag is refused (exit 5, `no-session`), so a
 missed migration never starts a silent fresh session: the first launch needs `--new`.
 
 Where to start it: from the user's own login session or the user's service manager, so the
@@ -116,7 +118,7 @@ In practice:
 - Any process of the same user whose command line holds the session id, even a `grep` for it,
   also makes `up` refuse `session-seen`. Close such commands before resuming.
 
-### What the child gets
+### What a Claude child gets
 
 - **Command:** `claude --model <model> [--effort <e>] [options] --append-system-prompt-file
   <card>` plus `--session-id <id>` (new) or `--resume <id>`. With a new session and a
@@ -162,10 +164,10 @@ Attempts are never pruned by mb.
 
 | Exit | Meaning |
 | --- | --- |
-| runtime's own status | A real run returns Claude's status, which can equal a code below. |
+| runtime's own status | A real run returns the runtime's status, which can equal a code below. |
 | 0 | `--dry-run` printed. |
 | 2 | Invalid policy, `unsafe-store`, `unsafe-path`, `bad-env:<NAME>`, `unsupported-runtime`, bad arguments, root. |
-| 4 | Refused, state unknown: `holder-lost`, `lock-owner-unknown`, `lock-orphan`, `proc-denied`, `inconsistent`, `session-seen`, `no-session-evidence`, `search-incomplete`, `wrong-profile`, `corrupt-state`, `no-proc`, `wait-lost`, `store-lock-timeout` (another `up` held the store lock for 10 s). |
+| 4 | Refused, state unknown: `holder-lost`, `lock-owner-unknown`, `lock-orphan`, `proc-denied`, `inconsistent`, `session-seen`, `no-session-evidence`, `search-incomplete`, `wrong-profile`, `wrong-cwd`, `corrupt-state`, `no-proc`, `wait-lost`, `store-lock-timeout` (another `up` held the store lock for 10 s). |
 | 5 | Refused: `no-session` (no stored session, no `--new`/`--session`), `live` (a running agent), `alias` (the id belongs to another row), `record-failed` (nothing was started), `go-failed`. |
 
 Unknown is never treated as dead. `up` starts a replacement only when the earlier process is
@@ -184,6 +186,69 @@ incomplete search is `search-incomplete`, never "no transcript", including befor
 and before a resume. A transcript that is not a regular file (a pipe, device or link) is never
 opened and counts as an unsupported format.
 
+## Codex launch and session evidence
+
+Codex launches require a native ELF entrypoint in the policy PATH. npm wrappers,
+shell wrappers and mise shims still refuse `unsupported-runtime`. New and resumed
+launches force `--no-daemon`; a shared background server does not satisfy the
+assumption that the session runs in the process mb started.
+
+New command: `codex --no-daemon -m <model> -c model_reasoning_effort=<effort>
+[options] [prompt]`.
+Resume command: `codex resume <id>` followed by those same options. The effort
+override is omitted when the row has none. No card path or contents enter Codex
+argv. The launcher does not set `model_instructions_file`: replacing base
+instructions drops Codex's own safety guidance. Native instructions stay, and
+`MB_ROLE` selects the card through the owner-installed SessionStart hook linked
+above. `check` compares the selected card path with policy, as for Claude; it
+does not establish that the hook ran or the card text loaded. `CODEX_HOME` is
+set only for a named profile; the default uses `~/.codex` under mb's selected HOME.
+
+A new Codex attempt records a null session id with `spawned` provenance. Discovery
+never changes that attempt or the saved state. A subsequent `up` refuses with
+exit 5 `no-session` until you give `--session <id>` or `--new`. `check` and the
+`no-session` message list matching candidates as `discovered (not adopted)`.
+With no id, a live check returns 4 because session evidence is unverified.
+Zero, one or several candidates never authorize an automatic resume.
+
+Candidates come only from `<recorded profile>/sessions/**`. Their first line
+must be `session_meta`, with equal UUID fields `payload.id` and
+`payload.session_id`, the recorded working folder in `payload.cwd`, and a
+`payload.timestamp` at or after the attempt's launch time. Another profile,
+another folder or older metadata cannot supply a discovery hint. The walk reads
+at most 10,000 entries per profile; exceeding that limit or conflicting id fields
+returns 4 `inconsistent`. Unsupported metadata, links and special rollout files
+are unknown, never accepted. Formats without both equal id fields are not supported.
+
+`--session <id>` validates the rollout under the selected profile and working
+folder before recording `owner-confirmed` provenance. Both explicit and saved
+resumes refuse 4 `wrong-cwd` for a rollout from another working folder, without
+starting a process or changing saved state. An absent rollout refuses with exit 2; one found
+only under another policy or historical profile refuses 4 `wrong-profile`.
+The source uses the thread id, `payload.id`, as the resume target. Requiring it
+to equal `session_id` deliberately excludes child threads with a different root id.
+A later resume without `--session` uses that saved id. Missing evidence for a
+saved id never starts a new session under that id.
+
+For a recorded id, a live check binds metadata to that id and working folder,
+then requires a metadata or transcript-tail timestamp after launch. File
+time alone never satisfies live evidence. Evidence is reopened component by
+component without following links, with scanned directory and file identities
+checked before and after the bounded read. Replacing a directory or rollout
+returns 4 `transcript-changed`. For a null id, the transcript tripwire
+uses discovered candidates written within the last 60 seconds; it does not scan
+command lines for a guessed id. A dead runtime with no recent evidence can still
+report ended under the stated lifetime assumption.
+
+Syntax was inspected in Codex 0.164.0 help and its pinned source:
+[config loading](https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/core/src/config/mod.rs),
+[config schema](https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/core/config.schema.json),
+[session metadata](https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/protocol/src/protocol.rs),
+and [resume target](https://github.com/openai/codex/blob/rust-v0.164.0/codex-rs/tui/src/session_resume.rs).
+Fixture tests cover the launcher and smoke verdict. Actual card loading, effective
+effort, new/resumed session behavior and lifetime on this version still need the
+real disposable-row smoke below. No verified Codex lifetime claim is made here.
+
 ## The lifetime smoke: `mb agent check <name> --smoke-marker <marker>`
 
 `up` can only prove that the process it started is alive or dead. That is the session's
@@ -192,7 +257,8 @@ and lets the child do the work looks the same to a plain check. The smoke observ
 doing work and judges it. It is the only thing `--smoke-marker` does, and it is evidence for the
 installed version, not a proof for every session or mode. mb does not run it at launch.
 
-The verdict reads /proc and passes only if all of these hold:
+The verdict accepts Claude and Codex rows, including a new Codex attempt with no
+session id. The verdict reads /proc and passes only if all of these hold:
 
 - the marker pid's parent chain reaches the recorded runtime pid within 8 links;
 - every process strictly between them runs a reviewed helper, approved by the device and inode
@@ -201,8 +267,8 @@ The verdict reads /proc and passes only if all of these hold:
   the runtime's exe);
 - the recorded pid's exe is still the recorded program, its environment has the attempt's names
   and mb-set values, and its folder is the attempt's;
-- no other process of this user carries the session id on its command line, and every such
-  command line could be read (a process that exited mid-scan does not count);
+- when the session id is known, no other process of this user carries it on its command line,
+  and every such command line could be read (a process that exited mid-scan does not count);
 - the runtime and every process in the chain still have the same parent, start time and program
   after all the reads. A fact that could not be read, or changed while it was read, is unknown
   (4), never a pass.
@@ -223,6 +289,9 @@ starting point. A helper that is not on it fails the smoke until it is reviewed 
 ### Running the real smoke (by hand, not in tests)
 
 Do this on a disposable fixture row, never on a working agent, after each pinned runtime update.
+For Codex, a plain `check` lists discovery hints while leaving the recorded id
+null. Use the hinted rollout to inspect transcript growth. The smoke verdict
+itself does not require a known id; it judges the recorded process and tool ancestry.
 
 1. Add a fixture row to `agents.json` with its own role card and a `start_file` containing:
    `Run this one foreground command and wait for it: sh -c 'echo $$ > /path/to/marker; sleep 120'`.
@@ -259,7 +328,7 @@ keystroke is sent. `mb agent check` with no name is still the policy check above
 | `identity` | The recorded pid is alive with the recorded start time, read twice with no change between. |
 | `exe` | The process still runs the recorded program (device and inode). |
 | `role` | `MB_ROLE` in the process equals the attempt's. |
-| `card` | Policy still names the card file that was launched. It is not proof the text was loaded. |
+| `card` | Policy still names the card file selected at launch. It is not proof the hook ran or the text was loaded. |
 | `profile` | The profile directory is the one recorded (device and inode). |
 | `cwd` | The process folder is the recorded one. |
 | `environment` | The variable names equal the attempt's names, and each value mb set itself is unchanged. |
@@ -310,7 +379,7 @@ moment. To bound that, the runtime's identity and program are read again after e
 row lock is read again after the fields (it is opened as an existing file only, never created or
 locked, and matched by device and inode in `/proc/locks`), and a transcript whose identity, size or
 modification time changes across its read is unknown (`transcript-changed`). Any such change is 4,
-which wins over a mismatch. Session evidence comes only from
+which wins over a mismatch. Claude session evidence comes only from
 `<profile>/projects/<folder>/<session-id>.jsonl`, where the folder is the recorded working folder's
 real path with every `/` and `.` replaced by `-` (confirmed on Claude Code 2.1.309); `up`'s own
 search of every project folder is unchanged.
@@ -318,6 +387,6 @@ search of every project folder is unchanged.
 `mb doctor` shows one `agents` row when `agents.json` exists, from a read-only check of every
 agent: ended or unknown warns, a mismatch fails, an agent never launched is not a finding.
 
-Not built yet: Codex launch and Codex checks. The live check of a running Claude agent is built,
-and the Claude flags are confirmed on Claude Code 2.1.309 only; repeat the confirmation for each
-new version.
+The Claude flags are confirmed on Claude Code 2.1.309 only. Codex launch and checks
+are built with fixture evidence; the real runtime confirmation remains outstanding.
+Repeat runtime confirmation after each pinned version update.

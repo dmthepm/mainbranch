@@ -36,6 +36,19 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
+- `mb agent up` and `check` now accept Codex rows. Launches force `--no-daemon`,
+  keep Codex's native instructions and take reasoning effort from the row.
+  `MB_ROLE` selects the repo card through the owner-installed SessionStart hook;
+  launch checks compare the card path with policy without claiming its text loaded.
+  New sessions keep a null id; bounded discovery lists hints without saving or
+  choosing one. Use `--session <id>` to confirm a rollout under the row's profile
+  and working folder. Saved resumes enforce the same folder binding.
+  Checks read Codex metadata and fresh transcript evidence with directory and file
+  identities checked through the read, and the lifetime smoke
+  accepts Codex fixture rows. Cards are now required for Codex policy validation.
+  Help and source were checked for Codex 0.164.0; real card loading, effective
+  effort and lifetime smoke are still unverified. See `docs/agent-policy.md`.
+
 - `mb agent up <name>` starts a Claude agent from its `agents.json` row and waits for it,
   exiting with Claude's own status. It builds the environment from nothing (dropping
   `ANTHROPIC_*`, `OPENAI_*` and the rest), records the program, folder, role card, profile, session
@@ -45,7 +58,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   that the launch configuration was verified at start: it does not check that the agent behaves like
   its role, does not re-check a running agent, passed values (`HEAVY_LOCK`, `SSH_AUTH_SOCK`) are
   not stored or compared, and the Claude flags are confirmed on Claude Code 2.1.309 only. Start it
-  from your own login or service manager, never with `sudo -u` or `runuser`. Codex rows are refused.
+  from your own login or service manager, never with `sudo -u` or `runuser`.
   See `docs/agent-policy.md`.
 - `mb agent check <name>` now checks a running Claude agent against the record `mb agent up` made
   of its launch: the process identity (read twice), its program, the names in its environment and
@@ -70,7 +83,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   is evidence for the installed version under that one observation, not proof for every session,
   and mb does not run it at launch. The live check of a running agent is built (`mb agent check
   <name>`), `check` with no name is still the policy check, and the Claude flags and the smoke
-  are confirmed on Claude Code 2.1.309 only. Codex launch is not built.
+  are confirmed on Claude Code 2.1.309 only. Codex runtime smoke remains unverified.
 
 ## [0.6.24] - 2026-11-09
 

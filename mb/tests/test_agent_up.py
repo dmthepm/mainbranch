@@ -381,7 +381,7 @@ def test_a_real_elf_passes_the_elf_test_and_a_script_does_not() -> None:
     assert not au.is_elf(__file__)
 
 
-def test_a_codex_row_is_refused_without_work(u: Up) -> None:
+def test_a_codex_row_without_a_codex_binary_is_refused_without_work(u: Up) -> None:
     u.write({"version": 1, "agents": [u.row(runtime="codex")]})
     code, _, err = u.up()
     assert code == 2 and "unsupported-runtime" in err
