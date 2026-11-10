@@ -8,6 +8,7 @@ in a subprocess.
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import io
 import json
@@ -102,6 +103,13 @@ if fault:
 sys.exit(au.up(host, cfg["name"], new=cfg.get("new", False), session=cfg.get("session"),
                dry_run=cfg.get("dry_run", False), environ=cfg.get("environ", {})))
 """
+
+
+def _default_signals() -> None:
+    for sig in signal.valid_signals():
+        with contextlib.suppress(OSError, ValueError):
+            signal.signal(sig, signal.SIG_DFL)
+    signal.pthread_sigmask(signal.SIG_SETMASK, [])
 
 
 class Proc:
@@ -266,17 +274,22 @@ def test_first_launch_runs_the_fixture_with_the_planned_argv_env_cwd_and_fds(u: 
         "last_attempt": a["id"],
     }
     # names and mb-set values equal the attempt; nothing else arrived
-    assert set(run["env"]) == set(a["env_set"]) | set(a["env_passed"])
-    assert all(run["env"][k] == v for k, v in a["env_set"].items())
+    seen_names = set(run["env"])
+    assert seen_names == set(a["env_set"]) | set(a["env_passed"])
+    mismatched = [k for k, v in a["env_set"].items() if run["env"][k] != v]
+    assert mismatched == []
     assert a["env_set"]["MB_ROLE"] == "planner"
     assert a["env_set"]["PATH"] == str(u.bin)
     assert run["fds"] == [0, 1, 2]
     # default dispositions: only what a fresh fixture Python ignores itself (SIGPIPE, SIGXFSZ)
+    # Reset every disposition and the mask first, so the baseline does not inherit
+    # what the test runner ignores (a suite started under nohup ignores SIGHUP).
     baseline = subprocess.run(
         [sys.executable, "-I", "-c", "print(open('/proc/self/status').read())"],
         capture_output=True,
         text=True,
         check=True,
+        preexec_fn=_default_signals,
     ).stdout
     assert run["sigign"] == re.search(r"SigIgn:\s*(\w+)", baseline).group(1)  # type: ignore[union-attr]
     assert run["sigblk"] == "0000000000000000"
@@ -503,12 +516,20 @@ def test_passed_values_arrive_but_are_never_recorded_or_printed(u: Up, tmp_path:
     code, out, err = u.up(environ=env)
     assert code == 0
     run = u.runs()[0]
-    for key in ("TERM_PROGRAM_VERSION", "HERDR_PANE_ID", "LANG", "HEAVY_LOCK"):
-        assert run["env"][key] == env[key]
-    for dropped in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "FOO_TOKEN"):
-        assert dropped not in run["env"]
-    assert run["env"]["HOME"] == str(u.home) and run["env"]["PATH"] == str(u.bin)
-    assert "CLAUDE_CONFIG_DIR" not in run["env"]
+    arrived = [
+        key
+        for key in ("TERM_PROGRAM_VERSION", "HERDR_PANE_ID", "LANG", "HEAVY_LOCK")
+        if run["env"].get(key) == env[key]
+    ]
+    assert len(arrived) == 4
+    leaked = [
+        k
+        for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "FOO_TOKEN", "CLAUDE_CONFIG_DIR")
+        if k in run["env"]
+    ]
+    assert leaked == []
+    home, path = run["env"]["HOME"], run["env"]["PATH"]
+    assert home == str(u.home) and path == str(u.bin)
     a = u.last()
     assert a["env_passed"] == ["HEAVY_LOCK", "HERDR_PANE_ID", "LANG", "TERM_PROGRAM_VERSION"]
     for seen in (_all_store_text(u), out, err):
@@ -566,7 +587,8 @@ def test_a_named_profile_sets_claude_config_dir_and_is_recorded(u: Up) -> None:
         {"version": 1, "profiles": {"alt": {"claude": str(prof)}}, "agents": [u.row(profile="alt")]}
     )
     u.up()
-    assert u.runs()[0]["env"]["CLAUDE_CONFIG_DIR"] == str(prof)
+    config_dir = u.runs()[0]["env"]["CLAUDE_CONFIG_DIR"]
+    assert config_dir == str(prof)
     a = u.last()
     assert a["profile_real"] == str(prof) and a["profile_id"] == [
         prof.stat().st_dev,
