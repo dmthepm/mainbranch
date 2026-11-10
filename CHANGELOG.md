@@ -11,6 +11,19 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb agent up <name>` starts a Claude agent from its `agents.json` row and waits for it,
+  exiting with Claude's own status. It builds the environment from nothing (dropping
+  `ANTHROPIC_*`, `OPENAI_*` and the rest), records the program, folder, role card, profile, session
+  id and launch plan in a private store before Claude starts (and nothing if that record cannot be
+  written), takes a per-agent lock so two cooperative starts never both run, and resumes or reruns the same
+  session id after a crash. `--dry-run` prints the command without any passed value. The claim is
+  that the launch configuration was verified at start: it does not check that the agent behaves like
+  its role, does not re-check a running agent, passed values (`HEAVY_LOCK`, `SSH_AUTH_SOCK`) are
+  not stored or compared, and the Claude flags are not yet confirmed against the installed version.
+  Codex rows are refused. See `docs/agent-policy.md`.
+
 ## [0.6.24] - 2026-11-09
 
 ### Breaking
@@ -43,16 +56,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
-- `mb agent up <name>` starts a Claude agent from its `agents.json` row and waits for it,
-  exiting with Claude's own status. It builds the environment from nothing (dropping
-  `ANTHROPIC_*`, `OPENAI_*` and the rest), records the program, folder, role card, profile, session
-  id and launch plan in a private store before Claude starts (and nothing if that record cannot be
-  written), takes a per-agent lock so two cooperative starts never both run, and resumes or reruns the same
-  session id after a crash. `--dry-run` prints the command without any passed value. The claim is
-  that the launch configuration was verified at start: it does not check that the agent behaves like
-  its role, does not re-check a running agent, passed values (`HEAVY_LOCK`, `SSH_AUTH_SOCK`) are
-  not stored or compared, and the Claude flags are not yet confirmed against the installed version.
-  Codex rows are refused. See `docs/agent-policy.md`.
 - `/mb-seo` now recommends password mode for a self-hosted OpenSEO copy: no Access
   app, workers.dev and previews off, rate limits bound, a separate admin user and
   expiring `oseo_` key per agent, keys in `mb connect` (`--custom --token-stdin`),
