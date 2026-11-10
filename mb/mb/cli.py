@@ -21,6 +21,7 @@ from typer.core import TyperGroup
 
 from mb import __version__
 from mb import agent_policy as agent_policy_mod
+from mb import agent_smoke as agent_smoke_mod
 from mb import agent_up as agent_up_mod
 from mb import connect as connect_mod
 from mb import doctor as doctor_mod
@@ -2553,8 +2554,27 @@ app.add_typer(agent_app, name="agent")
 @agent_app.command("check")
 def agent_check_cmd(
     name: str | None = typer.Argument(None, help="Only require this agent to exist."),
+    smoke_marker: str | None = typer.Option(
+        None,
+        "--smoke-marker",
+        help="Lifetime smoke verdict: the file the smoke's tool command wrote its pid to.",
+    ),
 ) -> None:
-    """Check agents.json and the files it names. Policy only: nothing is launched or verified."""
+    """Check agents.json and the files it names. Policy only: nothing is launched or verified.
+
+    With --smoke-marker, judge the lifetime smoke for a running fixture agent instead. The live
+    check of a running agent is not built yet.
+    """
+    if smoke_marker is not None:
+        if name is None:
+            typer.echo("mb agent check --smoke-marker needs an agent name.", err=True)
+            raise typer.Exit(2)
+        try:
+            code = agent_smoke_mod.smoke(agent_policy_mod.Host.local(), name, smoke_marker)
+        except Exception:  # noqa: BLE001
+            typer.echo("mb: agent check: internal error; no verdict.", err=True)
+            raise typer.Exit(2) from None
+        raise typer.Exit(code)
     try:
         report = agent_policy_mod.check(agent_policy_mod.Host.local(), name)
     except Exception:  # noqa: BLE001

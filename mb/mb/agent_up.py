@@ -7,8 +7,8 @@ agent behaves like its role. Nothing here sends a signal, and the holder neither
 the tty while the runtime runs. The attempt records mb-set values and the *names* of passed
 variables, never a passed value.
 
-Part b (not here): ``check --smoke-marker`` and the waiting-wrapper fixtures, the live ``check``
-that reads /proc against the attempt, and confirming flags on the installed claude version.
+The smoke verdict lives in ``agent_smoke``. Not built: the live ``check`` that reads /proc against
+the attempt, and confirming flags on the installed claude version (a manual step in the docs).
 """
 
 from __future__ import annotations
