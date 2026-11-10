@@ -168,6 +168,67 @@ incomplete search is `search-incomplete`, never "no transcript", including befor
 and before a resume. A transcript that is not a regular file (a pipe, device or link) is never
 opened and counts as an unsupported format.
 
-Not built yet (the next part): `mb agent check --smoke-marker`, the waiting-wrapper checks and
-the live `check` that compares a running agent with its record, and confirming the flags against
-the installed Claude version.
+## The lifetime smoke: `mb agent check <name> --smoke-marker <marker>`
+
+`up` can only prove that the process it started is alive or dead. That is the session's
+lifetime only if the runtime keeps its session in that process. An ELF that forks a child, waits,
+and lets the child do the work looks the same to a plain check. The smoke observes the session
+doing work and judges it. It is the only thing `--smoke-marker` does, and it is evidence for the
+installed version, not a proof for every session or mode. mb does not run it at launch.
+
+The verdict reads /proc and passes only if all of these hold:
+
+- the marker pid's parent chain reaches the recorded runtime pid within 8 links;
+- every process strictly between them runs a reviewed helper, approved by the device and inode
+  of the program it is executing (it must equal that of a listed helper's real path now, and the
+  path must agree), and none is the runtime's own program (a forked child that never exec'd shows
+  the runtime's exe);
+- the recorded pid's exe is still the recorded program, its environment has the attempt's names
+  and mb-set values, and its folder is the attempt's;
+- no other process of this user carries the session id on its command line, and every such
+  command line could be read (a process that exited mid-scan does not count);
+- the runtime and every process in the chain still have the same parent, start time and program
+  after all the reads. A fact that could not be read, or changed while it was read, is unknown
+  (4), never a pass.
+
+Exits: 0 pass; 1 fail, naming `not-session-process` (the chain) or `mismatch` (`environ`,
+`cwd`); 3 the runtime has ended; 4 unknown (`no-marker`, `no-session-evidence`, `proc-denied`,
+`inconsistent`, `exe-changed`, `session-seen`, `scan-incomplete`, `changed`,
+`helper-mismatch`); 2 invalid policy or no agent name. Passed values
+are not stored and not compared, and no value is printed.
+
+The reviewed helper list is built in and short: `/bin/sh`, `/bin/dash`, `/bin/bash`,
+`/bin/zsh` and `/usr/bin/bwrap`, compared by real path. The design keeps the real list per runtime
+version with the machine owner and says the first smoke produces it, so treat this one as a
+starting point. A helper that is not on it fails the smoke until it is reviewed and added.
+
+`mb agent check <name>` without the flag is still the policy check. The live check of a running
+agent is not built.
+
+### Running the real smoke (by hand, not in tests)
+
+Do this on a disposable fixture row, never on a working agent, after each pinned runtime update.
+
+1. Add a fixture row to `agents.json` with its own role card and a `start_file` containing:
+   `Run this one foreground command and wait for it: sh -c 'echo $$ > /path/to/marker; sleep 120'`.
+   (An invented scratch path; the marker file is the only thing the smoke reads from the session.)
+2. In a scratch pane run `mb agent up <fixture> --new`. Wait until the marker file exists.
+3. From another pane, while the command sleeps, run
+   `mb agent check <fixture> --smoke-marker /path/to/marker`. Record the exit and output.
+4. End the session from the pane, then confirm the runtime pid is gone and the transcript for the
+   session id stops growing.
+5. A pass for this exact version goes in the machine owner's record. A fail removes the version from
+   verified support until fixed. Add any helper the verdict names only after reading what it is.
+
+### Confirming the Claude flags on the installed version (by hand)
+
+`up` builds `--session-id`, `--resume`, `--append-system-prompt-file` and `--effort`. These are
+not yet confirmed against the installed Claude. Run `claude --help` and check that all four are
+listed and what they take. Then do one real run on the fixture row: start it with `--new` and a
+short `effort`, check the transcript is named with the id `up` recorded, end it, run
+`mb agent up <fixture>` again and check it resumes the same id, and look in the transcript or the
+session for the role card text. Record the version and what you saw. Until this is done the flags
+are unconfirmed.
+
+Not built yet: the live `check` that compares a running agent with its record (`--wait`,
+`--json`, doctor), and Codex.
