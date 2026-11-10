@@ -193,8 +193,8 @@ Checks run in this order:
 5. Audit write fails: exit 1, `audit_unavailable`, and no value is printed.
 6. Otherwise the raw value is written: exit 0.
 
-Scripts that redirected to a file without a flag must now explicitly pass
-`--print`, or move to `exec`. Scripts that relied on the full parent environment
+Scripts that redirected the value to a file should move to `exec`, which hands
+the credential to the command's environment and never writes it to disk. Scripts that relied on the full parent environment
 with `exec` can retain named variables with `--keep-env` or use `--inherit-env`.
 
 ## Caller policy
