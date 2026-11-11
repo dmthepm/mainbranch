@@ -378,7 +378,10 @@ The observation is a sequence of reads, not an atomic snapshot of a process that
 moment. To bound that, the runtime's identity and program are read again after everything else, the
 row lock is read again after the fields (it is opened as an existing file only, never created or
 locked, and matched by device and inode in `/proc/locks`), and a transcript whose identity, size or
-modification time changes across its read is unknown (`transcript-changed`). Any such change is 4,
+modification time changes across its read is unknown (`transcript-changed`). The check also compares
+hashes of the bytes it read with a re-read: the bounded tail and, for Codex, the metadata line.
+Changes outside those bytes or a rewrite restored before re-reading may go unseen.
+Any detected change is 4,
 which wins over a mismatch. Claude session evidence comes only from
 `<profile>/projects/<folder>/<session-id>.jsonl`, where the folder is the recorded working folder's
 real path with every `/` and `.` replaced by `-` (confirmed on Claude Code 2.1.309); `up`'s own
