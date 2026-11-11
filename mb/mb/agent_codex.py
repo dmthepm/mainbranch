@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import stat
@@ -25,7 +26,7 @@ class Rollout:
     path: str
     mtime: float
     ancestors: tuple[tuple[str, int, int], ...]
-    identity: tuple[int, int, int, int]
+    identity: tuple[int, int, int, int, bytes]
 
 
 def timestamp(value: str) -> datetime:
@@ -114,6 +115,9 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
             if not UUID_RE.fullmatch(sid) or not isinstance(payload["cwd"], str):
                 raise ValueError("invalid session metadata")
             stamp = timestamp(payload["timestamp"])
+            digest = hashlib.sha256(first.split(b"\n", 1)[0]).digest()
+            if digest != hashlib.sha256(os.pread(fd, META_BYTES, 0).split(b"\n", 1)[0]).digest():
+                raise Refusal(4, "transcript-changed", "Codex metadata changed while read")
             after = os.fstat(fd)
             named = os.stat(name, dir_fd=parent, follow_symlinks=False)
             fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns")
@@ -128,7 +132,7 @@ def rollouts(profile: str, expect: tuple[int, int] | None, cap: int) -> list[Rol
                 path,
                 before.st_mtime,
                 ancestors,
-                (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns),
+                (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, digest),
             )
         except (ValueError, KeyError, TypeError):
             raise Refusal(4, "unsupported-format", "unsupported Codex session metadata") from None
@@ -189,7 +193,13 @@ def open_rollout(row: Rollout) -> Iterator[int]:
                 for item in (info, named):
                     if (
                         not stat.S_ISREG(item.st_mode)
-                        or (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns)
+                        or (
+                            item.st_dev,
+                            item.st_ino,
+                            item.st_size,
+                            item.st_mtime_ns,
+                            hashlib.sha256(os.pread(fd, META_BYTES, 0).split(b"\n", 1)[0]).digest(),
+                        )
                         != row.identity
                     ):
                         raise Refusal(4, "transcript-changed", "Codex rollout changed")

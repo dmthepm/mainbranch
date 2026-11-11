@@ -11,6 +11,15 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- Lifetime smoke checks return unknown for a pipe or other non-file marker without blocking.
+- Agent launch failures now explain when the runtime could not start with exit 127.
+- Doctor warns about ignored owner skills using the reserved `mb-` prefix, and skill linking
+  explains the reservation.
+- Agent checks compare transcript bytes on re-read as well as file details to detect changes.
+- The agent recovery test waits for its transcript before stopping the fixture runtime.
+
 ### Breaking
 
 - Connection listing, planning, checks and repairs now find the business folder from
@@ -35,7 +44,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   3 or 4 (`--timeout`, at most 300 seconds), `--json` prints a versioned result, and `mb doctor`
   shows one read-only `agents` row. The fields are read one after another, not as an atomic
   snapshot: the runtime's identity and program are read again last, the holder's lock again after
-  the fields, and a transcript replaced or rewritten while it was read is unknown, never ok. Session
+  the fields, and a transcript whose file details or checked bytes differ on re-read is unknown,
+  never ok. Session
   evidence is read only from the transcript folder of the recorded working folder. The claim is
   launch configuration only. It does not prove the
   session runs in that process (a forked waiting parent can pass; only the smoke sees it), does not

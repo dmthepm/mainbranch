@@ -1030,6 +1030,19 @@ def test_row09_runtime_and_holder_both_dead_resume_when_a_transcript_exists(u: U
     u.transcripts()
     holder = u.drive()
     run = u.wait_runs(1)[0]
+    # The runtime announces its pid before writing its transcript. Wait for the
+    # recovery input itself before killing it, including completion of the write.
+    transcript = u.home / ".claude" / "projects" / "p" / f"{sid_of(run)}.jsonl"
+    deadline = time.monotonic() + 10
+    while True:
+        try:
+            ready = json.loads(transcript.read_text()) == {"sessionId": sid_of(run)}
+        except (OSError, ValueError):
+            ready = False
+        if ready:
+            break
+        assert time.monotonic() < deadline, "fixture transcript was not written"
+        time.sleep(0.01)
     os.kill(holder.popen.pid, signal.SIGKILL)
     os.kill(run["pid"], signal.SIGKILL)
     holder.wait()
@@ -1170,3 +1183,10 @@ def test_a_store_lock_that_stays_held_is_store_lock_timeout(
         held.close()
     assert code == 4 and "store-lock-timeout" in err
     assert u.runs() == []
+
+
+def test_bad_runtime_interpreter_explains_exit_127(u: Up) -> None:
+    u.runtime.write_text("#!/invented/missing-interpreter\n")
+    proc = u.drive()
+    assert proc.wait() == 127
+    assert proc.stderr == "mb agent up: the runtime could not be started (exit 127)\n"

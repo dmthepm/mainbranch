@@ -512,3 +512,20 @@ def _driver() -> str:
         "au.is_elf = lambda p: True\n"
         "sys.exit(au.up(host, cfg['name'], new=True, environ={}))\n"
     )
+
+
+def test_fifo_marker_returns_no_marker_without_blocking(s: Smoke) -> None:
+    s.marker.unlink(missing_ok=True)
+    os.mkfifo(s.marker)
+
+    def timeout(signum, frame):
+        raise AssertionError("marker read blocked on FIFO")
+
+    previous = signal.signal(signal.SIGALRM, timeout)
+    signal.alarm(2)
+    try:
+        code, text = s.run()
+        assert code == 4 and "no-marker" in text
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)

@@ -14,6 +14,7 @@ every session or mode, and mb does not run it at launch. Nothing here signals, k
 from __future__ import annotations
 
 import os
+import stat
 import sys
 from pathlib import Path
 from typing import Any, NamedTuple, TextIO
@@ -97,8 +98,13 @@ def _unchanged(seen: dict[int, Seen]) -> None:
 def _marker_pid(marker: str) -> int:
     """The pid the tool command wrote. Missing or odd is ``no-marker``: the tool has not run."""
     try:
-        with open(marker, "rb") as f:
-            text = f.read(MARKER_BYTES).decode(errors="replace").strip()
+        fd = os.open(marker, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("not a regular marker file")
+            text = os.read(fd, MARKER_BYTES).decode(errors="replace").strip()
+        finally:
+            os.close(fd)
     except OSError:
         raise Refusal(
             4, "no-marker", "the marker file is missing; the tool command has not run"

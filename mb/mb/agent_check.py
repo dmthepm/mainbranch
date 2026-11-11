@@ -16,6 +16,7 @@ that, per runtime version), that the agent behaves like its role, that passed va
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -189,7 +190,7 @@ def _fresh_record(
     """True when a record in the file's tail carries the id and is stamped after ``since``.
 
     A string is the reason the file cannot be used: ``unsupported-format``, or
-    ``transcript-changed`` when it was replaced or rewritten while it was read.
+    ``transcript-changed`` when file identity or the bytes read differ on re-read.
     """
     try:
         fd = (
@@ -206,7 +207,8 @@ def _fresh_record(
         meta_fresh = False
         if runtime == "codex":
             try:
-                header = json.loads(os.read(fd, cx.META_BYTES).split(b"\n", 1)[0])
+                first = os.read(fd, cx.META_BYTES).split(b"\n", 1)[0]
+                header = json.loads(first)
                 payload = header["payload"]
                 if (
                     header["type"] != "session_meta"
@@ -221,6 +223,15 @@ def _fresh_record(
         offset = max(0, info.st_size - TAIL_BYTES)
         os.lseek(fd, offset, os.SEEK_SET)
         data = os.read(fd, TAIL_BYTES)
+        digest = hashlib.sha256(data).digest()
+        if digest != hashlib.sha256(os.pread(fd, TAIL_BYTES, offset)).digest():
+            return "transcript-changed"
+        if (
+            runtime == "codex"
+            and hashlib.sha256(first).digest()
+            != hashlib.sha256(os.pread(fd, cx.META_BYTES, 0).split(b"\n", 1)[0]).digest()
+        ):
+            return "transcript-changed"
         again = os.fstat(fd)
         named = os.lstat(path)
     except OSError:

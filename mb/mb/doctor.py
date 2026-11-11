@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import socket
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1006,6 +1007,46 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
             else ("warn" if not (repo / "CLAUDE.md").exists() else "error"),
         }
     )
+    skills_dir = repo / ".claude" / "skills"
+    bundled = set(engine_mod.bundled_skills())
+    owner_skills = sorted(
+        p.name for p in skills_dir.glob("mb-*") if p.is_dir() and p.name not in bundled
+    )
+    if owner_skills:
+        # NUL-separated bytes both ways: folder names may hold newlines,
+        # quotes or bytes that are not UTF-8, and git quotes those otherwise.
+        prefix = os.fsencode(".claude/skills/")
+        try:
+            ignored = subprocess.run(
+                ["git", "check-ignore", "-z", "--stdin"],
+                cwd=repo,
+                input=b"".join(prefix + os.fsencode(name) + b"/\0" for name in owner_skills),
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            ignored = subprocess.CompletedProcess([], 1, stdout=b"")
+        hidden = [
+            os.fsdecode(entry[len(prefix) :].rstrip(b"/"))
+            for entry in ignored.stdout.split(b"\0")
+            if entry.startswith(prefix)
+        ]
+        if ignored.returncode == 0 and hidden:
+            checks.append(
+                {
+                    "name": "reserved-skill-prefix",
+                    "ok": False,
+                    "severity": "warn",
+                    "detail": (
+                        "Ignored owner skills: "
+                        + ", ".join(name if name.isprintable() else ascii(name) for name in hidden)
+                        + ". The mb- skill prefix is reserved for Main Branch; "
+                        "rename these folders without the mb- prefix "
+                        "to include them in saved history."
+                    ),
+                }
+            )
     if wiring_ok:
         missing_links = engine_mod.missing_bundled_links(repo)
         checks.append(

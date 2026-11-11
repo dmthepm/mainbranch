@@ -100,6 +100,9 @@ user these three lines and let them add any that are missing.
 
 **Why `.claude/skills/mb-*` (not `.claude/skills/`):** Users have custom skills (deck, pr-review, etc.) that ARE tracked. Ignoring the whole folder would hide those. Every Main Branch skill is named `mb-*`, so one line covers them, and a release that adds a skill adds no line. The line also ignores anything else named `mb-*` there, so the `mb-` prefix is reserved for Main Branch skills; files already tracked stay tracked. Older repos may keep per-skill lines such as `.claude/skills/start`; link never removes lines, so delete one by hand if you want to reuse that name for your own skill.
 
+Name owner skills without `mb-` so git includes them. `mb doctor` warns about
+ignored owner folders using that prefix; rename those folders without `mb-`.
+
 **Idempotent:** link adds only missing lines and never removes any, so
 existing `.gitignore` lines are not duplicated.
 

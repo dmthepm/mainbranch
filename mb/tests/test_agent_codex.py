@@ -419,7 +419,9 @@ def test_rollout_replaced_between_search_and_evidence_cannot_match(
 
     def replace(*args):
         rows = original(*args)
-        rollout(cv.profile, cwd=cv.record["cwd_real"], stamp=cv.record["utc"], other_id=SID2)
+        path = rollout(cv.profile, cwd=cv.record["cwd_real"], stamp=cv.record["utc"], other_id=SID2)
+        info = path.stat()
+        os.utime(path, ns=(info.st_atime_ns, rows[0].identity[3] + 1_000_000_000))
         return rows
 
     monkeypatch.setattr(cx, "rollouts", replace)
@@ -454,5 +456,28 @@ def test_rollout_parent_or_file_replaced_before_evidence_is_unknown(
         return rows
 
     monkeypatch.setattr(cx, "rollouts", replace)
+    code, text = cv.run()
+    assert code == 4 and "transcript-changed" in text
+
+
+def test_same_size_same_mtime_rollout_rewrite_is_unknown(
+    cv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from mb import agent_codex as cx
+
+    original = cx.rollouts
+
+    def rewrite(*args):
+        rows = original(*args)
+        path = Path(rows[0].path)
+        before = path.stat()
+        data = path.read_bytes()
+        changed = data.replace(SID.encode(), SID2.encode())
+        assert changed != data and len(changed) == len(data)
+        path.write_bytes(changed)
+        os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+        return rows
+
+    monkeypatch.setattr(cx, "rollouts", rewrite)
     code, text = cv.run()
     assert code == 4 and "transcript-changed" in text

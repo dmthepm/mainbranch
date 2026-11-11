@@ -156,6 +156,8 @@ def skill_link_cmd(
         if result["ok"]:
             typer.echo(f"linked Main Branch: {result['engine_root']}")
             typer.echo(f"repo: {result['repo']}")
+            if ".claude/skills/mb-*" in result["gitignore_add"]:
+                typer.echo("The mb- skill prefix is reserved for Main Branch.")
             if result["linked"]:
                 typer.echo(f"  + linked {len(result['linked'])} skill(s)")
             if result["copied"]:

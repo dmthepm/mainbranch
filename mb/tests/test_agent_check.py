@@ -839,3 +839,29 @@ def test_a_transcript_in_another_projects_folder_is_not_evidence(lv: Live) -> No
 def test_the_folder_slug_replaces_slashes_and_dots_with_dashes(lv: Live) -> None:
     assert "." not in lv.slug and "/" not in lv.slug and lv.slug.startswith("-")
     assert ac.project_slug("/home/u/.local/state/x") == "-home-u--local-state-x"
+
+
+def test_same_size_same_mtime_transcript_rewrite_is_unknown(
+    lv: Live, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = lv.transcript()
+    before = path.stat()
+    original = path.read_bytes()
+    changed = original.replace(lv.sid.encode(), b"0" * len(lv.sid))
+    assert changed != original and len(changed) == len(original)
+    real = os.read
+    done = False
+
+    def read(fd: int, n: int) -> bytes:
+        nonlocal done
+        data = real(fd, n)
+        if not done and data == original:
+            done = True
+            path.write_bytes(changed)
+            os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+        return data
+
+    monkeypatch.setattr(os, "read", read)
+    code, text = lv.run()
+    assert done
+    assert code == 4 and "transcript-changed" in text
