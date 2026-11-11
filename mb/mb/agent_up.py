@@ -678,6 +678,8 @@ def _child(rfd: int, plan: Plan, argv: list[str], env: dict[str, str]) -> None:
             os.execve(plan.runtime_real, argv, env)
     except BaseException:  # noqa: BLE001
         pass
+    with contextlib.suppress(OSError):
+        os.write(2, b"mb agent up: the runtime could not be started (exit 127)\n")
     os._exit(127)
 
 
