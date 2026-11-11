@@ -11,6 +11,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Breaking
+
+- Connection listing, planning, checks and repairs now find the business folder from
+  subfolders, stop at nested repos, and refuse outside git unless `--repo` is given.
+
 ## [0.6.25] - 2026-11-10
 
 ### Breaking
