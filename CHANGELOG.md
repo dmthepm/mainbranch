@@ -11,6 +11,14 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Breaking
+
+- Connection listing, planning, checks and repairs now find the business folder from
+  subfolders, stop at nested repos, and refuse outside git unless `--repo` is given.
+- `mb agent up` no longer passes the owner's SSH agent by default. Set `"ssh_agent": true`
+  on a row that needs it for an already authorized SSH/git workflow.
+  If any of your rows launch via mb agent up, set ssh_agent: true before upgrading.
+
 ### Fixed
 
 - Lifetime smoke checks return unknown for a pipe or other non-file marker without blocking.
