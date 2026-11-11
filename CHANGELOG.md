@@ -13,8 +13,17 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Breaking
 
+- Connection metadata now refuses token, secret, API key, passphrase and credential
+  settings with `=`, quoted keys with `:`, and unquoted keys with `:` followed by
+  whitespace or end in key contexts. Up to four adjacent empty or indexed bracket
+  groups are covered, with indexes limited to 64 non-whitespace, non-bracket characters.
+  Bounded JSON ASCII escapes and percent-encoded settings are checked too. Endpoint
+  ports, colon scopes and colon paths still pass the named-setting check.
+  See `docs/connect.md` for the grammar and limits. Use the secret store for credentials.
+
 - Connection listing, planning, checks and repairs now find the business folder from
   subfolders, stop at nested repos, and refuse outside git unless `--repo` is given.
+
 - `mb agent up` no longer passes the owner's SSH agent by default. Set `"ssh_agent": true`
   on a row that needs it for an already authorized SSH/git workflow.
   If any of your rows launch via mb agent up, set ssh_agent: true before upgrading.
@@ -27,19 +36,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   explains the reservation.
 - Agent checks compare transcript bytes on re-read as well as file details to detect changes.
 - The agent recovery test waits for its transcript before stopping the fixture runtime.
-
-### Breaking
-
-- Connection metadata now refuses token, secret, API key, passphrase and credential
-  settings with `=`, quoted keys with `:`, and unquoted keys with `:` followed by
-  whitespace or end in key contexts. Up to four adjacent empty or indexed bracket
-  groups are covered, with indexes limited to 64 non-whitespace, non-bracket characters.
-  Bounded JSON ASCII escapes and percent-encoded settings are checked too. Endpoint
-  ports, colon scopes and colon paths still pass the named-setting check.
-  See `docs/connect.md` for the grammar and limits. Use the secret store for credentials.
-
-- Connection listing, planning, checks and repairs now find the business folder from
-  subfolders, stop at nested repos, and refuse outside git unless `--repo` is given.
 
 ## [0.6.25] - 2026-11-10
 
