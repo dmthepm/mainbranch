@@ -24,6 +24,7 @@ slice, and updates this file as part of the same change. You steer by editing
 - <what the loop may never do — e.g. PR-only to protected branches, read-only
   on business data, no spend/publish/send, never print a credential>.
 - Do the smallest correct slice; validate before declaring done.
+  For branch work, follow [branch completion](https://github.com/dmthepm/mainbranch/blob/main/docs/operating-principles.md#branch-completion).
 - Never rule on owner-only calls — park them in **Flagged for me**.
 
 ## Shipped

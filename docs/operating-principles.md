@@ -134,6 +134,7 @@ written down:
   accepting the report.
 - **Worktree per file-mutating agent.** Parallel agents that mutate files
   are isolated in their own worktrees; they never share a checkout.
+  Finish each lane through [branch completion](#branch-completion).
 - **Liveness over silence.** Long-running agents are checked for liveness;
   a dead agent's task is reassigned, not assumed complete.
 - **Every brief has one owner.** The role that owns the work starts its lane.
@@ -148,6 +149,25 @@ written down:
 - **Docs first, cleanup last.** Agents read the relevant docs before
   building, and remove or update stale docs as part of completing the work
   — not as a follow-up that never comes.
+
+### Branch completion
+
+Work done in a worktree is not done until that worktree is gone. Closing a
+session or returning a lane for review can leave work pending; name that state.
+
+1. Verify the branch merged and checks pass on the resulting main revision.
+2. Verify the worktree has no uncommitted or untracked work and the branch has
+   no unpushed commits. If either check fails or cannot be verified, leave the
+   worktree and branch intact and report what remains. Preserve ignored local
+   files that still matter before cleanup.
+3. From another checkout, run `git worktree remove <path>` without force, then
+   `git branch -d <branch>`. If either refuses, report the blocker; do not force
+   removal or deletion.
+4. Verify the worktree and local branch are gone, then call the work done in
+   the same closeout. A lane's close note states which worktree was removed.
+
+A review-only or no-push assignment returns to its owner for the remaining
+steps. This rule grants no authority to push, merge, or discard work.
 
 ## How a new agent onboards
 

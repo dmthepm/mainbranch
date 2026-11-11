@@ -382,6 +382,9 @@ Lead with owner-facing save state before technical detail:
 Use these states when the user asks "is that it?" Put branch, pull request,
 merge, and working-tree detail second unless the user asks for plumbing.
 
+Before calling branch work done, follow [branch completion](https://github.com/dmthepm/mainbranch/blob/main/docs/operating-principles.md#branch-completion).
+Name pending cleanup when closing a session before branch completion.
+
 **If there are unsaved changes:**
 
 > "You have unsaved work:

@@ -132,6 +132,8 @@ Claude Code TUI evidence exists or why it was unavailable.
 
 ## 4. Parallel work lanes
 
+Before closing a lane, follow [branch completion](operating-principles.md#branch-completion).
+
 Lanes that can usually run concurrently without merge chaos:
 
 - **Docs-only** (this file's lane): no CLI module, no `mb/_data/`, no

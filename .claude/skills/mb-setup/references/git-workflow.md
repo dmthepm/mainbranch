@@ -68,6 +68,8 @@ plain language before trying to save.
 
 ## Sync And Review
 
+When finishing branch work, follow [branch completion](https://github.com/dmthepm/mainbranch/blob/main/docs/operating-principles.md#branch-completion).
+
 If the operator asks to sync saved work, first read the current facts:
 
 ```bash

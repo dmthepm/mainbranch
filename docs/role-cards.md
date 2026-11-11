@@ -3,6 +3,8 @@
 A role card tells one agent what it is for. A restarted agent reads its card
 instead of a generic prompt, so it does not take another agent's role.
 
+When closing a lane, follow [branch completion](operating-principles.md#branch-completion).
+
 Works in Claude Code and Codex. Codex needs one setup step and one review. See
 [Codex](#codex).
 
