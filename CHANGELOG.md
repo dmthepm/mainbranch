@@ -22,9 +22,13 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Breaking
 
-- Connection metadata now refuses named secret settings with `:` or `=`, including
-  quoted and `[]` forms and token, secret, API key, passphrase and credential names
-  that 0.6.25 accepted. Use the secret store for those values.
+- Connection metadata now refuses token, secret, API key, passphrase and credential
+  settings with `=`, quoted keys with `:`, and unquoted keys with `:` followed by
+  whitespace or end in key contexts. Up to four adjacent empty or indexed bracket
+  groups are covered, with indexes limited to 64 non-whitespace, non-bracket characters.
+  Bounded JSON ASCII escapes and percent-encoded settings are checked too. Endpoint
+  ports, colon scopes and colon paths still pass the named-setting check.
+  See `docs/connect.md` for the grammar and limits. Use the secret store for credentials.
 
 - Connection listing, planning, checks and repairs now find the business folder from
   subfolders, stop at nested repos, and refuse outside git unless `--repo` is given.

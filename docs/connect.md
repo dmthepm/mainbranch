@@ -528,20 +528,43 @@ A password in a URL is refused as `url_password` with or without a scheme.
 A named secret setting is refused too, under the same `url_password` rule.
 The names are `password`, `passwd`, `pass`, `pwd`, `secret`, `client_secret`,
 `token`, `access_token`, `api_key`, `apikey`, `api-key`, `pw`, `passphrase`
-and `credentials`, in any case. A name must be followed by optional `[]`,
-a closing quote, spaces, and `=` or `:`. Each of those parts is optional
-except the separator. This covers `password: x`, `"password": "x"`,
-`{"password":"x"}`, YAML settings and `password[]=x`, as well as URL
-queries, JDBC strings and other `key=value` settings.
-The whole string is read, raw and percent-decoded until stable, at most three
-passes. Tabs, CR and LF are stripped at each pass. Quotes, spaces and encoded
-separators do not hide the setting. Empty values such as `token=` and
-`secret:` are refused too.
-A name must start after something other than a letter or digit, so
-`db_password=x` is refused. Longer endings such as `password_hint=`,
+and `credentials`, in any case.
+
+- For `=`, the name must start after something other than a letter or digit,
+  so `db_password=x` is refused. An optional closing quote and whitespace may
+  appear before `=`. URL queries, JDBC strings and other settings are covered.
+- For `:`, a quoted name is refused even without whitespace after the colon,
+  as in `{"token":"x"}`. An unquoted name must start the string or a line,
+  or follow `{`, `,`, `;`, `[` or whitespace. Its colon must be followed by
+  whitespace or the end of the string. This covers YAML `token: x` and flow
+  `{token: x}`. It also refuses ambiguous prose such as `account: pass: operations`.
+  Endpoints `https://token:8443/`, scopes `scope=token:read`, labels
+  `project=example-token:prod` and paths `/api-key:docs` pass this check.
+- Immediately after the name, up to four bracket groups are covered. Each is
+  `[]` or an index of up to 64 characters, excluding brackets and whitespace.
+  Examples include `token[0]=x`, `token[primary]=x`, `token[][]=x` and
+  `"token[]": "x"`. Brackets after a closing quote (`"token"[]=x`) or
+  separated from the name (`token [] =x`) are outside this grammar and pass.
+
+The whole string is read raw and after up to three percent-decode passes.
+At each stage, a second copy decodes JSON `\"` and `\uXXXX` escapes for
+ASCII letters, digits, `_`, `-`, `:`, `=` and `"`, in one pass. This covers
+`{"to\u006ben":"x"}`, JSON serialized again as a string, and percent-encoded
+versions of those forms. This is bounded normalization, not a general JSON parser.
+Line contexts are checked before stripping tabs, CR and LF; stripped copies
+are checked too. Empty settings such as `token=` and `secret:` are refused.
+Longer endings such as `password_hint=`,
 `secret_name=`, `tokens_used=` and `token_type=bearer` pass. Bare names,
 a sentence containing the word `token`, and a URL path `/token/refresh`
 also pass this named-setting check.
+
+This check does not normalize Unicode lookalikes or zero-width characters,
+remove comments between names and separators, split camelCase names such as
+`accessToken`, or decode HTML entities. Existing placeholder exemptions run
+before this scan, so values such as `xxx token=x`, `your_token=x` and
+`<token=x>` pass. Other secret-shape rules may still refuse values outside
+the named-setting grammar. Use the secret store for credentials.
+
 Two checks run and a value is refused when either says so. The first reads each
 URL with a scheme the way Python's URL parser does, nested URLs included (a URL
 nested more than three levels deep is refused), so a comma, `;`, `&` or tab
