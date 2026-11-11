@@ -1635,13 +1635,15 @@ _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-
 # `host:5432` and emails have no `:` before the `@`, so they pass.
 _METADATA_URL_STRIP_RE = re.compile(r"[\t\r\n]")
 _METADATA_AUTHORITY_SPLIT_RE = re.compile(r"[ /?#]+")
-# A setting named password, passwd, pass or pwd followed by `=`: ``?password=x``,
-# ``;Password =x``, ``host=h password = 'x'``. The name must start at a word
-# boundary (letters and digits; `_` and `-` do not count, so ``db_password=`` is
-# a password and ``bypass=`` is not) and the value never matters, so an empty
-# one is refused too. Matched on the whole string, never on pieces.
+# Match a secret name followed by optional array brackets, a closing quote,
+# spaces and `=` or `:`. Prefixes such as `db_password` count, but longer
+# endings such as `password_hint` do not. Read the whole string and ignore
+# the assigned value, including an empty one.
 _METADATA_NAMED_PASSWORD_RE = re.compile(
-    r"(?<![A-Za-z0-9])(?:password|passwd|pass|pwd)[\"']?\s*=", re.I
+    r"(?<![A-Za-z0-9])(?:password|passwd|pass|pwd|secret|client_secret|token|"
+    r"access_token|api_key|apikey|api-key|pw|passphrase|credentials)"
+    r"(?:\[\])?[\"']?\s*[=:]",
+    re.I,
 )
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
@@ -1904,7 +1906,7 @@ def _nested_url_has_password(rest: str, depth: int) -> bool:
 
 def _has_named_password(text: str) -> bool:
     """True when ``text``, raw or percent-decoded (at most three passes), has a
-    setting named ``password``, ``passwd``, ``pass`` or ``pwd`` before an ``=``.
+    named secret setting before an ``=`` or ``:`` separator.
 
     Tab, CR and LF are removed first at each pass, as a URL parser does, so
     ``pass<tab>word=`` cannot hide the name."""

@@ -22,6 +22,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Breaking
 
+- Connection metadata now refuses named secret settings with `:` or `=`, including
+  quoted and `[]` forms and token, secret, API key, passphrase and credential names
+  that 0.6.25 accepted. Use the secret store for those values.
+
 - Connection listing, planning, checks and repairs now find the business folder from
   subfolders, stop at nested repos, and refuse outside git unless `--repo` is given.
 

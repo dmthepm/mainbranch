@@ -3956,6 +3956,102 @@ def test_metadata_passes_values_with_no_named_password(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == ""
 
 
+_NAMED_SECRET_NAMES = [
+    "password",
+    "passwd",
+    "pass",
+    "pwd",
+    "secret",
+    "client_secret",
+    "token",
+    "access_token",
+    "api_key",
+    "apikey",
+    "api-key",
+    "pw",
+    "passphrase",
+    "credentials",
+]
+_NAMED_SECRET_SHAPES = [
+    "{}: fixture_pw",
+    '"{}": "fixture_pw"',
+    '{{"{}":"fixture_pw"}}',
+    "'{}' : 'fixture_pw'",
+    "{}[]=fixture_pw",
+    '"{}[]": "fixture_pw"',
+    "{}=",
+    "{}:",
+    "host=db.example.invalid;{}=fixture_pw",
+    "https://db.example.invalid/?{}=fixture_pw",
+    "jdbc:postgresql://db.example.invalid/shop?{}=fixture_pw",
+]
+
+
+@pytest.mark.parametrize("name", _NAMED_SECRET_NAMES)
+@pytest.mark.parametrize("shape", _NAMED_SECRET_SHAPES)
+def test_metadata_refuses_named_secret_settings(name: str, shape: str) -> None:
+    value = shape.format(name.upper())
+    for encoded in (value, urllib.parse.quote(value, safe="")):
+        assert connect_mod.metadata_value_rule(encoded) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "rowan@example.invalid",
+        "git@github.com:org/repo.git",
+        "host:5432",
+        "https://[2001:db8::1]:8443/shop",
+        "bypass=",
+        "compass=",
+        "passenger=",
+        "passwordless=",
+        "password_hint=",
+        "token_type=bearer",
+        "secret_name=",
+        "tokenizer=",
+        "keyword:",
+        "https://example.invalid/token/refresh",
+        "a sentence with the word token",
+        "secretary=",
+        "tokens_used=",
+        *_NAMED_SECRET_NAMES,
+    ],
+)
+def test_metadata_passes_names_without_a_secret_setting(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "se%09cret%253Afixture_pw",
+        "cli%0Aent_secret%3Afixture_pw",
+        "to\tken:fixture_pw",
+        "api-\rkey[]=fixture_pw",
+    ],
+)
+def test_metadata_refuses_named_secrets_with_encoded_controls(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("token" * 80000, ""),
+        ("secret " * 57142 + "xxsecr", ""),
+        ("token" + " " * 399994 + "?", ""),
+        ("a" * (400000 - len('{"token":"fixture_pw"}')) + '{"token":"fixture_pw"}', "url_password"),
+    ],
+    ids=["long-word", "repeated-name", "missing-separator", "late-json-setting"],
+)
+def test_metadata_named_secret_scan_handles_400k(value: str, expected: str) -> None:
+    assert len(value) == 400_000
+    start = time.perf_counter()
+    assert connect_mod.metadata_value_rule(value) == expected
+    assert time.perf_counter() - start < 2
+
+
 # Review qa0624-67e27da: shapes the first named-password check let through.
 _NAMED_PASSWORD_SHAPES = [
     "host=db.example.invalid user=fixture password = fixture_pw",
@@ -3992,7 +4088,11 @@ def test_metadata_refuses_every_named_password_shape(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == "url_password"
 
 
-@pytest.mark.parametrize("value", _NAMED_PASSWORD_SHAPES)
+@pytest.mark.parametrize(
+    "value",
+    _NAMED_PASSWORD_SHAPES
+    + [shape.format(name) for name in _NAMED_SECRET_NAMES for shape in _NAMED_SECRET_SHAPES],
+)
 def test_connect_refuses_a_named_password_before_writing_config(
     value: str, tmp_path: Path, monkeypatch
 ) -> None:
