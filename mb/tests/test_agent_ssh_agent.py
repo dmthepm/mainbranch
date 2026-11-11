@@ -56,7 +56,8 @@ def test_ssh_agent_launch_decision(
     assert ssh_socket not in out + err
     code, out, err = u.up(environ=env)
     assert code == 0, err
-    assert u.runs()[0]["env"].get("SSH_AUTH_SOCK") == (ssh_socket if setting else None)
+    seen = u.runs()[0]["env"].get("SSH_AUTH_SOCK")
+    assert seen == (ssh_socket if setting else None)
     assert ("SSH_AUTH_SOCK" in u.last()["env_passed"]) is bool(setting)
     recorded = "".join(p.read_text() for p in u.store.rglob("*.json"))
     assert ssh_socket not in recorded + out + err
