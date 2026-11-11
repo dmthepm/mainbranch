@@ -13,7 +13,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/dmthepm/mainbranch.git",
-        "sha": "d96a9d23dc8c4fa0060dacf6b14f7f5a298083c0"
+        "sha": "67381288ed82ee07c78d6f5e9ced9e34a2e8da10"
       },
       "description": "Main Branch Claude Code skills for running a business from markdown files in git."
     }
