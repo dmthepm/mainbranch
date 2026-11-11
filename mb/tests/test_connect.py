@@ -4112,6 +4112,11 @@ def test_metadata_named_secrets_with_encoded_controls(value: str, expected: str)
     assert connect_mod.metadata_value_rule(value) == expected
 
 
+# Generous on purpose: a backtracking scan of 400,000 characters takes minutes, a
+# linear one well under a second, and loaded CI runners have taken 2.5 seconds.
+_LINEAR_SCAN_LIMIT = 10
+
+
 @pytest.mark.parametrize(
     "value, expected",
     [
@@ -4137,7 +4142,7 @@ def test_metadata_named_secret_scan_handles_400k(value: str, expected: str) -> N
     assert len(value) == 400_000
     start = time.perf_counter()
     assert connect_mod.metadata_value_rule(value) == expected
-    assert time.perf_counter() - start < 2
+    assert time.perf_counter() - start < _LINEAR_SCAN_LIMIT
 
 
 # Review qa0624-67e27da: shapes the first named-password check let through.
@@ -4208,12 +4213,12 @@ def test_metadata_named_password_check_is_linear_time() -> None:
     value = "password" * 20000 + "=" * 20000
     start = time.perf_counter()
     connect_mod.metadata_value_rule(value)
-    assert time.perf_counter() - start < 2
+    assert time.perf_counter() - start < _LINEAR_SCAN_LIMIT
 
     for hostile in ("pass" + " " * 200000, "pass " * 40000, "%25" * 60000 + "password"):
         start = time.perf_counter()
         connect_mod.metadata_value_rule(hostile)
-        assert time.perf_counter() - start < 2
+        assert time.perf_counter() - start < _LINEAR_SCAN_LIMIT
 
 
 def test_metadata_refuses_a_tab_inside_the_userinfo_split() -> None:
