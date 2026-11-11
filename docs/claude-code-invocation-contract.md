@@ -24,6 +24,10 @@ Main Branch skills are Claude Code skills under `.claude/skills/<name>/SKILL.md`
 bridge links such as `.claude/skills/mb-start` in the business repo. Those
 bridge links keep the supported, friendly slash-command surface.
 
+The `mb-` skill prefix is reserved for Main Branch. Linking adds the ignore rule
+`.claude/skills/mb-*`; name your own skills without `mb-` so git includes them.
+`mb doctor` warns when that rule hides an owner skill.
+
 Main Branch also wires the Claude Code plugin in tracked `.claude/settings.json`
 so skill distribution survives fresh git worktrees and works across the Claude
 Desktop app and the terminal. Claude Code plugin-native skills are namespaced,

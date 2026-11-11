@@ -3127,3 +3127,23 @@ def test_repair_plan_lists_the_old_status_line_as_a_manual_action(
         assert "claude-status-line" not in {s["id"] for s in scoped["sections"]}
     doctor_mod.repair_apply(repo)
     assert claude_md.read_bytes() == before
+
+
+def test_doctor_warns_only_for_ignored_owner_mb_skill(tmp_path: Path) -> None:
+    repo = tmp_path / "biz"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / ".gitignore").write_text(".claude/skills/mb-*\n")
+    for name in ("mb-owner-notes", "mb-start", "owner-notes"):
+        (repo / ".claude" / "skills" / name).mkdir(parents=True)
+    report = run(path=str(repo))
+    warnings = [c for c in report["checks"] if c["name"] == "reserved-skill-prefix"]
+    assert len(warnings) == 1
+    assert warnings[0]["severity"] == "warn" and not warnings[0]["ok"]
+    assert "mb-owner-notes" in warnings[0]["detail"]
+    assert "mb-start" not in warnings[0]["detail"]
+    assert "rename" in warnings[0]["detail"].lower()
+    assert "without the mb- prefix" in warnings[0]["detail"]
+    (repo / ".gitignore").write_text("")
+    report = run(path=str(repo))
+    assert not any(c["name"] == "reserved-skill-prefix" for c in report["checks"])

@@ -1191,6 +1191,7 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
         "copied": copied,
         "skipped": skipped,
         "warnings": planned["warnings"],
+        "gitignore_add": planned["gitignore_add"] if ".gitignore" in created else [],
         "removed_legacy": removed_legacy,
         "removed_stale_engine_paths": planned["removed_stale_engine_paths"],
         "errors": [],

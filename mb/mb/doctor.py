@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import socket
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1006,6 +1007,39 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
             else ("warn" if not (repo / "CLAUDE.md").exists() else "error"),
         }
     )
+    skills_dir = repo / ".claude" / "skills"
+    bundled = set(engine_mod.bundled_skills())
+    owner_skills = sorted(
+        p.name for p in skills_dir.glob("mb-*") if p.is_dir() and p.name not in bundled
+    )
+    if owner_skills:
+        try:
+            ignored = subprocess.run(
+                ["git", "check-ignore", "--stdin"],
+                cwd=repo,
+                input="".join(f".claude/skills/{name}/\n" for name in owner_skills),
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            ignored = subprocess.CompletedProcess([], 1, stdout="")
+        if ignored.returncode == 0 and ignored.stdout.strip():
+            checks.append(
+                {
+                    "name": "reserved-skill-prefix",
+                    "ok": False,
+                    "severity": "warn",
+                    "detail": (
+                        "Ignored owner skills: "
+                        + ", ".join(Path(line).name for line in ignored.stdout.splitlines())
+                        + ". The mb- skill prefix is reserved for Main Branch; "
+                        "rename these folders without the mb- prefix "
+                        "to include them in saved history."
+                    ),
+                }
+            )
     if wiring_ok:
         missing_links = engine_mod.missing_bundled_links(repo)
         checks.append(

@@ -771,3 +771,17 @@ def test_worktree_summary_mentions_plugin_rail_when_wired(tmp_path: Path) -> Non
     assert status["ok"] is False  # symlink rail still missing in the worktree
     assert status["plugin"]["wired"] is True  # tracked wiring carried over
     assert "survives fresh worktrees" in status["summary"]
+
+
+def test_skill_link_explains_reserved_prefix_only_when_adding_ignore(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from mb.cli import app
+
+    args = ["skill", "link", "--repo", str(tmp_path)]
+    first = CliRunner().invoke(app, args)
+    assert first.exit_code == 0, first.output
+    assert "The mb- skill prefix is reserved for Main Branch." in first.output
+    second = CliRunner().invoke(app, args)
+    assert second.exit_code == 0, second.output
+    assert "prefix is reserved" not in second.output
