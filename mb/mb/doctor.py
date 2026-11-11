@@ -1013,19 +1013,26 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
         p.name for p in skills_dir.glob("mb-*") if p.is_dir() and p.name not in bundled
     )
     if owner_skills:
+        # NUL-separated bytes both ways: folder names may hold newlines,
+        # quotes or bytes that are not UTF-8, and git quotes those otherwise.
+        prefix = os.fsencode(".claude/skills/")
         try:
             ignored = subprocess.run(
-                ["git", "check-ignore", "--stdin"],
+                ["git", "check-ignore", "-z", "--stdin"],
                 cwd=repo,
-                input="".join(f".claude/skills/{name}/\n" for name in owner_skills),
+                input=b"".join(prefix + os.fsencode(name) + b"/\0" for name in owner_skills),
                 capture_output=True,
-                text=True,
                 check=False,
                 timeout=5,
             )
         except (OSError, subprocess.TimeoutExpired):
-            ignored = subprocess.CompletedProcess([], 1, stdout="")
-        if ignored.returncode == 0 and ignored.stdout.strip():
+            ignored = subprocess.CompletedProcess([], 1, stdout=b"")
+        hidden = [
+            os.fsdecode(entry[len(prefix) :].rstrip(b"/"))
+            for entry in ignored.stdout.split(b"\0")
+            if entry.startswith(prefix)
+        ]
+        if ignored.returncode == 0 and hidden:
             checks.append(
                 {
                     "name": "reserved-skill-prefix",
@@ -1033,7 +1040,7 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
                     "severity": "warn",
                     "detail": (
                         "Ignored owner skills: "
-                        + ", ".join(Path(line).name for line in ignored.stdout.splitlines())
+                        + ", ".join(name if name.isprintable() else ascii(name) for name in hidden)
                         + ". The mb- skill prefix is reserved for Main Branch; "
                         "rename these folders without the mb- prefix "
                         "to include them in saved history."

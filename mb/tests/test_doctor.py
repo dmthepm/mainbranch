@@ -3147,3 +3147,21 @@ def test_doctor_warns_only_for_ignored_owner_mb_skill(tmp_path: Path) -> None:
     (repo / ".gitignore").write_text("")
     report = run(path=str(repo))
     assert not any(c["name"] == "reserved-skill-prefix" for c in report["checks"])
+
+
+def test_doctor_reserved_prefix_warning_survives_odd_folder_names(tmp_path: Path) -> None:
+    repo = tmp_path / "biz"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / ".gitignore").write_text(".claude/skills/mb-*\n")
+    odd = ['mb-a\n"oops', 'mb-quote"d', "mb-back\\slash"]
+    for name in ["mb-ordinary", *odd]:
+        (repo / ".claude" / "skills" / name).mkdir(parents=True)
+    report = run(path=str(repo))
+    warnings = [c for c in report["checks"] if c["name"] == "reserved-skill-prefix"]
+    assert len(warnings) == 1
+    detail = warnings[0]["detail"]
+    assert "mb-ordinary" in detail
+    assert "\n" not in detail
+    for name in odd:
+        assert (name if name.isprintable() else ascii(name)) in detail
