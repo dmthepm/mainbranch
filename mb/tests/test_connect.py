@@ -3956,6 +3956,195 @@ def test_metadata_passes_values_with_no_named_password(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == ""
 
 
+_NAMED_SECRET_NAMES = [
+    "password",
+    "passwd",
+    "pass",
+    "pwd",
+    "secret",
+    "client_secret",
+    "token",
+    "access_token",
+    "api_key",
+    "apikey",
+    "api-key",
+    "pw",
+    "passphrase",
+    "credentials",
+]
+_NAMED_SECRET_SHAPES = [
+    "{}: fixture_pw",
+    '"{}": "fixture_pw"',
+    '{{"{}":"fixture_pw"}}',
+    "'{}' : 'fixture_pw'",
+    "{}[]=fixture_pw",
+    '"{}[]": "fixture_pw"',
+    "{}=",
+    "{}:",
+    "host=db.example.invalid;{}=fixture_pw",
+    "https://db.example.invalid/?{}=fixture_pw",
+    "jdbc:postgresql://db.example.invalid/shop?{}=fixture_pw",
+]
+
+
+@pytest.mark.parametrize("name", _NAMED_SECRET_NAMES)
+@pytest.mark.parametrize("shape", _NAMED_SECRET_SHAPES)
+def test_metadata_refuses_named_secret_settings(name: str, shape: str) -> None:
+    value = shape.format(name.upper())
+    for encoded in (value, urllib.parse.quote(value, safe="")):
+        assert connect_mod.metadata_value_rule(encoded) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "rowan@example.invalid",
+        "git@github.com:org/repo.git",
+        "host:5432",
+        "https://[2001:db8::1]:8443/shop",
+        "bypass=",
+        "compass=",
+        "passenger=",
+        "passwordless=",
+        "password_hint=",
+        "token_type=bearer",
+        "secret_name=",
+        "tokenizer=",
+        "keyword:",
+        "https://example.invalid/token/refresh",
+        "a sentence with the word token",
+        "secretary=",
+        "tokens_used=",
+        *_NAMED_SECRET_NAMES,
+    ],
+)
+def test_metadata_passes_names_without_a_secret_setting(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        r'{"to\u006ben":"fixture_pw"}',
+        r"{\"token\":\"fixture_pw\"}",
+        json.dumps('{"token":"fixture_pw"}'),
+        r'{\u0022to\u006ben\u0022\u003a"fixture_pw"}',
+        r"api\u005fkey\u003dfixture_pw",
+        "token[0]=fixture_pw",
+        "token[primary]=fixture_pw",
+        "token[][]=fixture_pw",
+        "token[a][b][][0]=fixture_pw",
+        "token[" + "a" * 64 + "]=fixture_pw",
+    ],
+)
+def test_metadata_review_bypasses_refused(value: str) -> None:
+    for encoded in (value, "https://example.invalid/?data=" + urllib.parse.quote(value, safe="")):
+        assert connect_mod.metadata_value_rule(encoded) == "url_password"
+        with pytest.raises(ValueError, match="url_password"):
+            connect_mod._parse_metadata(["details=" + encoded])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://token:8443/",
+        "https://my-token:8443/",
+        "scope=token:read",
+        "scope=secret:read",
+        "project=example-token:prod",
+        "https://example.invalid/token:refresh",
+        "https://example.invalid/api-key:docs",
+        "/token:refresh",
+        "/api-key:docs",
+    ],
+)
+def test_metadata_review_colon_values_pass(value: str) -> None:
+    for encoded in (value, urllib.parse.quote(value, safe="")):
+        assert connect_mod.metadata_value_rule(encoded) == ""
+        assert connect_mod._parse_metadata(["details=" + encoded]) == {"details": encoded}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        '"token"[]=fixture_pw',
+        "token [] =fixture_pw",
+        "token[][][][][]=fixture_pw",
+        "token[" + "a" * 65 + "]=fixture_pw",
+        "token[a b]=fixture_pw",
+        "token[[0]]=fixture_pw",
+    ],
+)
+def test_metadata_review_array_limits(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "{token: fixture_pw}",
+        "[token: fixture_pw]",
+        "label,token: fixture_pw",
+        "label;token: fixture_pw",
+        "label\ntoken: fixture_pw",
+        '"token":"fixture_pw"',
+        "'token':fixture_pw",
+        "account: pass: operations",
+    ],
+)
+def test_metadata_review_colon_key_contexts_refused(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("se%09cret%253Afixture_pw", ""),
+        ("cli%0Aent_secret%3Afixture_pw", ""),
+        ("to\tken:fixture_pw", ""),
+        ("api-\rkey[]=fixture_pw", "url_password"),
+        ("se%09cret%253A%20fixture_pw", "url_password"),
+        ("cli%0Aent_secret%3A%20fixture_pw", "url_password"),
+        ("to\tken: fixture_pw", "url_password"),
+    ],
+)
+def test_metadata_named_secrets_with_encoded_controls(value: str, expected: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == expected
+
+
+# Generous on purpose: a backtracking scan of 400,000 characters takes minutes, a
+# linear one well under a second, and loaded CI runners have taken 2.5 seconds.
+_LINEAR_SCAN_LIMIT = 10
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("token" * 80000, ""),
+        ("secret " * 57142 + "xxsecr", ""),
+        ("token" + " " * 399994 + "?", ""),
+        ("a" * (400000 - len('{"token":"fixture_pw"}')) + '{"token":"fixture_pw"}', "url_password"),
+        ("token" + "[]" * 199997 + "?", ""),
+        (r"\u0061" * 66666 + "tail", ""),
+        ("token:" * 66666 + "tail", ""),
+    ],
+    ids=[
+        "long-word",
+        "repeated-name",
+        "missing-separator",
+        "late-json-setting",
+        "repeated-brackets",
+        "repeated-json-escapes",
+        "colon-runs",
+    ],
+)
+def test_metadata_named_secret_scan_handles_400k(value: str, expected: str) -> None:
+    assert len(value) == 400_000
+    start = time.perf_counter()
+    assert connect_mod.metadata_value_rule(value) == expected
+    assert time.perf_counter() - start < _LINEAR_SCAN_LIMIT
+
+
 # Review qa0624-67e27da: shapes the first named-password check let through.
 _NAMED_PASSWORD_SHAPES = [
     "host=db.example.invalid user=fixture password = fixture_pw",
@@ -3992,7 +4181,11 @@ def test_metadata_refuses_every_named_password_shape(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == "url_password"
 
 
-@pytest.mark.parametrize("value", _NAMED_PASSWORD_SHAPES)
+@pytest.mark.parametrize(
+    "value",
+    _NAMED_PASSWORD_SHAPES
+    + [shape.format(name) for name in _NAMED_SECRET_NAMES for shape in _NAMED_SECRET_SHAPES],
+)
 def test_connect_refuses_a_named_password_before_writing_config(
     value: str, tmp_path: Path, monkeypatch
 ) -> None:
@@ -4020,12 +4213,12 @@ def test_metadata_named_password_check_is_linear_time() -> None:
     value = "password" * 20000 + "=" * 20000
     start = time.perf_counter()
     connect_mod.metadata_value_rule(value)
-    assert time.perf_counter() - start < 2
+    assert time.perf_counter() - start < _LINEAR_SCAN_LIMIT
 
     for hostile in ("pass" + " " * 200000, "pass " * 40000, "%25" * 60000 + "password"):
         start = time.perf_counter()
         connect_mod.metadata_value_rule(hostile)
-        assert time.perf_counter() - start < 2
+        assert time.perf_counter() - start < _LINEAR_SCAN_LIMIT
 
 
 def test_metadata_refuses_a_tab_inside_the_userinfo_split() -> None:

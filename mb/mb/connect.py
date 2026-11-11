@@ -1635,14 +1635,18 @@ _METADATA_URL_START_RE = re.compile(r"(?<![A-Za-z0-9+.\-])[A-Za-z][A-Za-z0-9+.\-
 # `host:5432` and emails have no `:` before the `@`, so they pass.
 _METADATA_URL_STRIP_RE = re.compile(r"[\t\r\n]")
 _METADATA_AUTHORITY_SPLIT_RE = re.compile(r"[ /?#]+")
-# A setting named password, passwd, pass or pwd followed by `=`: ``?password=x``,
-# ``;Password =x``, ``host=h password = 'x'``. The name must start at a word
-# boundary (letters and digits; `_` and `-` do not count, so ``db_password=`` is
-# a password and ``bypass=`` is not) and the value never matters, so an empty
-# one is refused too. Matched on the whole string, never on pieces.
+# Equals keeps the suffix-name rule (db_password=). Colon requires a quoted
+# name or an unquoted key context with whitespace/end after the colon.
+# Both bracket repetitions are bounded; no nesting or unbounded index scan.
 _METADATA_NAMED_PASSWORD_RE = re.compile(
-    r"(?<![A-Za-z0-9])(?:password|passwd|pass|pwd)[\"']?\s*=", re.I
+    r"(?:(?P<quote>[\"'])|(?P<key>^|(?<=[{,;\[\s]))|(?<![A-Za-z0-9]))"
+    r"(?:password|passwd|pass|pwd|secret|client_secret|token|"
+    r"access_token|api_key|apikey|api-key|pw|passphrase|credentials)"
+    r"(?:\[[^\][\s]{0,64}\]){0,4}(?(quote)(?P=quote)|[\"']?)\s*"
+    r"(?:=|:(?(quote)|(?(key)(?=\s|$)|(?!))))",
+    re.I | re.M,
 )
+_METADATA_JSON_ESCAPE_RE = re.compile(r'\\(?:u([0-9a-fA-F]{4})|("))')
 _METADATA_URL_PIECE_RE = re.compile(r"[/&?;#@]")
 _METADATA_IPV4_RE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}")
 _METADATA_URL_DECODE_PASSES = 3
@@ -1902,16 +1906,28 @@ def _nested_url_has_password(rest: str, depth: int) -> bool:
     return _METADATA_URL_START_RE.search(rest) is not None
 
 
+def _metadata_json_escape(match: re.Match[str]) -> str:
+    decoded = chr(int(match[1], 16)) if match[1] else '"'
+    if decoded.isascii() and (decoded.isalnum() or decoded in '_-:="'):
+        return decoded
+    return match[0]
+
+
 def _has_named_password(text: str) -> bool:
     """True when ``text``, raw or percent-decoded (at most three passes), has a
-    setting named ``password``, ``passwd``, ``pass`` or ``pwd`` before an ``=``.
+    named secret setting before an ``=`` or ``:`` separator.
 
-    Tab, CR and LF are removed first at each pass, as a URL parser does, so
-    ``pass<tab>word=`` cannot hide the name."""
+    Scan line contexts before removing URL controls. At each pass also scan
+    one copy with JSON quote escapes and supported ASCII Unicode escapes
+    decoded, so percent-encoded JSON cannot hide the name."""
     for _ in range(_METADATA_URL_DECODE_PASSES + 1):
-        text = _METADATA_URL_STRIP_RE.sub("", text)
-        if _METADATA_NAMED_PASSWORD_RE.search(text):
-            return True
+        json_text = _METADATA_JSON_ESCAPE_RE.sub(_metadata_json_escape, text)
+        for candidate in (text, json_text) if json_text != text else (text,):
+            if _METADATA_NAMED_PASSWORD_RE.search(candidate):
+                return True
+            stripped = _METADATA_URL_STRIP_RE.sub("", candidate)
+            if stripped != candidate and _METADATA_NAMED_PASSWORD_RE.search(stripped):
+                return True
         decoded = urllib.parse.unquote(text)
         if decoded == text:
             return False
