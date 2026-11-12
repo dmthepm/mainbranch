@@ -195,6 +195,10 @@ Use these states even when the underlying facts mention commits, branches,
 pull requests, merges, working trees, or remotes. Technical details come after
 the business state unless the operator asks for plumbing.
 
+Before calling branch work done, follow
+[branch completion](../../docs/operating-principles.md#branch-completion).
+Name pending cleanup when closing a session before branch completion.
+
 ## Read Boundaries
 
 Read deterministic `mb` facts before raw markdown or git details. After the

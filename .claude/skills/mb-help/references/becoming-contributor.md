@@ -62,7 +62,8 @@ Once validated, build your contribution:
 
 ### 5. Submit for Review
 
-Share your work for feedback. Iterate based on input. Merge when ready.
+Share your work for feedback. Iterate based on input. After an authorized
+merge, follow [branch completion](https://github.com/dmthepm/mainbranch/blob/main/docs/operating-principles.md#branch-completion).
 
 ---
 

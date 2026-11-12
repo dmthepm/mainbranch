@@ -54,6 +54,8 @@ to do" only after showing the likely business routes.
 
 ## Save and Sync Vocabulary
 
+Before calling branch work done, follow [branch completion](https://github.com/dmthepm/mainbranch/blob/main/docs/operating-principles.md#branch-completion).
+
 Use business words first. Keep technical terms available only when they are the
 exact command, validation evidence, or the operator asks for git details.
 

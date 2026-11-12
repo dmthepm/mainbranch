@@ -28,6 +28,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   on a row that needs it for an already authorized SSH/git workflow.
   If any of your rows launch via mb agent up, set ssh_agent: true before upgrading.
 
+### Changed
+
+- Branch closeout guidance now requires safe removal of a lane's linked worktree and local branch before calling work done, and explains how to confirm a squash merge. An owner's primary checkout is not covered.
+- New business repos tell agents to use the tools already connected to the business on their own initiative, and to ask the owner to connect missing access instead of waiting.
+
 ### Fixed
 
 - Lifetime smoke checks return unknown for a pipe or other non-file marker without blocking.

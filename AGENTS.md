@@ -317,6 +317,9 @@ This repo commonly uses:
 
 Do not rewrite pushed history unless the maintainer explicitly asks.
 
+Before calling a branch or lane done, follow
+[branch completion](docs/operating-principles.md#branch-completion).
+
 ## Validation Ladder
 
 Use the lightest eval that proves the behavior. Do not ship first-run,
