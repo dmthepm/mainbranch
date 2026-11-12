@@ -146,23 +146,37 @@ written down:
   carries a `Waiting on:` line and is not flagged until the gate clears.
 - **Read-only auditors stay read-only.** Verification agents and change
   agents are separate; an auditor never fixes what it finds, it reports.
+- **Use the tools you have.** Agents use every tool already connected to the
+  business on their own initiative: look around, read the numbers, take a
+  swing, without asking first. Missing access is a request to whoever runs the
+  platform or holds the account, not a reason to wait. Spending, publishing,
+  email and changes to customer accounts still need the owner's approval.
 - **Docs first, cleanup last.** Agents read the relevant docs before
   building, and remove or update stale docs as part of completing the work
   — not as a follow-up that never comes.
 
 ### Branch completion
 
-Work done in a worktree is not done until that worktree is gone. Closing a
-session or returning a lane for review can leave work pending; name that state.
+Work done in a disposable linked worktree (one added with `git worktree add`
+for a branch or lane) is not done until that worktree is gone. The owner's
+primary checkout is not covered: saving directly on main, with or without a
+remote or checks, needs no merge, removal or branch deletion. Closing a session
+or returning a lane for review can leave work pending; name that state.
 
 1. Verify the branch merged and checks pass on the resulting main revision.
+   Use the merged pull request as the evidence, not ancestry alone: a squash
+   or rebase merge leaves the branch commits out of main's history. The merged
+   pull request's head commit must equal the local branch tip. If no merged
+   pull request matches, leave everything intact and report it.
 2. Verify the worktree has no uncommitted or untracked work and the branch has
    no unpushed commits. If either check fails or cannot be verified, leave the
    worktree and branch intact and report what remains. Preserve ignored local
    files that still matter before cleanup.
 3. From another checkout, run `git worktree remove <path>` without force, then
-   `git branch -d <branch>`. If either refuses, report the blocker; do not force
-   removal or deletion.
+   `git branch -d <branch>`. After a squash or rebase merge, `-d` refuses
+   because git cannot see the merge; `git branch -D <branch>` is then allowed
+   only when step 1's merged head equals the branch tip. Never force the
+   worktree removal. Any other refusal: report the blocker and stop.
 4. Verify the worktree and local branch are gone, then call the work done in
    the same closeout. A lane's close note states which worktree was removed.
 

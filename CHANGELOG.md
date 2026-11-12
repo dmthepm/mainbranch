@@ -11,19 +11,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
-### Changed
-
-- Branch closeout guidance now requires safe worktree removal and local branch cleanup before calling work done.
-
-### Fixed
-
-- Lifetime smoke checks return unknown for a pipe or other non-file marker without blocking.
-- Agent launch failures now explain when the runtime could not start with exit 127.
-- Doctor warns about ignored owner skills using the reserved `mb-` prefix, and skill linking
-  explains the reservation.
-- Agent checks compare transcript bytes on re-read as well as file details to detect changes.
-- The agent recovery test waits for its transcript before stopping the fixture runtime.
-
 ### Breaking
 
 - Connection metadata now refuses token, secret, API key, passphrase and credential
@@ -40,6 +27,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - `mb agent up` no longer passes the owner's SSH agent by default. Set `"ssh_agent": true`
   on a row that needs it for an already authorized SSH/git workflow.
   If any of your rows launch via mb agent up, set ssh_agent: true before upgrading.
+
+### Changed
+
+- Branch closeout guidance now requires safe removal of a lane's linked worktree and local branch before calling work done, and explains how to confirm a squash merge. An owner's primary checkout is not covered.
+- New business repos tell agents to use the tools already connected to the business on their own initiative, and to ask the owner to connect missing access instead of waiting.
 
 ### Fixed
 
