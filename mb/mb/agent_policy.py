@@ -57,6 +57,7 @@ ROW_KEYS = {
     "effort",
     "options",
     "start_file",
+    "ssh_agent",
     "declared_work",
 }
 ROW_REQUIRED = ("name", "runtime", "cwd", "role", "profile", "model")
@@ -348,6 +349,8 @@ def _row_schema(c: _Collect, i: int, row: Any, profiles: dict[str, Any]) -> bool
             c.add("profile", _loc(i, "profile"), f"profile has no {runtime} directory")
     if "effort" in row and runtime in RUNTIMES and row["effort"] not in EFFORT[runtime]:
         c.schema(_loc(i, "effort"), f"must be one of {', '.join(EFFORT[runtime])}")
+    if "ssh_agent" in row and not isinstance(row["ssh_agent"], bool):
+        c.schema(_loc(i, "ssh_agent"), "must be a boolean")
     if "options" in row:
         _options(c, i, row["options"], runtime)
     if "start_file" in row and not _relative_ok(row["start_file"]):

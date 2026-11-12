@@ -332,7 +332,10 @@ def _profile(last: dict[str, Any]) -> Field:
 
 
 def _environment(env: dict[str, str], last: dict[str, Any]) -> tuple[Field, Field]:
-    """The names equal env_set plus env_passed; each mb-set value equals the attempt's."""
+    """Compare names with the launch decision, including whether SSH_AUTH_SOCK was passed.
+
+    Passed values are never stored or compared; mb-set values must equal the attempt's.
+    """
     env_set: dict[str, str] = last["env_set"]
     bad = []
     if set(env) != set(env_set) | set(last["env_passed"]):

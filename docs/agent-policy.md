@@ -34,8 +34,37 @@ Each row:
 | `model` | yes | Model id, letters, digits, `.`, `_`, `-`. |
 | `effort` | no | Claude: `low` to `max`. Codex: `minimal` to `xhigh`. |
 | `options` | no | Claude: `--permission-mode` with `default`, `acceptEdits`, `plan` or `bypassPermissions`. Codex: `--sandbox` with `read-only`, `workspace-write` or `danger-full-access`. A list of strings, one option per entry: `["--sandbox read-only"]`. |
+| `ssh_agent` | no | Boolean, default `false`. Pass the owner's validated `SSH_AUTH_SOCK` only when `true`, for either runtime. |
 | `start_file` | no | File inside `cwd`, relative, no `..`. Must exist. |
 | `declared_work` | no | Scheduled or background work the agent is meant to do: `name`, `kind` (`cron` or `background`), optional `schedule` and `prompt_file`. A list of such objects: `[{"name": "digest", "kind": "cron", "schedule": "0 7 * * *", "prompt_file": "digest.md"}]`. |
+
+### SSH-agent access
+
+Set `"ssh_agent": true` only for an already authorized SSH/git workflow.
+Opting in exposes the whole SSH agent's capability, every loaded key and any host,
+not just git push. Leaving the variable out is hygiene, not same-uid isolation.
+Do not launch through an administrator or forward the agent remotely.
+
+For example, a row for an authorized git workflow:
+
+```json
+{
+  "name": "shipper",
+  "runtime": "claude",
+  "cwd": "/home/operator/business",
+  "role": "shipper",
+  "profile": "default",
+  "model": "claude-test-1",
+  "ssh_agent": true
+}
+```
+
+Absent or `false` means `up` withholds `SSH_AUTH_SOCK` without inspecting its
+value. With `true`, it passes the variable only if present and valid: an absolute
+socket path owned by the same user. An invalid value refuses launch with exit 2.
+Dry-run lists the name under passed or under dropped with `row ssh_agent is off`,
+without printing the value. The launch record stores only the passed name;
+`check` compares its presence against that decision, never the socket value.
 
 ## The card rule
 
@@ -126,10 +155,11 @@ In practice:
 - **Environment, built from nothing.** Set by mb: `HOME USER LOGNAME SHELL`, `PATH` (only the
   `path` folders that exist and passed), `MB_ROLE`, and `CLAUDE_CONFIG_DIR` for a named
   profile. Passed through if present and valid: `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`,
-  `SSH_AUTH_SOCK`, `HEAVY_LOCK`, `LANG LC_ALL LC_CTYPE TZ TERM COLORTERM TERM_PROGRAM
+  `HEAVY_LOCK`, `LANG LC_ALL LC_CTYPE TZ TERM COLORTERM TERM_PROGRAM
   TERM_PROGRAM_VERSION` and the seven `HERDR_*` names. An invalid one refuses `bad-env:<NAME>`
-  (exit 2) and never shows the value. Everything else is dropped, including `ANTHROPIC_*`,
-  `OPENAI_*`, `CLAUDE_*`, `CODEX_*` and `MISE_*`. Dropping env-only auth can cause a login
+  (exit 2) and never shows the value. `SSH_AUTH_SOCK` is passed only when the row's
+  `ssh_agent` is `true` and the socket is present and valid. Everything else is dropped,
+  including `ANTHROPIC_*`, `OPENAI_*`, `CLAUDE_*`, `CODEX_*` and `MISE_*`. Dropping env-only auth can cause a login
   prompt or a failure, or use the account the profile holds.
 - **Records hold no passed value.** The attempt keeps mb-set values and the *names* of the
   passed variables. Dry-run says `value not shown`. Anything you write into `agents.json`

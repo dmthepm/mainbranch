@@ -575,6 +575,8 @@ def test_interrupted_writes_leave_no_passed_value_even_in_temporary_files(
     ],
 )
 def test_a_bad_passed_value_refuses_2_by_name_only(u: Up, name: str, value: str) -> None:
+    if name == "SSH_AUTH_SOCK":
+        u.write({"version": 1, "agents": [u.row(ssh_agent=True)]})
     code, out, err = u.up(environ={name: value})
     assert code == 2 and f"bad-env:{name}" in err
     assert value not in out + err

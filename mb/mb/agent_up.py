@@ -138,10 +138,14 @@ def row_rev(row: Mapping[str, Any]) -> str:
     ).hexdigest()
 
 
-def _passed_env(host: ap.Host, environ: Mapping[str, str]) -> dict[str, str]:
+def _passed_env(
+    host: ap.Host, environ: Mapping[str, str], *, ssh_agent: bool = False
+) -> dict[str, str]:
     """The variables passed through if present, each validated. An invalid one refuses 2."""
     present = {k: environ[k] for k in (*PASSED_PLAIN, *HERDR, "XDG_RUNTIME_DIR") if k in environ}
     for key in ("DBUS_SESSION_BUS_ADDRESS", "SSH_AUTH_SOCK", "HEAVY_LOCK"):
+        if key == "SSH_AUTH_SOCK" and not ssh_agent:
+            continue
         if key in environ:
             present[key] = environ[key]
     xdg = f"/run/user/{host.uid}"
@@ -235,7 +239,7 @@ def prepare(host: ap.Host, name: str, environ: Mapping[str, str]) -> tuple[Plan,
     else:
         profile = report.profiles[row["profile"]][runtime]
     runtime_real, runtime_id = _resolve_runtime(host, report.path, runtime)
-    passed = _passed_env(host, environ)
+    passed = _passed_env(host, environ, ssh_agent=row.get("ssh_agent", False))
     pw = pwd.getpwuid(host.uid)
     env_set = {
         "HOME": home,
@@ -251,6 +255,8 @@ def prepare(host: ap.Host, name: str, environ: Mapping[str, str]) -> tuple[Plan,
     dropped: dict[str, list[str]] = {}
     for key in sorted(set(environ) - kept):
         prefix = next((p for p in DROP_PREFIXES if key.startswith(p)), "other")
+        if key == "SSH_AUTH_SOCK" and not row.get("ssh_agent", False):
+            prefix = "row ssh_agent is off"
         dropped.setdefault(prefix, []).append(key)
     return Plan(
         name=name,
@@ -892,6 +898,8 @@ def _dry_run(plan: Plan, decision: Decision, out: TextIO) -> None:
     lines += [f"env set: {k}={shlex.quote(v)}" for k, v in plan.env_set.items()]
     lines += [f"env passed: {k} (value not shown)" for k in plan.env_passed]
     for prefix, names in plan.dropped.items():
-        lines.append(f"env dropped: {prefix}{'*' if prefix != 'other' else ''}: {', '.join(names)}")
+        lines.append(
+            f"env dropped: {prefix}{'*' if prefix in DROP_PREFIXES else ''}: {', '.join(names)}"
+        )
     lines.append(DRY_RUN_NOTE)
     print("\n".join(lines), file=out)
