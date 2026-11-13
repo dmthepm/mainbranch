@@ -2446,7 +2446,9 @@ def test_update_without_terminal_leaves_tracked_files_and_reports_plan(
     for item in surface_actions:
         assert set(item) == set(engine_mod.plugin_switch_operator_action())
         assert item["note"].startswith("For a person to run at a terminal, not an agent")
-    assert result["surface_refresh"]["claude"]["applied"] is False
+    # #1361: the links run in ignored-only mode; none is ignored here, so none moves.
+    assert result["surface_refresh"]["claude"]["links_only"] is True
+    assert result["surface_refresh"]["claude"]["result"]["linked"] == []
     assert result["surface_refresh"]["claude"]["tracked_writes"] == [".gitignore"]
     assert result["surface_refresh"]["codex"]["applied"] is False
     assert result["surface_refresh"]["codex"]["tracked_writes"] == ["AGENTS.md"]
@@ -4823,3 +4825,202 @@ def test_check_codex_plan_is_doctors_codex_plan(
         "both": ["codex-agents-md", "codex-global-skill"],
     }[state]
     assert [item["id"] for item in checked["actions"]] == expected
+
+
+# --- #1361: gitignored skill links refresh without a terminal ----------------
+
+
+def _stale_start_link(repo: Path, tmp_path: Path) -> Path:
+    link = repo / ".claude" / "skills" / "mb-start"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(tmp_path / "old-engine" / "mb-start", target_is_directory=True)
+    return link
+
+
+def test_update_without_terminal_refreshes_ignored_links_and_holds_gitignore(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tmp_path: Path
+) -> None:
+    entries, _ = engine_mod._link_gitignore_entries()
+    held_line = ".claude/worktrees/"
+    (business_repo / ".gitignore").write_text(
+        "\n".join(entry for entry in entries if entry != held_line) + "\n", encoding="utf-8"
+    )
+    _commit_all(business_repo, "Links ignored, one line behind")
+    link = _stale_start_link(business_repo, tmp_path)
+    names = _git(business_repo, "ls-files").split()
+    tracked = {name: (business_repo / name).read_bytes() for name in names}
+    calls: list[list[str]] = []
+    _wheel_update_env(monkeypatch, calls)
+
+    result = update_mod.run(repo=business_repo, interactive=False)
+
+    assert result["ok"] is True, result["errors"]
+    assert (link / "SKILL.md").is_file()
+    assert {name: (business_repo / name).read_bytes() for name in tracked} == tracked
+    assert held_line not in (business_repo / ".gitignore").read_text(encoding="utf-8")
+    assert _git(business_repo, "status", "--porcelain") == ""
+    planned = result["surface_refresh"]["planned"]
+    assert planned["consent"] == "no_terminal"
+    assert ".gitignore" in planned["tracked_files"]
+    claude = result["surface_refresh"]["claude"]
+    assert claude["applied"] is True and claude["links_only"] is True
+    link_actions = [
+        item
+        for item in result["operator_actions"]
+        if item["command"].startswith("mb skill link") and "--plugin" not in item["command"]
+    ]
+    assert [item["changes"] for item in link_actions] == [[".gitignore"]]
+
+
+def _tree(root: Path) -> dict[str, str]:
+    """Every dir, file and symlink under ``root`` (outside `.git`), with content or target."""
+    found: dict[str, str] = {}
+    if not root.exists():
+        return found
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [name for name in dirs if name != ".git"]
+        for name in [*dirs, *files]:
+            path = Path(base) / name
+            rel = str(path.relative_to(root))
+            if path.is_symlink():
+                found[rel] = "link:" + os.readlink(path)
+            elif path.is_dir():
+                found[rel] = "dir"
+            else:
+                found[rel] = "file:" + path.read_bytes().hex()
+    return found
+
+
+def _broken_personal_start(home: Path, tmp_path: Path) -> Path:
+    personal = home / ".claude" / "skills" / "mb-start"
+    personal.parent.mkdir(parents=True, exist_ok=True)
+    personal.symlink_to(tmp_path / "gone" / "mb-start", target_is_directory=True)
+    return personal
+
+
+def test_update_without_terminal_holds_personal_skill_repairs(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tmp_path: Path
+) -> None:
+    # Review of aa3aeb4, finding 1: ignored-only moved a broken personal link.
+    entries, _ = engine_mod._link_gitignore_entries()
+    (business_repo / ".gitignore").write_text(
+        "\n".join(entry for entry in entries if entry != ".claude/worktrees/") + "\n",
+        encoding="utf-8",
+    )
+    _commit_all(business_repo, "Links ignored, one line behind")
+    link = _stale_start_link(business_repo, tmp_path)
+    personal = _broken_personal_start(tmp_path / "home", tmp_path)
+    skills_home = personal.parent
+    repo_before = _tree(business_repo)
+    home_before = _tree(skills_home)
+    calls: list[list[str]] = []
+    _wheel_update_env(monkeypatch, calls)
+
+    result = update_mod.run(repo=business_repo, interactive=False)
+
+    assert result["ok"] is True, result["errors"]
+    assert _tree(skills_home) == home_before
+    repo_after = _tree(business_repo)
+    assert (link / "SKILL.md").is_file()
+    rels = repo_before.keys() | repo_after.keys()
+    changed = {rel for rel in rels if repo_before.get(rel) != repo_after.get(rel)}
+    claude = result["surface_refresh"]["claude"]
+    # Only the ignored paths git allowed changed: links and the local settings.
+    assert changed == set(claude["result"]["created"])
+    assert ".claude/skills/mb-start" in changed
+    assert claude["links_only"] is True
+    assert str(personal) in claude["result"]["held"]
+    link_actions = [
+        item
+        for item in result["operator_actions"]
+        if item["command"].startswith("mb skill link") and "--plugin" not in item["command"]
+    ]
+    assert [item["changes"] for item in link_actions] == [[".gitignore", str(personal)]]
+
+
+def test_ignored_only_link_touches_nothing_when_git_ignores_nothing(
+    business_repo: Path, tmp_path: Path
+) -> None:
+    # Review of aa3aeb4, finding 2: a comment-only `.gitignore` still got `.claude/skills`.
+    (business_repo / ".gitignore").write_text("# nothing ignored yet\n", encoding="utf-8")
+    _commit_all(business_repo, "Comment only")
+    personal = _broken_personal_start(tmp_path / "home", tmp_path)
+    repo_before = _tree(business_repo)
+    home_before = _tree(personal.parent)
+
+    result = engine_mod.link_skills(business_repo, ignored_only=True)
+
+    assert result["ok"] is True
+    assert result["linked"] == [] and result["created"] == []
+    assert ".gitignore" in result["held"] and str(personal) in result["held"]
+    assert _tree(business_repo) == repo_before
+    assert not (business_repo / ".claude").exists()
+    assert _tree(personal.parent) == home_before
+
+
+def test_ignored_only_link_in_fresh_repo_leaves_git_status_unchanged(
+    business_repo: Path,
+) -> None:
+    # Review of 70bcc9f: parent folders of allowed links are created; git status must not move.
+    entries, _ = engine_mod._link_gitignore_entries()
+    (business_repo / ".gitignore").write_text("\n".join(entries) + "\n", encoding="utf-8")
+    _commit_all(business_repo, "Links ignored")
+    assert not (business_repo / ".claude").exists()
+
+    def status() -> str:
+        return subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=business_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+
+    before = status()
+    result = engine_mod.link_skills(business_repo, ignored_only=True)
+
+    assert result["ok"] is True and result["linked"]
+    assert status() == before
+
+
+def test_ignored_only_link_holds_everything_when_git_times_out(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tmp_path: Path
+) -> None:
+    entries, _ = engine_mod._link_gitignore_entries()
+    (business_repo / ".gitignore").write_text("\n".join(entries) + "\n", encoding="utf-8")
+    _commit_all(business_repo, "Links ignored")
+    engine_mod.link_skills(business_repo)
+    personal = _broken_personal_start(tmp_path / "home", tmp_path)
+    (business_repo / ".claude" / "skills" / "mb-start").unlink()
+    _stale_start_link(business_repo, tmp_path)
+    repo_before = _tree(business_repo)
+    home_before = _tree(personal.parent)
+    real_run = subprocess.run
+
+    def slow_git(args: Any, *rest: Any, **kwargs: Any) -> Any:
+        if list(args[:2]) == ["git", "check-ignore"]:
+            raise subprocess.TimeoutExpired(args, 5)
+        return real_run(args, *rest, **kwargs)
+
+    monkeypatch.setattr("mb.engine.subprocess.run", slow_git)
+
+    result = engine_mod.link_skills(business_repo, ignored_only=True)
+
+    assert result["ok"] is True
+    assert result["linked"] == [] and result["created"] == []
+    assert ".claude/skills/mb-start" in result["held"] and str(personal) in result["held"]
+    assert _tree(business_repo) == repo_before
+    assert _tree(personal.parent) == home_before
+
+
+def test_update_check_names_skill_link_when_wiring_is_stale(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, tmp_path: Path
+) -> None:
+    calls: list[list[str]] = []
+    _wheel_update_env(monkeypatch, calls)
+    _stale_start_link(business_repo, tmp_path)
+    monkeypatch.chdir(business_repo)
+
+    result = update_mod.run(repo=business_repo, check=True, interactive=False)
+
+    assert result["next_actions"][0] == "mb skill link --repo ."

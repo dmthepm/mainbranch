@@ -356,3 +356,46 @@ def test_warning_reserves_the_move_for_the_owner() -> None:
     warning = engine_mod.PLUGIN_SOURCE_MOVE_WARNING
     assert "must not do it without their approval" in warning
     assert "deletes its saved options" in warning
+
+
+# --- #1363: a marketplace remove inside the repo empties the tracked wiring ---
+
+RESTORE = "git checkout -- .claude/settings.json"
+
+
+def _commit(repo: Path) -> None:
+    for args in (["add", "-A"], ["commit", "-q", "-m", "Wire plugin"]):
+        subprocess.run(
+            ["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid", *args],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+
+@pytest.mark.parametrize("emptied", ["{}\n", '{"enabledPlugins": {}}\n'])
+def test_start_and_doctor_name_the_restore_when_committed_wiring_was_emptied(
+    business: Path, emptied: str
+) -> None:
+    settings = _settings(business, CANONICAL)
+    _commit(business)
+    settings.write_text(emptied, encoding="utf-8")
+
+    start = json.loads(CliRunner().invoke(app, ["start", "--repo", str(business), "--json"]).stdout)
+    doctor = json.loads(CliRunner().invoke(app, ["doctor", str(business), "--json"]).stdout)
+
+    assert any(RESTORE in action for action in start["next_actions"])
+    check = next(c for c in doctor["checks"] if c["name"] == "plugin-wiring-emptied")
+    assert check["severity"] == "warn" and RESTORE in check["detail"]
+    assert settings.read_text(encoding="utf-8") == emptied
+
+
+def test_no_restore_hint_when_the_wiring_was_never_committed(business: Path) -> None:
+    (business / ".claude" / "settings.json").write_text("{}\n", encoding="utf-8")
+    _commit(business)
+
+    start = json.loads(CliRunner().invoke(app, ["start", "--repo", str(business), "--json"]).stdout)
+    doctor = json.loads(CliRunner().invoke(app, ["doctor", str(business), "--json"]).stdout)
+
+    assert not any(RESTORE in action for action in start["next_actions"])
+    assert not [c for c in doctor["checks"] if c["name"] == "plugin-wiring-emptied"]

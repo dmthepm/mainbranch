@@ -119,14 +119,22 @@ def skill_link_cmd(
         "--plan",
         help="Report what would change, including tracked files, and write nothing.",
     ),
+    ignored_only: bool = typer.Option(
+        False,
+        "--ignored-only",
+        help="Only touch paths git ignores; leave .gitignore and every other file alone.",
+    ),
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
 ) -> None:
     """Wire bundled skills into a business repo for Claude Code discovery."""
     from mb.engine import link_skills, plan_link_skills, write_plugin_wiring
 
     if plan:
-        if plugin:
-            typer.echo("mb skill link: --plan cannot be combined with --plugin", err=True)
+        if plugin or ignored_only:
+            typer.echo(
+                "mb skill link: --plan cannot be combined with --plugin or --ignored-only",
+                err=True,
+            )
             raise typer.Exit(2)
         planned = _unreadable_guard(
             repo,
@@ -145,7 +153,10 @@ def skill_link_cmd(
                 typer.echo(f"  - {error}", err=True)
         raise typer.Exit(0 if planned["ok"] else 1)
 
-    result = link_skills(repo)
+    if plugin and ignored_only:
+        typer.echo("mb skill link: --plugin writes a tracked file; drop --ignored-only", err=True)
+        raise typer.Exit(2)
+    result = link_skills(repo, ignored_only=ignored_only)
     plugin_result: dict[str, Any] | None = None
     if plugin:
         plugin_result = write_plugin_wiring(repo)

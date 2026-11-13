@@ -331,17 +331,24 @@ not keep access to stale Main Branch paths after a clone-to-pipx migration. Duri
 that link step, Main Branch also moves provably stale or broken personal
 symlinks with Main Branch skill names into a timestamped backup.
 
-If you use the Claude Code plugin rail, also re-add the Main Branch plugin after
-updating (`claude plugin marketplace add dmthepm/mainbranch`) and restart
-Claude Code. The symlink repair path remains the fallback and repair path; the
+If you use the Claude Code plugin rail, also refresh the Main Branch plugin
+after updating and restart Claude Code. This is safe from inside a repo:
+
+```bash
+claude plugin marketplace update mainbranch && claude plugin install mainbranch@mainbranch --scope user
+```
+
+The symlink repair path remains the fallback and repair path; the
 plugin is the more durable route for fresh Claude Code worktrees.
 
 If your marketplace still points at the old `noontide-co/mainbranch` address,
-the add command above fails. Main Branch moved to `dmthepm/mainbranch` on 28 Oct
+the refresh above fails. Main Branch moved to `dmthepm/mainbranch` on 28 Oct
 2026. The old address only works through a GitHub redirect, which stops working
-if a new repository ever takes that name, so move to the new one:
+if a new repository ever takes that name, so move to the new one. Run these
+from outside any repo, such as your home folder:
 
 ```bash
+cd ~
 claude plugin marketplace remove mainbranch
 claude plugin marketplace add dmthepm/mainbranch
 claude plugin install mainbranch@mainbranch --scope user
@@ -350,6 +357,15 @@ claude plugin install mainbranch@mainbranch --scope user
 Removing the marketplace also uninstalls the plugin and deletes its saved
 options and data. Restart Claude Code afterwards. If your repo's tracked
 `.claude/settings.json` names the old address, change it there too.
+
+Run inside a repo, `claude plugin marketplace remove mainbranch` also empties
+the Main Branch entries that repo's tracked `.claude/settings.json` keeps on
+purpose. `mb start` and `mb doctor` warn when that happens. Restore the file
+before you commit:
+
+```bash
+git checkout -- .claude/settings.json
+```
 
 `mb skill repair --repo .` checks your personal `~/.claude/skills/` directory
 for entries that can beat the project-local Main Branch skills in Claude Code.

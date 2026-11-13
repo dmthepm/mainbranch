@@ -15,6 +15,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - `mb doctor repair --item ID` applies only the named repair items within the chosen scope, so `--only codex --item codex-global-skill` fixes the global Codex skills without rewriting `AGENTS.md`. The plan shows each item id.
 
+### Changed
+
+- When skill links are stale, `mb update --check` and `mb start` now name `mb skill link --repo .` as the next step.
+- The plugin move guide and `/mb-update` refresh the plugin with `marketplace update` and `install` inside a repo, and keep `marketplace remove` and `add` for outside any repo.
+
+### Fixed
+
+- Without a terminal, `mb update` now refreshes skill links that git ignores, and adds nothing that `git status` would show. Folders are created only to hold those links. The tracked `.gitignore` line and any repair to your personal skills folder wait for `mb skill link`.
+- `mb start` and `mb doctor` warn when the tracked `.claude/settings.json` has lost the plugin entries in the last commit, and name `git checkout -- .claude/settings.json`.
+
 ## [0.6.26] - 2026-11-13
 
 ### Breaking

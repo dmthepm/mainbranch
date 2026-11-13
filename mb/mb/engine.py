@@ -1112,10 +1112,35 @@ def plan_link_skills(repo: str | Path) -> dict[str, Any]:
     }
 
 
-def link_skills(repo: str | Path) -> dict[str, Any]:
-    """Wire bundled skills into a business repo for Claude Code discovery."""
+def _git_ignored(target: Path, rels: list[str]) -> set[str]:
+    """The repo-relative paths git ignores; none when git cannot say."""
+    try:
+        proc = subprocess.run(
+            ["git", "check-ignore", "-z", "--stdin"],
+            cwd=target,
+            input=b"".join(os.fsencode(rel) + b"\0" for rel in rels),
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if proc.returncode not in {0, 1}:
+        return set()
+    return {os.fsdecode(entry) for entry in proc.stdout.split(b"\0") if entry}
+
+
+def link_skills(repo: str | Path, *, ignored_only: bool = False) -> dict[str, Any]:
+    """Wire bundled skills into a business repo for Claude Code discovery.
+
+    ``ignored_only`` touches only paths git ignores (the skill links and
+    `.claude/settings.local.json`) and holds everything else, the `.gitignore`
+    line and personal skill repairs included, in ``held``. It creates a folder
+    only for a write git allowed. `mb update` runs it without a terminal (#1361).
+    """
     target = Path(repo).resolve()
-    target.mkdir(parents=True, exist_ok=True)
+    if not ignored_only:
+        target.mkdir(parents=True, exist_ok=True)
 
     root = engine_root()
     if root is None:
@@ -1147,7 +1172,14 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
 
     for warning in planned["warnings"]:
         logging.getLogger(__name__).warning(warning)
-    (target / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
+    held: list[str] = []
+    if ignored_only:
+        rels = [item["rel"] for item in planned["operations"] if item["rel"]]
+        ignored = _git_ignored(target, [rel for rel in rels if rel != ".gitignore"])
+        held = [rel for rel in rels if rel not in ignored]
+        held += [str(_personal_skills_dir() / name) for name in planned["personal_repairs"]]
+    else:
+        (target / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
     created: list[str] = []
     linked: list[str] = []
     copied: list[str] = []
@@ -1157,7 +1189,7 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
         op = item["op"]
         path = Path(item["path"])
         rel = item["rel"]
-        if not rel:
+        if not rel or rel in held:
             continue  # personal skill repairs run below, limited to the plan
         if op == "write":
             if rel == ".gitignore" and (problem := gitignore_problem(target)):
@@ -1172,6 +1204,9 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
                 path.unlink()
                 removed_legacy.append(rel)
         else:
+            # In ignored-only mode this may add parent folders of an allowed link. They hold
+            # only ignored files, and git does not track empty folders, so git status is unchanged.
+            path.parent.mkdir(parents=True, exist_ok=True)
             mode = _link_or_copy(Path(item["source"]), path)
             if mode == "linked":
                 linked.append(rel)
@@ -1190,13 +1225,14 @@ def link_skills(repo: str | Path) -> dict[str, Any]:
         "linked": linked,
         "copied": copied,
         "skipped": skipped,
+        "held": held,
         "warnings": planned["warnings"],
         "gitignore_add": planned["gitignore_add"] if ".gitignore" in created else [],
         "removed_legacy": removed_legacy,
         "removed_stale_engine_paths": planned["removed_stale_engine_paths"],
         "errors": [],
         "shadow_report": inspect_personal_skill_conflicts(
-            target, apply=True, backup_paths=planned["backup_paths"]
+            target, apply=not ignored_only, backup_paths=planned["backup_paths"]
         ),
     }
 
@@ -1299,8 +1335,11 @@ def link_status(repo: str | Path) -> dict[str, Any]:
             " Tracked plugin wiring is present — once the plugin is active, "
             "skill discovery survives fresh worktrees without relinking."
         )
+    ok = settings_has_engine and start_link_ok and shadow_report["ok"]
     return {
-        "ok": settings_has_engine and start_link_ok and shadow_report["ok"],
+        "ok": ok,
+        # Wired before, now out of date: `mb skill link` is the whole fix (#1361).
+        "stale": not ok and bool(stale_engine_paths or any(start_link.parent.glob("mb-*"))),
         "plugin": plugin,
         "is_linked_worktree": is_linked_worktree,
         "repo": str(target),
@@ -1479,16 +1518,18 @@ def plugin_registry_status() -> dict[str, str]:
     return {"source_classification": _plugin_source_classification(entry.get("source"))}
 
 
-def plugin_wiring_status(repo: str | Path) -> dict[str, Any]:
-    """Report the worktree-durable plugin wiring in tracked settings.
+PLUGIN_WIRING_RESTORE_COMMAND = "git checkout -- .claude/settings.json"
+PLUGIN_WIRING_EMPTIED_WARNING = (
+    "The tracked .claude/settings.json has lost the Main Branch plugin entries "
+    "your last commit has. `claude plugin marketplace remove mainbranch` run "
+    "inside a repo does this. Restore the file with `"
+    + PLUGIN_WIRING_RESTORE_COMMAND
+    + "` before you commit; mb does not restore it for you."
+)
 
-    Stage 2 of the plugin migration (decisions/2026-06-10): plugin
-    enablement written to TRACKED `.claude/settings.json` survives
-    worktrees, unlike the gitignored symlink wiring. Shape verified live
-    against `claude plugin marketplace add` output.
-    """
-    target = Path(repo).resolve()
-    settings = _read_settings(_tracked_settings_path(target))
+
+def _settings_plugin_wired(settings: dict[str, Any]) -> tuple[bool, bool, object]:
+    """Whether settings name the Main Branch marketplace and enable the plugin."""
     marketplaces = settings.get("extraKnownMarketplaces")
     marketplace = (
         marketplaces.get(PLUGIN_MARKETPLACE_NAME) if isinstance(marketplaces, dict) else None
@@ -1503,6 +1544,45 @@ def plugin_wiring_status(repo: str | Path) -> dict[str, Any]:
     plugin_enabled = bool(
         isinstance(enabled_plugins, dict) and enabled_plugins.get(PLUGIN_ENABLE_KEY) is True
     )
+    return marketplace_known, plugin_enabled, source
+
+
+def plugin_wiring_emptied(repo: str | Path) -> bool:
+    """True when HEAD's tracked settings carry the plugin wiring and the file lost it.
+
+    Read-only (#1363): `mb start` and `mb doctor` name the restore command;
+    nothing here writes the file.
+    """
+    target = Path(repo).resolve()
+    known, enabled, _ = _settings_plugin_wired(_read_settings(_tracked_settings_path(target)))
+    if known and enabled:
+        return False
+    try:
+        proc = subprocess.run(
+            ["git", "show", "HEAD:./.claude/settings.json"],
+            cwd=target,
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        head = json.loads(proc.stdout) if proc.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False
+    return isinstance(head, dict) and _settings_plugin_wired(head)[:2] == (True, True)
+
+
+def plugin_wiring_status(repo: str | Path) -> dict[str, Any]:
+    """Report the worktree-durable plugin wiring in tracked settings.
+
+    Stage 2 of the plugin migration (decisions/2026-06-10): plugin
+    enablement written to TRACKED `.claude/settings.json` survives
+    worktrees, unlike the gitignored symlink wiring. Shape verified live
+    against `claude plugin marketplace add` output.
+    """
+    target = Path(repo).resolve()
+    settings = _read_settings(_tracked_settings_path(target))
+    marketplace_known, plugin_enabled, source = _settings_plugin_wired(settings)
     source_classification = _plugin_source_classification(source)
     registry = plugin_registry_status()
     warnings = []
