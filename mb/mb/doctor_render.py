@@ -68,7 +68,7 @@ def render_repair(report: dict[str, Any]) -> None:
         for action in report["actions"]:
             mutability = "read-only" if action["mode"] == "read" else action["mode"]
             safe = "safe apply" if action["safe_to_apply"] else "manual approval"
-            console.print(f"  - [{mutability}; {safe}] {action['title']}")
+            console.print(f"  - [{mutability}; {safe}] {action['title']} (item: {action['id']})")
             console.print(f"    command: {action['command']}")
             console.print(f"    why: {action['reason']}")
     else:

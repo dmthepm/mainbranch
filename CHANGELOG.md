@@ -11,6 +11,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `mb doctor repair --item ID` applies only the named repair items within the chosen scope, so `--only codex --item codex-global-skill` fixes the global Codex skills without rewriting `AGENTS.md`. The plan shows each item id.
+
 ## [0.6.26] - 2026-11-13
 
 ### Breaking
