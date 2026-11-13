@@ -15,6 +15,16 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - `mb doctor repair --item ID` applies only the named repair items within the chosen scope, so `--only codex --item codex-global-skill` fixes the global Codex skills without rewriting `AGENTS.md`. The plan shows each item id.
 
+### Changed
+
+- When skill links are stale, `mb update --check` and `mb start` now name `mb skill link --repo .` as the next step.
+- The plugin move guide and `/mb-update` refresh the plugin with `marketplace update` and `install` inside a repo, and keep `marketplace remove` and `add` for outside any repo.
+
+### Fixed
+
+- Without a terminal, `mb update` now refreshes skill links that git ignores, and adds nothing that `git status` would show. Folders are created only to hold those links. The tracked `.gitignore` line and any repair to your personal skills folder wait for `mb skill link`.
+- `mb start` and `mb doctor` warn when the tracked `.claude/settings.json` has lost the plugin entries in the last commit, and name `git checkout -- .claude/settings.json`.
+
 ## [0.6.26] - 2026-11-13
 
 ### Breaking
@@ -43,8 +53,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - Custom connection aliases now explain that the key is stored but mb has no probe to verify it, without suggesting a test that cannot fix it.
 - Branch closeout guidance now requires safe removal of a lane's linked worktree and local branch before calling work done, and explains how to confirm a squash merge. An owner's primary checkout is not covered.
 - New business repos tell agents to use the tools already connected to the business on their own initiative, and to ask the owner to connect missing access instead of waiting.
-- When skill links are stale, `mb update --check` and `mb start` now name `mb skill link --repo .` as the next step.
-- The plugin move guide and `/mb-update` refresh the plugin with `marketplace update` and `install` inside a repo, and keep `marketplace remove` and `add` for outside any repo.
 
 ### Fixed
 
@@ -54,8 +62,6 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   explains the reservation.
 - Agent checks compare transcript bytes on re-read as well as file details to detect changes.
 - The agent recovery test waits for its transcript before stopping the fixture runtime.
-- Without a terminal, `mb update` now refreshes skill links that git ignores, and adds nothing that `git status` would show. Folders are created only to hold those links. The tracked `.gitignore` line and any repair to your personal skills folder wait for `mb skill link`.
-- `mb start` and `mb doctor` warn when the tracked `.claude/settings.json` has lost the plugin entries in the last commit, and name `git checkout -- .claude/settings.json`.
 
 ## [0.6.25] - 2026-11-10
 
