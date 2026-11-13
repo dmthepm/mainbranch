@@ -33,6 +33,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 ### Added
 
 - `mb connect fingerprint <provider>` compares stored copies with an eight-hex SHA-256 prefix, without printing the secret. Supports custom aliases, pipes and `--json`.
+- `mb doctor repair --item ID` applies only the named repair items within the chosen scope, so `--only codex --item codex-global-skill` fixes the global Codex skills without rewriting `AGENTS.md`. The plan shows each item id.
 
 ### Changed
 

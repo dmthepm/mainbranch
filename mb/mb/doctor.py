@@ -16,6 +16,7 @@ import shutil
 import socket
 import subprocess
 import sys
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -125,6 +126,10 @@ CLAUDE_ACTION_IDS = frozenset({"skill-link", "skill-shadow-repair", "legacy-clau
 CODEX_ACTION_IDS = frozenset({"codex-agents-md", "codex-global-skill"})
 AGENT_ACTION_IDS = CLAUDE_ACTION_IDS | CODEX_ACTION_IDS
 AGENT_SECTION_IDS = frozenset({"claude-wiring", "codex-wiring", "git"})
+# What a plain `--apply` may run, so `--item` can name one of them (#1362).
+DEFAULT_APPLY_ITEM_IDS = frozenset(
+    {"gitignore-local-state", "checkpoint-hook-install", "related-links-mirror"}
+)
 
 
 def _derive_audience(mode: str, safe_to_apply: bool) -> str:
@@ -533,6 +538,26 @@ def _action_ids_for_scope(only: str = "", *, all_agents: bool = False) -> set[st
     if only == "codex":
         return set(CODEX_ACTION_IDS)
     return set()
+
+
+def repair_item_error(items: Sequence[str], *, only: str = "", all_agents: bool = False) -> str:
+    """Why `--item` cannot run these ids in this scope, or "" when it can (#1362).
+
+    An item only narrows the scope: it never applies anything the same
+    `--apply` without `--item` would not.
+    """
+    allowed = _action_ids_for_scope(only, all_agents=all_agents) or set(DEFAULT_APPLY_ITEM_IDS)
+    for item in items:
+        if item in allowed:
+            continue
+        if item in CLAUDE_ACTION_IDS:
+            return f"item `{item}` is a Claude item: add --only claude"
+        if item in CODEX_ACTION_IDS:
+            return f"item `{item}` is a Codex item: add --only codex"
+        if item in DEFAULT_APPLY_ITEM_IDS:
+            return f"item `{item}` runs only without --only or --all-agents"
+        return f"unknown item `{item}`; valid items here: {', '.join(sorted(allowed))}"
+    return ""
 
 
 def _agent_scope_label(only: str = "", *, all_agents: bool = False) -> str:
@@ -1250,6 +1275,7 @@ def _not_business_folder_guard(target: Path, *, mode: str = "plan") -> dict[str,
         "mode": mode,
         "only": "",
         "all_agents": False,
+        "items": [],
         # The guard refuses before any write, so even --apply stays read-only.
         "read_only": True,
         "repo": str(target),
@@ -1380,12 +1406,16 @@ def repair_plan(
     applied_actions: list[dict[str, Any]] | None = None,
     only: str = "",
     all_agents: bool = False,
+    items: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Build the guided reconciliation plan without writing repo status markers."""
     if only and only not in AGENT_REPAIR_SCOPES:
         raise ValueError(f"unknown repair scope: {only}")
     if only and all_agents:
         raise ValueError("--only cannot be combined with --all-agents")
+    item_error = repair_item_error(items, only=only, all_agents=all_agents)
+    if item_error:
+        raise ValueError(item_error)
     target = Path(repo).expanduser().resolve()
     guard = _not_business_folder_guard(target, mode=mode)
     if guard is not None:
@@ -2171,6 +2201,8 @@ def repair_plan(
         only=only,
         all_agents=all_agents,
     )
+    if items:
+        actions = [action for action in actions if str(action["id"]) in items]
 
     states = [str(section["state"]) for section in sections]
     summary = {
@@ -2211,6 +2243,7 @@ def repair_plan(
         "mode": mode,
         "only": only,
         "all_agents": all_agents,
+        "items": list(items),
         "read_only": mode == "plan",
         "repo": str(target),
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -2283,25 +2316,42 @@ def repair_apply(
     include_migration: bool = False,
     only: str = "",
     all_agents: bool = False,
+    items: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """Apply safe doctor repairs and return a fresh reconciliation report."""
+    """Apply safe doctor repairs and return a fresh reconciliation report.
+
+    `items` narrows the apply to those action ids (#1362).
+    """
     if only and only not in AGENT_REPAIR_SCOPES:
         raise ValueError(f"unknown repair scope: {only}")
     if only and all_agents:
         raise ValueError("--only cannot be combined with --all-agents")
+    item_error = repair_item_error(items, only=only, all_agents=all_agents)
+    if item_error:
+        raise ValueError(item_error)
+    if items and include_migration:
+        raise ValueError("--item cannot be combined with --include-migration")
     target = Path(repo).expanduser().resolve()
     guard = _not_business_folder_guard(target, mode="apply")
     if guard is not None:
         return guard
-    before = repair_plan(target, only=only, all_agents=all_agents)
+    before = repair_plan(target, only=only, all_agents=all_agents, items=items)
     applied: list[dict[str, Any]] = []
     apply_non_agent = not only and not all_agents
     apply_claude = only == "claude" or all_agents
     apply_codex = only == "codex" or all_agents
 
+    def chosen(item: str) -> bool:
+        return not items or item in items
+
     missing_gitignore = _missing_gitignore_entries(target)
     tracked_local_state = _tracked_local_state_paths(target)
-    if missing_gitignore and apply_non_agent and not gitignore_problem(target):
+    if (
+        missing_gitignore
+        and apply_non_agent
+        and chosen("gitignore-local-state")
+        and not gitignore_problem(target)
+    ):
         changed = _append_unique_lines(target / ".gitignore", missing_gitignore)
         applied.append(
             _action(
@@ -2317,7 +2367,7 @@ def repair_apply(
                 result={"added": missing_gitignore},
             )
         )
-    if tracked_local_state and apply_non_agent:
+    if tracked_local_state and apply_non_agent and chosen("gitignore-local-state"):
         results = [_untrack_local_state_path(target, rel) for rel in tracked_local_state]
         applied.append(
             _action(
@@ -2338,7 +2388,11 @@ def repair_apply(
         )
 
     checkpoint_hook = checkpoint_mod.hook_status(target)
-    if checkpoint_hook.get("state") in {"missing", "broken"} and apply_non_agent:
+    if (
+        checkpoint_hook.get("state") in {"missing", "broken"}
+        and apply_non_agent
+        and chosen("checkpoint-hook-install")
+    ):
         installed = checkpoint_mod.install_commit_hook(target)
         applied.append(
             _action(
@@ -2355,8 +2409,9 @@ def repair_apply(
             )
         )
 
-    shadow = engine_mod.inspect_personal_skill_conflicts(target, apply=apply_claude)
-    if int(shadow.get("summary", {}).get("repaired", 0) or 0) and apply_claude:
+    apply_shadow = apply_claude and chosen("skill-shadow-repair")
+    shadow = engine_mod.inspect_personal_skill_conflicts(target, apply=apply_shadow)
+    if int(shadow.get("summary", {}).get("repaired", 0) or 0) and apply_shadow:
         applied.append(
             _action(
                 id="skill-shadow-repair",
@@ -2372,7 +2427,7 @@ def repair_apply(
             )
         )
 
-    if not link_status(target).get("ok") and apply_claude:
+    if not link_status(target).get("ok") and apply_claude and chosen("skill-link"):
         linked = engine_mod.link_skills(target)
         applied.append(
             _action(
@@ -2396,12 +2451,13 @@ def repair_apply(
     # tracked `.claude/settings.json`; the plan lists it in `operator_actions`.
 
     legacy_links = _legacy_claude_symlinks(target)
+    apply_legacy_links = apply_claude and chosen("legacy-claude-link-repair")
     repaired_links = (
         _repair_legacy_claude_symlinks(target, legacy_links["findings"])
-        if apply_claude
+        if apply_legacy_links
         else {"moved": [], "errors": [], "ok": True}
     )
-    if (repaired_links["moved"] or repaired_links["errors"]) and apply_claude:
+    if (repaired_links["moved"] or repaired_links["errors"]) and apply_legacy_links:
         _append_unique_lines(target / ".gitignore", [".mb/backups/"])
         applied.append(
             _action(
@@ -2425,7 +2481,7 @@ def repair_apply(
         )
 
     codex_instruction_status = codex_mod.instructions_status(target)
-    if not codex_instruction_status["ok"] and apply_codex:
+    if not codex_instruction_status["ok"] and apply_codex and chosen("codex-agents-md"):
         agents = codex_mod.write_agents_md(target)
         applied.append(
             _action(
@@ -2465,7 +2521,7 @@ def repair_apply(
 
     codex_status = codex_mod.readiness(target)
     codex_global_skill = codex_status["global_skill"]
-    if not codex_global_skill["ok"] and apply_codex:
+    if not codex_global_skill["ok"] and apply_codex and chosen("codex-global-skill"):
         installed = codex_mod.install_global_skill(target)
         applied.append(
             _action(
@@ -2489,7 +2545,7 @@ def repair_apply(
         )
 
     related_links_result: dict[str, Any] = {"changed": [], "errors": [], "ok": True}
-    if apply_non_agent:
+    if apply_non_agent and chosen("related-links-mirror"):
         related_links_result = related_links_mod.apply(target)
     if related_links_result["changed"] or related_links_result["errors"]:
         applied.append(
@@ -2533,6 +2589,7 @@ def repair_apply(
         applied_actions=applied,
         only=only,
         all_agents=all_agents,
+        items=items,
     )
     after["before_summary"] = before["summary"]
     return after

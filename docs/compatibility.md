@@ -102,7 +102,7 @@ Common shipped automation-safe commands include:
 | Runtime handoff metadata | `mb start --repo "$repo" --json` |
 | Repo health | `mb doctor "$repo" --json` |
 | Repair preview | `mb doctor repair --repo "$repo" --plan --json` |
-| Agent-surface repair preview | `mb doctor repair --repo "$repo" --plan --only claude`, `--only codex`, or `--all-agents`; `--only claude`, `--only codex` and `--all-agents` leave out the CLAUDE.md status-line finding (business conventions, not agent wiring) |
+| Agent-surface repair preview | `mb doctor repair --repo "$repo" --plan --only claude`, `--only codex`, or `--all-agents`; `--only claude`, `--only codex` and `--all-agents` leave out the CLAUDE.md status-line finding (business conventions, not agent wiring). `--item ID` (repeatable) narrows a scope to the named plan items, for example `mb doctor repair --apply --only codex --item codex-global-skill` installs the global Codex skills without rewriting `AGENTS.md` |
 | Frontmatter/schema validation | `mb validate "$repo" --json` |
 | Graph/index facts | `mb graph "$repo" --json` |
 | Provider readiness | `mb connect status --repo "$repo" --json` |

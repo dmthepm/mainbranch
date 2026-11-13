@@ -755,6 +755,7 @@ def _doctor_repair_from_args(args: list[str], *, json_out: bool) -> None:
     include_migration = False
     only = ""
     all_agents = False
+    items: list[str] = []
     local_json = json_out
     idx = 0
     while idx < len(args):
@@ -762,7 +763,8 @@ def _doctor_repair_from_args(args: list[str], *, json_out: bool) -> None:
         if arg == "--help":
             typer.echo(
                 "Usage: mb doctor repair [--repo PATH] [--plan | --apply] "
-                "[--only claude|codex | --all-agents] [--include-migration] [--json]"
+                "[--only claude|codex | --all-agents] [--item ID ...] "
+                "[--include-migration] [--json]"
             )
             typer.echo("")
             typer.echo("Plan or apply guided business-repo reconciliation repairs.")
@@ -771,6 +773,12 @@ def _doctor_repair_from_args(args: list[str], *, json_out: bool) -> None:
                 "Migration apply is opt-in: use `--include-migration` only with `--apply` "
                 "after reviewing the plan."
             )
+            typer.echo("")
+            typer.echo(
+                "`--item ID` (repeatable) runs only the named items from the plan, inside "
+                "the scope you chose. Example, the global Codex skills without AGENTS.md:"
+            )
+            typer.echo("  mb doctor repair --apply --only codex --item codex-global-skill")
             raise typer.Exit(0)
         if arg == "--repo":
             idx += 1
@@ -792,6 +800,12 @@ def _doctor_repair_from_args(args: list[str], *, json_out: bool) -> None:
                 typer.echo("mb doctor repair: --only requires a scope", err=True)
                 raise typer.Exit(2)
             only = args[idx]
+        elif arg == "--item":
+            idx += 1
+            if idx >= len(args) or args[idx].startswith("--"):
+                typer.echo("mb doctor repair: --item requires an item id", err=True)
+                raise typer.Exit(2)
+            items.append(args[idx])
         elif arg == "--json":
             local_json = True
         else:
@@ -825,6 +839,17 @@ def _doctor_repair_from_args(args: list[str], *, json_out: bool) -> None:
             err=True,
         )
         raise typer.Exit(2)
+    if items and include_migration:
+        typer.echo("mb doctor repair: --item cannot be combined with --include-migration", err=True)
+        raise typer.Exit(2)
+    item_error = doctor_mod.repair_item_error(items, only=only, all_agents=all_agents)
+    if item_error:
+        typer.echo(f"mb doctor repair: {item_error}", err=True)
+        raise typer.Exit(2)
+
+    scope: dict[str, Any] = {"only": only, "all_agents": all_agents} if only or all_agents else {}
+    if items:
+        scope["items"] = items
 
     if not apply_changes:
         # #1106: a file the plan cannot read is named, not a traceback.
@@ -833,24 +858,10 @@ def _doctor_repair_from_args(args: list[str], *, json_out: bool) -> None:
             command="mb doctor repair",
             schema_name="mainbranch.doctor.repair.result",
             json_out=local_json,
-            read=lambda: (
-                doctor_mod.repair_plan(repo=repo, only=only, all_agents=all_agents)
-                if only or all_agents
-                else doctor_mod.repair_plan(repo=repo)
-            ),
-        )
-    elif only or all_agents:
-        report = doctor_mod.repair_apply(
-            repo=repo,
-            include_migration=include_migration,
-            only=only,
-            all_agents=all_agents,
+            read=lambda: doctor_mod.repair_plan(repo=repo, **scope),
         )
     else:
-        report = doctor_mod.repair_apply(
-            repo=repo,
-            include_migration=include_migration,
-        )
+        report = doctor_mod.repair_apply(repo=repo, include_migration=include_migration, **scope)
 
     if local_json:
         typer.echo(
@@ -877,7 +888,7 @@ def _doctor_help() -> None:
     typer.echo("Repair:")
     typer.echo(
         "  mb doctor repair [--repo PATH] [--plan | --apply] "
-        "[--only claude|codex | --all-agents] [--include-migration] [--json]"
+        "[--only claude|codex | --all-agents] [--item ID ...] [--include-migration] [--json]"
     )
     typer.echo("  Note: --include-migration is valid only with --apply after plan review.")
 

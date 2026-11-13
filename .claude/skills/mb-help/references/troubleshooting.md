@@ -287,6 +287,7 @@ mb doctor repair --repo /path/to/your/repo --plan --json
 | Skill links are stale | Run `/mb-update` or `mb update --repo .`, then restart Claude |
 | Folder was moved | Run `mb start --json`; if it cannot find the folder, choose the correct path in `/mb-start` |
 | `.vip/config.yaml` exists | Audit it with `mb doctor repair --plan --json`; do not treat it as current team settings |
+| Codex skills need repair but `AGENTS.md` should stay as it is | `mb doctor repair --apply --only codex --item codex-global-skill`; item ids are in `mb doctor repair --plan` |
 
 **Migration from old system:**
 Use `docs/migrating.md` for clone-era installs, old repo layouts, or stale
