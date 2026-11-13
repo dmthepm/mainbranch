@@ -5002,7 +5002,7 @@ def test_ignored_only_link_holds_everything_when_git_times_out(
             raise subprocess.TimeoutExpired(args, 5)
         return real_run(args, *rest, **kwargs)
 
-    monkeypatch.setattr(engine_mod.subprocess, "run", slow_git)
+    monkeypatch.setattr("mb.engine.subprocess.run", slow_git)
 
     result = engine_mod.link_skills(business_repo, ignored_only=True)
 
