@@ -91,6 +91,8 @@ def render_status(result: dict[str, Any]) -> None:
         state = "ok" if item["ok"] else "warn"
         label = f" ({item['account_label']})" if item["account_label"] else ""
         print(f"  {state}  {item['provider']}{label}: {connect.state_label(item['state'])}")
+        if connect._is_custom_provider_id(item["provider"]) and item.get("stored"):
+            print(f"       {item['summary']}")
         if item["repair_command"]:
             print(f"       next: {item['repair_command']}")
 

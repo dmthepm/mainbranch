@@ -417,7 +417,8 @@ file; ask at most one question. Otherwise, or when unsure, skip.
   (docs/provider-mutation-contract.md). Reads and writes are separate surfaces.
 - Commands that need a credential -> `mb connect exec <provider> -- <command>`
   (the secret stays in that command's environment; `mb connect token` refuses
-  terminals and pipes). Scan agent configs for plaintext credentials with
+  terminals and pipes); compare stored copies with `mb connect fingerprint <provider>`.
+  Scan agent configs for plaintext credentials with
   `mb connect hygiene`; read the recorded business identity with
   `mb connect identity`; missing providers -> `mb connect <id> --custom`.
 - Surfaces below are triggered, not defaults. Lead with the business answer,

@@ -492,10 +492,7 @@ def _validate_with_provider(
             "state": UNVERIFIED_STATE,
             "checked_at": checked_at,
             "provider_verified": False,
-            "summary": (
-                f"{provider.name} has a stored credential, but Main Branch has no "
-                "automated way to confirm it works with the provider."
-            ),
+            "summary": connect._unverified_repair(provider)["summary"],
             "repair": connect._unverified_repair(provider)["repair"],
             "safe_to_share": True,
         }
