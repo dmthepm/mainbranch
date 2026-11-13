@@ -17,7 +17,13 @@ from mb import journal as journal_mod
 from mb import status as status_mod
 from mb import topology as topology_mod
 from mb import vocabulary
-from mb.engine import install_mode, link_status
+from mb.engine import (
+    PLUGIN_WIRING_EMPTIED_WARNING,
+    PLUGIN_WIRING_RESTORE_COMMAND,
+    install_mode,
+    link_status,
+    plugin_wiring_emptied,
+)
 from mb.freshness import (
     MODE_NEUTRAL_UPDATE_TEXT,
     format_update_alert,
@@ -217,7 +223,10 @@ def _build_checks(
             "ok": bool(wiring["ok"]),
             "severity": "error",
             "detail": skill_detail,
-            "repair": (
+            # #1361: links that went stale need only a relink.
+            "repair": "Run `mb skill link --repo .`."
+            if wiring.get("stale")
+            else (
                 "Run `mb doctor repair --plan`, review it, then run "
                 "`mb doctor repair --apply` from the business repo."
             ),
@@ -230,6 +239,16 @@ def _build_checks(
             "repair": "Reinstall Main Branch with `pipx install mainbranch` if commands fail.",
         },
     ]
+    if plugin_wiring_emptied(wiring["repo"]):
+        checks.append(
+            {
+                "name": "plugin_wiring",
+                "ok": False,
+                "severity": "warn",
+                "detail": PLUGIN_WIRING_EMPTIED_WARNING,
+                "repair": f"Run `{PLUGIN_WIRING_RESTORE_COMMAND}`.",
+            }
+        )
     if active_shadows or legacy_globals:
         checks.append(
             {

@@ -661,3 +661,20 @@ def test_start_runtime_guidance_is_plugin_first(tmp_path: Path, monkeypatch) -> 
     assert "/mainbranch:mb-start" in guidance
     assert "claude plugin marketplace add dmthepm/mainbranch" in guidance
     assert "cloud" in guidance.lower()
+
+
+def test_start_names_skill_link_when_wiring_is_stale(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(start_mod, "_which", _with_claude)
+    repo = tmp_path / "acme"
+    init_run(path=str(repo), name="Acme")
+    link = repo / ".claude" / "skills" / "mb-start"
+    link.unlink()
+    link.symlink_to(tmp_path / "old-engine" / "mb-start", target_is_directory=True)
+
+    monkeypatch.chdir(repo)
+    result = runner.invoke(app, ["start", "--repo", str(repo), "--json"])
+
+    report = json.loads(result.stdout)
+    assert report["handoff_ready"] is False
+    assert "Run `mb skill link --repo .`." in report["next_actions"]
+    assert not any("from the business repo" in action for action in report["next_actions"])

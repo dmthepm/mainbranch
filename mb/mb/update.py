@@ -24,6 +24,7 @@ from mb.engine import (
     claude_mainbranch_plugin_status,
     engine_root,
     install_mode,
+    link_status,
     looks_like_uv_tool_install,
     operator_action,
     plan_link_skills,
@@ -504,8 +505,11 @@ def _link_warnings(payload: dict[str, Any]) -> list[str]:
     ]
 
 
-def _link_skills(repo: Path) -> tuple[int, list[str], list[str], dict[str, Any] | None]:
-    result = _run_command(["mb", "skill", "link", "--repo", str(repo), "--json"])
+def _link_skills(
+    repo: Path, *, ignored_only: bool = False
+) -> tuple[int, list[str], list[str], dict[str, Any] | None]:
+    args = ["mb", "skill", "link", "--repo", str(repo), "--json"]
+    result = _run_command([*args, "--ignored-only"] if ignored_only else args)
     if result.returncode != 0:
         return 0, [_command_error("mb skill link", result)], [], None
     try:
@@ -1137,6 +1141,12 @@ def _add_plugin_follow_up(result: dict[str, Any], repo: Path) -> None:
         result["next_actions"].append(PLUGIN_INSTALL_COMMAND)
 
 
+def _add_link_follow_up(result: dict[str, Any], repo: Path) -> None:
+    """Stale skill links need `mb skill link` first, not the plugin (#1361)."""
+    if link_status(repo).get("stale"):
+        result["next_actions"].insert(0, f"mb skill link{_repo_flag(repo) or ' --repo .'}")
+
+
 def _refresh_surfaces(
     result: dict[str, Any],
     target_repo: Path,
@@ -1206,14 +1216,24 @@ def _refresh_surfaces(
         else:
             planned["consent"] = "no_terminal"
     apply_link = approved or not link_writes
+    # #1361: when a `.gitignore` line is the only held write, the ignored
+    # skill links still refresh; the line waits for a person. With no
+    # `.gitignore` yet, nothing is ignored, so there is nothing to refresh.
+    links_only = (
+        not apply_link and link_writes == [".gitignore"] and (target_repo / ".gitignore").is_file()
+    )
     apply_codex = (approved or not codex_writes) and not codex_blocked
 
     link_apply_command = f"mb skill link{_repo_flag(target_repo)}"
     codex_apply_command = f"mb doctor repair{_repo_flag(target_repo)} --apply --only codex"
 
-    before = _tracked_snapshot(target_repo) if (apply_link or apply_codex or approved) else None
+    before = (
+        _tracked_snapshot(target_repo)
+        if (apply_link or links_only or apply_codex or approved)
+        else None
+    )
 
-    if not apply_link:
+    if not apply_link and not links_only:
         surface["claude"] = {
             "ok": True,
             "applied": False,
@@ -1224,17 +1244,25 @@ def _refresh_surfaces(
         }
         planned["apply_commands"].append(link_apply_command)
     else:
-        linked_count, link_errors, link_warnings, link_payload = _link_skills(target_repo)
-        claude_command = f"mb skill link --repo {shlex.quote(str(target_repo))} --json"
+        linked_count, link_errors, link_warnings, link_payload = _link_skills(
+            target_repo, ignored_only=links_only
+        )
+        claude_command = f"mb skill link --repo {shlex.quote(str(target_repo))} --json" + (
+            " --ignored-only" if links_only else ""
+        )
         result["actions"].append(f"ran `{claude_command}`")
         surface["commands"].append(claude_command)
         surface["claude"] = {
             "ok": not link_errors,
             "applied": True,
+            "links_only": links_only,
             "skill_count": linked_count,
             "command": claude_command,
             "result": link_payload or {},
         }
+        if links_only:
+            surface["claude"]["tracked_writes"] = link_writes
+            planned["apply_commands"].append(link_apply_command)
         result["skills_relinked_count"] = linked_count
         result["warnings"].extend(link_warnings)
         if link_errors:
@@ -1536,6 +1564,14 @@ def run(
             lambda: _add_plugin_follow_up(result, target_repo),
             check=True,
         )
+        if refresh_surfaces:
+            _guard_unreadable(
+                result,
+                target_repo,
+                "Claude Code skill links",
+                lambda: _add_link_follow_up(result, target_repo),
+                check=True,
+            )
         return result
 
     if mode in {"pipx", "uv", "wheel"} and latest is None:

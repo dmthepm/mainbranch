@@ -101,7 +101,11 @@ If `plugin_rail.install.state` is `stale`, `installed_not_enabled`, `disabled`,
 or `not_installed`, tell the user the Claude Code plugin cache needs attention
 too. Quote the warning, include the plugin repair command from `next_actions`,
 and say to restart Claude Code or run `/reload-plugins` before relying on new
-slash-skill behavior.
+slash-skill behavior. Inside a repo, refresh the plugin only with
+`claude plugin marketplace update mainbranch && claude plugin install mainbranch@mainbranch --scope user`.
+Never run `claude plugin marketplace remove` or `add` inside a repo: remove
+empties the repo's tracked `.claude/settings.json` plugin entries. If that
+already happened, the restore is `git checkout -- .claude/settings.json`.
 
 ---
 

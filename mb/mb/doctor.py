@@ -945,6 +945,15 @@ def run(path: str, *, qualify: bool = True) -> dict[str, Any]:
             "plugin": plugin,
         }
     )
+    if engine_mod.plugin_wiring_emptied(repo):
+        checks.append(
+            {
+                "name": "plugin-wiring-emptied",
+                "ok": False,
+                "severity": "warn",
+                "detail": engine_mod.PLUGIN_WIRING_EMPTIED_WARNING,
+            }
+        )
     if roles_mod.has_cards(repo):
         role_wiring = roles_mod.wiring(repo, bool(plugin.get("wired")))
         role_problem = bool(role_wiring["invalid"]) or not role_wiring["hook_wired"]
