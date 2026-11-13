@@ -1261,6 +1261,9 @@ def _refresh_surfaces(
             "result": link_payload or {},
         }
         if links_only:
+            # Personal skill repairs it held wait for the same person step.
+            held = _list_field(link_payload or {}, "held")
+            link_writes = [*link_writes, *(path for path in held if Path(path).is_absolute())]
             surface["claude"]["tracked_writes"] = link_writes
             planned["apply_commands"].append(link_apply_command)
         result["skills_relinked_count"] = linked_count

@@ -1135,10 +1135,12 @@ def link_skills(repo: str | Path, *, ignored_only: bool = False) -> dict[str, An
 
     ``ignored_only`` touches only paths git ignores (the skill links and
     `.claude/settings.local.json`) and holds everything else, the `.gitignore`
-    line included, in ``held``. `mb update` runs it without a terminal (#1361).
+    line and personal skill repairs included, in ``held``. It creates a folder
+    only for a write git allowed. `mb update` runs it without a terminal (#1361).
     """
     target = Path(repo).resolve()
-    target.mkdir(parents=True, exist_ok=True)
+    if not ignored_only:
+        target.mkdir(parents=True, exist_ok=True)
 
     root = engine_root()
     if root is None:
@@ -1175,7 +1177,9 @@ def link_skills(repo: str | Path, *, ignored_only: bool = False) -> dict[str, An
         rels = [item["rel"] for item in planned["operations"] if item["rel"]]
         ignored = _git_ignored(target, [rel for rel in rels if rel != ".gitignore"])
         held = [rel for rel in rels if rel not in ignored]
-    (target / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
+        held += [str(_personal_skills_dir() / name) for name in planned["personal_repairs"]]
+    else:
+        (target / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
     created: list[str] = []
     linked: list[str] = []
     copied: list[str] = []
@@ -1200,6 +1204,7 @@ def link_skills(repo: str | Path, *, ignored_only: bool = False) -> dict[str, An
                 path.unlink()
                 removed_legacy.append(rel)
         else:
+            path.parent.mkdir(parents=True, exist_ok=True)
             mode = _link_or_copy(Path(item["source"]), path)
             if mode == "linked":
                 linked.append(rel)
@@ -1225,7 +1230,7 @@ def link_skills(repo: str | Path, *, ignored_only: bool = False) -> dict[str, An
         "removed_stale_engine_paths": planned["removed_stale_engine_paths"],
         "errors": [],
         "shadow_report": inspect_personal_skill_conflicts(
-            target, apply=True, backup_paths=planned["backup_paths"]
+            target, apply=not ignored_only, backup_paths=planned["backup_paths"]
         ),
     }
 

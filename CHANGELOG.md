@@ -54,7 +54,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   explains the reservation.
 - Agent checks compare transcript bytes on re-read as well as file details to detect changes.
 - The agent recovery test waits for its transcript before stopping the fixture runtime.
-- Without a terminal, `mb update` now refreshes skill links that git ignores. Only the tracked `.gitignore` line waits for the owner's approval.
+- Without a terminal, `mb update` now refreshes skill links that git ignores, and creates no folder git would not ignore. The tracked `.gitignore` line and any repair to your personal skills folder wait for `mb skill link`.
 - `mb start` and `mb doctor` warn when the tracked `.claude/settings.json` has lost the plugin entries in the last commit, and name `git checkout -- .claude/settings.json`.
 
 ## [0.6.25] - 2026-11-10
