@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.26] - 2026-11-13
+
 ### Breaking
 
 - Connection metadata now refuses token, secret, API key, passphrase and credential
