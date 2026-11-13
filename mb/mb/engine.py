@@ -1204,6 +1204,8 @@ def link_skills(repo: str | Path, *, ignored_only: bool = False) -> dict[str, An
                 path.unlink()
                 removed_legacy.append(rel)
         else:
+            # In ignored-only mode this may add parent folders of an allowed link. They hold
+            # only ignored files, and git does not track empty folders, so git status is unchanged.
             path.parent.mkdir(parents=True, exist_ok=True)
             mode = _link_or_copy(Path(item["source"]), path)
             if mode == "linked":

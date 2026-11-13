@@ -4958,6 +4958,31 @@ def test_ignored_only_link_touches_nothing_when_git_ignores_nothing(
     assert _tree(personal.parent) == home_before
 
 
+def test_ignored_only_link_in_fresh_repo_leaves_git_status_unchanged(
+    business_repo: Path,
+) -> None:
+    # Review of 70bcc9f: parent folders of allowed links are created; git status must not move.
+    entries, _ = engine_mod._link_gitignore_entries()
+    (business_repo / ".gitignore").write_text("\n".join(entries) + "\n", encoding="utf-8")
+    _commit_all(business_repo, "Links ignored")
+    assert not (business_repo / ".claude").exists()
+
+    def status() -> str:
+        return subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=business_repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+
+    before = status()
+    result = engine_mod.link_skills(business_repo, ignored_only=True)
+
+    assert result["ok"] is True and result["linked"]
+    assert status() == before
+
+
 def test_ignored_only_link_holds_everything_when_git_times_out(
     monkeypatch: pytest.MonkeyPatch, business_repo: Path, tmp_path: Path
 ) -> None:
