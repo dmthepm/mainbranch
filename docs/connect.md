@@ -139,6 +139,37 @@ forms, such as `${NAME:-x}` or `env sh -c`. The guard sees only exec's direct
 child arguments, not what a shell or script later does. The
 environment stays readable by the same OS user.
 
+## Comparing stored copies: `fingerprint`
+
+`mb connect fingerprint <provider> [--repo PATH] [--json]` prints the provider,
+its first required secret slot, and `sha256:` followed by the first eight hex
+characters of the stored value's SHA-256 hash. It supports connected custom
+aliases without repeating `--custom`:
+
+```bash
+mb connect fingerprint cloudflare
+# cloudflare api_token sha256:12345678
+mb connect fingerprint my-alias --json
+```
+
+The hash uses the exact stored UTF-8 bytes, with no added newline. Compare a
+copy already in a shell variable with:
+
+```bash
+printf %s "$SECRET" | sha256sum | cut -c1-8
+```
+
+The eight-hex prefix is for matching copies, not a secret or proof of validity.
+The command prints no credential and works in pipes without a terminal or
+`--print`. It reads the stored primary slot even for Google OAuth; it does not
+mint a fresh access token or hash the OAuth grant. Missing or unreadable
+credentials exit 1 with a one-line reason on stderr; `--json` also returns
+`ok: false` and `state` on stdout. Usage and repo lookup refusals exit 2;
+caller-policy and audit failures follow the existing release rules.
+Each attempt writes one local audit decision with verb `fingerprint`, without
+the secret or its hash. The existing binding, reference and caller-policy
+checks apply.
+
 ## Raw Read: `token`
 
 `mb connect token <provider> --print` explicitly releases the raw credential
@@ -237,7 +268,7 @@ and its rule as `reason`. Existing audit failure behavior still applies.
 
 ## Local release audit
 
-Each `exec` and `token` attempt appends one JSON line to
+Each `exec`, `token` and `fingerprint` attempt appends one JSON line to
 `$XDG_STATE_HOME/mainbranch/connect-audit.jsonl`, defaulting to
 `~/.local/state/mainbranch/connect-audit.jsonl` on Linux and macOS.
 The directory has mode 0700 and the file 0600. The log stays local, outside git.
@@ -296,6 +327,11 @@ provider, so there is no credential to confirm and `provider_verified` stays
 false. Such a provider is not covered by the invariant and keeps reporting
 `ready` from its repo-local metadata — see below. Claiming `provider_verified`
 for it would be the same overclaim this behavior exists to remove.
+
+For a custom alias, status and test say that the key is stored but mb has no
+probe for custom aliases, so it can't verify the key. They suggest no test
+command as a repair. A fresh alias can still show `unvalidated` until checked;
+`test` records storage, without contacting a provider or verifying validity.
 
 There is no repair command for `stored, unverified` on a provider with no
 probe. Rerunning `mb connect test` records the same answer, so confirm the

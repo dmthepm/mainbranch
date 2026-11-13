@@ -520,6 +520,7 @@ _CONNECT_REPO_ROOT_VERBS = frozenset(
         "exec",
         "rotate",
         "token",
+        "fingerprint",
         "policy",
         "hydrate",
         "rebind",
@@ -536,7 +537,7 @@ def _connect_default_repo(target: str, provider: str, *, json_out: bool, flags: 
     try:
         return str(connect_mod.find_business_repo("."))
     except connect_mod.ConnectRefusal as exc:
-        if target in {"exec", "token"}:
+        if target in {"exec", "token", "fingerprint"}:
             # Same audit line any other refusal leaves, before anything is read.
             with suppress(connect_mod.ConnectRefusal):
                 connect_mod.write_release_audit(
@@ -1072,6 +1073,7 @@ _CONNECT_SUBCOMMANDS = frozenset(
         "exec",
         "rotate",
         "token",
+        "fingerprint",
         "hydrate",
         "rebind",
         "remove",
@@ -1252,8 +1254,8 @@ def connect_cmd(
         "",
         help=(
             "Provider to connect, or `list` / `plan` / `status` / `doctor` / `hygiene` / "
-            "`identity` / `test` / `exec` / `rotate` / `token` / `audit` / `policy` / "
-            "`hydrate` / `rebind` / `remove` / `repair`."
+            "`identity` / `test` / `exec` / `rotate` / `token` / `fingerprint` / "
+            "`audit` / `policy` / `hydrate` / `rebind` / `remove` / `repair`."
         ),
     ),
     provider: str = typer.Argument(
@@ -1421,12 +1423,18 @@ def connect_cmd(
     ),
     json_out: bool = typer.Option(False, "--json", help="Machine-readable output."),
 ) -> None:
-    """Connect provider credentials without committing secrets."""
+    """Connect provider credentials without committing secrets.
+
+    fingerprint <provider> prints provider, primary slot and sha256:<8 hex> of
+    stored UTF-8 bytes, without an added newline in the hash. Safe in pipes;
+    the prefix matches copies and is not a secret. Compare with:
+    printf %s "$SECRET" | sha256sum | cut -c1-8
+    """
     command = command or []
     if repo is None:
         # A usage error comes first: it needs no repo to be reported.
         usage_error = (bool(command) and target != "exec") or (
-            target in {"exec", "token", "test"} and not provider
+            target in {"exec", "token", "test", "fingerprint"} and not provider
         )
         flags = ["inherit_env"] if inherit_env else []
         flags += ["keep_env"] if keep_env else []
@@ -1750,6 +1758,35 @@ def connect_cmd(
         if not result["stored"]:
             raise typer.Exit(1)
         raise typer.Exit(1 if connect_mod.provider_needs_action(result["status"]) else 0)
+    if target == "fingerprint":
+        if not provider:
+            with suppress(connect_mod.ConnectRefusal):
+                connect_mod.write_release_audit(
+                    "fingerprint",
+                    "",
+                    repo,
+                    result="refused",
+                    reason="provider_required",
+                    exit_code=2,
+                    flags=[],
+                )
+            _connect_usage_exit("mb connect fingerprint", "provider required", json_out=json_out)
+        try:
+            result = connect_mod.fingerprint(provider, repo)
+        except ValueError as exc:
+            _connect_error_exit(
+                "mb connect fingerprint",
+                exc,
+                code=connect_mod.release_refusal_exit_code(exc),
+                json_out=json_out,
+            )
+        if not result["ok"]:
+            typer.echo(f"mb connect fingerprint: {result['error']}", err=True)
+        if json_out:
+            typer.echo(json.dumps(result))
+        elif result["ok"]:
+            typer.echo(f"{result['provider']} {result['slot']} {result['fingerprint']}")
+        raise typer.Exit(0 if result["ok"] else 1)
     if target == "token":
         if not provider or json_out:
             flags = ["print"] if print_token else []

@@ -1342,6 +1342,15 @@ def _unverified_repair(provider: Provider) -> dict[str, str]:
     provider that exits 1 always names something to run, and a provider that
     exits 0 never sends the operator after a fix that cannot work.
     """
+    if provider.category == "custom":
+        return {
+            "summary": (
+                f"{provider.name} key is stored; mb has no probe for custom aliases, "
+                "so it can't verify this key."
+            ),
+            "repair": "Confirm the key with the provider or its first real workflow run.",
+            "repair_command": "",
+        }
     if has_provider_probe(provider.id):
         # Reachable through metadata that recorded readiness without recording
         # a provider call. Running the probe is a real next step.
@@ -1428,6 +1437,8 @@ def _repair(
         }
     if state == NOT_CHECKED_STATE:
         return _not_checked_repair(provider)
+    if provider.category == "custom" and state in {"unvalidated", UNVERIFIED_STATE}:
+        return _unverified_repair(provider)
     validation = validation or {}
     validation_repair = str(validation.get("repair") or "")
     validation_repair_command = str(validation.get("repair_command") or "")
@@ -3904,7 +3915,9 @@ def _stored_secret(provider: Provider, entry: dict[str, Any], repo: Path) -> str
     return _entry_secret_value(entry, provider.required_secrets[0])
 
 
-def read_token(provider_id: str, repo: str | Path = ".") -> dict[str, Any]:
+def read_token(
+    provider_id: str, repo: str | Path = ".", *, mint_google: bool = True
+) -> dict[str, Any]:
     """Resolve the stored primary credential for scripted consumers.
 
     The returned ``token`` exists to be written to stdout exactly once;
@@ -3913,6 +3926,7 @@ def read_token(provider_id: str, repo: str | Path = ".") -> dict[str, Any]:
     and scheduled tasks resolve the same credential as the primary checkout.
     A `google` entry with an OAuth grant returns a freshly minted access
     token instead of the stored one; the grant itself is never returned.
+    ``mint_google=False`` reads the stored primary slot without a provider call.
     """
     provider = resolve_provider(provider_id, repo)
     if not provider.required_secrets:
@@ -3940,7 +3954,7 @@ def read_token(provider_id: str, repo: str | Path = ".") -> dict[str, Any]:
             "error": str(exc),
             "repair_command": _reconnect_command(provider, entry, grant_readable=False),
         }
-    if _records_oauth_grant(provider, entry):
+    if mint_google and _records_oauth_grant(provider, entry):
         # OAuth mode: mint a short-lived access token from the stored grant.
         from mb import google_connect
 
@@ -4511,6 +4525,30 @@ def release_attempt(
                     exit_code=code,
                 )
         raise
+
+
+def fingerprint(provider: str, repo: str | Path) -> dict[str, Any]:
+    """Compare stored primary credentials without returning their value."""
+    with release_attempt("fingerprint", provider, repo, []) as record:
+        result = read_token(provider, repo, mint_google=False)
+        output = {
+            "ok": result["ok"],
+            "provider": result["provider"],
+            "slot": result["field"],
+        }
+        if result["ok"]:
+            output["fingerprint"] = (
+                "sha256:" + hashlib.sha256(result["token"].encode("utf-8")).hexdigest()[:8]
+            )
+        else:
+            output.update(state=result["state"], error=result["error"])
+        record(
+            result="released" if result["ok"] else "failed",
+            reason="" if result["ok"] else result["state"],
+            exit_code=0 if result["ok"] else 1,
+            scope=result.get("source", ""),
+        )
+    return output
 
 
 def token_for_output(
