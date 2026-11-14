@@ -501,7 +501,7 @@ def _review_required(repo: Path, changes: list[dict[str, Any]]) -> list[dict[str
                     "path": path,
                     "message": (
                         "generic Untitled files look like accidental editor scratch, "
-                        "not durable business memory"
+                        "not part of the durable business record"
                     ),
                     "guidance": REVIEW_REQUIRED_GUIDANCE,
                 }
@@ -556,7 +556,10 @@ def _review_required(repo: Path, changes: list[dict[str, Any]]) -> list[dict[str
                 {
                     "code": "prompt_draft",
                     "path": path,
-                    "message": "prompt drafts should be reviewed before becoming business memory",
+                    "message": (
+                        "prompt drafts should be reviewed before becoming part of the "
+                        "business record"
+                    ),
                     "guidance": REVIEW_REQUIRED_GUIDANCE,
                 }
             )
@@ -1061,7 +1064,7 @@ def commit(
             "errors": [
                 (
                     "checkpoint includes files that need review; remove them or pass "
-                    "--include-review-required after confirming they belong in business memory"
+                    "--include-review-required after confirming they belong in the business record"
                 )
             ],
         }
@@ -1223,7 +1226,7 @@ def render_human(result: dict[str, Any]) -> None:
         if review:
             print(
                 "These files look like scratch, setup junk, or prompt drafts, "
-                "not durable business memory:"
+                "not part of the durable business record:"
             )
             for item in review:
                 print(f"  - {item['path']}: {item['message']}")

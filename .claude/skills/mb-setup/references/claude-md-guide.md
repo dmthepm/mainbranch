@@ -8,7 +8,7 @@ How to draft an effective CLAUDE.md for a business repo.
 
 Your entire repo is a precision instrument for LLM context quality. Every file should earn its place. CLAUDE.md is the lightest layer — summaries and pointers, not full content.
 
-CLAUDE.md is the **always-loaded business brain**. Claude reads this file at the start of every session. It should contain:
+CLAUDE.md is the **always-loaded entry to the business record**. Claude reads this file at the start of every session. It should contain:
 
 - Enough context to work effectively
 - Pointers to deeper reference files
@@ -50,10 +50,10 @@ Claude. For old clone-era installs, use `docs/migrating.md`.
 
 ```
 [business-name]/
-├── CLAUDE.md              # Always loaded - business brain
+├── CLAUDE.md              # Always loaded - entry to the business record
 ├── README.md              # Human-readable overview
 │
-├── core/                  # Evergreen business brain
+├── core/                  # Evergreen core of the business record
 │   ├── offer.md
 │   ├── audience.md
 │   ├── voice.md

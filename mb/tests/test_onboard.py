@@ -50,7 +50,7 @@ def _assert_onboard_claude_md_cli_first_contract(text: str) -> None:
     assert "## First-run setup intent" in text
     assert "setup intent, not as a document to save" in normalized
     assert "gh auth status" in normalized
-    assert "business brain" in normalized
+    assert "business record" in normalized
     assert "## Business primitive routing" in text
     assert "multi-offer repo, `core/offer.md` is the portfolio thesis" in text
     assert "offer-specific proof belongs in `core/offers/<slug>/proof/`" in text

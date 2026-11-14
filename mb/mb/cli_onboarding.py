@@ -28,7 +28,7 @@ def _render_onboard_intro(level: str) -> None:
         return
     typer.echo("")
     typer.echo("Main Branch works because the business lives somewhere durable:")
-    typer.echo("  local files  - readable, portable business memory")
+    typer.echo("  local files  - readable, portable business record")
     typer.echo("  git          - the evolution story and rollback layer")
     typer.echo("  GitHub       - tasks, proposals, reviews, and shipped history")
     typer.echo("  Claude Code  - the first execution runtime for judgment-heavy work")
@@ -49,7 +49,7 @@ def _render_onboard_human(result: dict[str, Any]) -> None:
 
     if result["level"] != "power":
         console.print("[bold]Why this stack[/bold]")
-        console.print("  Local files are the business brain.")
+        console.print("  Local files are the business record.")
         console.print("  Git remembers how the business changed.")
         console.print("  GitHub turns tasks and proposals into a team surface.")
         console.print("  Claude Code is the first runtime that can act on the repo.\n")

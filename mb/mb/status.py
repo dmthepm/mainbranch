@@ -2008,7 +2008,8 @@ def _business_memory_readiness(report: dict[str, Any]) -> dict[str, Any]:
         return {
             "state": "not_ready",
             "summary": (
-                "Business memory is not available until this folder is a Main Branch business repo."
+                "The business record is not available until this folder is a Main Branch "
+                "business repo."
             ),
             "signals": ["repo.looks_like_mainbranch_repo=false"],
             "safe_to_share": True,
@@ -2022,7 +2023,7 @@ def _business_memory_readiness(report: dict[str, Any]) -> dict[str, Any]:
         return {
             "state": "blocked",
             "summary": (
-                "Business memory has validation blockers; repo/runtime readiness does "
+                "The business record has validation blockers; repo/runtime readiness does "
                 "not mean the business context is complete."
             ),
             "signals": signals,
@@ -2038,7 +2039,7 @@ def _business_memory_readiness(report: dict[str, Any]) -> dict[str, Any]:
             "summary": (
                 f"{onboarding_summary.get('completed_required', 0)}/"
                 f"{onboarding_summary.get('total_required', 0)} required onboarding "
-                "inputs are complete; runtime can be ready while business memory still "
+                "inputs are complete; runtime can be ready while the business record still "
                 "needs profile inputs."
             ),
             "signals": [*signals, *[str(item) for item in missing]],
@@ -2072,7 +2073,7 @@ def _business_memory_readiness(report: dict[str, Any]) -> dict[str, Any]:
         return {
             "state": "needs_attention",
             "summary": (
-                "Repo/runtime checks are usable, but business memory still has drift or "
+                "Repo/runtime checks are usable, but the business record still has drift or "
                 "follow-up signals to review."
             ),
             "signals": signals,
@@ -2082,7 +2083,7 @@ def _business_memory_readiness(report: dict[str, Any]) -> dict[str, Any]:
     return {
         "state": "ready",
         "summary": (
-            "Business memory has no onboarding, validation, or drift blockers in the "
+            "The business record has no onboarding, validation, or drift blockers in the "
             "current status facts."
         ),
         "signals": [],
@@ -2215,7 +2216,7 @@ def _readiness(report: dict[str, Any]) -> dict[str, Any]:
         "level": level,
         "summary": (
             f"Repo/runtime readiness is {level} at {percent}/100. "
-            f"Business memory is {business_memory['state']}."
+            f"Business record is {business_memory['state']}."
         ),
         "dimensions": {
             "repo_runtime": {
@@ -2567,7 +2568,7 @@ def render_human(
     business_memory = (readiness.get("dimensions") or {}).get("business_memory") or {}
     if business_memory:
         console.print(
-            "[bold]Business memory[/bold] "
+            "[bold]Business record[/bold] "
             f"{business_memory.get('state', 'unknown')}: "
             f"{business_memory.get('summary', '')}"
         )

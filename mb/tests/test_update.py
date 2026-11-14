@@ -2563,12 +2563,22 @@ def test_update_adds_entry_rules_to_069_claude_and_keeps_operator_notes(
     assert claude_guidance.plan(business_repo) == (None, None)
 
 
+def _pre_d275_template() -> str:
+    """The current CLAUDE.md template with its pre-D275 "business brain" wording."""
+
+    from mb.init import _read_template
+
+    text = _read_template("CLAUDE.md.tmpl")
+    for old, new in claude_guidance._RECORD_WORDING[:2]:
+        text = text.replace(new, old)
+    return text
+
+
 def test_update_replaces_0611_repair_claim_outside_managed_block(
     monkeypatch: pytest.MonkeyPatch, business_repo: Path
 ) -> None:
-    from mb.init import _read_template
 
-    template = _read_template("CLAUDE.md.tmpl")
+    template = _pre_d275_template()
     new = (
         "Before an apply command succeeds,\n"
         "describe the repair as a proposed step. After it succeeds, say which command\n"
@@ -2639,6 +2649,16 @@ def _legacy_claude_case(repo: Path, tag: str, newline: str) -> tuple[Path, bytes
     return path, original, baseline
 
 
+def _record_wording(text: bytes, newline: str) -> bytes:
+    """`text` with the generated "business brain" wording swapped for D275's."""
+
+    for old, new in claude_guidance._RECORD_WORDING:
+        text = text.replace(
+            old.replace("\n", newline).encode(), new.replace("\n", newline).encode()
+        )
+    return text
+
+
 @pytest.mark.parametrize("tag", ["oe-v0.6.9", "oe-v0.6.10"])
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
 def test_a1_legacy_update_changes_only_repair_claim_beyond_base_entry_rules(
@@ -2655,7 +2675,7 @@ def test_a1_legacy_update_changes_only_repair_claim_beyond_base_entry_rules(
     )
 
     assert result["ok"] is True, result["errors"]
-    assert path.read_bytes() == baseline.replace(old, new)
+    assert path.read_bytes() == _record_wording(baseline.replace(old, new), newline)
 
 
 @pytest.mark.parametrize("tag", ["oe-v0.6.9", "oe-v0.6.10"])
@@ -2727,7 +2747,8 @@ def test_a4_legacy_update_check_and_unapproved_run_leave_file_untouched(
     old = _LEGACY_REPAIR_CLAIM.replace("\n", newline).encode()
     new = claude_guidance._NEW_REPAIR_GUIDANCE.replace("\n", newline).encode()
     planned, _ = claude_guidance.plan(business_repo)
-    assert planned is not None and planned.encode() == baseline.replace(old, new)
+    assert planned is not None
+    assert planned.encode() == _record_wording(baseline.replace(old, new), newline)
 
     checked = update_mod.run(repo=business_repo, check=True)
     assert "CLAUDE.md" in checked["surface_refresh"]["planned"]["tracked_files"]
@@ -2744,7 +2765,7 @@ def test_claude_guidance_replaces_one_exact_0611_paragraph(tmp_path: Path, newli
     current = _read_template("CLAUDE.md.tmpl")
     old = claude_guidance._OLD_REPAIR_CLAIM
     new = claude_guidance._NEW_REPAIR_GUIDANCE
-    prior = current.replace(new, old).replace("\n", newline)
+    prior = _pre_d275_template().replace(new, old).replace("\n", newline)
     path = tmp_path / "CLAUDE.md"
     path.write_bytes(prior.encode())
 
@@ -2817,9 +2838,8 @@ def test_claude_guidance_preserves_paragraph_without_generated_section(tmp_path:
 def test_claude_guidance_replaces_only_real_section_beside_fenced_copy(
     tmp_path: Path, newline: str
 ) -> None:
-    from mb.init import _read_template
 
-    current = _read_template("CLAUDE.md.tmpl")
+    current = _pre_d275_template()
     old = current.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
     claim_at = old.index(claude_guidance._OLD_REPAIR_CLAIM)
     section = old[old.index("## First-run setup intent") : old.index("\n\n", claim_at)]
@@ -2837,9 +2857,8 @@ def test_claude_guidance_replaces_only_real_section_beside_fenced_copy(
 
 
 def test_claude_guidance_replaces_generated_section_at_eof_without_newline(tmp_path: Path) -> None:
-    from mb.init import _read_template
 
-    current = _read_template("CLAUDE.md.tmpl")
+    current = _pre_d275_template()
     old = current.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
     claim_at = old.index(claude_guidance._OLD_REPAIR_CLAIM)
     section = old[old.index("## First-run setup intent") : old.index("\n\n", claim_at)]
@@ -2879,9 +2898,8 @@ def test_claude_guidance_preserves_ambiguous_0611_paragraph(tmp_path: Path, edit
 def test_claude_guidance_refreshes_markers_while_preserving_repeated_repair(
     tmp_path: Path,
 ) -> None:
-    from mb.init import _read_template
 
-    current = _read_template("CLAUDE.md.tmpl")
+    current = _pre_d275_template()
     old = current.replace(claude_guidance._NEW_REPAIR_GUIDANCE, claude_guidance._OLD_REPAIR_CLAIM)
     claim_at = old.index(claude_guidance._OLD_REPAIR_CLAIM)
     paragraph = old[old.rfind("\n\n", 0, claim_at) + 2 : old.index("\n\n", claim_at)]
@@ -5024,3 +5042,38 @@ def test_update_check_names_skill_link_when_wiring_is_stale(
     result = update_mod.run(repo=business_repo, check=True, interactive=False)
 
     assert result["next_actions"][0] == "mb skill link --repo ."
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_update_refreshes_0626_business_brain_wording_once(
+    monkeypatch: pytest.MonkeyPatch, business_repo: Path, newline: str
+) -> None:
+    """A repo generated by 0.6.26 gets "business record" wording, not a second section."""
+
+    from mb.init import _read_template
+
+    released = (_LEGACY_CLAUDE_FIXTURES / "oe-v0.6.26-CLAUDE.md.tmpl").read_text(encoding="utf-8")
+    assert released.count("business brain") == 4
+    for old, _ in claude_guidance._RECORD_WORDING[:2]:
+        assert released.count(old) == 1
+    path = business_repo / "CLAUDE.md"
+    path.write_bytes(
+        (released + "\n## Operator notes\n\nKeep this.\n").replace("\n", newline).encode()
+    )
+    _commit_all(business_repo, "0.6.26 Claude guidance")
+    _wheel_update_env(monkeypatch, [])
+
+    result = update_mod.run(
+        repo=business_repo, interactive=True, confirm_surfaces=lambda _repo, _files: True
+    )
+
+    assert result["ok"] is True, result["errors"]
+    updated = path.read_bytes().decode()
+    template = _read_template("CLAUDE.md.tmpl").replace("\n", newline)
+    assert "business brain" not in updated
+    assert updated.count("## First-run setup intent") == 1
+    for _, new in claude_guidance._RECORD_WORDING[:2]:
+        new = new.replace("\n", newline)
+        assert updated.count(new) == template.count(new) == 1
+    assert updated.endswith(f"## Operator notes{newline}{newline}Keep this.{newline}")
+    assert claude_guidance.plan(business_repo) == (None, None)

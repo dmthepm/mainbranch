@@ -754,7 +754,7 @@ Test whether search intent can produce qualified calls for the HVAC proof offer.
 - `../hvac-offer-sidecar` is a synthetic linked execution repo placeholder.
 - Parent repo remains canonical for offer, bet, push, and outcome truth.
 - Raw provider exports, customer records, and secrets stay outside committed
-  business memory.
+  business record.
 """,
         encoding="utf-8",
     )

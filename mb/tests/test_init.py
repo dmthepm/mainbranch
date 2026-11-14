@@ -60,8 +60,8 @@ def _assert_claude_md_cli_first_contract(text: str) -> None:
     assert "gh auth status" in normalized
     assert "gh api user --jq .login" in normalized
     assert "GitHub is strongly recommended" in normalized
-    assert "connector-friendly copy of the business brain" in normalized
-    assert "business brain" in normalized
+    assert "connector-friendly copy of the business record" in normalized
+    assert "business record" in normalized
     assert "If `/mb-start` is not discoverable" in text
     assert "restart Claude Code from this repo and try" in text
     assert "I repaired missing Main Branch start wiring" not in text
@@ -159,8 +159,8 @@ def _assert_agents_md_codex_start_contract(text: str) -> None:
     assert "gh auth status" in normalized
     assert "gh api user --jq .login" in normalized
     assert "GitHub is strongly recommended" in normalized
-    assert "connector-friendly copy of the business brain" in normalized
-    assert "business brain" in normalized
+    assert "connector-friendly copy of the business record" in normalized
+    assert "business record" in normalized
     assert "business-owner language" in text
     assert "bets, goals, offers, pushes" in text
     assert "`working tree: clean`" in text
