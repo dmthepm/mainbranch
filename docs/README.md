@@ -58,7 +58,7 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 
 ## Machines that run your agents
 
-- [Read-only checks](read-only-checks.md) — `mb machine doctor`, `mb machine update` (draft), and the `mb-homelab-*` skills: inspect the computer, change nothing.
+- [Read-only checks](read-only-checks.md) — `mb machine doctor`, `mb machine update` (draft), and the `mb-homelab-*` skills: inspect the computer, install nothing, change no settings.
 - [`machine-setup.md`](machine-setup.md) — an always-on box for your agents: concepts, machine picks, Ubuntu and Omarchy, first week.
 
 ## Inspect schemas and contracts

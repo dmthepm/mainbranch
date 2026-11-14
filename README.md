@@ -115,7 +115,7 @@ approval and a tested execution path. Installing Main Branch does not authorize
 those actions.
 
 `mb` starts and checks the agents you define. It hosts no model and schedules
-nothing. `mb agent up` and `mb agent check` shipped in 0.6.25; see
+nothing. `mb agent up` and the live `mb agent check <name>` shipped in 0.6.25; see
 [agent policy](docs/agent-policy.md) for what they prove. The local read-only
 dashboard is a view over your files, not a hosted business database.
 

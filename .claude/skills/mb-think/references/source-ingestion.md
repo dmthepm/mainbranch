@@ -2,7 +2,7 @@
 
 Use this before reading transcripts, authenticated community content,
 connected-provider recordings, cloud-drive files, call notes, exported chats,
-or mixed private/business sources into business memory.
+or mixed private/business sources into the business record.
 
 The goal is to get useful signal without copying raw private material into git.
 Raw sources are evidence. Durable output is synthesized research, decisions,

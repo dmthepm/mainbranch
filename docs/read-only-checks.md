@@ -1,9 +1,9 @@
 # Read-only checks
 
 These checks look at the computer that runs your agents, not at a business.
-They work outside a business repo, read no business data and change nothing.
-Any step that needs root stays the owner's to run. Setting up the machine
-itself is covered in [machine setup](machine-setup.md).
+They work outside a business repo, read no business data, install nothing and
+change no settings. Any step that needs root stays the owner's to run. Setting
+up the machine itself is covered in [machine setup](machine-setup.md).
 
 ## Machine commands
 
