@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -226,7 +227,7 @@ def test_b5_no_hledger_host_reads_receipt(tmp_path: Path, monkeypatch: pytest.Mo
 def test_doctor_help_describes_both_modes() -> None:
     result = RUNNER.invoke(app, ["books", "doctor", "--help"])
     assert result.exit_code == 0
-    text = " ".join(result.output.split())
+    text = " ".join(re.sub(r"\x1b\[[0-9;]*m", "", result.output).split())
     assert "Required" not in text
     assert "--repo" in text and "--plan" in text
     assert "vault_location" in text
