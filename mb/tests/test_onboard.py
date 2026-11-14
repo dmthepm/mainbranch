@@ -51,6 +51,7 @@ def _assert_onboard_claude_md_cli_first_contract(text: str) -> None:
     assert "setup intent, not as a document to save" in normalized
     assert "gh auth status" in normalized
     assert "business record" in normalized
+    assert "business brain" not in normalized.lower()
     assert "## Business primitive routing" in text
     assert "multi-offer repo, `core/offer.md` is the portfolio thesis" in text
     assert "offer-specific proof belongs in `core/offers/<slug>/proof/`" in text
@@ -75,6 +76,8 @@ def test_onboard_yes_creates_repo_and_reports_next_steps(tmp_path: Path, monkeyp
     assert (repo / "CLAUDE.md").exists()
     claude_md = (repo / "CLAUDE.md").read_text(encoding="utf-8")
     _assert_onboard_claude_md_cli_first_contract(claude_md)
+    agents_md = (repo / "AGENTS.md").read_text(encoding="utf-8")
+    assert "business brain" not in agents_md.lower()
     assert (repo / ".claude" / "skills" / "mb-start" / "SKILL.md").exists()
     assert (repo / ".git" / "hooks" / "commit-msg").exists()
     assert result["checkpoint_hook"]["state"] == "installed"
