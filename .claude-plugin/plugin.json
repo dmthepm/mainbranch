@@ -1,7 +1,7 @@
 {
   "name": "mainbranch",
   "version": "0.6.26",
-  "description": "Main Branch Claude Code skills for running a business from markdown files in git.",
+  "description": "Main Branch: the system of record for businesses run with AI agents.",
   "author": {
     "name": "Noontide"
   },

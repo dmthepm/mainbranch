@@ -12,6 +12,7 @@ import pytest
 
 from mb import codex as codex_mod
 from mb import init as init_mod
+from mb.codex_data import _DEFAULT_AGENTS
 from mb.durable import UnconfirmedWriteError
 from mb.init import _DEFAULT_CLAUDE, DATA_FOLDERS, _read_template, run
 
@@ -60,8 +61,9 @@ def _assert_claude_md_cli_first_contract(text: str) -> None:
     assert "gh auth status" in normalized
     assert "gh api user --jq .login" in normalized
     assert "GitHub is strongly recommended" in normalized
-    assert "connector-friendly copy of the business brain" in normalized
-    assert "business brain" in normalized
+    assert "connector-friendly copy of the business record" in normalized
+    assert "business record" in normalized
+    assert "business brain" not in normalized.lower()
     assert "If `/mb-start` is not discoverable" in text
     assert "restart Claude Code from this repo and try" in text
     assert "I repaired missing Main Branch start wiring" not in text
@@ -159,8 +161,9 @@ def _assert_agents_md_codex_start_contract(text: str) -> None:
     assert "gh auth status" in normalized
     assert "gh api user --jq .login" in normalized
     assert "GitHub is strongly recommended" in normalized
-    assert "connector-friendly copy of the business brain" in normalized
-    assert "business brain" in normalized
+    assert "connector-friendly copy of the business record" in normalized
+    assert "business record" in normalized
+    assert "business brain" not in normalized.lower()
     assert "business-owner language" in text
     assert "bets, goals, offers, pushes" in text
     assert "`working tree: clean`" in text
@@ -190,6 +193,13 @@ def test_default_claude_operating_contract_matches_template() -> None:
     assert fallback_contract == template_contract
     _assert_claude_md_cli_first_contract(_DEFAULT_CLAUDE)
     _assert_claude_md_primitive_routing_contract(_DEFAULT_CLAUDE)
+
+
+def test_fallback_claude_and_codex_defaults_say_business_record() -> None:
+    for text in (_DEFAULT_CLAUDE, _DEFAULT_AGENTS):
+        normalized = _normalize(text).lower()
+        assert "business record" in normalized
+        assert "business brain" not in normalized
 
 
 def test_business_repo_templates_load_entry_rules_once() -> None:

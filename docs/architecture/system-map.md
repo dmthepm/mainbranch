@@ -42,7 +42,7 @@ flowchart TB
     supply["supply-chain gates<br/>OIDC, pypi environment, dependency review"]
   end
 
-  subgraph brain["Business repo - durable business brain"]
+  subgraph record["Business repo - durable business record"]
     core["core/<br/>offer, audience, voice, team, strategy, operations, finance policy"]
     growthcraft["offer sharpening + AI SEO/recognition<br/>content strategy and conversion knowledge"]
     research["research/<br/>point-in-time findings"]
@@ -101,9 +101,9 @@ flowchart TB
   codex --> cli
   future -. planned adapters .-> cli
   skills --> cli
-  skills --> brain
+  skills --> record
 
-  cli --> brain
+  cli --> record
   cli --> templates
   cli --> tests
   cli --> git
@@ -138,7 +138,7 @@ flowchart TB
   logs --> reflect
   reflect --> core
 
-  brain --> git
+  record --> git
   git --> ghissues
   ghissues --> prs
   prs --> checks
@@ -162,10 +162,10 @@ flowchart TB
   books -. safe summaries only .-> core
   books -. safe summaries only .-> logs
   secrets -. handles only .-> cli
-  raw -. sanitized summaries only .-> brain
+  raw -. sanitized summaries only .-> record
 
-  brain --> obsidian
-  brain --> dashboard
+  record --> obsidian
+  record --> dashboard
   github --> dashboard
   data --> dashboard
   pushes --> sites
@@ -189,7 +189,7 @@ flowchart TB
 
   class cli,tests,templates,docs,roadmap,release,supply control;
   class skills,claude,codex,future judgment;
-  class brain,core,growthcraft,research,decisions,bets,pushes,playbooks,logs,data,mbstate,wiring,git memory;
+  class record,core,growthcraft,research,decisions,bets,pushes,playbooks,logs,data,mbstate,wiring,git memory;
   class github,ghissues,prs,checks,linear,cloudflare,google,meta,apify,postiz,sync,sidecars external;
   class books,hledger,secrets,raw private;
   class obsidian,dashboard,sites view;

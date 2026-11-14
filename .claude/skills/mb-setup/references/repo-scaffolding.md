@@ -110,12 +110,12 @@ with `mb doctor repair --plan --json` before reusing any values.
 Full structure (single-offer):
 ```
 {business-name}/
-├── CLAUDE.md              # Always loaded - business brain
+├── CLAUDE.md              # Always loaded - entry to the business record
 ├── README.md              # Human-readable overview
 ├── .env                   # Secrets (gitignored)
 ├── .gitignore             # Include .env
 │
-├── core/                  # Evergreen business brain
+├── core/                  # Evergreen core of the business record
 │   ├── soul.md            # Why you exist
 │   ├── offer.md           # What you sell / brand thesis
 │   ├── audience.md        # Who buys
