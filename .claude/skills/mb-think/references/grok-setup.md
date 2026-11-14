@@ -20,18 +20,17 @@ See `mb-start/references/config-system.md` for legacy config cleanup guidance.
 
 ## CRITICAL: REST API vs Python SDK
 
-**The xAI REST API does NOT support live X search.**
+**The xAI REST API supports live X search through the Responses API.** The Python SDK is optional.
 
 | API | Chat Works | X Search Works |
 |-----|------------|----------------|
-| REST API (`api.x.ai/v1/chat/completions`) | YES | NO |
-| Python SDK (`xai_sdk` via gRPC) | YES | YES |
+| REST `POST https://api.x.ai/v1/responses` with `"tools": [{"type": "x_search"}]` | YES | YES |
+| Python SDK (`xai_sdk`) | YES | YES |
+| REST `api.x.ai/v1/chat/completions` with `search: true` (legacy Live Search) | YES | NO: `num_sources_used: 0` |
 
-When you use the REST API with `search: true`, you get `num_sources_used: 0` — no live X data.
+The legacy `search: true` failure is the removed Live Search feature, not a limit of REST. Use `/v1/responses`.
 
-**To get live X search, you must use the Python SDK.** The SDK uses gRPC and server-side tool execution, which is how xAI grants access to X data.
-
-**Model requirement (as of Jan 2026):** Server-side tools like `x_search` require the **grok-4 family** of models. grok-3 no longer supports server-side tools and will return an `INVALID_ARGUMENT` error if you try.
+**Checked against xAI's X Search docs on 10 November 2026** (docs.x.ai/developers/tools/x-search). Their examples use `grok-4.7`. Main Branch has not tested REST `x_search` or `grok-4.7`: **not tested by Main Branch**. The SDK route above was tested in January 2026; that is history, not a current check. Older notes here (January 2026) said server-side tools need the grok-4 family and that grok-3 returns `INVALID_ARGUMENT`; treat that as history and check xAI's models page for the current name.
 
 ---
 
@@ -56,16 +55,12 @@ When you use the REST API with `search: true`, you get `num_sources_used: 0` —
 | New user bonus | $25 free credits |
 | Data sharing bonus | +$150/mo free credits |
 
-**Grok-4 pricing (for X search):**
-- Input: ~$3 per million tokens
-- Output: ~$15 per million tokens
+**X Search is billed on top of tokens** (xAI docs, checked 10 November 2026):
+- $5 per 1,000 posts fetched
+- $10 per 1,000 user profiles fetched
+- plus token costs at the model's current rates (see xAI's pricing page; the old Grok-4 figure of ~$3 input and ~$15 output per million tokens is January 2026 history)
 
-**What does that mean practically?**
-- A typical X sentiment search with synthesis: ~5-10K total tokens
-- Cost per search: ~$0.02-0.10
-- $5 gets you ~50-250 searches depending on complexity
-
-**Bottom line:** $5-10 is enough for weeks of regular research use.
+A search's cost depends on how many posts and profiles it fetches, so do not promise a number of searches from a $5 balance. Start small, then read the usage in your xAI console.
 
 ---
 
@@ -133,7 +128,7 @@ from xai_sdk.chat import user
 client = Client()
 
 chat = client.chat.create(
-    model="grok-4",  # grok-4 required for server-side x_search tools
+    model="grok-4",  # tested January 2026; xAI docs now show grok-4.7 (untested here)
     tools=[x_search()],
 )
 
@@ -242,7 +237,7 @@ then verify at [console.x.ai](https://console.x.ai)
 
 **SDK: "num_sources_used: 0"** — You're using REST API, not SDK. Make sure you're using `x_search()` tool.
 
-**SDK: "the model grok-3 is not supported when using server-side tools"** — As of Jan 2026, x_search requires grok-4 family models. Change `model="grok-3"` to `model="grok-4"`.
+**SDK: "the model grok-3 is not supported when using server-side tools"** — In Jan 2026 this meant grok-3 had lost server-side tools. Use a model from xAI's X Search docs (see the dated note near the top).
 
 **SDK: "AttributeError: 'Chat' object has no attribute 'add_user_turn'"** — Old SDK API. Update to v1.6+: use `chat.append(user(...))` then `chat.sample()` instead of async `add_user_turn()`.
 

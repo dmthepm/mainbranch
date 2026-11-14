@@ -5,9 +5,29 @@ provider recordings, cloud-drive files, call notes, or exported chats may become
 business memory.
 
 The goal is to mine useful signal without copying raw private material into
-git, public docs, GitHub issues, or agent-visible contexts that do not need it.
-Raw sources are evidence. Durable Main Branch output is synthesized research,
-decisions, proof candidates, push inputs, logs, or stale-source cleanup notes.
+public docs, GitHub issues, code repos, or agent-visible contexts that do not
+need it. Raw sources are evidence. Durable Main Branch output is synthesized
+research, decisions, proof candidates, push inputs, logs, or stale-source
+cleanup notes.
+
+## How This Fits Where Data Lives
+
+The current storage rule is [where data lives](../.claude/skills/mb-setup/references/where-data-lives.md).
+The business repo is the team's private memory, for the team and its agents
+only, so real material (recordings, P&L, reviews, real examples) belongs
+there. This rail does not forbid that. It is the method for the cases where
+more care is needed:
+
+- **Large datasets and full exports:** not in the hub, because commits are
+  never deleted. Inventory, filter and keep the synthesis.
+- **Customers' customers' data and sensitive categories** (health, date of
+  birth, ID photos, signatures, bank details): production systems only,
+  encrypted. Never copy them into the hub; inventory and synthesize instead.
+- **Media and screen recordings:** on the tracker issue they explain.
+- **Real books:** the ledger stays in the private bookkeeping vault per
+  [`books.md`](books.md); the hub holds safe summaries.
+- **Public docs, public issues and code repos:** never raw private material.
+  Going down, it becomes an invented example of the same shape.
 
 ## When To Use This
 
@@ -91,20 +111,24 @@ Read only the content needed for the decision. Prefer title-only search,
 metadata manifests, excerpts, speaker/topic segments, or operator-approved
 files over full raw dumps.
 
-Do not commit:
+Do not commit to the hub, and never to a public repo, issue or doc:
 
-- raw transcripts, full chat exports, provider payloads, scrape dumps, or CRM
-  rows;
-- gated-community content copied from authenticated spaces;
-- customer/member names, private community content, DMs, emails, phone numbers,
-  account ids, screenshots, credentials, or local paths;
-- private proof quotes or testimonials before permission is recorded;
+- full chat exports, provider payloads, scrape dumps, or CRM rows (large
+  datasets);
+- gated-community content copied in bulk from authenticated spaces;
+- credentials, local paths, or customers' customers' data and sensitive
+  categories;
+- private proof quotes or testimonials used publicly before permission is
+  recorded;
 - copied source material that would make the repo a shadow database for another
   provider.
 
-If raw transcription is required, write raw output to OS temp or ignored local
-scratch first. Commit only synthesized findings unless the operator explicitly
-approves a short, sanitized excerpt and the public/private boundary is safe.
+A real recording or transcript that the team needs can live in the private hub
+under the where-data-lives rule. For anything larger or more sensitive, write
+raw output to OS temp or ignored local scratch first and commit only
+synthesized findings. A short excerpt may be committed when the operator
+approves it and it is sanitized first. No approval lets credentials, sensitive
+categories or customers' customers' data into a commit.
 
 ## Step 5: Route Durable Output
 
@@ -169,7 +193,7 @@ Allowed sources: <safe labels>.
 Skipped sources: <count and generic reasons>.
 Content read: <smallest useful slice>.
 Durable output proposed: <research/decision/proof/push/log/issue>.
-Private evidence kept out of git: yes.
+Large or sensitive raw material kept out of git: yes.
 Permission gates: <proof/public quote/customer data/account boundaries>.
 Next approval needed: <read more, codify, collect proof permission, stale-source cleanup, checkpoint>.
 ```

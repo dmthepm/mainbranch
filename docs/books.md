@@ -406,9 +406,17 @@ Exit codes:
   or `.mb/private/` exists without a matching ignore rule).
 - `mb books status`: `0` when there are no error findings; `1` when
   status finds an error.
-- `mb books doctor --plan`: `0` after printing a plan. Running
-  `mb books doctor` without `--plan` exits `2` because applying
-  repairs is not implemented.
+- `mb books doctor --plan`: `0` after printing a setup plan; it changes
+  nothing.
+- `mb books doctor --repo <books-repo>` inspects a private books repo (and
+  runs its declared doctor, up to `--doctor-timeout`): `0` when the repo is
+  healthy, `1` when inspection finds a problem, `2` when the repo is
+  unavailable or the flags conflict (`--repo` with `--plan`, or
+  `--doctor-timeout` without `--repo`).
+- `mb books doctor` with neither flag looks up `books_repo` or
+  `vault_location` in `core/finance/books.md` and inspects that repo with the
+  same `0`/`1` exits. With no configured target it exits `2`: applying
+  repairs is not implemented, so use `--plan` or `--repo`.
 - `mb books report monthly --sample`: `0` when the sample report is generated;
   `1` for generation failures such as missing hledger or missing fixture;
   `2` for usage errors such as missing `--sample`, missing `--month`, or an

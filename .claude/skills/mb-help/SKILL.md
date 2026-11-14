@@ -30,7 +30,7 @@ for repair facts before giving prose-only advice.
 |----------|-----------|
 | Terminal, drag files, cd, business folder vs site folder | [terminal-basics.md](references/terminal-basics.md) |
 | Business folder, CLI, skills, linked site folder, system model | [system-model.md](references/system-model.md) |
-| Where should this go, real data, code repo, screenshots | `references/where-data-lives.md` in `/mb-setup` |
+| Where should this go, real data, code repo, screenshots | [where-data-lives.md](references/where-data-lives.md) |
 | Philosophy, why, compound, passive memory | [philosophy.md](references/philosophy.md) |
 | /mb-think, research, decide, codify | [the-think-cycle.md](references/the-think-cycle.md) |
 | /mb-bet, bet, hypothesis, deadline, public narration, bet vs offer | [skills-guide.md](references/skills-guide.md) |
@@ -111,7 +111,7 @@ for repair facts before giving prose-only advice.
 | Which ad creatives are working — keep or kill? | `mb ledger init` scaffolds the creative ledger (per-asset spend, raw vs eligible CPL, downstream event, KEEP/KILL/WATCH) — an asset isn't working until it makes an eligible lead. See [cli-surfaces.md](references/cli-surfaces.md). |
 | Is my site ready to launch? | Use `/mb-site`; the agent runs `mb launch check` for app/deploy/commerce/email/smoke posture and `mb site check` for paid-traffic measurement detail. Publishing, spend, provider changes, and customer contact still need your explicit approval. |
 | I run an overnight loop but can't see its state. | `mb automation init` scaffolds the steered-loop contract (`loop-state.md`): one inspectable file the loop reads first and updates each run; handoffs render from it. See [cli-surfaces.md](references/cli-surfaces.md). |
-| How do scripts read credentials safely? | `mb connect exec <provider> -- <command>` runs the command with the credential in its environment only — built for scheduled tasks and agents, so the raw value is never retrieved into chat; the command itself must not print its environment. `mb connect token` refuses terminals and pipes with exit 3, before any provider lookup; `--print > file` is only for a script that must capture the raw value. Custom tools: `mb connect <id> --custom`. |
+| How do scripts read credentials safely? | `mb connect exec <provider> -- <command>` runs the command with the credential in its environment only — built for scheduled tasks and agents, so the raw value is never retrieved into chat; the command itself must not print its environment. `mb connect token` refuses terminals and pipes with exit 3, before any provider lookup; Custom tools: `mb connect <id> --custom`. |
 | macOS says a credential has a "keychain prompt pending"? | Run `mb connect repair --keychain` once from a terminal in that hub and choose Always Allow. It moves each credential to Apple's `security` tool, so later Python or `mb` updates stop asking; unattended runs never wait on the dialog. Never reset the login keychain. |
 | Are any of my keys sitting in plaintext? | `mb connect hygiene` scans agent configs (`~/.claude.json`, project MCP/settings) for plaintext credentials and shows where to move each one (keychain/env). Read-only; never prints the value. |
 | What's the state of all my sites across hubs? | `mb fleet refresh` then `mb fleet status`: one read-only row per site (framework, main's CI, deployed commit, last commit), plus a per-repo Dependabot table (alerts by severity, open PRs). Needs Python 3.11+. Detail: `docs/fleet.md` in the engine repo. |

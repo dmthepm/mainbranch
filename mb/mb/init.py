@@ -388,17 +388,17 @@ read-only checks that fit the situation from this business repo:
 
 ```bash
 mb --version
-mb status --json --peek
+mb status --summary
 mb start --json
 mb doctor repair --plan
 ```
 
-Start with `mb status --summary` as the daily briefing: a few KB with ranked
-actions, readiness, save and update state, and warn and error drift. It carries the
-same `runtime.codex_cli.status` and `drift.items[].id` fields as the full payload, so
-the stop rules above apply to it unchanged. Run `mb status --json --peek` (large:
-recent work, MoneyPath, bets, pushes, checkpoint state) only when the summary is not
-enough; if the summary says `repair_omitted`, run it for the repair steps.
+Start with `mb status --summary` as the cheap first read: a few KB with ranked
+actions, readiness, save and update state, and warn and error drift. It also
+carries `drift.items[].id`. The summary omits MoneyPath, bets, pushes and
+checkpoint state. Before routing business work, run `mb status --json --peek`
+(large) to read them; if the summary says `repair_omitted`, run it for the
+repair steps.
 Do not replace those facts with ad hoc shell inspection unless `mb` says a section is unavailable.
 
 Read-only commands can be run without asking first. Commands that write files,

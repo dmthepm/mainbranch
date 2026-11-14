@@ -24,8 +24,9 @@ legacy only, and use `core/vocabulary.md` display words (real paths in commands)
 
 **CLI facts first:** Once the business repo path is known, run
 `mb status --summary` first: ranked actions, readiness, save and update state in
-a few KB. Run `mb status --json --peek` (about 300 KB) only for a section the
-summary does not carry, before asking setup or routing questions. Treat JSON
+a few KB. It omits MoneyPath, bets, pushes and checkpoint state, so before
+asking setup or routing questions run `mb status --json --peek` (about 300 KB)
+for the facts routing needs. Treat JSON
 as source of truth for update severity, readiness, drift, onboarding,
 integrations, GitHub, team, bets, dirty git, since-last-check,
 `content_strategy`, `money_path`, `validation.file_contracts`, and
@@ -125,7 +126,7 @@ Use a covering bet, or offer `/mb-bet` before execution; ask before writes.
 `show`; money-path-overnight worries (real money flowing unattended) →
 `mb canary init`; recurring daily business read → `mb pulse init`; "show me
 the business" → `mb dashboard open`; scripts reading credentials →
-`mb connect exec <id> -- <cmd>` (never echo values). Full map: mb-help
+`mb connect exec <id> -- <cmd>` (never echo values). Full map:
 `references/cli-surfaces.md` — business answer first; triggered surfaces stay triggered.
 
 **Books/finance routing:** When the user mentions bookkeeping, books, finance,

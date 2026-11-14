@@ -8,8 +8,8 @@ When and how to use Gemini for comprehensive research. Setup: [gemini-setup.md](
 
 | Tier | Use | Tool | Time | Cost |
 |------|-----|------|------|------|
-| **1 Quick** | Simple questions, fact-checking | `generate_content` with `gemini-2.0-flash` (tested; optional Google Search grounding) | 30-60s | ~$0.005-0.05 |
-| **2 Deep** | Competitive analysis, industry research, multi-source synthesis | Deep Research Agent via Interactions API, agent `deep-research-pro-preview-12-2025` (tested 2026-01-26) | 5-20 min (max 60) | ~$2-5 (about 80 searches/250K tokens standard, 160 searches/900K complex; Gemini 3 Pro rates, caching cuts repeats) |
+| **1 Quick** | Simple questions, fact-checking | `generate_content` with a current Flash model (see gemini-setup.md; `gemini-2.0-flash` is shut down; optional Google Search grounding) | 30-60s | ~$0.005-0.05 |
+| **2 Deep** | Competitive analysis, industry research, multi-source synthesis | Deep Research Agent via Interactions API, agent from Google's deprecations page (`deep-research-pro-preview-12-2025`, tested 2026-01-26, is shut down; its listed replacement `deep-research-preview-04-2026` is not tested by Main Branch) | 5-20 min (max 60) | ~$2-5 (about 80 searches/250K tokens standard, 160 searches/900K complex; Gemini 3 Pro rates, caching cuts repeats) |
 | **3 Manual** | Specific sources, API unavailable, cost-sensitive | WebSearch + Apify + Claude synthesis | variable | ~$0.20-1.00 |
 
 Tier 1 handles about 80% of needs; reserve Tier 2. Tier 1 is a standard model call, not "Deep Research". Check current prices at ai.google.dev/pricing. Batch is 50% off; context caching cuts repeat content up to 90%.
@@ -27,7 +27,7 @@ The Gemini UI "Deep Research" checkbox and the Tier 2 agent are the same technol
 ## Tier 1 (REST)
 
 ```
-POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+POST https://generativelanguage.googleapis.com/v1beta/models/<current-flash-model>:generateContent
 Header: x-goog-api-key: $GOOGLE_API_KEY
 ```
 
@@ -41,7 +41,7 @@ Start:
 curl -s "https://generativelanguage.googleapis.com/v1beta/interactions" \
   -H "x-goog-api-key: $GOOGLE_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"input": "Your research question here", "agent": "deep-research-pro-preview-12-2025", "background": true, "store": true}'
+  -d '{"input": "Your research question here", "agent": "<current-deep-research-agent>", "background": true, "store": true}'
 ```
 
 Returns `{"id": "v1_xxxxx", "status": "in_progress", ...}`. Poll:

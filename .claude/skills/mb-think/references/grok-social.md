@@ -21,7 +21,7 @@ Real-time social intelligence from X/Twitter using xAI's Grok API.
 
 ## CRITICAL: API Limitations
 
-**The REST API does not support X search. You must use the Python SDK with grok-4.** See [grok-setup.md](grok-setup.md) for the full REST vs SDK explanation and setup instructions.
+**X search works over REST (`/v1/responses` with the `x_search` tool) or the Python SDK.** The old `search: true` chat-completions Live Search is what no longer works. See [grok-setup.md](grok-setup.md) for the REST vs SDK explanation, dated 10 November 2026; Main Branch has not tested REST `x_search`. The SDK recipe below is the tested route.
 
 **DEPRECATED (Feb 2026):** The `SearchParameters` / `x_source()` API (aka "Live Search") has been removed server-side. Using `search_parameters=SearchParameters(sources=[x_source()])` returns `UNIMPLEMENTED: "Live search is deprecated"`. Use the Agent Tools API (`tools=[x_search()]`) instead — see code below.
 
@@ -92,7 +92,7 @@ from xai_sdk.chat import user
 client = Client()
 
 chat = client.chat.create(
-    model="grok-4",  # grok-4 required for server-side x_search tools
+    model="grok-4",  # tested January 2026; xAI docs now show grok-4.7 (untested here)
     tools=[x_search()],
 )
 
@@ -362,11 +362,13 @@ linked_decisions: []
 
 | Model | Input | Output | X Search |
 |-------|-------|--------|----------|
-| grok-4 | ~$3/M tokens | ~$15/M tokens | YES |
-| grok-3 | ~$3/M tokens | ~$15/M tokens | NO (server-side tools removed) |
-| grok-3-fast | ~$1/M tokens | ~$5/M tokens | NO |
+| grok-4 (January 2026 figures) | ~$3/M tokens | ~$15/M tokens | YES |
+| grok-3 (January 2026 figures) | ~$3/M tokens | ~$15/M tokens | NO (server-side tools removed) |
+| grok-3-fast (January 2026 figures) | ~$1/M tokens | ~$5/M tokens | NO |
 
-**Typical costs per X search query:**
+xAI's docs (10 November 2026) list `grok-4.7` in current X Search examples and add $5 per 1,000 posts fetched and $10 per 1,000 profiles fetched on top of tokens. Check xAI's pricing page for current token rates.
+
+**Old token-only estimates per X search query (January 2026; they leave out the per-post and per-profile charges above):**
 
 | Operation | Approx Tokens | Approx Cost |
 |-----------|---------------|-------------|
@@ -379,7 +381,7 @@ linked_decisions: []
 1. **Be specific:** "Skool pricing complaints" vs just "Skool"
 2. **Limit scope:** "last 7 days" vs "all time"
 3. **Single turn:** Get what you need in one prompt
-4. **Use grok-4** — currently the only model supporting x_search server-side tools
+4. **Use a model xAI's X Search docs show** (`grok-4.7` on 10 November 2026; not tested by Main Branch). The old "grok-4 is the only model" claim is withdrawn.
 
 ---
 
@@ -421,7 +423,9 @@ WebSearch: "Skool vs Circle site:x.com"
 
 ## Technical Details
 
-### Why REST API Doesn't Work for X Search
+### Why Legacy `search: true` Doesn't Work for X Search
+
+This section covers the removed Live Search parameter on chat completions only. REST with the `/v1/responses` `x_search` tool is the current route (see grok-setup.md).
 
 The xAI REST API at `api.x.ai/v1/chat/completions` accepts a `search` parameter, but testing shows:
 

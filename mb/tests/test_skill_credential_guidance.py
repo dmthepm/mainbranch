@@ -107,6 +107,7 @@ CONNECT_A_PROVIDER = re.compile(rf"mb connect (?!(?:{CONNECT_SUBCOMMANDS})(?![\w
 HANDOFF_EXEMPT = {
     ".claude/skills/mb-help/SKILL.md",
     ".claude/skills/mb-help/references/cli-surfaces.md",
+    ".claude/skills/mb-start/references/cli-surfaces.md",
     ".claude/skills/mb-think/references/research-depth-ladder.md",
     ".claude/skills/mb-think/references/tool-detection.md",
     ".claude/skills/mb-think/references/tool-surfacing.md",

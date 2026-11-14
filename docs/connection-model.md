@@ -159,8 +159,6 @@ Approval-gated every time:
 
 ## Issue-Ready Follow-Ups
 
-- Add `mb connect rotate <provider>` as a clearer alias over reconnecting with
-  `--token-stdin`, preserving the selected business's `repo_id` boundary.
 - Add finance-provider metadata validation warnings for raw-looking account
   numbers, missing `access_level`, and missing `data_domain`.
 - Add an optional 1Password service-account reference adapter without teaching

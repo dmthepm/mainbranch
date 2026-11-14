@@ -61,6 +61,14 @@ agent-runner scratch directory, or OS temp, or in Linear-only comments when the
 tool clearly supports keeping the note private. Do not copy private Linear
 evidence into public GitHub comments or PR bodies.
 
+This follows [where data lives](../.claude/skills/mb-setup/references/where-data-lives.md):
+a team's private business repo may hold real material for the team and its
+agents (recordings, reviews, real examples), media goes on the team's own
+tracker issue, and large datasets stay out because commits are never deleted.
+The line this page draws is the public one: this engine repo, its public
+issues and its docs get sanitized summaries only. Raw session material that
+would not suit the private hub goes in ignored scratch or OS temp.
+
 ## Source Inventory
 
 Start by listing the evidence set before analysis:

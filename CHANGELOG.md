@@ -19,6 +19,10 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 - When skill links are stale, `mb update --check` and `mb start` now name `mb skill link --repo .` as the next step.
 - The plugin move guide and `/mb-update` refresh the plugin with `marketplace update` and `install` inside a repo, and keep `marketplace remove` and `add` for outside any repo.
+- A docs fact-check pass: gitignore, rotate, books doctor and books storage, Codex growth and
+  start-read guidance in generated files, the local dashboard, data-location wording, old Gemini
+  and Grok setup notes, and three missing skill references now match the code and current
+  provider docs.
 
 ### Fixed
 
