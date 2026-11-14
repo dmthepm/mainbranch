@@ -238,7 +238,7 @@ def test_checkpoint_plan_explains_scratch_review_in_business_language(
 
     assert result.exit_code == 1
     assert "checkpoint needs review before saving" in result.output
-    assert "not durable business memory" in result.output
+    assert "not part of the durable business record" in result.output
     assert "Untitled.md" in result.output
     assert "--include-review-required" in result.output
 

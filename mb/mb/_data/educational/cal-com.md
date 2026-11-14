@@ -5,7 +5,7 @@ status: draft
 last-updated: 2026-05-08
 ---
 
-# Cal.com: booking calls without making scheduling the business brain
+# Cal.com: booking calls without making scheduling the business record
 
 Cal.com is a scheduling rail. It helps someone book a call, consultation,
 fitting, onboarding session, or sales conversation.

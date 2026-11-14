@@ -35,7 +35,7 @@ the named first win, and show what was set up.
 
 **GitHub-backed setup preflight.** GitHub is strongly recommended because it
 gives Main Branch a free cloud backup, shared history, task/proposal layer, and
-connector-friendly copy of the business brain. Main Branch can start locally
+connector-friendly copy of the business record. Main Branch can start locally
 without GitHub. If the user wants backup, sync, collaboration, or `mb onboard
 --github <owner/repo> --push`, check `gh auth status` and
 `gh api user --jq .login` first.

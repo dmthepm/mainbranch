@@ -1802,7 +1802,7 @@ def test_status_readiness_separates_repo_runtime_from_business_memory(
         "needs_attention",
         "ready",
     }
-    assert "Business memory is" in report["readiness"]["summary"]
+    assert "Business record is" in report["readiness"]["summary"]
 
 
 def test_status_json_exposes_push_and_legacy_campaign_facts(tmp_path: Path, monkeypatch) -> None:

@@ -22,7 +22,7 @@ STALE_TOP_LEVEL_FOLDERS = {
     "ops": "Use `core/operations/` for durable operations context.",
     "skills": (
         "Use packaged `.claude/skills/mb-*` wiring; do not treat top-level `skills/` "
-        "as current business memory."
+        "as part of the current business record."
     ),
     "briefs": (
         "Use `research/`, `decisions/`, `pushes/`, `log/`, or `documents/` based on the artifact."

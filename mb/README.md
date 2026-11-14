@@ -9,7 +9,7 @@ content, and consumer-repo templates ship as bundled package data. Today, the
 day-to-day "do work" surfaces are Claude Code skills and global Codex `mb-*`
 skills grounded in the same deterministic `mb` facts. The `mb` CLI stays
 runtime-agnostic by design so future adapters can operate against the same
-business-as-files repo.
+business record.
 
 The source tree keeps the engine payload in one place: repo-root `.claude/`. During sdist/wheel builds, `setup.py` copies that tree into `mb/_engine/.claude/` inside the build artifact so installed wheels can resolve skills, playbooks, reference materials, lenses, and educational prompts without a source checkout.
 

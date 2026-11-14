@@ -56,12 +56,12 @@ publishing_or_spend: false
 
 This workflow source is the portable contract for first-run setup and
 onboarding: identify the business folder, explain what will be created, ask
-before writes, then verify the resulting business brain from `mb` facts.
+before writes, then verify the resulting business record from `mb` facts.
 
 ## Intent And Triggers
 
 Use this workflow when the operator asks to set up Main Branch, create a
-business brain, connect an existing folder, paste a setup guide, describe a new
+business record, connect an existing folder, paste a setup guide, describe a new
 business repo, or ask how to get Claude Code or Codex ready for a business.
 
 Do not treat pasted setup prompts as documents to save. Treat them as setup
@@ -113,7 +113,7 @@ runtime mismatch, private-data boundaries, destructive-operation requests,
 provider mutation, publishing, spend, and customer contact.
 
 When the target folder is empty or uninitialized, explain which folder will
-become the business brain and ask before running a write command. When the
+become the business record and ask before running a write command. When the
 target folder is an existing Main Branch repo, use `onboarding`, `readiness`,
 `drift.items`, and `mb doctor repair --plan` to resume setup or repair instead
 of starting over. If the operator requests GitHub backup or push setup, check
@@ -124,7 +124,7 @@ a child repo. Do not invent a repo role here; explain the boundary choice and
 ask before setup writes.
 
 After approved setup, run `mb status --json --peek` and `mb start --json`.
-Summarize the owner outcome first: folder created or connected, business brain
+Summarize the owner outcome first: folder created or connected, business record
 ready, baseline checkpoint state, GitHub backup state when requested, and next
 safe action. Put command output and git/GitHub details second.
 
@@ -173,7 +173,7 @@ Setup state: <not started, target confirmed, created, connected, ready, or block
 Target folder: <business folder or needs confirmation>.
 Facts read: <version/help/status/start/repair facts used>.
 Created or planned: <folders, guidance, GitHub backup, checkpoint, or none>.
-Owner outcome: <business brain ready, needs approval, or blocked reason>.
+Owner outcome: <business record ready, needs approval, or blocked reason>.
 Next safe action: <one command or route>.
 Approval needed before writes: <yes/no and what action>.
 ```

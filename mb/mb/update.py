@@ -845,7 +845,7 @@ def _predict_surface_consent(result: dict[str, Any], repo: Path, codex: dict[str
             operator_action(
                 _update_command(repo),
                 consent["claude_writes"],
-                "Run interactively and approve the CLAUDE.md entry guidance refresh.",
+                "Run interactively and approve the refresh of the generated CLAUDE.md wording.",
             )
         )
 
@@ -1387,7 +1387,7 @@ def _refresh_surfaces(
                 operator_action(
                     _update_command(target_repo),
                     claude_writes,
-                    "Run interactively and approve the CLAUDE.md entry guidance refresh.",
+                    "Run interactively and approve the refresh of the generated CLAUDE.md wording.",
                 )
             )
 

@@ -73,8 +73,8 @@ Main Branch prepares its own runtime guidance during onboarding; it does not
 provide the runtime or its subscription.
 
 GitHub is recommended, and it does not need to cost anything. Main Branch can
-start locally, but with GitHub the business brain has cloud backup and readable
-saved history, and AI tools with GitHub connectors can read the business brain.
+start locally, but with GitHub the business record has cloud backup and readable
+saved history, and AI tools with GitHub connectors can read the business record.
 If you want GitHub backup, install GitHub CLI and confirm the account before
 creating a remote business folder:
 

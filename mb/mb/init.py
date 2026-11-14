@@ -460,7 +460,7 @@ description into an empty or uninitialized folder, treat it as setup intent,
 not as a document to save. Do not ask what file format to save the prompt in. First
 check `mb --version`. If `mb` is missing, stop and give the exact install step:
 `pipx install mainbranch`. If `mb` is available, inspect the setup path with
-`mb onboard --help`, then explain which folder will become the business brain
+`mb onboard --help`, then explain which folder will become the business record
 and ask before running any command that writes files.
 
 If the operator asks for GitHub backup, sync, collaboration, or
@@ -468,12 +468,12 @@ If the operator asks for GitHub backup, sync, collaboration, or
 `gh auth status` and `gh api user --jq .login`. Confirm the signed-in account
 matches the operator's expected account. GitHub is strongly recommended because
 it gives Main Branch a free cloud backup, shared history, task/proposal layer,
-and connector-friendly copy of the business brain. Main Branch can start
+and connector-friendly copy of the business record. Main Branch can start
 locally without GitHub; GitHub is needed for sync, collaboration, and the
 GitHub-backed onboarding path.
 
 After setup, run `mb status --json --peek` and `mb start --json`. Summarize the
-outcome in business language first: folder created, business brain ready,
+outcome in business language first: folder created, business record ready,
 baseline saved, GitHub backup connected when requested, checkpoint state, and
 next safe action. Put commands and git/GitHub details second.
 
@@ -516,8 +516,8 @@ detail:" line after the owner meaning.
 
 ## Folders
 
-- `core/` — the business brain: offer, audience, voice, soul, proof, brand, strategy,
-  operations, finance
+- `core/` — the core business record: offer, audience, voice, soul, proof, brand,
+  strategy, operations, finance
   (`core/offers/`, `core/proof/`, `core/brand/`, `core/marketing/`, `core/team/`,
   `core/people/`, `core/strategy/`, `core/operations/`, `core/finance/`)
 - `research/` — dated notes from when you went looking

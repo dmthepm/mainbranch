@@ -967,7 +967,7 @@ def repo_boundary_decision_helper(
             "use_when": ("brand, team, voice, access, accounts, and operating history are shared"),
             "owner_language": (
                 "Keep the work here when future sessions should read the same "
-                "business memory before deciding."
+                "business record before deciding."
             ),
             "next_step": "Use this business repo and continue with `mb-start`.",
         },
@@ -979,7 +979,7 @@ def repo_boundary_decision_helper(
             ),
             "owner_language": (
                 "Create a separate Main Branch business repo when mixing the "
-                "memory would make either business harder to reason about."
+                "records would make either business harder to reason about."
             ),
             "next_step": (
                 "Run `mb onboard --name <business> --path <folder>` in the new business folder."
@@ -995,7 +995,7 @@ def repo_boundary_decision_helper(
             ),
             "owner_language": (
                 "Use a child repo when the files or access boundary differ, "
-                "but the strategy still reports back to this business brain. "
+                "but the strategy still reports back to this business record. "
                 "A child repo can itself have children (e.g. a site under an offer)."
             ),
             "next_step": (
@@ -1043,7 +1043,7 @@ def repo_boundary_decision_helper(
         state = "business_repo_with_topology"
         recommended_choice = "same_business_repo"
         next_action = (
-            "Use this repo as the hub business brain. Check the topology "
+            "Use this repo as the hub business record. Check the topology "
             "registry before creating or editing child repos."
         )
     else:

@@ -1,0 +1,274 @@
+# {{BUSINESS_NAME}}
+
+Your business as files. Claude reads these; you edit them; git remembers them.
+
+## Claude operating contract
+
+Main Branch CLI facts are the source of truth for repo health, setup, runtime
+wiring, updates, graph/status signals, provider readiness, and repair paths.
+Main Branch installs as a Claude Code plugin
+(`claude plugin marketplace add dmthepm/mainbranch`, then enable it); `mb init`
+and `mb onboard` also keep the project-local bridge so the
+normal user command stays `/mb-start`. `/mainbranch:mb-start` is the
+plugin smoke/diagnostic command.
+Open this repo in Claude Code — the Claude Desktop app, or run `claude` in a
+terminal — then type `/mb-start` inside Claude Code. From the terminal,
+`mb start --json` checks the handoff and `mb start --launch` can open Claude Code.
+Before giving setup, routing, migration, update, or repair advice, run the
+read-only checks that fit the situation from this business repo:
+
+```bash
+mb --version
+mb status --json --peek
+mb start --json
+mb doctor repair --plan
+```
+
+Start with `mb status --summary` as the daily briefing: a few KB with ranked
+actions, readiness, save and update state, and warn and error drift. It carries the
+same `runtime.codex_cli.status` and `drift.items[].id` fields as the full payload, so
+the stop rules above apply to it unchanged. Run `mb status --json --peek` (large:
+recent work, MoneyPath, bets, pushes, checkpoint state) only when the summary is not
+enough; if the summary says `repair_omitted`, run it for the repair steps.
+Do not replace those facts with ad hoc shell inspection unless `mb` says a section is unavailable.
+
+Read-only commands can be run without asking first. Commands that write files,
+refresh local runtime wiring, move personal skill shadows, update packages,
+migrate business files, create checkpoints, publish, spend money, email, or
+mutate provider accounts require explicit operator approval before applying.
+Plan first, then apply only after approval:
+
+```bash
+mb doctor repair --plan
+mb skill repair --repo .
+mb skill link --repo .          # writes project-local Claude skill wiring
+mb skill repair --repo . --apply
+mb doctor repair --apply
+mb update
+```
+
+<!-- mainbranch:entry-rules:begin -->
+## Trials and readouts
+
+Only when the operator states both a measurable target and a review or cut point
+for a current experiment, check existing bets first and reuse the matching bet.
+If none covers that experiment, offer to open one with `/mb-bet` before the work.
+Otherwise, route to the requested work, or to `/mb-think` if the operator is
+unsure what to do.
+For an observation or readout, such as "the numbers show" or "this week's read",
+offer a short `research/` readout with summarized numbers, source, timeframe,
+caveat, and next question. Do not file the readout in `log/`. The one exception is
+the growth loop's own daily log, `log/growth.md`, which `/mb-grow` writes under the
+approval the owner gave to `core/growth/autonomy.md`.
+If the observation changes the plan, also offer a `decisions/` record. Link the
+readout and decision both ways with `linked_decisions` and `linked_research`,
+and link the bet or push that changes. For a status-only question, answer it
+without proposing records. Ask for approval before any write. Never copy raw
+provider rows, account IDs, or exported tables into the repo. See `/mb-start`,
+`/mb-bet`, and `/mb-think` for the full routes.
+
+## Where data lives
+
+Code repos (the app, the site, tools) hold product code only: never customer
+data, customers' customers' data, photos or videos. Tests, fixtures and
+screenshots use invented values in the real case's shape. This business repo is
+the team's private memory, for the team and its agents only: real material
+belongs here (recordings, P&L, reviews, real examples), but no large customer
+datasets, because commits are never deleted. Media and screen recordings go on
+the tracker issue they explain. Customers' customers' data and sensitive
+categories (health, date of birth, ID photos, signatures, bank details) live
+only in production systems, encrypted. Real data flows up into this repo and
+the tracker, never down into a code repo; going down, it becomes an invented
+example of the same shape. The full rule: `/mb-setup` reference
+`where-data-lives.md`.
+<!-- mainbranch:entry-rules:end -->
+
+## First-run setup intent
+
+When the operator pastes a setup guide, bootstrap prompt, or business/folder
+description into an empty or uninitialized folder, treat it as setup intent,
+not as a document to save. Do not ask what file format to save the prompt in. First
+check `mb --version`. If `mb` is missing, stop and give the exact install step:
+`pipx install mainbranch`. If `mb` is available, inspect the setup path with
+`mb onboard --help`, then explain which folder will become the business brain
+and ask before running any command that writes files.
+
+If the operator asks for GitHub backup, sync, collaboration, or
+`mb onboard --github <owner/repo> --push`, check GitHub CLI before any setup write:
+`gh auth status` and `gh api user --jq .login`. Confirm the signed-in account
+matches the operator's expected account. GitHub is strongly recommended because
+it gives Main Branch a free cloud backup, shared history, task/proposal layer,
+and connector-friendly copy of the business brain. Main Branch can start
+locally without GitHub; GitHub is needed for sync, collaboration, and the
+GitHub-backed onboarding path.
+
+After setup, run `mb status --json --peek` and `mb start --json`. Summarize the
+outcome in business language first: folder created, business brain ready,
+baseline saved, GitHub backup connected when requested, checkpoint state, and
+next safe action. Put commands and git/GitHub details second.
+
+If `/mb-start` is not discoverable or Claude Code reports `Unknown command:
+/mb-start`, do not improvise from memory. The most common cause is that the
+Main Branch plugin is not installed or enabled — install it with
+`claude plugin marketplace add dmthepm/mainbranch` and enable it (this
+works in the Claude Desktop app and the terminal). If you need to prove the
+plugin itself loaded, use the namespaced `/mainbranch:mb-start` command. If you
+are in a cloud/web session, plugins are unavailable there — use the Claude
+Desktop app or the `claude` CLI. From this business repo, check `mb --version`,
+run `mb start --json` and `mb status --json --peek`, inspect repair options
+with `mb doctor repair --plan`, then ask before running any write/apply command
+such as `mb skill link --repo .`, `mb skill repair --repo . --apply`,
+`mb doctor repair --apply`, or `mb update`. Before an apply command succeeds,
+describe the repair as a proposed step. After it succeeds, say which command
+ran, then ask the operator to restart Claude Code from this repo and try
+`/mb-start` again.
+
+If `mb status --json --peek` reports `update.severity` as `recommended` or
+`required`, make the update the only recommendation before business routing:
+name the installed/latest versions and `update.release_notes_url` when present,
+ask whether to update now, and show no ranked actions until the operator updates
+or chooses to continue. Rerun the status briefing after an approved update.
+
+Speak first in terms of bets, goals, offers, pushes, playbooks, outcomes,
+decisions, next actions, and saved checkpoints, in business-owner language. Treat git,
+branches, pull requests, provider refs, and local wiring as the hidden memory
+layer unless the operator asks for the plumbing.
+Default translations:
+- `git is clean`, `repo is clean`, `working tree clean`, or `working tree: clean`
+  -> nothing unsaved locally;
+- `branch main`, `branch: main`, or `current branch: main` -> current business
+  folder or workspace;
+- `No GitHub origin remote`, `No origin remote`, or `Connected GitHub backup:
+  none surfaced` -> no connected GitHub backup or shared task source;
+- `PR/issue facts` or `PR and issue facts` -> GitHub task and proposal context.
+Use raw git/GitHub terms only in exact commands or a separate "Technical
+detail:" line after the owner meaning.
+
+## Folders
+
+- `core/` — the business brain: offer, audience, voice, soul, proof, brand, strategy,
+  operations, finance
+  (`core/offers/`, `core/proof/`, `core/brand/`, `core/marketing/`, `core/team/`,
+  `core/people/`, `core/strategy/`, `core/operations/`, `core/finance/`)
+- `research/` — dated notes from when you went looking
+- `decisions/` — dated choices, with rationale
+- `bets/` — operating bets with appetite, metric, target, and outcome
+- `log/` — running activity log
+- `pushes/` — coordinated pushes (launches, drops, challenges, promos, etc.)
+- `documents/` — anything that doesn't belong above
+
+Keep finance in `core/finance/` out of iCloud or Drive (`mb educational anti-cloud-backup`).
+Books setup, monthly close, reconciliation, CPA handoff: `/mb-books` (runs `mb books check`).
+Use current Main Branch paths for new work. If `mb status` or `mb doctor`
+reports old structural paths, treat them as migration input and follow the
+repair plan before relying on them.
+
+## Hub and child repos
+
+This repo is the hub for strategy, bets, decisions, offers, pushes, logs, and
+routing. Child repos (site, product, client, finance, legal, ops) hold
+role-specific execution work. Edit a child repo's files from that repo, read its
+`.mainbranch/repo.json` there (older site repos may use `.mainbranch/source.json`),
+and return here for business routing and decisions. The optional registry is
+`core/operations/repo-topology.md`; it holds safe handles only, never local
+absolute paths, secrets, raw provider caches, or raw finance/legal/customer data.
+
+## Business primitive routing
+
+Use business meaning first:
+
+- Offer: what the business sells or may sell repeatedly.
+- Bet: a time-boxed wager with appetite, target, evidence, and verdict.
+- Push: coordinated work that ships something to an audience.
+- Reusable playbook: an engine recipe for running a repeatable operating
+  workflow. Treat its defaults as attributed method, not universal law.
+- Push playbook: this push's approval, provider-boundary, check, manual-step,
+  evidence, fork, and outcome record.
+- Proof: evidence that a claim is true.
+- Decision: rationale for changing durable truth.
+
+In a single-offer repo, `core/offer.md` is the durable offer truth. In a
+multi-offer repo, `core/offer.md` is the portfolio thesis and
+`core/offers/<slug>/offer.md` holds per-offer truth. Company-wide proof belongs
+in `core/proof/`; offer-specific proof belongs in `core/offers/<slug>/proof/`.
+Use standard proof files such as `testimonials.md`, `typicality.md`, and
+`angles/` there. Use `permissioned_public: false` for internal proof that is not
+approved for public marketing. If
+`money_path.objects.proof.quality.public_marketing.status` is `blocked`,
+collect permission before using that proof in public ads, pages, or claims.
+Content strategy starts at `core/content-strategy.md`; for more layers use
+`core/marketing/channels/<channel>.md`,
+`core/marketing/accounts/<platform>-<account>.md`, and
+`core/people/<person>.md`.
+`mb status --json --peek` also emits `money_path`. Use MoneyPath from
+`mb status --json --peek` for routing when the path needs to be legible,
+supported, connected, and instrumented. Treat proof-quality fields as factual
+signals, not persuasion scores; do not claim proof or offers are good, bad,
+high-converting, or likely to convert.
+A live idea can be both a bet and an offer candidate: open the bet first, then
+create or update the offer only when the operator wants durable sellable truth.
+
+Team context lives in `core/team/<slug>.md`: public-safe names, roles, owned
+areas, GitHub handles without `@`. No payroll, legal ownership percentages, home
+contact details, private customer/member data, or credentials there.
+
+Do not rename, delete, merge, split, or move offer folders until an accepted
+decision, approved migration plan, or explicit operator instruction exists.
+Paused, dead, superseded, or graduated offers should remain inspectable.
+`core/vocabulary.md` is optional; when it exists, use its words for pushes
+(drops, launches, challenges) in prose while engine names stay stable.
+
+## Conventions
+
+- Decisions, research, bets, offers, and pushes carry a small block of metadata
+  at the top (frontmatter). Run `mb validate` to check it.
+{{STATUS_CONVENTIONS}}
+- One owner per file via `.github/CODEOWNERS`.
+- Pull request titles use Conventional Commits.
+
+Before calling branch work done, follow [branch completion](https://github.com/dmthepm/mainbranch/blob/main/docs/operating-principles.md#branch-completion).
+
+## Linking
+
+Typed relationships live in frontmatter as repo-relative `.md` paths
+(`linked_decisions:`, `linked_research:`, `linked_pushes:`, etc.); `mb graph` and
+`mb validate --cross-refs` read them. Author them only from evidence in the repo
+or explicit operator instruction; never invent relationships. Mirror them in a
+body `## Related links` section using note-level Markdown relative links;
+frontmatter wins if they disagree. If the mirror is missing or stale, preview
+`mb doctor repair --plan` and ask before `mb doctor repair --apply`. Rules:
+https://github.com/dmthepm/mainbranch/blob/main/docs/business-connections.md and
+https://github.com/dmthepm/mainbranch/blob/main/docs/markdown-link-conventions.md.
+
+## Connected accounts
+
+This repo is the boundary for connected business tools: when you switch business
+repos, switch the accounts, tokens, and MCP servers too. Public or non-secret
+identifiers may live in repo files: Stripe account IDs, product IDs, and price
+IDs (e.g. `core/offers/<offer>/stripe.md`); Google Ads customer IDs and campaign
+IDs in `pushes/<push>/push.md` `provider_refs:`; ad pixel IDs; MCP server names
+and intended scopes.
+
+Never commit API keys, OAuth refresh tokens, service-account JSON, webhook
+secrets, MCP tokens, or bearer tokens. Put secrets in the runtime's local
+config, an OS keychain, 1Password, `.env`, or `.claude/settings.local.json`;
+those files should stay gitignored. Use a stored credential through
+`mb connect exec <provider> -- <command>`; never print it. If a tool can spend money, publish,
+email, or mutate a customer account, verify that it is tethered to this repo
+before using it.
+
+## Helpful commands
+
+```
+mb doctor                # see if anything is off in this repo
+mb validate              # check the metadata on your files
+mb graph --open          # see what links to what
+mb educational <topic>   # read why we picked the defaults we did
+```
+
+## Repo owner
+
+`@{{GH_USERNAME}}`
+
+For the engine docs (skills, vocabulary, the v0.1 master decision), see
+https://github.com/dmthepm/mainbranch.

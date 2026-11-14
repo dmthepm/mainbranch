@@ -720,7 +720,7 @@ or blocked>.
 Target folder: <business folder or needs confirmation>.
 Facts read: <version/help/status/start/repair facts used>.
 Created or planned: <folders, guidance, GitHub backup, checkpoint, or none>.
-Owner outcome: <business brain ready, needs approval, or blocked reason>.
+Owner outcome: <business record ready, needs approval, or blocked reason>.
 Next safe action: <one command or route>.
 Approval needed before writes: <yes/no and what action>."""
     return """Maintenance state: <current, update available, repair needed, blocked, or applied>.

@@ -40,7 +40,7 @@ recent activity, and checkpoint readiness.
    tells you to. Do not start by debugging Python packaging or git internals.
 
 3. **Choose or create a business folder.**
-   That folder is the business brain: `core/`, `research/`, `decisions/`,
+   That folder is the business record: `core/`, `research/`, `decisions/`,
    `bets/`, `pushes/`, `log/`, and `documents/`.
 
 4. **Run `/mb-start` or `mb status`.**

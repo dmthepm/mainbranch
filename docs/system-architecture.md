@@ -69,7 +69,7 @@ my-business/
 └── documents/
 ```
 
-The main business brain is `core/`.
+The core of the business record is `core/`.
 
 ## Repo Topology
 

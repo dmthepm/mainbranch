@@ -81,6 +81,9 @@ Specific proof is not public proof until permission is recorded.
   paths;
 - private proof quotes or testimonials before permission is recorded.
 
+A recording or transcript the team needs may live in the private hub under the
+where-data-lives rule; see `docs/source-ingestion.md` in the Main Branch docs.
+
 Raw transcription output belongs in OS temp or ignored scratch first. Commit
 only synthesized findings unless the operator explicitly approves a short,
 sanitized excerpt and the public/private boundary is safe.

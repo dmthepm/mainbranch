@@ -24,6 +24,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   and Grok setup notes, and three missing skill references now match the code and current
   provider docs.
 - Docs, package text and new business repos now call Main Branch the system of record for businesses run with AI agents: agents run the work, you keep the business record and the keys. Machine checks moved to one page, `docs/read-only-checks.md`.
+- `mb status`, `mb onboard`, checkpoint notes, generated `CLAUDE.md` and `AGENTS.md`, and the plugin listing say "business record" instead of "business memory" or "business brain"; `mb update` refreshes the generated wording in `CLAUDE.md` files written by 0.4.1 to 0.6.26 and in the `AGENTS.md` managed block; text the owner edited is left as it is.
 
 ### Fixed
 

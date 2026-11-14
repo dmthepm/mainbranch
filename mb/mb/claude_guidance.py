@@ -62,11 +62,51 @@ _OLD_069_0610_REPAIR_CLAIM = (
 _OLD_069_0610_GENERATED_SECTION = _OLD_GENERATED_SECTION.replace(
     _OLD_REPAIR_CLAIM, _OLD_069_0610_REPAIR_CLAIM
 )
+# 0.4.1 to 0.6.16 wrote the plugin address as noontide-co/mainbranch; 0.6.17 on
+# write dmthepm/mainbranch. Each known section is matched in both forms, and the
+# address line itself is kept as the file has it.
+_PLUGIN_ADDRESSES = ("dmthepm/mainbranch", "noontide-co/mainbranch")
+
+
+def _both_addresses(section: str) -> tuple[str, ...]:
+    return tuple(
+        section.replace(f"add {_PLUGIN_ADDRESSES[0]}`", f"add {address}`")
+        for address in _PLUGIN_ADDRESSES
+    )
+
+
 _NEW_REPAIR_GUIDANCE = (
     "Before an apply command succeeds,\n"
     "describe the repair as a proposed step. After it succeeds, say which command\n"
     "ran, then ask the operator to restart Claude Code from this repo and try\n"
     "`/mb-start` again."
+)
+# 0.4.1 to 0.6.26 wrote the first-run section with "business brain" wording;
+# D275 says "business record". After the repair pass every released section
+# reads as below, in either plugin address. Each known generated text is swapped
+# only when it appears once, whole, outside fences, so edited copies stay.
+_OLD_0611_GENERATED_SECTION = _OLD_GENERATED_SECTION.replace(
+    _OLD_REPAIR_CLAIM, _NEW_REPAIR_GUIDANCE
+)
+_NEW_CORE_FOLDER_LINE = (
+    "- `core/` — the core business record: offer, audience, voice, soul, proof, brand,\n"
+    "  strategy, operations, finance\n"
+)
+_RECORD_WORDING = (
+    *(
+        (section, section.replace("business brain", "business record"))
+        for section in _both_addresses(_OLD_0611_GENERATED_SECTION)
+    ),
+    (
+        "- `core/` — the business brain: offer, audience, voice, soul, proof, brand, strategy,\n"
+        "  operations, finance\n",
+        _NEW_CORE_FOLDER_LINE,
+    ),
+    (
+        "- `core/` — the business brain: offer, audience, voice, soul, proof, brand, strategy, "
+        "operations, finance\n",
+        _NEW_CORE_FOLDER_LINE,
+    ),
 )
 APPEND_NOTICE = (
     "CLAUDE.md has no managed entry rule markers or known 0.6.9 anchor; "
@@ -107,8 +147,11 @@ def _outside_fences(content: str, positions: list[int]) -> list[int]:
 
 def _replace_known_repair_paragraph(content: str, newline: str) -> tuple[str, str | None]:
     targets = (
-        (_OLD_GENERATED_SECTION, _OLD_REPAIR_CLAIM),
-        (_OLD_069_0610_GENERATED_SECTION, _OLD_069_0610_REPAIR_CLAIM),
+        *((section, _OLD_REPAIR_CLAIM) for section in _both_addresses(_OLD_GENERATED_SECTION)),
+        *(
+            (section, _OLD_069_0610_REPAIR_CLAIM)
+            for section in _both_addresses(_OLD_069_0610_GENERATED_SECTION)
+        ),
     )
     matches: list[tuple[int, str, str]] = []
     for section, claim in targets:
@@ -136,6 +179,25 @@ def _replace_known_repair_paragraph(content: str, newline: str) -> tuple[str, st
     ):
         return content, REPAIR_NOTICE
     return content, None
+
+
+def _replace_record_wording(content: str, newline: str) -> str:
+    for old, new in _RECORD_WORDING:
+        old = old.replace("\n", newline)
+        positions: list[int] = []
+        at = 0
+        while (at := content.find(old, at)) != -1:
+            after = at + len(old)
+            if (at == 0 or content[at - 1] == "\n") and (
+                after == len(content) or old.endswith("\n") or content.startswith(newline, after)
+            ):
+                positions.append(at)
+            at = after
+        outside = _outside_fences(content, positions)
+        if len(outside) == 1:
+            at = outside[0]
+            content = content[:at] + new.replace("\n", newline) + content[at + len(old) :]
+    return content
 
 
 def plan(repo: Path) -> tuple[str | None, str | None]:
@@ -170,6 +232,7 @@ def plan(repo: Path) -> tuple[str | None, str | None]:
         updated = existing + (newline if existing.endswith("\n") else newline * 2) + block + newline
         notice = APPEND_NOTICE
     updated, repair_notice = _replace_known_repair_paragraph(updated, newline)
+    updated = _replace_record_wording(updated, newline)
     return (updated if updated != existing else None), repair_notice or notice
 
 

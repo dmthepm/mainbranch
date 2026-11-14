@@ -37,8 +37,8 @@ def test_beginner_setup_uses_owner_friendly_setup_prompt() -> None:
         "Ask me to review assumptions before writing",
         "gh auth status",
         "GitHub is recommended, and it does not need to cost anything",
-        "the business brain has cloud backup and readable saved history",
-        "AI tools with GitHub connectors can read the business brain",
+        "the business record has cloud backup and readable saved history",
+        "AI tools with GitHub connectors can read the business record",
         "Do not save that prompt as a markdown document.",
         "A checkpoint is an approved saved point in the business history.",
         "Main Branch updates change the engine and skills",
@@ -75,7 +75,7 @@ def test_runtime_guidance_routes_pasted_setup_to_onboarding() -> None:
         assert "gh auth status" in normalized
         assert "gh api user --jq .login" in normalized
         assert "GitHub is strongly recommended" in normalized
-        assert "connector-friendly copy of the business brain" in normalized
+        assert "connector-friendly copy of the business record" in normalized
         assert "mb onboard --github <owner/repo> --push" in normalized
         assert "mb onboard --github --push" not in normalized
 
