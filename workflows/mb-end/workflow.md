@@ -74,7 +74,7 @@ ending the day, saving progress, checkpointing, asking "is that it?", or asking
 whether the work is saved.
 
 This is the bookend to start/status. It is not a daily standup, task planner,
-or autosave. It closes the current session and keeps business memory durable.
+or autosave. It closes the current session and keeps the business record durable.
 
 A mid-session save where the operator keeps working -- "save", "save my
 progress", "checkpoint this", "yes save", "should we checkpoint everything" -- is
@@ -182,7 +182,7 @@ this order:
 
 Owner-facing save states:
 
-- `drafted`: work exists but is not yet saved as durable business memory.
+- `drafted`: work exists but is not yet saved in the durable business record.
 - `saved locally`: work is saved in the local business folder history.
 - `ready to send up`: work is saved locally and ready for shared backup or
   review.

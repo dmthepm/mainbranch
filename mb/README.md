@@ -1,6 +1,8 @@
 # mainbranch (`mb`)
 
-Engine umbrella for [Main Branch](https://github.com/dmthepm/mainbranch) — scaffolds, validates, and graphs business-as-files repos.
+[Main Branch](https://github.com/dmthepm/mainbranch) is the system of record for businesses run with AI agents. Agents run the work. You keep the business record and the keys.
+
+`mb` scaffolds, validates, and graphs the business record: plain files in a git repo you own. It starts and checks the agents you define. It hosts no model and schedules nothing.
 
 This package is the Python entry point. Workflows, playbooks, educational
 content, and consumer-repo templates ship as bundled package data. Today, the

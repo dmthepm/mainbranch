@@ -1,4 +1,4 @@
-"""Main Branch engine umbrella.
+"""Main Branch: the system of record for businesses run with AI agents.
 
 Public surface: ``mb.cli:app`` (Typer entry point installed as the ``mb``
 console script). Submodules implement individual subcommands so the CLI

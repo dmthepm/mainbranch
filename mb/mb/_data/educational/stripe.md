@@ -5,7 +5,7 @@ status: draft
 last-updated: 2026-05-08
 ---
 
-# Stripe: payments as a rail, not the business memory
+# Stripe: payments as a rail, not the business record
 
 Stripe is a payment provider. Main Branch should use it when the business job
 needs to charge money, collect a deposit, or point a site at a payment page.

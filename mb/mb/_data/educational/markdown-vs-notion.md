@@ -8,7 +8,7 @@ last-updated: 2026-05-08
 # Markdown vs. Notion: why Main Branch writes plain files
 
 Notion is useful for pages, databases, and team notes. Main Branch uses
-markdown because the business memory needs to stay portable, searchable, and
+markdown because the business record needs to stay portable, searchable, and
 easy for agents to read without a private app API.
 
 ## The beginner version
@@ -24,7 +24,7 @@ This is who we serve, what we sell, and why it matters.
 That file can be opened in any text editor. Claude Code can read it directly.
 Git can show how it changed. GitHub can render it nicely.
 
-## Why markdown works for business memory
+## Why markdown works for the business record
 
 **It is durable.** Plain text survives tool changes better than proprietary
 workspace pages.

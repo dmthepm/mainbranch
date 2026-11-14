@@ -8,8 +8,8 @@ last-updated: 2026-05-08
 # GitHub vs. Google Docs: why your business repo lives in files
 
 Main Branch is not asking you to become a developer. It is asking you to put
-important business memory in a place that you, your team, and your agent can
-inspect later.
+the important parts of the business record in a place that you, your team,
+and your agent can inspect later.
 
 Google Docs is good for live writing. GitHub plus markdown is better for
 durable operating memory.

@@ -1,15 +1,16 @@
 # Agent Instructions
 
-Main Branch also carries read-only `mb-homelab-*` skills for securing the machines that run your agents; they do not touch business data. See [homelab skills](docs/homelab-skills.md).
-
 Main Branch is public open-source infrastructure. Treat this file as the
 repo-level operating contract for Codex, Claude Code, and any other agent or
 human contributor working in this repository.
 
 ## Product Shape
 
-Main Branch is a CLI plus agent-runtime skill system for running a business from
-markdown files in git.
+Main Branch is the system of record for businesses run with AI agents. Agents
+run the work; the owner keeps the business record and the keys. It is a CLI
+plus agent-runtime skills over a business record kept as markdown files in git.
+`mb` starts and checks the agents the owner defines. It hosts no model and
+schedules nothing.
 
 - `mb` is the deterministic, inspectable, scriptable control plane.
 - Agent-runtime skills are the judgment-heavy execution layer.
@@ -18,7 +19,7 @@ markdown files in git.
 - GitHub issues are tasks.
 - Pull requests are proposals and review conversations.
 - Git history is the evolution story.
-- A user's business repo is the durable business brain.
+- A user's business repo is the durable business record.
 - A user is not met with git speak but instead business speak.
 
 Claude Code and Codex CLI are the supported agent runtimes today. Claude Code
@@ -30,6 +31,10 @@ proves that fallback is required.
 Cursor, OpenClaw, Hermes, Paperclip-adjacent orchestration, and local runtimes
 remain compatibility targets until tested. Do not claim support before there is
 an adapter and smoke evidence for the exact surface.
+
+Machine checks (`mb machine doctor` and the read-only `mb-homelab-*` skills)
+inspect the computer, not a business, and do not touch business data. See
+`docs/read-only-checks.md`.
 
 The public product frame lives in `docs/ethos.md`, the operator loop taxonomy
 lives in `docs/operator-loops.md`, and release direction lives in

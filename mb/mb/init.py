@@ -369,7 +369,8 @@ def run(
 _DEFAULT_CLAUDE = """\
 # {{BUSINESS_NAME}}
 
-Your business as files. Claude reads these; you edit them; git remembers them.
+This folder is the business record for {{BUSINESS_NAME}}. Agents run the work.
+You keep the business record and the keys.
 
 ## Claude operating contract
 

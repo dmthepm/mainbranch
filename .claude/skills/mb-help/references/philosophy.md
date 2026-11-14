@@ -48,7 +48,7 @@ You're not hoping AI "gets" your business. You're teaching it explicitly.
 
 ## The Interface is the Commodity
 
-There's a million ways to work with your business memory:
+There's a million ways to work with your business record:
 - Claude Code (Terminal or IDE)
 - Claude on your phone
 - ChatGPT with GitHub connected
@@ -60,7 +60,7 @@ They're the truth. Any tool can read them. You're not locked into anything.
 
 ---
 
-## GitHub Sync: Your Business Memory Everywhere
+## GitHub Sync: Your Business Record Everywhere
 
 Push your repo to GitHub:
 - Team sees the same context

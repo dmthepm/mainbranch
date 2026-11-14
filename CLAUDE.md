@@ -21,7 +21,7 @@ Main Branch's current daily loop is: open a business repo, start Claude Code,
 run `/mb-start` or follow generated repo instructions, ground the agent in
 `mb` facts, route business input into primitives such as bets, research,
 decisions, pushes, playbooks, outcomes, and checkpoints, then close with
-`/mb-end` or checkpoint guidance so the durable memory lands in git.
+`/mb-end` or checkpoint guidance so the business record lands in git.
 
 `mb` is the deterministic control and enforcement plane. Claude Code skills are
 the judgment-heavy execution layer. Keep user-facing guidance in business
@@ -54,7 +54,7 @@ mb start --launch
 
 The machine skills (`/mb-homelab-machine` and the tailnet audit and policy
 review skills) are the exception: they inspect the computer, not a business, and
-run outside any business repo. See [docs/homelab-skills.md](docs/homelab-skills.md).
+run outside any business repo. See [docs/read-only-checks.md](docs/read-only-checks.md).
 
 When contributing to the engine, work in this repository and keep changes
 scoped to the assigned issue or PR.

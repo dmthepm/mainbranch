@@ -11,7 +11,7 @@ Cal.com is a scheduling rail. It helps someone book a call, consultation,
 fitting, onboarding session, or sales conversation.
 
 Main Branch treats booking tools as provider rails around the business repo,
-not as the source of business memory.
+not as the source of the business record.
 
 ## When you need this
 

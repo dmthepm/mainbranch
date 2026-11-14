@@ -14,7 +14,7 @@ bottom. The rest of this doc describes the current model.
 
 ## Architecture In One Sentence
 
-Business memory lives in repos the operator owns. `mb` is the deterministic
+The business record lives in repos the operator owns. `mb` is the deterministic
 control plane. Skills do the judgment work. Provider data, secrets, caches,
 and dashboards stay outside the main business record.
 
@@ -137,7 +137,13 @@ nor runtime skill files are the canonical source for cross-runtime workflow
 semantics.
 
 `mb` may validate, render snapshots for tests, and repair generated runtime
-guidance. It must not invoke Claude, Codex, or any model.
+guidance. It starts and checks the agents you define; it hosts no model and
+schedules nothing. `mb start --launch` starts Claude Code after readiness
+checks. `mb agent up <name>` starts a Claude or Codex agent from its
+`agents.json` row and waits for it, and `mb agent check <name>` checks a
+running one (both released in 0.6.25; see [agent policy](agent-policy.md)).
+The only model call is `mb image smoke-* --generate`, an operator-approved
+image-provider smoke.
 
 ### `core/`
 
@@ -630,7 +636,7 @@ Incorrect pattern:
 ```text
 push.md becomes a raw ads database
 dashboard database becomes the only place push truth exists
-.mb/cache is treated as business memory
+.mb/cache is treated as the business record
 chat transcript is treated as the decision record
 ```
 

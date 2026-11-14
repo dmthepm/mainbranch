@@ -23,6 +23,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
   start-read guidance in generated files, the local dashboard, data-location wording, old Gemini
   and Grok setup notes, and three missing skill references now match the code and current
   provider docs.
+- Docs, package text and new business repos now call Main Branch the system of record for businesses run with AI agents: agents run the work, you keep the business record and the keys. Machine checks moved to one page, `docs/read-only-checks.md`.
 
 ### Fixed
 
@@ -584,7 +585,7 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 - `mb-homelab-machine`, a Claude Code skill for setting up, maintaining,
   hardening and extending an always-on agent machine, with read-only
   done-checks that report NOT VERIFIED instead of guessing.
-- Read-only Claude Code tailnet machine and policy review skills with redacted reports; see [homelab skills](docs/homelab-skills.md).
+- Read-only Claude Code tailnet machine and policy review skills with redacted reports; see [read-only checks](docs/read-only-checks.md).
 
 ### Changed
 

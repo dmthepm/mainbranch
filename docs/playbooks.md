@@ -18,7 +18,7 @@ Main Branch uses two related meanings:
 The reusable playbook teaches the method. The push playbook proves what the
 operator actually chose, approved, changed, and learned.
 
-## Business Memory
+## Business Record
 
 Playbooks should not trap durable learning inside a one-off run file. When a
 run discovers something that changes the business, market, offer, audience,
@@ -107,7 +107,7 @@ Record a fork when the operator changes:
 - execution tool or provider boundary.
 
 The run record should state the default, the chosen fork, and the rationale.
-That rationale becomes future business memory and may later improve the
+That rationale becomes part of the business record and may later improve the
 reusable playbook.
 
 ## Contribution Shape

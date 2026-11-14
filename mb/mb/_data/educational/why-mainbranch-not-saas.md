@@ -83,7 +83,7 @@ web app with a big button. Main Branch should make that safer with `mb
 onboard`, numbered choices, readiness checks, exact next commands, and Claude
 Code skills that explain the result.
 
-The learning curve exists because the payoff exists: your business memory is
+The learning curve exists because the payoff exists: your business record is
 portable, inspectable, and compounding.
 
 ## What Main Branch does not claim

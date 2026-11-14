@@ -187,12 +187,13 @@ account IDs, customer data, or exported tables in the business repo.
 
 When transcripts, authenticated community content, provider recordings,
 cloud-drive files, call notes, exported chats, or mixed private/business
-sources may become business memory, route through the source-ingestion privacy
-rail before reading content: inventory sources, review a metadata-only
-manifest, apply allow/skip filters, read the smallest approved slice, and route
-synthesized output into research, decisions, proof candidates, pushes, logs, or
-issue drafts. Raw transcripts, provider payloads, gated-community content, and
-private customer/member data stay out of committed files by default.
+sources may become part of the business record,
+route through the source-ingestion privacy rail before reading content:
+inventory sources, review a metadata-only manifest, apply allow/skip filters,
+read the smallest approved slice, and route synthesized output into research,
+decisions, proof candidates, pushes, logs, or issue drafts. Raw transcripts,
+provider payloads, gated-community content, and private customer/member data
+stay out of committed files by default.
 
 When source material, a claim, an offer detail, proof usage, or an angle is
 stale, reconcile current truth instead of erasing history. Identify the stale

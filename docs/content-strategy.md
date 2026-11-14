@@ -2,7 +2,7 @@
 
 Content strategy is the operating model for what a business wants to be known
 for, where it publishes, which accounts speak, whose voice they use, what each
-asset is trying to do, and how results feed back into durable business memory.
+asset is trying to do, and how results feed back into the durable business record.
 
 It is not a social-media template. Social is one distribution layer beside
 blog, wiki, changelog, email, communities, partner channels, paid

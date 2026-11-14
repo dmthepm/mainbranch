@@ -22,7 +22,7 @@ Use session excavation for:
 
 When the goal is to mine transcripts, authenticated community content,
 connected-provider recordings, cloud-drive files, or mixed private/business
-sources into business memory, use [`source-ingestion.md`](source-ingestion.md)
+sources into the business record, use [`source-ingestion.md`](source-ingestion.md)
 before reading source content. Session excavation turns a session into public
 product follow-ups; source ingestion controls whether and how source material
 may be read and routed.

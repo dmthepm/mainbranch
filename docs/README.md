@@ -1,8 +1,13 @@
 # Docs
 
-This folder holds Main Branch's durable references, contracts, PRDs, evidence,
-and examples. It is meant to be skimmable for both business operators and
-coding agents.
+Main Branch is the system of record for businesses run with AI agents. Agents
+run the work. You keep the business record and the keys: plain files in a
+folder you own, saved with your approval. Session logs show what an agent did.
+The business record shows what you decided.
+
+Nothing publishes, spends, contacts a customer, or changes an account without
+your say. This folder holds the references, contracts, plans, evidence, and
+examples behind that, for owners and for coding agents.
 
 Public product truth lives here. Per-event narratives live in `decisions/`,
 and the changelog lives in `../CHANGELOG.md`.
@@ -24,7 +29,6 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 ## Set up or repair a folder
 
 - [`beginner-setup.md`](beginner-setup.md) — install, first run, first decision.
-- [`machine-setup.md`](machine-setup.md) — an always-on box for your agents: concepts, machine picks, Ubuntu and Omarchy, first week.
 - [`migrating.md`](migrating.md) — moving an older Main Branch layout forward.
 - [`compatibility.md`](compatibility.md) — supported OS, runtime, and adapter matrix.
 - [`repo-visibility-rubric.md`](repo-visibility-rubric.md) — public vs private repo guidance.
@@ -39,7 +43,6 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 - [`scheduled-data-sync.md`](scheduled-data-sync.md) — how to keep business data fresh on a schedule.
 - [`usage.md`](usage.md) — `mb usage`: read local snapshots of your agents' weekly usage.
 - [`role-cards.md`](role-cards.md) — role cards: tell each restarted agent what it is for (Claude Code and Codex).
-- [`homelab-skills.md`](homelab-skills.md) — read-only Claude Code skills that inspect the machines running your agents.
 - [`books.md`](books.md) — bookkeeping safety, hledger, and the private ledger vault model.
 - [`library.md`](library.md) — `mb library`: what media exists, where, and whether a use is cleared.
 - [`books-workflow.md`](books-workflow.md) — the statement-anchored books protocol inside a private hledger books repo.
@@ -52,6 +55,11 @@ Contributors should follow [the engine route](#contributing-to-the-engine).
 - [`connection-model.md`](connection-model.md) — why agents use secrets without seeing them.
 - [`feedback.md`](feedback.md) — `mb feedback`: log mb friction and self-logged refusals locally, roll them up weekly.
 - [`session-excavation.md`](session-excavation.md) — turn transcripts, chat exports, and session logs into prioritized public-safe follow-ups.
+
+## Machines that run your agents
+
+- [Read-only checks](read-only-checks.md) — `mb machine doctor`, `mb machine update` (draft), and the `mb-homelab-*` skills: inspect the computer, install nothing, change no settings.
+- [`machine-setup.md`](machine-setup.md) — an always-on box for your agents: concepts, machine picks, Ubuntu and Omarchy, first week.
 
 ## Inspect schemas and contracts
 
