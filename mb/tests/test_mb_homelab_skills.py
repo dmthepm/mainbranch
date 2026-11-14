@@ -584,7 +584,7 @@ def test_b1_ipv4_punctuation(skill: Path, text: str, expected: str) -> None:
 
 
 def test_b2_docs_list_every_homelab_skill() -> None:
-    doc = (ROOT / "docs" / "homelab-skills.md").read_text(encoding="utf-8")
+    doc = (ROOT / "docs" / "read-only-checks.md").read_text(encoding="utf-8")
     for path in sorted(SKILLS.glob("mb-homelab-*/SKILL.md")):
         assert f"| `/{path.parent.name}` |" in doc
 

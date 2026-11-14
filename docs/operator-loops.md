@@ -126,7 +126,7 @@ proposal with no evidence, return to Sense. If you have evidence with no next
 move, Decide. If you have completed work with no recorded result, Reflect.
 
 For contributors, describe which owner loop a change improves. Keep deterministic
-facts in `mb`, judgment in skills, and business memory in the business repo.
+facts in `mb`, judgment in skills, and the business record in the business repo.
 Follow [AGENTS.md](../AGENTS.md) for changes to commands or runtime behavior.
 
 ## Channels (the four pillars)

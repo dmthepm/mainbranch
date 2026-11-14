@@ -74,6 +74,7 @@ for repair facts before giving prose-only advice.
 
 | Question | Answer |
 |----------|--------|
+| What is Main Branch? | The system of record for businesses run with AI agents. Agents run the work; you keep the business record and the keys. Your business folder is that record. See [system-model.md](references/system-model.md). |
 | Is this a bet or an offer? | If you're testing whether a direction should continue, it is a bet in `bets/`. If it is something the business sells or may sell repeatedly, it is an offer. A live idea can be both: open the bet first, then create or update the offer only when the operator wants durable sellable truth. |
 | Start Claude in a folder? | Open the business folder in Claude Code — either the **Claude Desktop app** or the **terminal** (`cd ~/Documents/GitHub/[your-business] && claude`). Claude reads the files in that folder; the Main Branch plugin makes `/mb-start` and the other skills available on both surfaces. |
 | Why can't Claude find `/mb-start` (or any `/mb-` command)? | Main Branch ships as a Claude Code **plugin**. Install it once with `claude plugin marketplace add dmthepm/mainbranch`, then enable it. The plugin works in both the **Claude Desktop app** and the **terminal** `claude` CLI, and it survives git worktrees. Cloud/web Claude sessions can't load plugins — use Desktop or the terminal. If it is installed but skills still don't show, run `mb status --json --peek` and `mb doctor repair --plan` from the business repo, apply the approved repair, then restart Claude. |

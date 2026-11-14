@@ -1,9 +1,14 @@
 # Main Branch System Model
 
+Main Branch is the system of record for businesses run with AI agents. Agents
+run the work. You keep the business record and the keys. Session logs show what
+an agent did; the business record shows what you decided. `mb` starts and
+checks the agents you define. It hosts no model and schedules nothing.
+
 Main Branch has three user-visible pieces:
 
-- **Your business folder** -- the place Claude reads and writes durable
-  business memory: offer, audience, voice, proof, team context, research,
+- **Your business folder** -- the business record Claude reads and writes:
+  offer, audience, voice, proof, team context, research,
   decisions, bets, pushes, logs, and outcomes.
 - **The `mb` CLI** -- the deterministic control plane. It checks setup,
   status, validation, graph links, provider readiness, updates, repairs, and
@@ -45,7 +50,7 @@ the folder through CLI facts before routing the operator into a workflow.
 | Research, decisions, bets, pushes, logs | Business folder | Operating memory the next session can read |
 | Local setup state | `.mb/` | Repairable machine-local state |
 | Claude Code skill links | `.claude/skills/mb-*` | Runtime discovery |
-| Main Branch implementation | Installed package or source checkout | Shared software, not business memory |
+| Main Branch implementation | Installed package or source checkout | Shared software, not the business record |
 
 If the operator asks where to edit, point them to the business folder. If they
 ask how to repair, route to `/mb-start`, `/mb-setup`, `/mb-update`, or the

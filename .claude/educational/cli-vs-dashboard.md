@@ -41,7 +41,7 @@ tell you the next exact command when something needs attention.
 ## Why not start with a SaaS dashboard?
 
 **Dashboards can hide the source of truth.** If a dashboard becomes the place
-where business memory lives, the repo becomes a stale export. Main Branch wants
+where the business record lives, the repo becomes a stale export. Main Branch wants
 the opposite: the repo is truth, and dashboards are views.
 
 **Commands are testable.** `mb status --json --peek` either reports the facts or

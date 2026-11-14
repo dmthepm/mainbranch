@@ -370,7 +370,7 @@ surfaces/files, proposed message, and any blockers.
 
 Lead with owner-facing save state before technical detail:
 
-- `drafted` -- work exists but is not yet saved as durable business memory.
+- `drafted` -- work exists but is not yet saved in the durable business record.
 - `saved locally` -- work is saved in local business history.
 - `ready to send up` -- work is saved locally and ready for shared backup or
   review.

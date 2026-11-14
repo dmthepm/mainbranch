@@ -52,11 +52,11 @@ recent activity, and checkpoint readiness.
 
 6. **Close with `/mb-end` or checkpoint guidance.**
    The point is not to leave a long chat behind. The point is to preserve the
-   useful business memory in files and git history.
+   useful business record in files and git history.
 
 ## Why the tools exist
 
-- **Markdown files** make the business memory readable.
+- **Markdown files** make the business record readable.
 - **Git history** turns saved work into a timeline.
 - **GitHub** gives durable tasks, blockers, proposals, and reviews.
 - **`mb`** checks the facts and prints exact next commands.

@@ -17,7 +17,7 @@ raw finance, legal, customer, credential, and account-export material.
 
 Use this rule:
 
-- durable business memory can live in the business repo;
+- the durable business record can live in the business repo;
 - raw sensitive records need stricter boundaries;
 - secrets never belong in committed markdown;
 - cloud sync is not the same thing as a deliberate backup plan.
@@ -50,7 +50,7 @@ summary.
 
 ## What Main Branch recommends
 
-For everyday business memory, use the normal repo created by:
+For the everyday business record, use the normal repo created by:
 
 ```bash
 mb onboard --name "My Business" --path my-business

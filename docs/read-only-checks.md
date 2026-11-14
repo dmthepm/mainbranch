@@ -1,7 +1,35 @@
-# Read-only homelab skills
+# Read-only checks
 
-Use these Claude Code skills to inspect the machines that run your agents.
-They work outside a business repo and do not touch business data. They are
+These checks look at the computer that runs your agents, not at a business.
+They work outside a business repo, read no business data and change nothing.
+Any step that needs root stays the owner's to run. Setting up the machine
+itself is covered in [machine setup](machine-setup.md).
+
+## Machine commands
+
+`mb machine doctor` is a read-only check of part of the
+[machine setup guide](machine-setup.md). It reports results as text or JSON
+with exit codes, without changing anything or using `sudo`. It doesn't cover the
+whole guide yet, so exit 3 means incomplete, and every otherwise-passing Linux
+run gets that result for now. Real failures still exit 1. The reboot and
+lid-closed tests in the guide's first week are still the check.
+
+`mb machine update` (draft) shows what updating this machine would change:
+the operating system's pending updates, with which steps may need a reboot.
+It checks free disk space first and warns when it is low, because partial
+upgrades on a full disk are a known failure. It runs on one machine with no
+business repo and never uses `sudo`. It runs only root-owned system tools from
+a fixed list (`apt`, `pro`, `softwareupdate`); those tools may touch their own
+caches, and nothing it runs installs packages or changes settings. It does not
+run your own tools (`mise`, `brew`): they evaluate your config, so it can't
+promise that is read-only. The plan says they were not checked and names the
+command to run yourself (`mise outdated`, `brew outdated`). A read that fails
+is reported as failed, never as "no updates". Attaching Ubuntu Pro stays your
+step. The apply step is not built yet.
+
+## Machine skills
+
+These Claude Code skills inspect the machines that run your agents. They are
 Claude-only, excluded from Codex global skills, workflow inventory and daily
 start routing. The two tailnet skills remain draft pending runtime dogfood and
 security review.
@@ -20,7 +48,7 @@ Each returns one redacted table and a short list of things to inspect. Unknown
 fields say "not checked" with a reason. Command availability, permissions and
 platform differences can limit coverage. No check uses sudo.
 
-## Run the bundled scripts directly
+### Run the bundled scripts directly
 
 From the chosen skill directory, run the applicable pipeline:
 
@@ -39,7 +67,7 @@ Review results exit 0, including an explicit incomplete result for invalid
 HuJSON. An unreadable file exits nonzero; when using a pipeline, inspect both
 process exit statuses. No policy is downloaded, exported or written.
 
-## Privacy and limits
+### Privacy and limits
 
 Keep raw JSON local. The report omits raw nested Serve/Funnel configuration and
 replaces IPs, Tailscale key values, tailnet DNS names, identified hostnames and

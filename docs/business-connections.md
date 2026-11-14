@@ -160,7 +160,7 @@ be the data warehouse.
 
 ## GitHub and Git History
 
-GitHub and git are part of the business memory:
+GitHub and git are part of the business record:
 
 - Issues are tasks, blockers, requests, or follow-ups.
 - Pull requests are proposals and review conversations.

@@ -2,7 +2,7 @@
 
 Use this workflow when transcripts, authenticated community content, connected
 provider recordings, cloud-drive files, call notes, or exported chats may become
-business memory.
+part of the business record.
 
 The goal is to mine useful signal without copying raw private material into
 public docs, GitHub issues, code repos, or agent-visible contexts that do not

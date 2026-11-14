@@ -194,7 +194,7 @@ folders, and want one business repo that future sessions can read.
 
 ## Promise
 
-Turn scattered launch and operating context into durable business memory the
+Turn scattered launch and operating context into a durable business record the
 operator owns.
 
 ## Mechanism

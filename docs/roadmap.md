@@ -48,7 +48,7 @@ owner to manage git details:
 The success measure is a coherent owner task, not the number of commands or
 skills added. [A working day](working-day.md) illustrates the intended sequence.
 
-## Extend views over business memory
+## Extend views over the business record
 
 Future dashboard and multi-repo work should help owners see linked businesses,
 sites, offers, tasks, proposals, bets, and outcomes. Views should expose source
@@ -82,9 +82,10 @@ business folder. That does not establish support for the caller's agent workflow
 ## Boundaries that remain
 
 - Business truth stays in files and saved history owned by the user.
-- Secrets and raw sensitive records stay outside tracked business memory.
-- `mb` remains deterministic. Model invocation and ongoing execution belong
-  to the runtime or caller.
+- Secrets and raw sensitive records stay outside the tracked business record.
+- `mb` remains deterministic. It starts and checks the agents you define; it
+  hosts no model and schedules nothing. Model calls and ongoing work belong to
+  the runtime, apart from the operator-approved `mb image smoke-* --generate`.
 - Publishing, spend, customer contact, and account changes need explicit
   authority and tested support.
 - Connections stay optional and tied to a useful owner task.

@@ -4,12 +4,15 @@
 
 # Main Branch
 
-Your business, written down where an AI agent can read it.
+The system of record for businesses run with AI agents.
+
+**Agents run the work. You keep the business record and the keys.**
 
 Main Branch keeps your offers, audience, research, decisions, and lessons as
-plain files in a folder you own. Claude Code or Codex reads those files before
-it advises you, proposes work, and saves what you approve. Next session, it
-starts from what you decided, not from a blank chat.
+plain files in a folder you own. That folder is your business record. Claude
+Code or Codex reads it before it advises you, proposes work, and saves what you
+approve. Session logs show what an agent did. The business record shows what
+you decided, so the next session starts there, not from a blank chat.
 
 [Set up your business folder](docs/beginner-setup.md) ·
 [Follow a working day](docs/working-day.md) ·
@@ -102,7 +105,7 @@ You do not need a separate agent or document for every step.
 
 ## Your files and authority
 
-Your business memory stays in plain Markdown and git history. You can read it
+Your business record stays in plain Markdown and git history. You can read it
 in a text editor without Main Branch. Credentials, caches, and raw sensitive
 data have separate storage boundaries.
 
@@ -111,9 +114,10 @@ Publishing, spending, customer contact, and account changes require explicit
 approval and a tested execution path. Installing Main Branch does not authorize
 those actions.
 
-`mb` runs checks and commands when called. It does not host a model or keep an
-agent running in the background. The local read-only dashboard is a view over
-your files, not a hosted business database.
+`mb` starts and checks the agents you define. It hosts no model and schedules
+nothing. `mb agent up` and `mb agent check` shipped in 0.6.25; see
+[agent policy](docs/agent-policy.md) for what they prove. The local read-only
+dashboard is a view over your files, not a hosted business database.
 
 ## Supported setups
 
@@ -149,10 +153,6 @@ and proposals directly:
 
 Run `mb --help` for the command list. See the [docs index](docs/README.md) for
 Google reads, books, provider connections, playbooks, and other references.
-
-Main Branch also carries read-only `mb-homelab-*` skills for securing the
-machines that run your agents; they do not touch business data. See
-[homelab skills](docs/homelab-skills.md).
 
 New contributors should read [CONTRIBUTING.md](CONTRIBUTING.md). Agents working
 on the engine follow [AGENTS.md](AGENTS.md) and the

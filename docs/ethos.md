@@ -1,8 +1,12 @@
 # Main Branch ethos
 
-Main Branch is public open-source infrastructure for running a business from
-Markdown files in git. The owner keeps the business record. Agents read that
-record, propose work, and save accepted decisions and lessons for future sessions.
+Main Branch is the system of record for businesses run with AI agents.
+Agents run the work. You keep the business record and the keys.
+
+The business record is Markdown files in git that the owner controls. Agents
+read it, propose work, and save accepted decisions and lessons for future
+sessions. Session logs show what an agent did. The business record shows what
+you decided. Main Branch is public open-source software.
 
 [The working-day example](working-day.md) shows the method.
 [Operator loops](operator-loops.md) names its phases.
@@ -17,7 +21,7 @@ research, decisions, bets, coordinated work, and lessons. A text editor should
 still open that record without Main Branch.
 
 Keep credentials, caches, raw financial or legal records, and runtime state
-outside tracked business memory. Dashboards and graphs are views over the
+outside the tracked business record. Dashboards and graphs are views over the
 files. They do not become a second source of truth.
 
 ### 2. Deterministic facts, agent judgment
@@ -109,8 +113,12 @@ why it changed, and what remains open without the original chat.
 
 ## Product boundary
 
-`mb` does not host a model, run a chat session, or schedule agents. A runtime
-or external caller handles conversation and ongoing execution. The local
+`mb` starts and checks the agents you define. It hosts no model and schedules
+nothing. `mb start --launch` and `mb agent up` start a runtime the owner
+chose; the runtime handles conversation and ongoing work, and the owner or an
+external caller decides when it runs. The one narrow model call is
+`mb image smoke-* --generate`, which calls a provider's image API only when
+local credentials exist and the operator approved generation. The local
 read-only dashboard displays repo facts; it is not a hosted service.
 
 Future interfaces must preserve the same ownership and authority boundaries.
