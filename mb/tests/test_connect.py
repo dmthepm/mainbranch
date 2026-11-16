@@ -3061,6 +3061,34 @@ def test_hygiene_flags_literal_secret_mixed_with_env_ref(tmp_path: Path) -> None
     assert any(f["location"].endswith("API_KEY") for f in result["findings"])
 
 
+# A setting or URL is never a placeholder, however it is encoded or wrapped,
+# so `your_token=<secret>` still reads as a plaintext secret. Synthetic values.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "your_token=FixtureSecret123",
+        "XXX token=FixtureSecret123",
+        "YoUr_token=FixtureSecret123",
+        "  xXx token=FixtureSecret123  ",
+        "your_token%3DFixtureSecret123",
+        "xxx token%253DFixtureSecret123",
+        "<your_token=FixtureSecret123>",
+        "[your_token=FixtureSecret123]",
+        '"your_token=FixtureSecret123"',
+        "'<[your_token%3DFixtureSecret123]>'",
+    ],
+)
+def test_hygiene_placeholder_shape_does_not_hide_a_setting(value: str) -> None:
+    flagged, reason = connect_mod._classify_credential_value("api_key", value)
+    assert flagged, value
+    assert "FixtureSecret123" not in reason
+
+
+@pytest.mark.parametrize("value", ["your_token", "<your password>", "xxx", "  YoUr-api-key "])
+def test_hygiene_still_spares_plain_placeholders(value: str) -> None:
+    assert connect_mod._classify_credential_value("api_key", value) == (False, "")
+
+
 def test_hygiene_surfaces_unscannable_files_loudly(tmp_path: Path) -> None:
     home = tmp_path / "home"
     home.mkdir(parents=True)
@@ -3988,6 +4016,34 @@ def test_metadata_placeholder_shape_does_not_skip_decoding_or_token_checks(
     value: str, rule: str
 ) -> None:
     assert connect_mod.metadata_value_rule(value) == rule
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
+# Token shapes are judged on each word raw and percent-decoded (up to the
+# named-setting decoder's passes), with brackets and quotes stripped.
+_ENCODED_SK = "%73%6b%2dproj-" + "aB3c" * 12
+_TWICE_ENCODED_SK = "%2573%256b%252dproj-" + "aB3c" * 12
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        _ENCODED_SK,
+        _TWICE_ENCODED_SK,
+        f"<{_ENCODED_SK}>",
+        f"xxx {_ENCODED_SK}",
+        f"  YoUr_token {_TWICE_ENCODED_SK}  ",
+        f"[{_ENCODED_SK}]",
+        f'"{_ENCODED_SK}"',
+        f"'({_TWICE_ENCODED_SK})'",
+        f"<[`{_ENCODED_SK}`]>",
+        f"%3C{_ENCODED_SK}%3E",
+        f"note: <{_ENCODED_SK}>",
+    ],
+)
+def test_metadata_refuses_encoded_or_wrapped_token_shapes(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "credential_prefix:sk-"
     with pytest.raises(ValueError):
         connect_mod._parse_metadata([f"note={value}"])
 

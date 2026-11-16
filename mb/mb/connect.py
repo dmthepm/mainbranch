@@ -2000,9 +2000,11 @@ def metadata_value_rule(value: str) -> str:
     for word in words:
         if _looks_like_env_reference(word):
             continue
-        rule = _word_secret_rule(word) or _word_secret_rule(word.strip(_METADATA_WRAPPERS))
-        if rule:
-            return rule
+        # Judge each word raw and percent-decoded, so `%73%6b%2d` cannot hide `sk-`.
+        for form in dict.fromkeys((word, _fully_unquote(word))):
+            rule = _word_secret_rule(form) or _word_secret_rule(form.strip(_METADATA_WRAPPERS))
+            if rule:
+                return rule
     if (
         _has_named_password(candidate)
         or any(_url_has_password(word) for word in words)
@@ -6319,6 +6321,11 @@ def _looks_like_iso_datetime(value: str) -> bool:
 def _looks_like_placeholder(value: str) -> bool:
     stripped = value.strip()
     lowered = stripped.lower()
+    # A URL, an address or a setting is never a placeholder, however it is
+    # wrapped or percent-encoded, so a secret inside one still meets the
+    # hygiene checks.
+    if any(mark in _fully_unquote(stripped) for mark in ("@", "://", "=", ":")):
+        return False
     if lowered in _PLACEHOLDER_VALUES:
         return True
     if stripped.startswith("<") and stripped.endswith(">"):
