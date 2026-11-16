@@ -170,15 +170,37 @@ def test_fingerprint_resolves_repo_from_subfolder(
 ) -> None:
     (repo / ".git").mkdir()
     (repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
-    connect.connect_provider("cloudflare", repo=repo, token="fixture-only")
+    connect.connect_provider("cloudflare", repo=repo, token="fixture-only-long-value")
     nested = repo / "nested"
     nested.mkdir()
     monkeypatch.chdir(nested)
     result = runner.invoke(app, ["connect", "fingerprint", "cloudflare", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["fingerprint"] == (
-        "sha256:" + hashlib.sha256(b"fixture-only").hexdigest()[:8]
+        "sha256:" + hashlib.sha256(b"fixture-only-long-value").hexdigest()[:8]
     )
+
+
+@pytest.mark.parametrize("json_out", [False, True])
+def test_fingerprint_short_value_prints_no_prefix(repo: Path, json_out: bool) -> None:
+    pin = "482913"
+    connect.connect_provider("fixture-alias", repo=repo, token="fixture-only", custom=True)
+    entry = connect._read_config(repo)["providers"]["fixture-alias"]
+    SecretStore("local-file").set(entry["secrets"]["api_key"]["ref"], pin)
+    args = ["connect", "fingerprint", "fixture-alias", "--repo", str(repo)]
+    result = runner.invoke(app, args + (["--json"] if json_out else []))
+    assert result.exit_code == 0, result.output
+    prefix = hashlib.sha256(pin.encode()).hexdigest()[:8]
+    assert prefix not in result.output
+    assert "sha256:" not in result.output
+    if json_out:
+        payload = json.loads(result.stdout)
+        assert set(payload) == {"ok", "provider", "slot", "fingerprint", "reason"}
+        assert payload["fingerprint"] is None
+        assert "under 20 characters" in payload["reason"]
+    else:
+        assert result.stdout.startswith("fixture-alias api_key no fingerprint: ")
+        assert "under 20 characters" in result.stdout
 
 
 def test_custom_alias_aggregate_status_explains_probe(repo: Path) -> None:

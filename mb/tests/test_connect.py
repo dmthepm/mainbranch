@@ -3956,6 +3956,30 @@ def test_metadata_passes_values_with_no_named_password(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == ""
 
 
+# Fake values only. A placeholder-looking wrapper or prefix must not hide a
+# password; plain placeholders still pass.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "<postgres://rowan:hunter2-fake@db.example.invalid/shop>",
+        "<host=db.example.invalid;password=hunter2-fake>",
+        "xxx postgres://rowan:hunter2-fake@db.example.invalid",
+        "your_password=hunter2-fake",
+        "your-db rowan:hunter2-fake@db.example.invalid",
+    ],
+)
+def test_metadata_placeholder_shape_does_not_hide_a_password(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["<your password>", "<token>", "xxx", "your_token", "your-api-key", "<jo@example.org>"],
+)
+def test_metadata_still_passes_plain_placeholders(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
 _NAMED_SECRET_NAMES = [
     "password",
     "passwd",
@@ -4673,6 +4697,27 @@ def test_rotate_cli_json_never_carries_the_secret(tmp_path: Path, monkeypatch) -
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["provider_verified"] is True
     assert "cf-rotated-token" not in result.output
+
+
+def test_rotate_names_the_repo_folder(tmp_path: Path, monkeypatch) -> None:
+    _local_secret_env(monkeypatch, tmp_path)
+    _ok_http(monkeypatch)
+    repo = tmp_path / "biz"
+    repo.mkdir()
+    connect_mod.connect_provider(
+        "cloudflare",
+        repo=repo,
+        token="cf-old-token",
+        source="op://Business/Cloudflare/credential",
+    )
+    run, _calls = _fake_op("cf-rotated-token")
+    monkeypatch.setattr(connect_mod, "_run_command", run)
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    result = runner.invoke(app, ["connect", "rotate", "cloudflare", "--repo", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    assert f"mb connect rotate cloudflare in {repo.resolve()}:" in result.stdout
 
 
 def test_rotate_without_source_explains(tmp_path: Path, monkeypatch) -> None:

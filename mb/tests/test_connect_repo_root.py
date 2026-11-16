@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from mb import connect
+from mb import cli, connect
 from mb.cli import app
 
 runner = CliRunner()
@@ -543,3 +543,28 @@ def test_audit_reads_machine_log_outside_git(
     result = runner.invoke(app, ["connect", "audit", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout) == []
+
+
+def test_remove_from_a_subfolder_names_the_hub(hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    sub = hub / "downloads" / "unzipped"
+    sub.mkdir(parents=True)
+    monkeypatch.chdir(sub)
+    monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
+    declined = runner.invoke(app, ["connect", "remove", "stripe"], input="n\n")
+    assert declined.exit_code == 1, declined.output
+    assert f"in {hub.resolve()}?" in declined.stdout
+    assert "stripe" in connect._read_config(hub)["providers"]
+    removed = runner.invoke(app, ["connect", "remove", "stripe", "--yes"])
+    assert removed.exit_code == 0, removed.output
+    assert f"Removed the Stripe connection from {hub.resolve()}." in removed.stdout
+    payload = runner.invoke(app, ["connect", "remove", "stripe", "--yes", "--json"])
+    assert json.loads(payload.stdout)["repo"] == str(hub.resolve())
+
+
+def test_rebind_from_a_subfolder_names_the_hub(hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    sub = hub / "x"
+    sub.mkdir()
+    monkeypatch.chdir(sub)
+    result = runner.invoke(app, ["connect", "rebind"])
+    assert result.exit_code == 0, result.output
+    assert result.stdout.startswith(f"mb connect rebind  {hub.resolve()}\n")

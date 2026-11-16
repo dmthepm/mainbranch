@@ -11,6 +11,13 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Fixed
+
+- `mb connect` no longer treats a connection value as a placeholder when it holds `@`, `://`, `=` or `:`. Wrapping a URL or setting in `<...>`, or starting it with `xxx` or `your_`, no longer gets a password past the check. Plain placeholders such as `<your password>` and `your_token` still pass.
+- `mb connect fingerprint` prints no hash prefix for a stored value under 20 characters, and says why: a short hash of a short value, such as a PIN, can give the value away. `--json` returns `fingerprint: null` and a `reason`.
+- `mb connect remove` names the business folder in its confirm prompt and its result line, so running it from a subfolder shows which folder's connection it removes. `rotate` and `rebind` name the folder too.
+- The plugin move steps in `docs/migrating.md` no longer rely on the plugin refresh failing. They say to run `mb doctor` and move to `dmthepm/mainbranch` if it reports the old address.
+
 ## [0.6.27] - 2026-11-15
 
 ### Added

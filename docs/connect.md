@@ -159,9 +159,12 @@ copy already in a shell variable with:
 printf %s "$SECRET" | sha256sum | cut -c1-8
 ```
 
-The eight-hex prefix is for matching copies, not a secret or proof of validity.
-The command prints no credential and works in pipes without a terminal or
-`--print`. It reads the stored primary slot even for Google OAuth; it does not
+The eight-hex prefix is for matching copies, not proof of validity. For a long
+random key it gives nothing away. For a short value, such as a PIN, eight hex
+characters are enough to find the value by trying every candidate, so a stored
+value under 20 characters gets no prefix: the line says `no fingerprint` and
+why, and `--json` returns `fingerprint: null` with a `reason`. The command
+prints no credential and works in pipes without a terminal or `--print`. It reads the stored primary slot even for Google OAuth; it does not
 mint a fresh access token or hash the OAuth grant. Missing or unreadable
 credentials exit 1 with a one-line reason on stderr; `--json` also returns
 `ok: false` and `state` on stdout. Usage and repo lookup refusals exit 2;

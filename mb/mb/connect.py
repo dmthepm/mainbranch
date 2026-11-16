@@ -2626,6 +2626,7 @@ def remove_provider(
             "ok": bool(entries),
             "applied": False,
             "provider": provider.id,
+            "repo": str(target),
             "state": "ready" if entries else "not_connected",
             "repo_metadata": isinstance(repo_entry, dict),
             "user_scope_metadata": isinstance(user_entry, dict),
@@ -2713,7 +2714,7 @@ def remove_provider(
             ok=True,
             applied=True,
             state="removed",
-            message=f"Removed the {provider.name} connection.",
+            message=f"Removed the {provider.name} connection from {target}.",
         )
         return result
 
@@ -4527,6 +4528,9 @@ def release_attempt(
         raise
 
 
+FINGERPRINT_MIN_LENGTH = 20
+
+
 def fingerprint(provider: str, repo: str | Path) -> dict[str, Any]:
     """Compare stored primary credentials without returning their value."""
     with release_attempt("fingerprint", provider, repo, []) as record:
@@ -4536,7 +4540,15 @@ def fingerprint(provider: str, repo: str | Path) -> dict[str, Any]:
             "provider": result["provider"],
             "slot": result["field"],
         }
-        if result["ok"]:
+        if result["ok"] and len(result["token"]) < FINGERPRINT_MIN_LENGTH:
+            # Eight hex characters of a short value, such as a PIN, are enough
+            # to find the value by trying every candidate.
+            output["fingerprint"] = None
+            output["reason"] = (
+                f"the stored value is under {FINGERPRINT_MIN_LENGTH} characters, "
+                "so even a short hash of it could give it away"
+            )
+        elif result["ok"]:
             output["fingerprint"] = (
                 "sha256:" + hashlib.sha256(result["token"].encode("utf-8")).hexdigest()[:8]
             )
@@ -5062,6 +5074,7 @@ def rotate_provider(
         "ok": bool(connected["ok"]) and bool(tested["ok"]),
         "provider": provider.id,
         "source_kind": "1password",
+        "repo": str(target),
         "stored": bool(connected["ok"]),
         "provider_verified": bool(tested.get("provider_verified")),
         "validation": tested.get("validation") or {},
@@ -6298,6 +6311,10 @@ def _looks_like_iso_datetime(value: str) -> bool:
 def _looks_like_placeholder(value: str) -> bool:
     stripped = value.strip()
     lowered = stripped.lower()
+    # A URL, an address or a setting is never a placeholder, however it is
+    # wrapped, so a password inside one still meets the secret checks.
+    if any(mark in stripped for mark in ("@", "://", "=", ":")):
+        return False
     if lowered in _PLACEHOLDER_VALUES:
         return True
     if stripped.startswith("<") and stripped.endswith(">"):
