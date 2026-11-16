@@ -1615,7 +1615,7 @@ def connect_cmd(
         if json_out:
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.echo(f"mb connect rebind  {result['repo']}")
+            typer.echo(f"mb connect rebind  {connect_mod.shown_path(result['repo'])}")
             typer.echo(result["message"])
         raise typer.Exit(0)
     if target == "remove":
@@ -1649,7 +1649,8 @@ def connect_cmd(
                 if part
             )
             if not typer.confirm(
-                f"Remove the {plan['provider']} connection ({where}) in {plan['repo']}?"
+                f"Remove the {plan['provider']} connection ({where}) "
+                f"in {connect_mod.shown_path(plan['repo'])}?"
             ):
                 typer.echo("Nothing was removed.")
                 raise typer.Exit(1)

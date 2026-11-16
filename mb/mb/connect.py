@@ -336,11 +336,16 @@ KeychainError = CredentialStoreError
 _select_secret_backend = select_secret_backend
 
 
-def _shown_user_scope_path(path: Path) -> str:
-    """The user-scope file as an operator sees it: ``~/...`` under the home folder."""
+def shown_path(path: Path | str) -> str:
+    """A path as an operator sees it: ``~/...`` under the home folder.
 
+    For human output only; ``--json`` keeps the absolute path.
+    """
+
+    path = Path(path)
     with suppress(ValueError, RuntimeError):
-        return f"~/{path.relative_to(Path.home())}"
+        relative = path.relative_to(Path.home())
+        return "~" if relative == Path(".") else f"~/{relative}"
     return str(path)
 
 
@@ -373,7 +378,7 @@ def _user_scope_write_failure(exc: OSError) -> tuple[str, str]:
     if exc.errno == errno.EROFS:
         return "its file system is read-only", "Make that file system writable"
     if isinstance(exc, PermissionError):
-        folder = _shown_user_scope_path(_user_scope_path().parent)
+        folder = shown_path(_user_scope_path().parent)
         return f"permission to write in its folder {folder} was denied", "Make that folder writable"
     code = errno.errorcode.get(exc.errno or 0, "")
     cause = f"the file system reported an error ({code})" if code else "a file system error"
@@ -384,7 +389,7 @@ class UserScopeReadOnlyError(ConnectRefusal):
     """The user-scope file is read-only, so it was left as it is (rule ``user_scope_read_only``)."""
 
     def __init__(self, path: Path) -> None:
-        shown = _shown_user_scope_path(path)
+        shown = shown_path(path)
         self.shown = shown
         super().__init__(
             "user_scope_read_only",
@@ -1287,7 +1292,7 @@ def _user_scope_record_failure(exc: Exception) -> tuple[str, str, str]:
 
     if isinstance(exc, UserScopeReadOnlyError):
         return exc.shown, "is read-only", "Make that file writable"
-    shown = _shown_user_scope_path(_user_scope_path())
+    shown = shown_path(_user_scope_path())
     if isinstance(exc, ConfigCorruptError):
         return shown, "is unreadable or invalid YAML", "Fix or move that file"
     if isinstance(exc, UserScopeRecordRestoreError):
@@ -1971,6 +1976,10 @@ def _carries_password(text: str, depth: int = 0) -> bool:
     return False
 
 
+# Brackets and quotes around a word, stripped before its token shape is judged.
+_METADATA_WRAPPERS = "<>[](){}\"'`"
+
+
 def metadata_value_rule(value: str) -> str:
     """Name the secret-shape rule a metadata value trips, or "" when it is safe.
 
@@ -1982,17 +1991,16 @@ def metadata_value_rule(value: str) -> str:
     candidate = value.strip()
     if _BEARER_RE.search(candidate):
         return "bearer_credential"
-    if (
-        _looks_like_env_reference(candidate)
-        or _looks_like_placeholder(candidate)
-        or _looks_like_iso_datetime(candidate)
-    ):
+    if _looks_like_env_reference(candidate) or _looks_like_iso_datetime(candidate):
         return ""
+    # No placeholder exemption: a plain placeholder such as `<your password>`
+    # passes every check below anyway, and a wrapped or `xxx`-prefixed secret
+    # must not skip them.
     words = [candidate, *_metadata_words(candidate)]
     for word in words:
-        if _looks_like_env_reference(word) or _looks_like_placeholder(word):
+        if _looks_like_env_reference(word):
             continue
-        rule = _word_secret_rule(word)
+        rule = _word_secret_rule(word) or _word_secret_rule(word.strip(_METADATA_WRAPPERS))
         if rule:
             return rule
     if (
@@ -2714,7 +2722,7 @@ def remove_provider(
             ok=True,
             applied=True,
             state="removed",
-            message=f"Removed the {provider.name} connection from {target}.",
+            message=f"Removed the {provider.name} connection from {shown_path(target)}.",
         )
         return result
 
@@ -6311,10 +6319,6 @@ def _looks_like_iso_datetime(value: str) -> bool:
 def _looks_like_placeholder(value: str) -> bool:
     stripped = value.strip()
     lowered = stripped.lower()
-    # A URL, an address or a setting is never a placeholder, however it is
-    # wrapped, so a password inside one still meets the secret checks.
-    if any(mark in stripped for mark in ("@", "://", "=", ":")):
-        return False
     if lowered in _PLACEHOLDER_VALUES:
         return True
     if stripped.startswith("<") and stripped.endswith(">"):

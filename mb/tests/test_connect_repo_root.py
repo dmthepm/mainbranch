@@ -546,25 +546,43 @@ def test_audit_reads_machine_log_outside_git(
 
 
 def test_remove_from_a_subfolder_names_the_hub(hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The folder sits under the home folder, so text shows it as ~/hub and
+    # never the absolute path; --json keeps the absolute path.
+    monkeypatch.setenv("HOME", str(hub.resolve().parent))
     sub = hub / "downloads" / "unzipped"
     sub.mkdir(parents=True)
     monkeypatch.chdir(sub)
     monkeypatch.setattr(cli, "_stdin_is_tty", lambda: True)
     declined = runner.invoke(app, ["connect", "remove", "stripe"], input="n\n")
     assert declined.exit_code == 1, declined.output
-    assert f"in {hub.resolve()}?" in declined.stdout
+    assert "in ~/hub?" in declined.stdout
+    assert str(hub.resolve()) not in declined.stdout
     assert "stripe" in connect._read_config(hub)["providers"]
     removed = runner.invoke(app, ["connect", "remove", "stripe", "--yes"])
     assert removed.exit_code == 0, removed.output
-    assert f"Removed the Stripe connection from {hub.resolve()}." in removed.stdout
+    assert "Removed the Stripe connection from ~/hub." in removed.stdout
+    assert str(hub.resolve()) not in removed.stdout
     payload = runner.invoke(app, ["connect", "remove", "stripe", "--yes", "--json"])
     assert json.loads(payload.stdout)["repo"] == str(hub.resolve())
 
 
 def test_rebind_from_a_subfolder_names_the_hub(hub: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", str(hub.resolve().parent))
     sub = hub / "x"
     sub.mkdir()
     monkeypatch.chdir(sub)
     result = runner.invoke(app, ["connect", "rebind"])
     assert result.exit_code == 0, result.output
-    assert result.stdout.startswith(f"mb connect rebind  {hub.resolve()}\n")
+    assert result.stdout.startswith("mb connect rebind  ~/hub\n")
+    assert str(hub.resolve()) not in result.stdout
+    payload = runner.invoke(app, ["connect", "rebind", "--json"])
+    assert json.loads(payload.stdout)["repo"] == str(hub.resolve())
+
+
+def test_shown_path_uses_tilde_only_under_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    assert connect.shown_path(tmp_path / "home") == "~"
+    assert connect.shown_path(tmp_path / "home" / "biz") == "~/biz"
+    assert connect.shown_path(tmp_path / "elsewhere") == str(tmp_path / "elsewhere")

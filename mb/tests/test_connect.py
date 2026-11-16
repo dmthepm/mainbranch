@@ -3972,6 +3972,26 @@ def test_metadata_placeholder_shape_does_not_hide_a_password(value: str) -> None
     assert connect_mod.metadata_value_rule(value) == "url_password"
 
 
+# The placeholder exemption ran before percent-decoding and the token-shape
+# checks; now every secret check runs first. Synthetic values only.
+@pytest.mark.parametrize(
+    ("value", "rule"),
+    [
+        ("<password%3Dfixture-secret>", "url_password"),
+        ("XXX password%3Dfixture-secret", "url_password"),
+        (" YoUr_password%3Dfixture-secret", "url_password"),
+        ("<postgres%3A%2F%2Frowan%3Afixture-secret%40db.example.invalid>", "url_password"),
+        ("<sk-proj-" + "aB3c" * 12 + ">", "credential_prefix:sk-"),
+    ],
+)
+def test_metadata_placeholder_shape_does_not_skip_decoding_or_token_checks(
+    value: str, rule: str
+) -> None:
+    assert connect_mod.metadata_value_rule(value) == rule
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
 @pytest.mark.parametrize(
     "value",
     ["<your password>", "<token>", "xxx", "your_token", "your-api-key", "<jo@example.org>"],
@@ -4714,10 +4734,13 @@ def test_rotate_names_the_repo_folder(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(connect_mod, "_run_command", run)
     monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
 
+    monkeypatch.setenv("HOME", str(tmp_path))
+
     result = runner.invoke(app, ["connect", "rotate", "cloudflare", "--repo", str(repo)])
 
     assert result.exit_code == 0, result.output
-    assert f"mb connect rotate cloudflare in {repo.resolve()}:" in result.stdout
+    assert "mb connect rotate cloudflare in ~/biz:" in result.stdout
+    assert str(repo.resolve()) not in result.stdout
 
 
 def test_rotate_without_source_explains(tmp_path: Path, monkeypatch) -> None:
