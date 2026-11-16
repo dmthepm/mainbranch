@@ -4048,9 +4048,45 @@ def test_metadata_refuses_encoded_or_wrapped_token_shapes(value: str) -> None:
         connect_mod._parse_metadata([f"note={value}"])
 
 
+# An encoded separator decodes to a word boundary, so it cannot glue a label
+# to the key and hide it from the whole-word checks.
+_PLAIN_SK = "sk-proj-" + "aB3c" * 12
+
+
 @pytest.mark.parametrize(
     "value",
-    ["<your password>", "<token>", "xxx", "your_token", "your-api-key", "<jo@example.org>"],
+    [
+        f"xxx%20{_PLAIN_SK}",
+        f"xxx%2520{_PLAIN_SK}",
+        f"xxx%09{_PLAIN_SK}",
+        f"note:%20{_PLAIN_SK}",
+        f"xxx%20{_ENCODED_SK}",
+        f"<[`xxx%20{_PLAIN_SK}`]>",
+        f"%3C%60xxx%2520{_PLAIN_SK}%60%3E",
+        f"xxx%0A{_PLAIN_SK}",
+        f"xxx%2C{_PLAIN_SK}",
+        f"xxx%3B{_PLAIN_SK}",
+        f"xxx %20%3C{_PLAIN_SK}%3E",
+        f"xxx%C2%A0{_PLAIN_SK}",
+    ],
+)
+def test_metadata_refuses_token_behind_encoded_separator(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "credential_prefix:sk-"
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "<your password>",
+        "<token>",
+        "xxx",
+        "your_token",
+        "your-api-key",
+        "<jo@example.org>",
+        "Spring%20launch%2C%20week%202",
+    ],
 )
 def test_metadata_still_passes_plain_placeholders(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == ""

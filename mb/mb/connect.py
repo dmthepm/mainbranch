@@ -1997,6 +1997,11 @@ def metadata_value_rule(value: str) -> str:
     # passes every check below anyway, and a wrapped or `xxx`-prefixed secret
     # must not skip them.
     words = [candidate, *_metadata_words(candidate)]
+    # Split the decoded value too, so an encoded separator such as `%20` or
+    # `%2C` cannot glue a label to a key and hide the key's word boundary.
+    decoded = _fully_unquote(candidate)
+    if decoded != candidate:
+        words += [decoded, *_metadata_words(decoded)]
     for word in words:
         if _looks_like_env_reference(word):
             continue
