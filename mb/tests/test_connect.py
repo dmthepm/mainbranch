@@ -4068,6 +4068,12 @@ _PLAIN_SK = "sk-proj-" + "aB3c" * 12
         f"xxx%3B{_PLAIN_SK}",
         f"xxx %20%3C{_PLAIN_SK}%3E",
         f"xxx%C2%A0{_PLAIN_SK}",
+        f"xxx|{_PLAIN_SK}",
+        f"xxx/{_PLAIN_SK}",
+        f"xxx+{_PLAIN_SK}",
+        f"xxx%7C{_PLAIN_SK}",
+        f"xxx.{_PLAIN_SK}",
+        f"<xxx|{_PLAIN_SK}>",
     ],
 )
 def test_metadata_refuses_token_behind_encoded_separator(value: str) -> None:
@@ -4086,6 +4092,9 @@ def test_metadata_refuses_token_behind_encoded_separator(value: str) -> None:
         "your-api-key",
         "<jo@example.org>",
         "Spring%20launch%2C%20week%202",
+        "https://example.com/docs/setup?ref=launch#step-2",
+        "repo:read|write/admin+billing",
+        "AcmeProd2026/us-east-1",
     ],
 )
 def test_metadata_still_passes_plain_placeholders(value: str) -> None:

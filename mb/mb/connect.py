@@ -1635,6 +1635,10 @@ _JWT_RE = re.compile(r"^eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*$
 # label; "bearer" inside an ordinary phrase is not a credential.
 _BEARER_RE = re.compile(r"^bearer\s+\S|\sbearer\s+[A-Za-z0-9._~+/=\-]{16,}", re.IGNORECASE)
 _TOKEN_CHARSET_RE = re.compile(r"^[A-Za-z0-9+/=_.\-]+$")
+# Pieces of a word judged on their own: split on anything outside the token
+# characters, and on the joiners `+ / = .` among them, leaving the
+# `[A-Za-z0-9_-]` body that prefixed keys share.
+_METADATA_PIECE_SPLIT_RE = re.compile(r"[^A-Za-z0-9_\-]+")
 # Split a value into words so a credential behind a short label ("note: <key>")
 # is judged on its own: first on spaces, commas and semicolons, then on `:`
 # and `=`. Structured references (URLs, op:// refs, emails) are not split on
@@ -2010,6 +2014,12 @@ def metadata_value_rule(value: str) -> str:
             rule = _word_secret_rule(form) or _word_secret_rule(form.strip(_METADATA_WRAPPERS))
             if rule:
                 return rule
+            # Judge its pieces too, so `xxx|<key>`, `xxx/<key>` or `xxx+<key>`
+            # cannot glue a label to a key.
+            for piece in _METADATA_PIECE_SPLIT_RE.split(form):
+                rule = _word_secret_rule(piece) if piece and piece != form else ""
+                if rule:
+                    return rule
     if (
         _has_named_password(candidate)
         or any(_url_has_password(word) for word in words)
