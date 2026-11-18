@@ -399,3 +399,12 @@ def test_no_restore_hint_when_the_wiring_was_never_committed(business: Path) -> 
 
     assert not any(RESTORE in action for action in start["next_actions"])
     assert not [c for c in doctor["checks"] if c["name"] == "plugin-wiring-emptied"]
+
+
+def test_move_guide_points_at_doctor_not_a_failed_refresh() -> None:
+    guide = (Path(__file__).resolve().parents[2] / "docs" / "migrating.md").read_text()
+    section = " ".join(guide.split("If you use the Claude Code plugin rail", 1)[1].split())
+    assert "Then run `mb doctor`. If it reports the old `noontide-co/mainbranch`" in section
+    assert "claude plugin marketplace add dmthepm/mainbranch" in section
+    assert "outside any repo" in section
+    assert "refresh above fails" not in section

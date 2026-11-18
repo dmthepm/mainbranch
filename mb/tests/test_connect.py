@@ -3061,6 +3061,34 @@ def test_hygiene_flags_literal_secret_mixed_with_env_ref(tmp_path: Path) -> None
     assert any(f["location"].endswith("API_KEY") for f in result["findings"])
 
 
+# A setting or URL is never a placeholder, however it is encoded or wrapped,
+# so `your_token=<secret>` still reads as a plaintext secret. Synthetic values.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "your_token=FixtureSecret123",
+        "XXX token=FixtureSecret123",
+        "YoUr_token=FixtureSecret123",
+        "  xXx token=FixtureSecret123  ",
+        "your_token%3DFixtureSecret123",
+        "xxx token%253DFixtureSecret123",
+        "<your_token=FixtureSecret123>",
+        "[your_token=FixtureSecret123]",
+        '"your_token=FixtureSecret123"',
+        "'<[your_token%3DFixtureSecret123]>'",
+    ],
+)
+def test_hygiene_placeholder_shape_does_not_hide_a_setting(value: str) -> None:
+    flagged, reason = connect_mod._classify_credential_value("api_key", value)
+    assert flagged, value
+    assert "FixtureSecret123" not in reason
+
+
+@pytest.mark.parametrize("value", ["your_token", "<your password>", "xxx", "  YoUr-api-key "])
+def test_hygiene_still_spares_plain_placeholders(value: str) -> None:
+    assert connect_mod._classify_credential_value("api_key", value) == (False, "")
+
+
 def test_hygiene_surfaces_unscannable_files_loudly(tmp_path: Path) -> None:
     home = tmp_path / "home"
     home.mkdir(parents=True)
@@ -3956,6 +3984,178 @@ def test_metadata_passes_values_with_no_named_password(value: str) -> None:
     assert connect_mod.metadata_value_rule(value) == ""
 
 
+# Fake values only. A placeholder-looking wrapper or prefix must not hide a
+# password; plain placeholders still pass.
+@pytest.mark.parametrize(
+    "value",
+    [
+        "<postgres://rowan:hunter2-fake@db.example.invalid/shop>",
+        "<host=db.example.invalid;password=hunter2-fake>",
+        "xxx postgres://rowan:hunter2-fake@db.example.invalid",
+        "your_password=hunter2-fake",
+        "your-db rowan:hunter2-fake@db.example.invalid",
+    ],
+)
+def test_metadata_placeholder_shape_does_not_hide_a_password(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "url_password"
+
+
+# The placeholder exemption ran before percent-decoding and the token-shape
+# checks; now every secret check runs first. Synthetic values only.
+@pytest.mark.parametrize(
+    ("value", "rule"),
+    [
+        ("<password%3Dfixture-secret>", "url_password"),
+        ("XXX password%3Dfixture-secret", "url_password"),
+        (" YoUr_password%3Dfixture-secret", "url_password"),
+        ("<postgres%3A%2F%2Frowan%3Afixture-secret%40db.example.invalid>", "url_password"),
+        ("<sk-proj-" + "aB3c" * 12 + ">", "credential_prefix:sk-"),
+    ],
+)
+def test_metadata_placeholder_shape_does_not_skip_decoding_or_token_checks(
+    value: str, rule: str
+) -> None:
+    assert connect_mod.metadata_value_rule(value) == rule
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
+# Token shapes are judged on each word raw and percent-decoded (up to the
+# named-setting decoder's passes), with brackets and quotes stripped.
+_ENCODED_SK = "%73%6b%2dproj-" + "aB3c" * 12
+_TWICE_ENCODED_SK = "%2573%256b%252dproj-" + "aB3c" * 12
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        _ENCODED_SK,
+        _TWICE_ENCODED_SK,
+        f"<{_ENCODED_SK}>",
+        f"xxx {_ENCODED_SK}",
+        f"  YoUr_token {_TWICE_ENCODED_SK}  ",
+        f"[{_ENCODED_SK}]",
+        f'"{_ENCODED_SK}"',
+        f"'({_TWICE_ENCODED_SK})'",
+        f"<[`{_ENCODED_SK}`]>",
+        f"%3C{_ENCODED_SK}%3E",
+        f"note: <{_ENCODED_SK}>",
+    ],
+)
+def test_metadata_refuses_encoded_or_wrapped_token_shapes(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "credential_prefix:sk-"
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
+# An encoded separator decodes to a word boundary, so it cannot glue a label
+# to the key and hide it from the whole-word checks.
+_PLAIN_SK = "sk-proj-" + "aB3c" * 12
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        f"xxx%20{_PLAIN_SK}",
+        f"xxx%2520{_PLAIN_SK}",
+        f"xxx%09{_PLAIN_SK}",
+        f"note:%20{_PLAIN_SK}",
+        f"xxx%20{_ENCODED_SK}",
+        f"<[`xxx%20{_PLAIN_SK}`]>",
+        f"%3C%60xxx%2520{_PLAIN_SK}%60%3E",
+        f"xxx%0A{_PLAIN_SK}",
+        f"xxx%2C{_PLAIN_SK}",
+        f"xxx%3B{_PLAIN_SK}",
+        f"xxx %20%3C{_PLAIN_SK}%3E",
+        f"xxx%C2%A0{_PLAIN_SK}",
+        f"xxx|{_PLAIN_SK}",
+        f"xxx/{_PLAIN_SK}",
+        f"xxx+{_PLAIN_SK}",
+        f"xxx%7C{_PLAIN_SK}",
+        f"xxx.{_PLAIN_SK}",
+        f"<xxx|{_PLAIN_SK}>",
+    ],
+)
+def test_metadata_refuses_token_behind_encoded_separator(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == "credential_prefix:sk-"
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
+# One invented sample per credential grammar the module recognises, several
+# holding the joiners `/ + = . _ -` inside the key itself.
+_GRAMMAR_SAMPLES = {
+    "credential_prefix:sk_": "sk_live_" + "F4k3v4lu3F4k3",
+    "credential_prefix:rk_": "rk_test_" + "F4k3v4lu3F4k3",
+    "credential_prefix:pk_live_": "pk_live_" + "F4k3v4lu3F4k3",
+    "credential_prefix:whsec_": "whsec_" + "a" * 8 + "/" + "a" * 8 + "+b=",
+    "credential_prefix:re_": "re_" + "F4k3v4lu" + "_" + "F4k3v4lu3F4k3F4k",
+    "credential_prefix:sk-": "sk-proj-" + "F4k3_v4lu3-F4k3v4lu3",
+    "credential_prefix:ghp_": "ghp_" + "F4k3" * 8,
+    "credential_prefix:gho_": "gho_" + "F4k3" * 8,
+    "credential_prefix:ghu_": "ghu_" + "F4k3" * 8,
+    "credential_prefix:ghs_": "ghs_" + "F4k3" * 8,
+    "credential_prefix:ghr_": "ghr_" + "F4k3" * 8,
+    "credential_prefix:github_pat_": "github_pat_" + "11F4K3_f4k3v4lu3",
+    "credential_prefix:glpat-": "glpat-" + "F4k3_v4lu3-F4k3v4lu3",
+    "credential_prefix:xox": "xoxb-" + "1111-2222-f4k3",
+    "credential_prefix:AKIA": "ASIA" + "F4K3F4K3F4K3F4K3",
+    "credential_prefix:AIza": "AIza" + "F4k3_v4lu3-" * 3 + "F4",
+    "credential_prefix:cfat_": "cfat_" + "F4k3_v4lu3-F4k3v4lu3",
+    "jwt_shape": "eyJ" + "aaaa.aaaa.aaaa",
+    "high_entropy": "Q2hhbmdlTWVQ.bGVhc2U4ZjNr+MjlYcVdlUnR5VWlPcA",
+    "bearer_credential": "Bearer " + "F4k3v4lu3F4k3F4k3v4",
+}
+_JOINER_FRAMES = [
+    "xxx|{}",
+    "xxx/{}",
+    "xxx+{}",
+    "xxx.{}",
+    "xxx={}",
+    "xxx%7C{}",
+    "xxx%257C{}",
+    "<[xxx|{}]>",
+    "note:{}",
+    "xxx%20{}",
+    "xxx|{}|yyy",
+]
+
+
+def test_grammar_samples_cover_every_grammar() -> None:
+    rules = {f"credential_prefix:{prefix}" for prefix, _ in connect_mod.METADATA_SECRET_GRAMMARS}
+    assert set(_GRAMMAR_SAMPLES) == rules | {"jwt_shape", "high_entropy", "bearer_credential"}
+    for rule, sample in _GRAMMAR_SAMPLES.items():
+        assert connect_mod.metadata_value_rule(sample) == rule
+
+
+@pytest.mark.parametrize("frame", _JOINER_FRAMES)
+@pytest.mark.parametrize("rule", sorted(_GRAMMAR_SAMPLES))
+def test_metadata_refuses_every_grammar_behind_every_joiner(rule: str, frame: str) -> None:
+    value = frame.format(_GRAMMAR_SAMPLES[rule])
+    assert connect_mod.metadata_value_rule(value) == rule
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "<your password>",
+        "<token>",
+        "xxx",
+        "your_token",
+        "your-api-key",
+        "<jo@example.org>",
+        "Spring%20launch%2C%20week%202",
+        "https://example.com/docs/setup?ref=launch#step-2",
+        "repo:read|write/admin+billing",
+        "AcmeProd2026/us-east-1",
+    ],
+)
+def test_metadata_still_passes_plain_placeholders(value: str) -> None:
+    assert connect_mod.metadata_value_rule(value) == ""
+
+
 _NAMED_SECRET_NAMES = [
     "password",
     "passwd",
@@ -4673,6 +4873,30 @@ def test_rotate_cli_json_never_carries_the_secret(tmp_path: Path, monkeypatch) -
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["provider_verified"] is True
     assert "cf-rotated-token" not in result.output
+
+
+def test_rotate_names_the_repo_folder(tmp_path: Path, monkeypatch) -> None:
+    _local_secret_env(monkeypatch, tmp_path)
+    _ok_http(monkeypatch)
+    repo = tmp_path / "biz"
+    repo.mkdir()
+    connect_mod.connect_provider(
+        "cloudflare",
+        repo=repo,
+        token="cf-old-token",
+        source="op://Business/Cloudflare/credential",
+    )
+    run, _calls = _fake_op("cf-rotated-token")
+    monkeypatch.setattr(connect_mod, "_run_command", run)
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    result = runner.invoke(app, ["connect", "rotate", "cloudflare", "--repo", str(repo)])
+
+    assert result.exit_code == 0, result.output
+    assert "mb connect rotate cloudflare in ~/biz:" in result.stdout
+    assert str(repo.resolve()) not in result.stdout
 
 
 def test_rotate_without_source_explains(tmp_path: Path, monkeypatch) -> None:

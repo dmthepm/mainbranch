@@ -341,11 +341,11 @@ claude plugin marketplace update mainbranch && claude plugin install mainbranch@
 The symlink repair path remains the fallback and repair path; the
 plugin is the more durable route for fresh Claude Code worktrees.
 
-If your marketplace still points at the old `noontide-co/mainbranch` address,
-the refresh above fails. Main Branch moved to `dmthepm/mainbranch` on 28 Oct
-2026. The old address only works through a GitHub redirect, which stops working
-if a new repository ever takes that name, so move to the new one. Run these
-from outside any repo, such as your home folder:
+Then run `mb doctor`. If it reports the old `noontide-co/mainbranch` plugin
+address, move to `dmthepm/mainbranch`, even if the refresh worked. Main Branch
+moved there on 28 Oct 2026, and the old address only works through a GitHub
+redirect, which stops working if a new repository ever takes that name. Run
+these from outside any repo, such as your home folder:
 
 ```bash
 cd ~

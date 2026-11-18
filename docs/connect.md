@@ -159,9 +159,12 @@ copy already in a shell variable with:
 printf %s "$SECRET" | sha256sum | cut -c1-8
 ```
 
-The eight-hex prefix is for matching copies, not a secret or proof of validity.
-The command prints no credential and works in pipes without a terminal or
-`--print`. It reads the stored primary slot even for Google OAuth; it does not
+The eight-hex prefix is for matching copies, not proof of validity. For a long
+random key it gives nothing away. For a short value, such as a PIN, eight hex
+characters are enough to find the value by trying every candidate, so a stored
+value under 20 characters gets no prefix: the line says `no fingerprint` and
+why, and `--json` returns `fingerprint: null` with a `reason`. The command
+prints no credential and works in pipes without a terminal or `--print`. It reads the stored primary slot even for Google OAuth; it does not
 mint a fresh access token or hash the OAuth grant. Missing or unreadable
 credentials exit 1 with a one-line reason on stderr; `--json` also returns
 `ok: false` and `state` on stdout. Usage and repo lookup refusals exit 2;
@@ -596,10 +599,10 @@ also pass this named-setting check.
 
 This check does not normalize Unicode lookalikes or zero-width characters,
 remove comments between names and separators, split camelCase names such as
-`accessToken`, or decode HTML entities. Existing placeholder exemptions run
-before this scan, so values such as `xxx token=x`, `your_token=x` and
-`<token=x>` pass. Other secret-shape rules may still refuse values outside
-the named-setting grammar. Use the secret store for credentials.
+`accessToken`, or decode HTML entities. It runs before any placeholder
+exemption, so `xxx token=x`, `your_token=x` and `<token=x>` are refused. Other
+secret-shape rules may still refuse values outside the named-setting grammar.
+Use the secret store for credentials.
 
 Two checks run and a value is refused when either says so. The first reads each
 URL with a scheme the way Python's URL parser does, nested URLs included (a URL
@@ -626,8 +629,10 @@ Some ordinary values look the same as `user:pw@host` and are refused too:
   such as `a:b,jo@example.com`.
 
 Write the address without the label (`jo@example.com`) or as
-`owner=jo@example.com`. A value wrapped in `<...>` or marked as a placeholder is
-treated as a placeholder, not judged for a password.
+`owner=jo@example.com`. Wrapping a value in `<...>` or starting it with `xxx`
+or `your_` does not exempt it: every check runs on it first, so plain
+placeholders such as `<your password>` and `your_token` pass, and a password
+or key inside a wrapper is still refused.
 
 If the disk refuses to sync a directory (error `EINVAL`, `ENOTSUP` or
 `EOPNOTSUPP`, as some network and FUSE filesystems do), saves carry on, but the

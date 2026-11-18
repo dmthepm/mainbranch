@@ -227,7 +227,10 @@ def render_rotate_result(result: dict[str, Any]) -> None:
     from mb import connect
 
     stored = "stored" if result["stored"] else "not stored"
-    print(f"mb connect rotate {result['provider']}: re-read from 1Password, {stored}")
+    print(
+        f"mb connect rotate {result['provider']} in {connect.shown_path(result['repo'])}: "
+        f"re-read from 1Password, {stored}"
+    )
     connect.render_test_result(result)
 
 

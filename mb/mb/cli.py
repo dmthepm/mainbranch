@@ -1437,8 +1437,9 @@ def connect_cmd(
     """Connect provider credentials without committing secrets.
 
     fingerprint <provider> prints provider, primary slot and sha256:<8 hex> of
-    stored UTF-8 bytes, without an added newline in the hash. Safe in pipes;
-    the prefix matches copies and is not a secret. Compare with:
+    stored UTF-8 bytes, without an added newline in the hash. Safe in pipes.
+    A stored value under 20 characters gets no prefix, since a short hash of a
+    short value can give it away. Compare with:
     printf %s "$SECRET" | sha256sum | cut -c1-8
     """
     command = command or []
@@ -1614,6 +1615,7 @@ def connect_cmd(
         if json_out:
             typer.echo(json.dumps(result, indent=2))
         else:
+            typer.echo(f"mb connect rebind  {connect_mod.shown_path(result['repo'])}")
             typer.echo(result["message"])
         raise typer.Exit(0)
     if target == "remove":
@@ -1646,7 +1648,10 @@ def connect_cmd(
                 )
                 if part
             )
-            if not typer.confirm(f"Remove the {plan['provider']} connection ({where})?"):
+            if not typer.confirm(
+                f"Remove the {plan['provider']} connection ({where}) "
+                f"in {connect_mod.shown_path(plan['repo'])}?"
+            ):
                 typer.echo("Nothing was removed.")
                 raise typer.Exit(1)
         try:
@@ -1795,6 +1800,8 @@ def connect_cmd(
             typer.echo(f"mb connect fingerprint: {result['error']}", err=True)
         if json_out:
             typer.echo(json.dumps(result))
+        elif result["ok"] and result["fingerprint"] is None:
+            typer.echo(f"{result['provider']} {result['slot']} no fingerprint: {result['reason']}")
         elif result["ok"]:
             typer.echo(f"{result['provider']} {result['slot']} {result['fingerprint']}")
         raise typer.Exit(0 if result["ok"] else 1)
