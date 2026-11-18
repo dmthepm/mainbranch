@@ -1642,10 +1642,12 @@ _METADATA_EMBEDDED_GRAMMARS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
 # A JWT inside a word: a whole `[A-Za-z0-9_-]` segment followed by
 # `.<4+ chars>.`, then an `eyJ` with four characters after it that starts the
 # segment or follows a `_` or `-` in it. Matching whole segments keeps the
-# scan linear on `-eyJ-eyJ...`.
-_METADATA_JWT_LEAD_RE = re.compile(r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]++(?=\.[A-Za-z0-9_-]{4})")
+# scan linear on `-eyJ-eyJ...`. No possessive quantifiers: Python 3.10 has none,
+# and they are not needed here (a segment holds no `.`, so only its full length
+# can satisfy the lookahead, and each segment is tried once from its start).
+_METADATA_JWT_LEAD_RE = re.compile(r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]+(?=\.[A-Za-z0-9_-]{4})")
 _METADATA_JWT_START_RE = re.compile(r"(?<![A-Za-z0-9])eyJ[A-Za-z0-9_-]{4}")
-_METADATA_JWT_REST_RE = re.compile(r"\.[A-Za-z0-9_-]{4,}+\.")
+_METADATA_JWT_REST_RE = re.compile(r"\.[A-Za-z0-9_-]{4,}\.")
 _METADATA_TOKEN_RUN_RE = re.compile(r"[A-Za-z0-9+/=_.\-]+")
 # Tails of a token run longer than this are not judged for entropy one by
 # one (the whole run still is), which keeps a long run linear to scan.
