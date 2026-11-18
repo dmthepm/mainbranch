@@ -1631,14 +1631,32 @@ METADATA_SECRET_GRAMMARS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("cfat_", re.compile(r"cfat_[A-Za-z0-9_\-]{20,}")),
 )
 _JWT_RE = re.compile(r"^eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*$")
+# The same grammars found inside a word: a key that starts and ends at a
+# non-alphanumeric character (or the word's edge), so `xxx|<key>|yyy` is
+# caught while the key keeps its own `/ + = .` characters. Every class holds
+# all alphanumerics or has a fixed length, so a failed match never rescans.
+_METADATA_EMBEDDED_GRAMMARS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
+    (prefix, re.compile(rf"(?<![A-Za-z0-9])(?:{grammar.pattern})(?![A-Za-z0-9])"))
+    for prefix, grammar in METADATA_SECRET_GRAMMARS
+)
+# A JWT inside a word: a whole `[A-Za-z0-9_-]` segment followed by
+# `.<4+ chars>.`, then an `eyJ` with four characters after it that starts the
+# segment or follows a `_` or `-` in it. Matching whole segments keeps the
+# scan linear on `-eyJ-eyJ...`.
+_METADATA_JWT_LEAD_RE = re.compile(r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]++(?=\.[A-Za-z0-9_-]{4})")
+_METADATA_JWT_START_RE = re.compile(r"(?<![A-Za-z0-9])eyJ[A-Za-z0-9_-]{4}")
+_METADATA_JWT_REST_RE = re.compile(r"\.[A-Za-z0-9_-]{4,}+\.")
+_METADATA_TOKEN_RUN_RE = re.compile(r"[A-Za-z0-9+/=_.\-]+")
+# Tails of a token run longer than this are not judged for entropy one by
+# one (the whole run still is), which keeps a long run linear to scan.
+_METADATA_ENTROPY_MAX_TAIL = 512
 # "Bearer <anything>" as the whole value, or "Bearer <long token>" after a
-# label; "bearer" inside an ordinary phrase is not a credential.
-_BEARER_RE = re.compile(r"^bearer\s+\S|\sbearer\s+[A-Za-z0-9._~+/=\-]{16,}", re.IGNORECASE)
+# label and any joiner (`note:`, `xxx|`); "bearer" inside an ordinary phrase
+# is not a credential.
+_BEARER_RE = re.compile(
+    r"^bearer\s+\S|(?<![A-Za-z0-9])bearer\s+[A-Za-z0-9._~+/=\-]{16,}", re.IGNORECASE
+)
 _TOKEN_CHARSET_RE = re.compile(r"^[A-Za-z0-9+/=_.\-]+$")
-# Pieces of a word judged on their own: split on anything outside the token
-# characters, and on the joiners `+ / = .` among them, leaving the
-# `[A-Za-z0-9_-]` body that prefixed keys share.
-_METADATA_PIECE_SPLIT_RE = re.compile(r"[^A-Za-z0-9_\-]+")
 # Split a value into words so a credential behind a short label ("note: <key>")
 # is judged on its own: first on spaces, commas and semicolons, then on `:`
 # and `=`. Structured references (URLs, op:// refs, emails) are not split on
@@ -1815,6 +1833,41 @@ def _word_secret_rule(word: str) -> str:
     return ""
 
 
+def _embedded_credential_rule(word: str) -> str:
+    """Name a credential grammar found inside ``word``, or "" when none is.
+
+    A joiner such as ``|``, ``/`` or ``.`` can glue a label to a key
+    (``xxx|<key>|yyy``), and a key may hold the same characters itself
+    (``whsec_`` bodies, JWT dots), so the word is not split: each grammar is
+    searched with non-alphanumeric edges.
+    """
+    for prefix, pattern in _METADATA_EMBEDDED_GRAMMARS:
+        if pattern.search(word):
+            return f"credential_prefix:{prefix}"
+    for lead in _METADATA_JWT_LEAD_RE.finditer(word):
+        if _METADATA_JWT_START_RE.search(lead[0]) and _METADATA_JWT_REST_RE.match(word, lead.end()):
+            return "jwt_shape"
+    return ""
+
+
+def _embedded_entropy_rule(word: str) -> str:
+    """Judge each run of token characters in ``word``, and each of its tails
+    that starts after a non-alphanumeric character, so a joiner cannot hide a
+    random key."""
+    for run in _METADATA_TOKEN_RUN_RE.findall(word):
+        rule = _word_secret_rule(run)
+        if rule:
+            return rule
+        first = max(1, len(run) - _METADATA_ENTROPY_MAX_TAIL)
+        for start in range(first, len(run) - METADATA_ENTROPY_MIN_LENGTH + 1):
+            if run[start - 1].isalnum():
+                continue
+            rule = _word_secret_rule(run[start:])
+            if rule:
+                return rule
+    return ""
+
+
 def _metadata_words(value: str) -> list[str]:
     """The words of a metadata value that are judged one by one.
 
@@ -1980,10 +2033,6 @@ def _carries_password(text: str, depth: int = 0) -> bool:
     return False
 
 
-# Brackets and quotes around a word, stripped before its token shape is judged.
-_METADATA_WRAPPERS = "<>[](){}\"'`"
-
-
 def metadata_value_rule(value: str) -> str:
     """Name the secret-shape rule a metadata value trips, or "" when it is safe.
 
@@ -1993,7 +2042,7 @@ def metadata_value_rule(value: str) -> str:
     not hide it. The returned rule name is safe to show; the value never is.
     """
     candidate = value.strip()
-    if _BEARER_RE.search(candidate):
+    if _BEARER_RE.search(candidate) or _BEARER_RE.search(_fully_unquote(candidate)):
         return "bearer_credential"
     if _looks_like_env_reference(candidate) or _looks_like_iso_datetime(candidate):
         return ""
@@ -2006,20 +2055,21 @@ def metadata_value_rule(value: str) -> str:
     decoded = _fully_unquote(candidate)
     if decoded != candidate:
         words += [decoded, *_metadata_words(decoded)]
-    for word in words:
-        if _looks_like_env_reference(word):
-            continue
-        # Judge each word raw and percent-decoded, so `%73%6b%2d` cannot hide `sk-`.
-        for form in dict.fromkeys((word, _fully_unquote(word))):
-            rule = _word_secret_rule(form) or _word_secret_rule(form.strip(_METADATA_WRAPPERS))
+    # Judge each word raw and percent-decoded, so `%73%6b%2d` cannot hide `sk-`.
+    # Wrappers and joiners sit outside every token grammar, so the bare and
+    # the unwrapped word are judged too. Grammars run first so a refusal
+    # names the key's family rather than its entropy.
+    forms = dict.fromkeys(
+        form
+        for word in words
+        if not _looks_like_env_reference(word)
+        for form in (word, _fully_unquote(word))
+    )
+    for judge in (_embedded_credential_rule, _embedded_entropy_rule):
+        for form in forms:
+            rule = judge(form)
             if rule:
                 return rule
-            # Judge its pieces too, so `xxx|<key>`, `xxx/<key>` or `xxx+<key>`
-            # cannot glue a label to a key.
-            for piece in _METADATA_PIECE_SPLIT_RE.split(form):
-                rule = _word_secret_rule(piece) if piece and piece != form else ""
-                if rule:
-                    return rule
     if (
         _has_named_password(candidate)
         or any(_url_has_password(word) for word in words)

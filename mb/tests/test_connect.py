@@ -4082,6 +4082,61 @@ def test_metadata_refuses_token_behind_encoded_separator(value: str) -> None:
         connect_mod._parse_metadata([f"note={value}"])
 
 
+# One invented sample per credential grammar the module recognises, several
+# holding the joiners `/ + = . _ -` inside the key itself.
+_GRAMMAR_SAMPLES = {
+    "credential_prefix:sk_": "sk_live_" + "F4k3v4lu3F4k3",
+    "credential_prefix:rk_": "rk_test_" + "F4k3v4lu3F4k3",
+    "credential_prefix:pk_live_": "pk_live_" + "F4k3v4lu3F4k3",
+    "credential_prefix:whsec_": "whsec_" + "a" * 8 + "/" + "a" * 8 + "+b=",
+    "credential_prefix:re_": "re_" + "F4k3v4lu" + "_" + "F4k3v4lu3F4k3F4k",
+    "credential_prefix:sk-": "sk-proj-" + "F4k3_v4lu3-F4k3v4lu3",
+    "credential_prefix:ghp_": "ghp_" + "F4k3" * 8,
+    "credential_prefix:gho_": "gho_" + "F4k3" * 8,
+    "credential_prefix:ghu_": "ghu_" + "F4k3" * 8,
+    "credential_prefix:ghs_": "ghs_" + "F4k3" * 8,
+    "credential_prefix:ghr_": "ghr_" + "F4k3" * 8,
+    "credential_prefix:github_pat_": "github_pat_" + "11F4K3_f4k3v4lu3",
+    "credential_prefix:glpat-": "glpat-" + "F4k3_v4lu3-F4k3v4lu3",
+    "credential_prefix:xox": "xoxb-" + "1111-2222-f4k3",
+    "credential_prefix:AKIA": "ASIA" + "F4K3F4K3F4K3F4K3",
+    "credential_prefix:AIza": "AIza" + "F4k3_v4lu3-" * 3 + "F4",
+    "credential_prefix:cfat_": "cfat_" + "F4k3_v4lu3-F4k3v4lu3",
+    "jwt_shape": "eyJ" + "aaaa.aaaa.aaaa",
+    "high_entropy": "Q2hhbmdlTWVQ.bGVhc2U4ZjNr+MjlYcVdlUnR5VWlPcA",
+    "bearer_credential": "Bearer " + "F4k3v4lu3F4k3F4k3v4",
+}
+_JOINER_FRAMES = [
+    "xxx|{}",
+    "xxx/{}",
+    "xxx+{}",
+    "xxx.{}",
+    "xxx={}",
+    "xxx%7C{}",
+    "xxx%257C{}",
+    "<[xxx|{}]>",
+    "note:{}",
+    "xxx%20{}",
+    "xxx|{}|yyy",
+]
+
+
+def test_grammar_samples_cover_every_grammar() -> None:
+    rules = {f"credential_prefix:{prefix}" for prefix, _ in connect_mod.METADATA_SECRET_GRAMMARS}
+    assert set(_GRAMMAR_SAMPLES) == rules | {"jwt_shape", "high_entropy", "bearer_credential"}
+    for rule, sample in _GRAMMAR_SAMPLES.items():
+        assert connect_mod.metadata_value_rule(sample) == rule
+
+
+@pytest.mark.parametrize("frame", _JOINER_FRAMES)
+@pytest.mark.parametrize("rule", sorted(_GRAMMAR_SAMPLES))
+def test_metadata_refuses_every_grammar_behind_every_joiner(rule: str, frame: str) -> None:
+    value = frame.format(_GRAMMAR_SAMPLES[rule])
+    assert connect_mod.metadata_value_rule(value) == rule
+    with pytest.raises(ValueError):
+        connect_mod._parse_metadata([f"note={value}"])
+
+
 @pytest.mark.parametrize(
     "value",
     [
