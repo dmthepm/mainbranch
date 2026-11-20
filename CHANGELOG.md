@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.28] - 2026-11-20
+
 ### Fixed
 
 - `mb connect` metadata runs every secret check before it accepts a value as a placeholder. Wrapping a URL, a setting or a key in `<...>`, starting it with `xxx` or `your_`, or percent-encoding it no longer gets a password or token past the check. Plain placeholders such as `<your password>` and `your_token` still pass. `mb connect hygiene` likewise no longer treats a setting such as `your_token=...` or `XXX token=...` as a placeholder, wrapped or percent-encoded.
