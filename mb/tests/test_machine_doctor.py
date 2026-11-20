@@ -268,6 +268,30 @@ def test_sshd_password_authentication_fails(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    "data,state,pubkey_on",
+    [
+        # OpenSSH defaults PubkeyAuthentication to yes, so leaving it unset is keys-only.
+        (b"PasswordAuthentication no\nKbdInteractiveAuthentication no\n", "pass", True),
+        (
+            b"PasswordAuthentication no\nKbdInteractiveAuthentication no\n"
+            b"PubkeyAuthentication no\n",
+            "fail",
+            False,
+        ),
+        # Password and keyboard-interactive default to yes, so unset is not off.
+        (b"KbdInteractiveAuthentication no\n", "fail", True),
+        (b"PasswordAuthentication no\n", "fail", True),
+    ],
+)
+def test_sshd_openssh_defaults(monkeypatch, data, state, pubkey_on):
+    monkeypatch.setattr(doctor, "_config_files", lambda _: ([], None))
+    monkeypatch.setattr(probe, "read_file", lambda *a, **kw: ProbeResult(data=data))
+    read = doctor.sshd_keys(100)[0]
+    assert read.state == state
+    assert read.observed["pubkey_on"] is pubkey_on
+
+
+@pytest.mark.parametrize(
     "data,code,state",
     [
         (b'{"RunSSH": false}', 0, "pass"),

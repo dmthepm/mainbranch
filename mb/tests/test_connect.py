@@ -3323,6 +3323,42 @@ def test_connect_custom_provider_reports_stored_unverified(tmp_path: Path, monke
     assert checks["provider:mercury"]["ok"] is False
 
 
+@pytest.mark.parametrize(
+    "provider,extra,summary",
+    [
+        ("resend", [], "no automated way to confirm it works"),
+        ("mercury", ["--custom"], "stored, not checked: custom providers have no built-in check"),
+    ],
+)
+def test_connect_test_stored_only_never_reads_ready(
+    tmp_path: Path, monkeypatch, provider: str, extra: list[str], summary: str
+) -> None:
+    _local_secret_env(monkeypatch, tmp_path)
+    repo = tmp_path / "biz"
+    repo.mkdir()
+    runner.invoke(
+        app, ["connect", provider, *extra, "--repo", str(repo), "--token", "re_fixture-only-value"]
+    )
+
+    human = runner.invoke(app, ["connect", "test", provider, "--repo", str(repo)])
+    # Stored but no provider call: not ready, not ok, and not an error.
+    assert human.exit_code == 0
+    first = human.stdout.splitlines()[0]
+    assert first == f"mb connect test {provider}: stored, not checked with the provider"
+    assert "ready" not in human.stdout
+    assert summary in human.stdout
+
+    result = runner.invoke(app, ["connect", "test", provider, "--repo", str(repo), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["stored"] is True
+    assert payload["provider_verified"] is False
+    assert payload["validation"]["state"] == connect_mod.UNVERIFIED_STATE
+    assert payload["status"]["state"] == connect_mod.UNVERIFIED_STATE
+    assert "re_fixture-only-value" not in human.stdout + result.stdout
+
+
 def test_connect_metadata_only_provider_stays_ready_without_provider_verified(
     tmp_path: Path, monkeypatch
 ) -> None:

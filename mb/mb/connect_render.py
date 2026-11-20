@@ -177,7 +177,11 @@ def render_test_result(result: dict[str, Any]) -> None:
         if result.get("not_recorded_reason")
         else status["state"]
     )
-    print(f"mb connect test {result['provider']}: {state} ({connect.state_label(shown)})")
+    if shown == UNVERIFIED_STATE:
+        # No provider call confirmed it: neither "ok" nor a failure-looking "warn".
+        print(f"mb connect test {result['provider']}: stored, not checked with the provider")
+    else:
+        print(f"mb connect test {result['provider']}: {state} ({connect.state_label(shown)})")
     summary = validation.get("summary")
     if summary:
         print(f"summary: {summary}")

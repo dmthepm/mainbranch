@@ -377,7 +377,9 @@ def sshd_keys(_: float) -> list[ReadResult]:
             "kbdinteractiveauthentication", values.get("challengeresponseauthentication")
         )
         == "no"
-        and values.get("pubkeyauthentication") == "yes"
+        # OpenSSH defaults PubkeyAuthentication to yes; the other two default to yes too,
+        # so only they must be set explicitly.
+        and values.get("pubkeyauthentication", "yes") == "yes"
     )
     return [
         _verdict(
@@ -388,7 +390,7 @@ def sshd_keys(_: float) -> list[ReadResult]:
                 "kbdinteractiveauthentication", values.get("challengeresponseauthentication")
             )
             == "no",
-            pubkey_on=values.get("pubkeyauthentication") == "yes",
+            pubkey_on=values.get("pubkeyauthentication", "yes") == "yes",
         )
     ]
 
