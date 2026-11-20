@@ -1350,8 +1350,8 @@ def _unverified_repair(provider: Provider) -> dict[str, str]:
     if provider.category == "custom":
         return {
             "summary": (
-                f"{provider.name} key is stored; mb has no probe for custom aliases, "
-                "so it can't verify this key."
+                f"{provider.name} key is stored, not checked: custom providers have no "
+                "built-in check, so mb can't verify this key."
             ),
             "repair": "Confirm the key with the provider or its first real workflow run.",
             "repair_command": "",

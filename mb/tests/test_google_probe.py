@@ -832,7 +832,7 @@ def test_legacy_google_stays_probe_less_and_unchanged(
     assert "needs_action" not in result
     human = _test(repo)
     assert human.exit_code == 0
-    assert human.stdout.startswith("mb connect test google: warn (stored, unverified)")
+    assert human.stdout.startswith("mb connect test google: stored, not checked with the provider")
     status_exit, status = _status(repo)
     assert status_exit == 0
     assert status["has_probe"] is False

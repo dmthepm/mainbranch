@@ -332,8 +332,9 @@ The invariant, stated precisely: **for a provider with `required_secrets`,
 Meta, Stripe, GitHub and GA4 have real probes (see [Probes](#probes)). Every
 other built-in provider, and every custom provider, reports
 `stored, unverified`: the credential is present and readable,
-and nothing has checked that it works. `mb connect doctor` and `mb status` grade
-that as a warning, not a pass.
+and nothing has checked that it works. `mb connect test` says so in its first
+line, `stored, not checked with the provider`, and never calls it ready.
+`mb connect doctor` and `mb status` grade that as a warning, not a pass.
 
 The scoping matters. A provider with no `required_secrets` sends nothing to a
 provider, so there is no credential to confirm and `provider_verified` stays
@@ -341,8 +342,8 @@ false. Such a provider is not covered by the invariant and keeps reporting
 `ready` from its repo-local metadata — see below. Claiming `provider_verified`
 for it would be the same overclaim this behavior exists to remove.
 
-For a custom alias, status and test say that the key is stored but mb has no
-probe for custom aliases, so it can't verify the key. They suggest no test
+For a custom alias, status and test say the key is stored, not checked: custom
+providers have no built-in check, so mb can't verify the key. They suggest no test
 command as a repair. A fresh alias can still show `unvalidated` until checked;
 `test` records storage, without contacting a provider or verifying validity.
 

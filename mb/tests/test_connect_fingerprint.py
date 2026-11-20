@@ -108,7 +108,7 @@ def test_custom_alias_has_no_test_repair(repo: Path, json_out: bool) -> None:
             + (["--json"] if json_out else []),
         )
         if not json_out:
-            assert "no probe for custom aliases" in result.stdout
+            assert "custom providers have no built-in check" in result.stdout
             assert "can't verify" in result.stdout
             assert "next: mb connect test" not in result.stdout
             continue
@@ -116,7 +116,7 @@ def test_custom_alias_has_no_test_repair(repo: Path, json_out: bool) -> None:
         status = payload["status"] if verb == "test" else payload
         assert status["stored"] is True
         assert status["provider_verified"] is False
-        assert "no probe for custom aliases" in status["summary"]
+        assert "custom providers have no built-in check" in status["summary"]
         assert "can't verify" in status["summary"]
         assert status["repair_command"] == ""
         assert "mb connect test" not in status["repair"]
@@ -206,5 +206,5 @@ def test_fingerprint_short_value_prints_no_prefix(repo: Path, json_out: bool) ->
 def test_custom_alias_aggregate_status_explains_probe(repo: Path) -> None:
     connect.connect_provider("fixture-alias", repo=repo, token="fixture-only", custom=True)
     result = runner.invoke(app, ["connect", "status", "--repo", str(repo)])
-    assert "no probe for custom aliases" in result.stdout
+    assert "custom providers have no built-in check" in result.stdout
     assert "next: mb connect test fixture-alias" not in result.stdout
