@@ -1692,7 +1692,9 @@ def connect_cmd(
         raise typer.Exit(0 if result["valid"] else 1)
     if target == "audit":
         try:
-            entries = connect_mod.read_release_audit(limit=limit, provider=audit_provider)
+            entries, skipped = connect_mod.read_release_audit_counted(
+                limit=limit, provider=audit_provider
+            )
         except (OSError, ValueError):
             _connect_failure(
                 "mb connect audit",
@@ -1701,8 +1703,11 @@ def connect_cmd(
                 exit_code=1,
                 state="audit_unavailable",
             )
+        damaged = f"Skipped {skipped} damaged line{'s' if skipped != 1 else ''} in the audit log."
         if json_out:
             typer.echo(json.dumps(entries, indent=2))
+            if skipped:
+                typer.echo(damaged, err=True)  # stdout stays a list of rows
         elif not entries:
             typer.echo("No audit entries.")
         else:
@@ -1714,6 +1719,8 @@ def connect_cmd(
                         for key in ("ts", "verb", "provider", "result", "reason", "exit_code")
                     )
                 )
+        if skipped and not json_out:
+            typer.echo(damaged)
         raise typer.Exit(0)
     if target == "exec":
         if not provider or json_out:

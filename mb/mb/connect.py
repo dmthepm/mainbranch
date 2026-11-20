@@ -4720,28 +4720,55 @@ def _read_audit_tail(max_bytes: int) -> tuple[list[bytes], bool, bool]:
 
 
 def read_release_audit(*, limit: int = 20, provider: str = "") -> list[dict[str, Any]]:
+    return read_release_audit_counted(limit=limit, provider=provider)[0]
+
+
+def read_release_audit_counted(
+    *, limit: int = 20, provider: str = ""
+) -> tuple[list[dict[str, Any]], int]:
+    """The newest rows and how many damaged lines were skipped.
+
+    A line that is not a JSON object (NUL bytes left by a power cut, a torn
+    row, invalid UTF-8, a bare value) is counted and skipped, so one bad line
+    does not hide the good rows around it.
+    """
     from mb.feedback_scrub import scrub
+
+    skipped = 0
+
+    def entries(stream: BinaryIO) -> Iterator[dict[str, Any]]:
+        nonlocal skipped
+        for line in stream:
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except (ValueError, UnicodeError, RecursionError):
+                entry = None
+            if not isinstance(entry, dict):
+                skipped += 1
+                continue
+            yield entry
 
     try:
         with _open_audit_log() as stream:
-            entries = (json.loads(line) for line in stream if line.strip())
             rows = list(
                 deque(
                     (
                         entry
-                        for entry in entries
+                        for entry in entries(stream)
                         if not provider or entry.get("provider") == provider
                     ),
                     maxlen=limit,
                 )
             )
     except FileNotFoundError:
-        return []
+        return [], 0
     # Keep display read-only and scrub strings again in case the file was edited.
     return [
         {key: scrub(value) if isinstance(value, str) else value for key, value in row.items()}
         for row in rows
-    ]
+    ], skipped
 
 
 def recent_rebinds(repo_id: str) -> tuple[list[dict[str, Any]], str]:

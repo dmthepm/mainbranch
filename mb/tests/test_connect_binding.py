@@ -872,3 +872,62 @@ def test_an_unconfirmed_bindings_write_says_written_not_nothing_changed(
     message = str(caught.value)
     assert "was written, but the write could not be confirmed" in message
     assert "Nothing was changed" not in message
+
+
+_GOOD = [
+    {"verb": "token", "provider": "example-tool", "result": "released", "n": 1},
+    {"verb": "token", "provider": "other-tool", "result": "refused", "n": 2},
+    {"verb": "exec", "provider": "example-tool", "result": "released", "n": 3},
+]
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [b"\x00" * 64, b'{"verb": "token", "provid', b"[1, 2]", b'"text"', b"\xff\xfe{}"],
+    ids=["nul-bytes", "torn-row", "non-object-list", "non-object-string", "invalid-utf8"],
+)
+def test_audit_skips_a_damaged_line_and_keeps_rows_around_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, damage: bytes
+) -> None:
+    audit = tmp_path / "audit.jsonl"
+    rows = [json.dumps(row).encode() for row in _GOOD]
+    audit.write_bytes(b"\n".join([rows[0], damage, rows[1], rows[2]]) + b"\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+
+    entries, skipped = c.read_release_audit_counted()
+    assert [entry["n"] for entry in entries] == [1, 2, 3]
+    assert skipped == 1
+    filtered, _ = c.read_release_audit_counted(provider="example-tool")
+    assert [entry["n"] for entry in filtered] == [1, 3]
+
+    text = runner.invoke(app, ["connect", "audit", "--provider", "example-tool"])
+    assert text.exit_code == 0, text.output
+    assert "cannot read audit log" not in text.output
+    assert "other-tool" not in text.stdout
+    assert text.stdout.count("example-tool") == 2
+    assert "Skipped 1 damaged line in the audit log." in text.stdout
+
+    as_json = runner.invoke(app, ["connect", "audit", "--json"])
+    assert as_json.exit_code == 0, as_json.output
+    assert [entry["n"] for entry in json.loads(as_json.stdout)] == [1, 2, 3]
+    assert "Skipped 1 damaged line in the audit log." in as_json.stderr
+
+
+def test_audit_counts_every_damaged_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    audit = tmp_path / "audit.jsonl"
+    good = json.dumps(_GOOD[0]).encode()
+    audit.write_bytes(b"\n".join([b"\x00\x00", good, b"{torn", b"7"]) + b"\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+
+    assert c.read_release_audit() == [_GOOD[0]]
+    result = runner.invoke(app, ["connect", "audit"])
+    assert "Skipped 3 damaged lines in the audit log." in result.stdout
+
+
+def test_clean_audit_prints_no_skip_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    audit = tmp_path / "audit.jsonl"
+    audit.write_text(json.dumps(_GOOD[0]) + "\n")
+    monkeypatch.setattr(c, "audit_path", lambda: audit)
+
+    result = runner.invoke(app, ["connect", "audit", "--json"])
+    assert "damaged" not in result.output
