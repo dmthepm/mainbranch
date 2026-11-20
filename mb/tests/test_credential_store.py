@@ -221,6 +221,57 @@ def test_native_failure_states_are_sanitized(
     assert probe == store_mod.SecretProbe("", False, False, reason)
 
 
+@pytest.mark.parametrize(
+    ("bus_env", "reason"),
+    [
+        ({}, "secret_service_no_session_bus"),
+        ({"XDG_RUNTIME_DIR": "/run/user/1000"}, "secret_service_no_session_bus"),
+        (
+            {"DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus"},
+            "secret_service_unavailable",
+        ),
+    ],
+)
+def test_secret_service_without_session_bus_has_its_own_reason(
+    monkeypatch: pytest.MonkeyPatch, bus_env: dict[str, str], reason: str
+) -> None:
+    monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+    for name, value in bus_env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(
+        store_mod,
+        "_run_helper",
+        lambda backend, action, **kwargs: {"state": "unavailable"},
+    )
+
+    probe = store_mod.SecretStore("secret-service").probe("fixture-ref")
+
+    assert probe == store_mod.SecretProbe("", False, False, reason)
+
+
+def test_no_session_bus_repair_names_nesting_and_the_keep_env_cost() -> None:
+    detail = store_mod.backend_repair("secret_service_no_session_bus")
+
+    assert "no session bus" in detail["summary"]
+    assert "mb connect exec" in detail["repair"]
+    assert "--keep-env DBUS_SESSION_BUS_ADDRESS" in detail["repair"]
+    assert "every stored credential" in detail["repair"]
+
+
+def test_locked_secret_service_without_session_bus_stays_locked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
+    monkeypatch.setattr(
+        store_mod, "_run_helper", lambda backend, action, **kwargs: {"state": "locked"}
+    )
+
+    assert store_mod.SecretStore("secret-service").probe("fixture-ref").reason == (
+        "secret_service_locked"
+    )
+
+
 def test_macos_read_query_explicitly_forbids_authentication_ui() -> None:
     adapter: Any = object.__new__(helper_mod._MacSecurity)
     adapter.security = object()

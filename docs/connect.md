@@ -112,6 +112,13 @@ contains the released one, is counted as "N more not listed" instead. This is a
 shape check, not a guarantee: a short password that someone used as a variable
 name can look ordinary and be printed.
 
+Don't nest `exec`. A command run by `mb connect exec` has no session bus, so a
+tool that calls `mb connect` again cannot reach the Linux keyring and reports
+`secret_service_no_session_bus`. Let the one `exec` release the credential the
+tool needs, or run the tool directly so its own `mb connect` call reaches the
+keyring. `--keep-env DBUS_SESSION_BUS_ADDRESS` makes nesting work, but the
+child can then reach every stored credential, not just the one released.
+
 This is the path agents and scripts should use. What the command prints is
 still the command's business: avoid commands that echo their environment.
 
@@ -295,6 +302,9 @@ A request already refused keeps its refusal exit code if logging also fails.
 Read recent entries with `mb connect audit`, `mb connect audit --limit 50`,
 or `mb connect audit --provider stripe --json`. A missing log has no entries.
 `mb connect audit` streams the whole log and keeps only the rows it shows.
+A line that is not a JSON object, such as a torn row or NUL bytes left by a
+power cut, is skipped, and the command says how many it skipped (on stderr
+with `--json`, so stdout stays a list of rows).
 `mb connect status` reads only the last 4 MiB and calls the rebind history
 incomplete when that could hide a rebind (the read was cut and fewer than five
 rebinds were found) or when the log shrank while it was read. A symlink or named

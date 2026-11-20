@@ -120,6 +120,20 @@ BACKEND_REPAIRS: dict[str, dict[str, str]] = {
         ),
         "repair_command": "",
     },
+    "secret_service_no_session_bus": {
+        "summary": (
+            "The Linux Secret Service is unreachable because this environment has no "
+            "session bus (DBUS_SESSION_BUS_ADDRESS is not set)."
+        ),
+        "repair": (
+            "If this runs inside `mb connect exec`, do not nest exec: let the outer exec release "
+            "the credential the tool needs, or run the tool directly so its own `mb connect` "
+            "call can reach the keyring. Pass "
+            "`--keep-env DBUS_SESSION_BUS_ADDRESS` only if you accept that the child can "
+            "then reach every stored credential."
+        ),
+        "repair_command": "",
+    },
     "credential_store_timeout": {
         "summary": "The credential store did not answer before the safety deadline.",
         "repair": (
@@ -434,6 +448,10 @@ def _reason_for(backend: str, state: str) -> str:
     if backend == "secret-service":
         if state in {"locked", "auth-failed", "prompt-pending"}:
             return "secret_service_locked"
+        # The Secret Service client finds the session bus only through this
+        # variable; `mb connect exec` drops it by default.
+        if state == "unavailable" and not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
+            return "secret_service_no_session_bus"
         return "secret_service_unavailable"
     return "local_file_unavailable"
 
