@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mainbranch"
-version = "0.6.27"
+version = "0.6.28"
 description = "The system of record for businesses run with AI agents. Agents run the work; you keep the business record and the keys."
 readme = "README.md"
 requires-python = ">=3.10"
