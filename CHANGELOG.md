@@ -13,11 +13,11 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ### Added
 
-- `MB_ROLE_REPO` lets role commands read a business repo's cards while the agent works in another repo.
+- `MB_ROLE_REPO` lets role commands read a business repo's cards while the agent works in another repo. An agent policy row can set `role_repo` to pass it at launch.
 
 ### Fixed
 
-- The role hook now refuses when `MB_ROLE` names a role but the repo has no cards, instead of staying silent.
+- The role hook now refuses when `MB_ROLE` names a role but the repo has no cards, instead of staying silent. The installed Codex hook also reaches `MB_ROLE_REPO` from a code repo without cards and refuses if `mb` is unavailable. The override rejects invalid or linked `.git` markers, and `mb agent check` compares `MB_ROLE_REPO` at launch.
 
 ## [0.6.28] - 2026-11-20
 

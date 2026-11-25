@@ -29,6 +29,7 @@ Each row:
 | `name` | yes | Lowercase letters, digits, hyphens, unique in the file. |
 | `runtime` | yes | `claude` or `codex`. |
 | `cwd` | yes | Absolute path under the home folder, written as its real path. |
+| `role_repo` | no | Absolute path under the home folder to the business repo containing `core/roles/<role>.md`. It follows the same path rules as `cwd`. Use when `cwd` is a separate code repo. |
 | `role` | yes | Role card name, same naming rule as `name`. |
 | `profile` | yes | `default`, or a name from `profiles` that has this runtime. |
 | `model` | yes | Model id, letters, digits, `.`, `_`, `-`. |
@@ -68,10 +69,12 @@ without printing the value. The launch record stores only the passed name;
 
 ## The card rule
 
-A row's role card is `<cwd>/core/roles/<role>.md` when `<cwd>/core/roles`
-exists, otherwise `~/.local/share/agent-role-cards/<role>.md`. Both runtimes
+A row's role card is `<role_repo>/core/roles/<role>.md` when `role_repo` is set.
+Otherwise it is `<cwd>/core/roles/<role>.md` when `<cwd>/core/roles` exists, or
+`~/.local/share/agent-role-cards/<role>.md`. Both runtimes
 require a valid card. Claude receives its path with `--append-system-prompt-file`;
-Codex keeps its native instructions. `up` sets `MB_ROLE` for both runtimes;
+Codex keeps its native instructions. `up` sets `MB_ROLE` for both runtimes and
+sets `MB_ROLE_REPO` when the row names `role_repo`;
 Codex receives repo card fields through the owner-installed
 [SessionStart hook](role-cards.md#codex). Install and trust that hook in the
 selected Codex profile. The hook reads repo cards, not the fallback card folder.
@@ -357,7 +360,7 @@ keystroke is sent. `mb agent check` with no name is still the policy check above
 | --- | --- |
 | `identity` | The recorded pid is alive with the recorded start time, read twice with no change between. |
 | `exe` | The process still runs the recorded program (device and inode). |
-| `role` | `MB_ROLE` in the process equals the attempt's. |
+| `role` | `MB_ROLE` and, when set at launch, `MB_ROLE_REPO` in the process equal the attempt's values. |
 | `card` | Policy still names the card file selected at launch. It is not proof the hook ran or the text was loaded. |
 | `profile` | The profile directory is the one recorded (device and inode). |
 | `cwd` | The process folder is the recorded one. |

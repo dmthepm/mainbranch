@@ -197,8 +197,7 @@ def test_hook_prints_card_and_checkpoint_for_each_source(repo: Path, source: str
 def test_hook_with_selected_role_and_no_cards_refuses(repo: Path) -> None:
     out = _hook(repo, role="scout")
     assert (
-        "Selected role scout has no card at core/roles/scout.md; "
-        "no role cards exist in this repo."
+        "Selected role scout has no card at core/roles/scout.md; no role cards exist in this repo."
     ) in out
     assert "ROLE CHECK FAILED" in out
     assert _hook(repo, role=None) == ""
@@ -222,6 +221,30 @@ def test_role_repo_override_reads_card_and_checkpoint_from_other_cwd(
         assert "scout" in result.output
         if command == ["hook"]:
             assert "BIZ-CHECKPOINT" in result.output
+
+
+@pytest.mark.parametrize("marker", ["symlink", "empty", "invalid", "worktree"])
+def test_role_repo_requires_a_git_root_marker(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, marker: str
+) -> None:
+    git = repo / ".git"
+    if marker == "symlink":
+        target = tmp_path / "metadata"
+        target.mkdir()
+        git.symlink_to(target)
+    elif marker == "empty":
+        git.write_text("")
+    elif marker == "invalid":
+        git.write_text("metadata\n")
+    else:
+        git.write_text("gitdir: /fixture/worktree\n")
+    monkeypatch.setenv("MB_ROLE_REPO", str(repo))
+    selected, problem = roles.role_repo(None, tmp_path)
+    if marker == "worktree":
+        assert selected == repo.resolve() and problem is None
+    else:
+        assert selected == tmp_path and problem is not None
+        assert "not a git root" in problem
 
 
 @pytest.mark.parametrize("problem", ["relative", "missing", "not_git", "no_roles"])
@@ -746,6 +769,29 @@ def test_hook_command_silent_when_mb_cannot_run_and_no_cards_dir(
         path_dir.mkdir(exist_ok=True)
         result = _run_hook("startup", project, path_dir)
         assert result.returncode == 0 and result.stdout == "" and result.stderr == ""
+
+
+def test_hook_command_refuses_with_role_repo_when_mb_cannot_run(tmp_path: Path) -> None:
+    project = tmp_path / "code"
+    project.mkdir()
+    for source in ("startup", "compact"):
+        for path_dir in (tmp_path / "nothing", _old_mb(tmp_path / f"old-bin-{source}")):
+            path_dir.mkdir(exist_ok=True)
+            env = {
+                "PATH": str(path_dir),
+                "CLAUDE_PROJECT_DIR": str(project),
+                roles.ROLE_ENV: "scout",
+                roles.ROLE_REPO_ENV: str(tmp_path / "business"),
+            }
+            result = subprocess.run(
+                ["/bin/sh", "-c", _hook_commands()[source]],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            assert result.returncode == 0
+            assert "ROLE CHECK FAILED" in result.stdout
 
 
 def test_hook_command_silent_for_empty_roles_folder(repo: Path, tmp_path: Path) -> None:

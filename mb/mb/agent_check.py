@@ -341,10 +341,16 @@ def _environment(env: dict[str, str], last: dict[str, Any]) -> tuple[Field, Fiel
     if set(env) != set(env_set) | set(last["env_passed"]):
         bad.append("env")
     bad += [f"env:{k}" for k, v in env_set.items() if k in env and env[k] != v]
-    role = env.get("MB_ROLE") == env_set["MB_ROLE"]
+    role_problems = [
+        key
+        for key in ("MB_ROLE", "MB_ROLE_REPO")
+        if key in env_set and env.get(key) != env_set[key]
+    ]
     return (
         Field("environment", "mismatch", ", ".join(bad)) if bad else Field("environment", "match"),
-        Field("role", "match") if role else Field("role", "mismatch", "MB_ROLE"),
+        Field("role", "mismatch", ", ".join(role_problems))
+        if role_problems
+        else Field("role", "match"),
     )
 
 

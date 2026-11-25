@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -127,7 +128,23 @@ def role_repo(explicit: str | None, fallback: str | Path) -> tuple[str | Path, s
         root = path
     if not is_dir:
         return fallback, f"{ROLE_REPO_ENV} path {safe!r} is missing or not a directory."
-    if not (root / ".git").exists():
+    git_marker = root / ".git"
+    try:
+        marker_mode = git_marker.lstat().st_mode
+        if stat.S_ISDIR(marker_mode):
+            git_root = True
+        elif stat.S_ISREG(marker_mode):
+            fd = os.open(git_marker, os.O_RDONLY | os.O_NOFOLLOW)
+            try:
+                first_line = os.read(fd, 256).split(b"\n", 1)[0]
+                git_root = stat.S_ISREG(os.fstat(fd).st_mode) and first_line.startswith(b"gitdir: ")
+            finally:
+                os.close(fd)
+        else:
+            git_root = False
+    except OSError:
+        git_root = False
+    if not git_root:
         return fallback, f"{ROLE_REPO_ENV} path {safe!r} is not a git root."
     if not (root / ROLES_DIR).is_dir():
         return fallback, f"{ROLE_REPO_ENV} path {safe!r} has no {ROLES_DIR}/ directory."

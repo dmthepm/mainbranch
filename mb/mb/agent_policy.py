@@ -51,6 +51,7 @@ ROW_KEYS = {
     "name",
     "runtime",
     "cwd",
+    "role_repo",
     "role",
     "profile",
     "model",
@@ -339,6 +340,8 @@ def _row_schema(c: _Collect, i: int, row: Any, profiles: dict[str, Any]) -> bool
         c.schema(_loc(i, "model"), "must be letters, digits, '.', '_' or '-' (1-64)")
     if "cwd" in row and not _norm_abs(row["cwd"]):
         c.add("cwd", _loc(i, "cwd"), "must be a normalized absolute path")
+    if "role_repo" in row and not _norm_abs(row["role_repo"]):
+        c.add("role_repo", _loc(i, "role_repo"), "must be a normalized absolute path")
     profile = row.get("profile")
     if "profile" in row:
         if not isinstance(profile, str):
@@ -435,7 +438,9 @@ def _check_card(
     c: _Collect, host: Host, i: int, row: dict[str, Any], cwd: str, home: str, report: Report
 ) -> None:
     role = row["role"]
-    if os.path.lexists(f"{cwd}/core/roles"):
+    if "role_repo" in row:
+        folder = f"{row['role_repo']}/core/roles"
+    elif os.path.lexists(f"{cwd}/core/roles"):
         folder = f"{cwd}/core/roles"
     else:
         folder = "/".join([home, *SHARED_CARDS_PARTS])
@@ -461,7 +466,7 @@ def _check_card(
     except UnicodeDecodeError:
         c.add("card", _loc(i, "role"), "card is not UTF-8 text")
         return
-    for error in roles.card_text_errors(text, role, Path(cwd)):
+    for error in roles.card_text_errors(text, role, Path(row.get("role_repo", cwd))):
         c.add("card", _loc(i, "role"), error)
     report.cards[row["name"]] = found.real
 
@@ -633,7 +638,19 @@ def check(host: Host, name: str | None = None) -> Report:
             c.add("cwd", _loc(i, "cwd"), "must be under HOME, written as its real path")
             continue
         if _check_dir(c, host, cwd, owner_only=True, plain_below=home, code="cwd"):
-            _check_card(c, host, i, row, cwd, home, report)
+            role_repo = row.get("role_repo")
+            if role_repo is None:
+                _check_card(c, host, i, row, cwd, home, report)
+            elif not role_repo.startswith(home + "/"):
+                c.add(
+                    "role_repo",
+                    _loc(i, "role_repo"),
+                    "must be under HOME, written as its real path",
+                )
+            elif _check_dir(
+                c, host, role_repo, owner_only=True, plain_below=home, code="role_repo"
+            ):
+                _check_card(c, host, i, row, cwd, home, report)
             if "start_file" in row:
                 _check_start_file(c, host, i, cwd, home, row["start_file"])
         if row["profile"] == DEFAULT and row["runtime"] not in default_seen:

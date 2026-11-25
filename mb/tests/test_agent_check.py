@@ -183,6 +183,18 @@ def test_a_changed_mb_set_value_names_the_variable_and_never_its_value(lv: Live)
     assert MARKER not in text
 
 
+def test_role_field_names_changed_role_repo(lv: Live) -> None:
+    lv.record["env_set"]["MB_ROLE_REPO"] = str(lv.u.biz)
+    lv.save()
+    lv.env["MB_ROLE_REPO"] = str(lv.u.biz)
+    lv.runtime(env={**lv.env, "MB_ROLE_REPO": MARKER})
+    code, text = lv.run()
+    assert code == 1
+    assert "environment: mismatch (env:MB_ROLE_REPO)" in text
+    assert "role: mismatch (MB_ROLE_REPO)" in text
+    assert MARKER not in text
+
+
 def test_cwd_mismatch_alone_is_exit_1(lv: Live) -> None:
     lv.runtime(cwd="/elsewhere")
     code, text = lv.run()

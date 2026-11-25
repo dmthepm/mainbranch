@@ -280,10 +280,13 @@ def _run(
     payload: object | None,
     role: str | None = "scout",
     cwd_in_payload: Path | None = None,
+    role_repo: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = {"PATH": f"{path_dir}:/usr/bin:/bin", "HOME": str(cwd)}
     if role:
         env[roles.ROLE_ENV] = role
+    if role_repo is not None:
+        env[roles.ROLE_REPO_ENV] = str(role_repo)
     stdin = "" if payload is None else json.dumps(payload)
     if isinstance(payload, dict) and cwd_in_payload is not None:
         stdin = json.dumps({**payload, "cwd": str(cwd_in_payload)})
@@ -354,6 +357,29 @@ def test_hook_is_silent_and_never_starts_mb_with_no_cards(tmp_path: Path) -> Non
     result = _run(plain, path_dir, {"source": "startup"})
     assert result.returncode == 0 and result.stdout == "" and result.stderr == ""
     assert not marker.exists()
+
+
+def test_installed_hook_calls_mb_with_role_repo_from_no_card_cwd(
+    repo: Path, tmp_path: Path
+) -> None:
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / ".git").mkdir()
+    marker = tmp_path / "ran"
+    path_dir = _shim(tmp_path / "bin", marker)
+    result = _run(plain, path_dir, {"source": "startup"}, role_repo=repo)
+    assert result.returncode == 0 and result.stderr == ""
+    assert "running as role: scout" in result.stdout
+    assert marker.exists()
+
+
+def test_installed_hook_refuses_if_mb_missing_with_role_repo(repo: Path, tmp_path: Path) -> None:
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / ".git").mkdir()
+    result = _run(plain, tmp_path / "empty-bin", {"source": "startup"}, role_repo=repo)
+    assert result.returncode == 0 and result.stderr == ""
+    assert "MAIN BRANCH ROLE CHECK FAILED" in result.stdout
 
 
 def test_hook_does_not_climb_past_a_git_root_into_a_parent_repo(repo: Path, tmp_path: Path) -> None:

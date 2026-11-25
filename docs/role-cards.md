@@ -80,6 +80,8 @@ present.
 
 Set `MB_ROLE_REPO` to the business repo when an agent works from a separate code
 repo. The path must be absolute, point to a git root, and contain `core/roles/`.
+For agents launched with `mb agent up`, set the
+[`role_repo` policy field](agent-policy.md#fields) on the agent row.
 `mb role hook`, `mb role list`, `mb role show`, and `mb role check` read cards
 there; an explicit `--repo` on a command takes precedence. For example:
 
@@ -88,10 +90,10 @@ MB_ROLE=scout MB_ROLE_REPO=/home/ada/my-business claude
 ```
 
 The checkpoint path in the card is resolved within that business repo. An
-invalid `MB_ROLE_REPO` produces a refusal that names the problem.
-The installed Codex shell hook still checks the current repo for cards before
-it calls `mb role hook --runtime codex`, so it does not reach this override from
-a code repo without cards yet.
+invalid `MB_ROLE_REPO` produces a refusal that names the problem. The installed
+Codex shell hook calls `mb role hook --runtime codex` whenever `MB_ROLE_REPO` is
+set, including from a code repo with no cards. If `mb` is unavailable, it prints
+a refusal.
 
 ## The SessionStart hook
 
@@ -164,7 +166,8 @@ keep repo folders off `PATH`. Replacing `mb` needs no new review.
 
 The hook walks up from the session folder to the git root looking for
 `core/roles`, so a session in a subfolder or a git worktree finds its repo. In a
-folder with no `core/roles` it exits at once without starting `mb`. Codex hands the
+folder with no `core/roles` it exits at once without starting `mb`, unless
+`MB_ROLE_REPO` is set. Codex hands the
 hook its session folder on stdin and sets no project variable, so the Codex route
 never reads `CLAUDE_PROJECT_DIR`.
 

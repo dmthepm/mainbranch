@@ -368,6 +368,28 @@ def test_cwd_need_not_be_a_business_repo(w: World) -> None:
     assert w.check().ok
 
 
+def test_role_repo_selects_card_outside_cwd(w: World) -> None:
+    plain = w.mkdir(w.home / "plain")
+    w.write({"version": 1, "agents": [w.row(cwd=str(plain), role_repo=str(w.biz))]})
+    report = w.check()
+    assert report.ok
+    assert report.cards["planner"] == str(w.biz / "core/roles/planner.md")
+
+
+@pytest.mark.parametrize("bad", ["relative", "not-normal", "missing", "link"])
+def test_role_repo_uses_cwd_path_rules(w: World, bad: str) -> None:
+    link = w.home / "link"
+    link.symlink_to(w.biz)
+    value = {
+        "relative": "biz",
+        "not-normal": f"{w.biz}/../biz",
+        "missing": str(w.home / "missing"),
+        "link": str(link),
+    }[bad]
+    w.write({"version": 1, "agents": [w.row(role_repo=value)]})
+    assert not w.check().ok
+
+
 # --- cards: fixed locations ---------------------------------------------------------
 
 
