@@ -19,6 +19,7 @@ import yaml
 
 ROLES_DIR = "core/roles"
 ROLE_ENV = "MB_ROLE"
+ROLE_REPO_ENV = "MB_ROLE_REPO"
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 # The card schema. A test pins this tuple: change it on purpose, not by accident.
 REQUIRED_FIELDS: tuple[str, ...] = (
@@ -105,6 +106,32 @@ def find_repo(start: str | Path) -> Path | None:
         if (folder / ".git").exists():
             return None
     return None
+
+
+def role_repo(explicit: str | None, fallback: str | Path) -> tuple[str | Path, str | None]:
+    """Choose the card repo. Validate only the environment override."""
+    if explicit is not None:
+        return explicit, None
+    value = os.environ.get(ROLE_REPO_ENV, "")
+    if not value:
+        return fallback, None
+    safe = printable(value, 120)
+    path = Path(value)
+    if not path.is_absolute():
+        return fallback, f"{ROLE_REPO_ENV} path {safe!r} is not absolute."
+    try:
+        is_dir = path.is_dir()
+        root = path.resolve()
+    except (OSError, RuntimeError, ValueError):
+        is_dir = False
+        root = path
+    if not is_dir:
+        return fallback, f"{ROLE_REPO_ENV} path {safe!r} is missing or not a directory."
+    if not (root / ".git").exists():
+        return fallback, f"{ROLE_REPO_ENV} path {safe!r} is not a git root."
+    if not (root / ROLES_DIR).is_dir():
+        return fallback, f"{ROLE_REPO_ENV} path {safe!r} has no {ROLES_DIR}/ directory."
+    return root, None
 
 
 def _safe_relative(value: str) -> bool:
@@ -296,8 +323,17 @@ def list_cards(repo: str | Path) -> list[dict[str, Any]]:
 
 def check(repo: str | Path, name: str | None = None) -> dict[str, Any]:
     """Validate every card, or one named card. ``ok`` is false on any invalid card."""
+    if name is None and not has_cards(repo):
+        selected = os.environ.get(ROLE_ENV, "").strip()
+        if selected:
+            name = selected
     if name is not None:
         card = load_card(repo, name)
+        if not card["found"] and not has_cards(repo) and valid_name(name):
+            card["errors"] = [
+                f"Selected role {name} has no card at {ROLES_DIR}/{name}.md; "
+                "no role cards exist in this repo."
+            ]
         results = [{k: card[k] for k in ("name", "valid", "errors", "warnings")}]
     else:
         results = []
@@ -359,12 +395,21 @@ NO_ROLE_WARNING_SOURCES = ("resume", "clear", "compact", "fork")
 def hook_text(repo: str | Path, source: str, env: dict[str, str] | None = None) -> str:
     """Text the SessionStart hook prints. Empty string means print nothing.
 
-    No cards in the repo means nothing changes for that business, so the hook
-    is silent there. With cards, the role must be named explicitly.
+    With no selected role and no cards, the hook is silent. A selected role
+    without a card always produces a refusal.
     """
-    if not has_cards(repo):
-        return ""
     selected = (env if env is not None else os.environ).get(ROLE_ENV, "")
+    if not has_cards(repo):
+        if not selected.strip():
+            return ""
+        if not valid_name(selected):
+            return refusal(
+                f"The selected role name {printable(selected)!r} is not a valid role name."
+            )
+        return refusal(
+            f"Selected role {selected} has no card at {ROLES_DIR}/{selected}.md; "
+            "no role cards exist in this repo."
+        )
     if not selected.strip():
         if source in NO_ROLE_WARNING_SOURCES:
             return WARNING.format(env=ROLE_ENV)

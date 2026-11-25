@@ -39,6 +39,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (root / "core" / "roles").mkdir(parents=True)
     (root / "state").mkdir()
     monkeypatch.delenv(roles.ROLE_ENV, raising=False)
+    monkeypatch.delenv("MB_ROLE_REPO", raising=False)
     return root
 
 
@@ -193,12 +194,105 @@ def test_hook_prints_card_and_checkpoint_for_each_source(repo: Path, source: str
     assert "ROLE CHECK FAILED" not in out
 
 
-def test_hook_with_no_cards_prints_nothing_even_if_role_is_set(repo: Path) -> None:
-    assert _hook(repo, role="scout") == ""
+def test_hook_with_selected_role_and_no_cards_refuses(repo: Path) -> None:
+    out = _hook(repo, role="scout")
+    assert (
+        "Selected role scout has no card at core/roles/scout.md; "
+        "no role cards exist in this repo."
+    ) in out
+    assert "ROLE CHECK FAILED" in out
     assert _hook(repo, role=None) == ""
     (repo / "core" / "roles").rmdir()
-    assert _hook(repo, role="scout") == ""
-    assert _hook(repo / "missing-repo", role="scout") == ""
+    assert "ROLE CHECK FAILED" in _hook(repo, role="scout")
+    assert _hook(repo / "missing-repo", role=None) == ""
+
+
+def test_role_repo_override_reads_card_and_checkpoint_from_other_cwd(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (repo / ".git").mkdir()
+    _card(repo)
+    (repo / "state" / "scout-checkpoint.md").write_text("BIZ-CHECKPOINT", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MB_ROLE_REPO", str(repo))
+    monkeypatch.setenv("MB_ROLE", "scout")
+    for command in (["hook"], ["list"], ["show", "scout"], ["check"]):
+        result = runner.invoke(app, ["role", *command])
+        assert result.exit_code == 0, result.output
+        assert "scout" in result.output
+        if command == ["hook"]:
+            assert "BIZ-CHECKPOINT" in result.output
+
+
+@pytest.mark.parametrize("problem", ["relative", "missing", "not_git", "no_roles"])
+def test_role_repo_override_refuses_bad_path(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, problem: str
+) -> None:
+    (repo / ".git").mkdir()
+    target = {
+        "relative": "biz",
+        "missing": str(tmp_path / "missing"),
+        "not_git": str(repo),
+        "no_roles": str(repo),
+    }[problem]
+    if problem == "not_git":
+        (repo / ".git").rmdir()
+    if problem == "no_roles":
+        (repo / "core" / "roles").rmdir()
+    monkeypatch.setenv("MB_ROLE_REPO", target)
+    monkeypatch.setenv("MB_ROLE", "scout")
+    for command in (["hook"], ["list"], ["show", "scout"], ["check"]):
+        result = runner.invoke(app, ["role", *command])
+        assert "ROLE CHECK FAILED" in result.output
+        assert "Traceback" not in result.output
+        expected = {
+            "relative": "not absolute",
+            "missing": "missing",
+            "not_git": "not a git root",
+            "no_roles": "no core/roles",
+        }[problem]
+        assert expected in result.output
+
+
+def test_role_repo_override_without_selected_role_refuses(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (repo / ".git").mkdir()
+    _card(repo)
+    monkeypatch.setenv("MB_ROLE_REPO", str(repo))
+    result = runner.invoke(app, ["role", "hook"])
+    assert "ROLE CHECK FAILED" in result.output and "MB_ROLE is not set" in result.output
+
+
+def test_check_reports_selected_role_when_no_cards(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MB_ROLE", "scout")
+    result = runner.invoke(app, ["role", "check", "--repo", str(repo)])
+    assert result.exit_code == 1
+    assert "no role cards exist in this repo" in result.output
+
+
+def test_explicit_repo_beats_role_repo_env(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _card(repo)
+    monkeypatch.setenv("MB_ROLE_REPO", str(tmp_path / "missing"))
+    for command in (["list"], ["show", "scout"], ["check"]):
+        result = runner.invoke(app, ["role", *command, "--repo", str(repo)])
+        assert result.exit_code == 0, result.output
+
+
+def test_role_repo_error_keeps_json_envelope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MB_ROLE_REPO", str(tmp_path / "missing"))
+    for command in (["list"], ["show", "scout"], ["check"]):
+        result = runner.invoke(app, ["role", *command, "--json"])
+        assert result.exit_code == 1
+        payload = json.loads(result.output)
+        assert payload["ok"] is False and payload["result_status"] == "error"
+        assert "missing" in payload["errors"][0]
 
 
 def test_hook_with_cards_but_no_selected_role_refuses_loudly(repo: Path) -> None:

@@ -11,6 +11,14 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+### Added
+
+- `MB_ROLE_REPO` lets role commands read a business repo's cards while the agent works in another repo.
+
+### Fixed
+
+- The role hook now refuses when `MB_ROLE` names a role but the repo has no cards, instead of staying silent.
+
 ## [0.6.28] - 2026-11-20
 
 ### Fixed

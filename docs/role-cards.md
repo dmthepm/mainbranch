@@ -76,6 +76,23 @@ MB_ROLE=scout claude
 The role is never guessed from the repo, the directory, or the only card
 present.
 
+## Agents that work in a code repo
+
+Set `MB_ROLE_REPO` to the business repo when an agent works from a separate code
+repo. The path must be absolute, point to a git root, and contain `core/roles/`.
+`mb role hook`, `mb role list`, `mb role show`, and `mb role check` read cards
+there; an explicit `--repo` on a command takes precedence. For example:
+
+```bash
+MB_ROLE=scout MB_ROLE_REPO=/home/ada/my-business claude
+```
+
+The checkpoint path in the card is resolved within that business repo. An
+invalid `MB_ROLE_REPO` produces a refusal that names the problem.
+The installed Codex shell hook still checks the current repo for cards before
+it calls `mb role hook --runtime codex`, so it does not reach this override from
+a code repo without cards yet.
+
 ## The SessionStart hook
 
 The Main Branch plugin ships `hooks/hooks.json`, which runs `mb role hook` on
@@ -84,7 +101,8 @@ adds the hook's stdout to the model's context.
 
 | Situation | What the hook prints |
 |---|---|
-| No cards in `core/roles/` | Nothing. Existing businesses see no change. |
+| No cards in `core/roles/` and `MB_ROLE` unset | Nothing. |
+| No cards in `core/roles/` and `MB_ROLE` set | A refusal naming the missing card. |
 | Cards exist, `MB_ROLE` unset, fresh `startup` | A refusal: stop, tell the owner, ask which role. |
 | Cards exist, `MB_ROLE` unset, `resume`, `clear`, `compact` or `fork` | One warning line, no stop. It is informational, not enforcement. |
 | `MB_ROLE` invalid, card missing, or card invalid | The same refusal with the reason. |

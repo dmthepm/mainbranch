@@ -319,6 +319,17 @@ def test_hook_finds_the_repo_from_a_deep_subfolder_by_payload_cwd(
     assert "running as role: scout" in result.stdout
 
 
+def test_codex_hook_uses_role_repo_over_payload_cwd(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MB_ROLE_REPO", str(repo))
+    monkeypatch.setenv(roles.ROLE_ENV, "scout")
+    payload = json.dumps({"source": "startup", "cwd": str(tmp_path)})
+    result = runner.invoke(app, ["role", "hook", "--runtime", "codex"], input=payload)
+    assert "running as role: scout" in result.output
+    assert "ZEBRA-42" in result.output
+
+
 def test_hook_works_in_a_git_worktree_where_dot_git_is_a_file(repo: Path, tmp_path: Path) -> None:
     (repo / ".git").rmdir()
     (repo / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
