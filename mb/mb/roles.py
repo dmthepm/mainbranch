@@ -110,7 +110,13 @@ def find_repo(start: str | Path) -> Path | None:
 
 
 def role_repo(explicit: str | None, fallback: str | Path) -> tuple[str | Path, str | None]:
-    """Choose the card repo. Validate only the environment override."""
+    """Choose the card repo. Validate only the environment override.
+
+    MB_ROLE_REPO is launch configuration, trusted like MB_ROLE and the folder a
+    session starts in. These checks catch a wrong or stale path. They are not a
+    boundary against someone who can already set the agent's environment or PATH,
+    or write into the named folder: that person controls the session anyway.
+    """
     if explicit is not None:
         return explicit, None
     value = os.environ.get(ROLE_REPO_ENV, "")

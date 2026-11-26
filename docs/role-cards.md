@@ -90,7 +90,13 @@ MB_ROLE=scout MB_ROLE_REPO=/home/ada/my-business claude
 ```
 
 The checkpoint path in the card is resolved within that business repo. An
-invalid `MB_ROLE_REPO` produces a refusal that names the problem. The installed
+invalid `MB_ROLE_REPO` produces a refusal that names the problem.
+
+`MB_ROLE_REPO` has the same trust as `MB_ROLE` and the folder a session starts
+in: whoever launches the agent sets it. The path checks, including asking git for
+the repo's top level, catch a wrong or stale path. They do not protect against
+someone who can already change the agent's environment or `PATH`, or write into
+the business repo, because that person already controls what the agent reads. The installed
 Codex shell hook calls `mb role hook --runtime codex` whenever `MB_ROLE_REPO` is
 set, including from a code repo with no cards. If `mb` is unavailable, it prints
 a refusal.
