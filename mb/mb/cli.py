@@ -2714,13 +2714,35 @@ role_app = typer.Typer(help="Agent role cards: list, show, check, and the sessio
 app.add_typer(role_app, name="role")
 
 
+def _role_command_repo(explicit: str | None, *, command: str, json_out: bool) -> str | Path:
+    repo, problem = roles_mod.role_repo(explicit, ".")
+    if problem:
+        if json_out:
+            payload: dict[str, Any] = {"ok": False, "errors": [problem]}
+            if command == "list":
+                payload["roles"] = []
+            elif command == "check":
+                payload.update(cards=[], warnings=[])
+            else:
+                payload["role"] = None
+            typer.echo(
+                _json_payload(
+                    payload, command=f"mb role {command}", schema_name=f"mainbranch.role.{command}"
+                )
+            )
+        else:
+            typer.echo(roles_mod.refusal(problem))
+        raise typer.Exit(1)
+    return repo
+
+
 @role_app.command("list")
 def role_list_cmd(
-    repo: str = typer.Option(".", "--repo", help="Business repo."),
+    repo: str | None = typer.Option(None, "--repo", help="Business repo."),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """List the role cards in core/roles/."""
-    cards = roles_mod.list_cards(repo)
+    cards = roles_mod.list_cards(_role_command_repo(repo, command="list", json_out=json_out))
     if json_out:
         typer.echo(
             _json_payload(
@@ -2741,11 +2763,11 @@ def role_list_cmd(
 @role_app.command("show")
 def role_show_cmd(
     name: str = typer.Argument(..., help="Role name, exactly as the card file is named."),
-    repo: str = typer.Option(".", "--repo", help="Business repo."),
+    repo: str | None = typer.Option(None, "--repo", help="Business repo."),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Show one role card. Exits 1 if it is missing or invalid."""
-    card = roles_mod.load_card(repo, name)
+    card = roles_mod.load_card(_role_command_repo(repo, command="show", json_out=json_out), name)
     if json_out:
         typer.echo(
             _json_payload(
@@ -2769,11 +2791,11 @@ def role_show_cmd(
 @role_app.command("check")
 def role_check_cmd(
     name: str = typer.Argument(None, help="One role to check; default is every card."),
-    repo: str = typer.Option(".", "--repo", help="Business repo."),
+    repo: str | None = typer.Option(None, "--repo", help="Business repo."),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Validate role cards. Exits 1 if any checked card is invalid."""
-    report = roles_mod.check(repo, name)
+    report = roles_mod.check(_role_command_repo(repo, command="check", json_out=json_out), name)
     if json_out:
         typer.echo(
             _json_payload(report, command="mb role check", schema_name="mainbranch.role.check")
@@ -2820,18 +2842,20 @@ def role_hook_cmd(
 ) -> None:
     """SessionStart hook entry: print the selected role card, or a refusal.
 
-    Prints nothing when the repo has no role cards. Always exits 0: a hook
+    Prints nothing when no role is selected and the repo has no cards. Always exits 0: a hook
     cannot block a session, so the refusal is text the agent must obey.
     With --runtime codex the repo and source come from Codex's stdin payload.
     """
     try:
+        repo: str | Path
         if runtime == "codex":
             repo, safe_source = _codex_hook_target(_codex_hook_input(), source)
         else:
             repo = os.environ.get("CLAUDE_PROJECT_DIR") or "."
             source = source or "startup"
             safe_source = source if source in roles_mod.HOOK_SOURCES else "unknown"
-        text = roles_mod.hook_text(repo, safe_source)
+        repo, problem = roles_mod.role_repo(None, repo)
+        text = roles_mod.refusal(problem) if problem else roles_mod.hook_text(repo, safe_source)
     except Exception:
         text = roles_mod.refusal(
             "The role check hit an internal error and could not read the role card."

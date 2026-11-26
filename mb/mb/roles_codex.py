@@ -27,9 +27,9 @@ HOOK_TIMEOUT_SECONDS = 20
 _MARK = "mb role hook --runtime codex"
 
 # POSIX sh, wrapped so a zsh or fish login shell cannot abort it. It walks up from the
-# session folder to a git root looking for core/roles, so a session with no cards
-# never starts Python. If mb cannot run it prints a plain refusal, but only when a
-# card file exists. It always exits 0.
+# session folder to a git root looking for core/roles. An explicit role repo
+# always calls mb. If mb cannot run, it prints a plain refusal for that override
+# or a current-repo card. It always exits 0.
 _REFUSAL = (
     "MAIN BRANCH ROLE CHECK FAILED: this repo has role cards (core/roles) but the role "
     "could not be loaded. STOP. Do not start work and do not pick a role yourself. "
@@ -40,16 +40,26 @@ _REFUSAL = (
 # for resume, clear, compact and fork lives in the Python path (mb role hook), which parses it.
 CODEX_HOOK_COMMAND = (
     "sh -c '"
-    'd=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
+    'd=$PWD; if [ -z "${MB_ROLE_REPO:-}" ]; then while :; do '
+    '[ -d "$d/core/roles" ] && break; '
+    '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; '
+    "done; fi; "
+    "in=; [ -t 0 ] || in=$(head -c 65536); "
+    f'if command -v mb >/dev/null 2>&1 && out=$(printf "%s" "$in" | {_MARK} 2>/dev/null); '
+    'then [ -z "$out" ] || printf "%s\\n" "$out"; '
+    'else set -- "$d"/core/roles/*.md; '
+    f'if [ -n "${{MB_ROLE_REPO:-}}" ] || [ -e "$1" ] || [ -L "$1" ]; '
+    f'then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\''
+)
+# The exact command an earlier release wrote. Still ours, so apply replaces it and remove clears it.
+_PREVIOUS_COMMANDS = (
+    'sh -c \'d=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
     '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
     "in=; [ -t 0 ] || in=$(head -c 65536); "
     f'if command -v mb >/dev/null 2>&1 && out=$(printf "%s" "$in" | {_MARK} 2>/dev/null); '
     'then [ -z "$out" ] || printf "%s\\n" "$out"; '
     'else set -- "$d"/core/roles/*.md; '
-    f'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\''
-)
-# The exact command an earlier release wrote. Still ours, so apply replaces it and remove clears it.
-_PREVIOUS_COMMANDS = (
+    f'if [ -e "$1" ] || [ -L "$1" ]; then printf "%s\\n" "{_REFUSAL}"; fi; fi; exit 0\'',
     'sh -c \'d=$PWD; while :; do [ -d "$d/core/roles" ] && break; '
     '{ [ -e "$d/.git" ] || [ "$d" = / ]; } && exit 0; p=${d%/*}; d=${p:-/}; done; '
     f"if command -v mb >/dev/null 2>&1 && out=$({_MARK} 2>/dev/null); "

@@ -249,6 +249,8 @@ def prepare(host: ap.Host, name: str, environ: Mapping[str, str]) -> tuple[Plan,
         "PATH": ":".join(report.path),
         "MB_ROLE": row["role"],
     }
+    if "role_repo" in row:
+        env_set["MB_ROLE_REPO"] = row["role_repo"]
     if row["profile"] != ap.DEFAULT:
         env_set["CLAUDE_CONFIG_DIR" if runtime == "claude" else "CODEX_HOME"] = profile
     kept = set(env_set) | set(passed)

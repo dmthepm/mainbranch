@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -55,7 +56,7 @@ def repo(tmp_path: Path) -> Path:
     (root / "state").mkdir()
     (root / "core" / "roles" / "scout.md").write_text(CARD, encoding="utf-8")
     (root / "state" / "scout-checkpoint.md").write_text("ZEBRA-42 open\n", encoding="utf-8")
-    (root / ".git").mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
     return root
 
 
@@ -280,10 +281,13 @@ def _run(
     payload: object | None,
     role: str | None = "scout",
     cwd_in_payload: Path | None = None,
+    role_repo: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = {"PATH": f"{path_dir}:/usr/bin:/bin", "HOME": str(cwd)}
     if role:
         env[roles.ROLE_ENV] = role
+    if role_repo is not None:
+        env[roles.ROLE_REPO_ENV] = str(role_repo)
     stdin = "" if payload is None else json.dumps(payload)
     if isinstance(payload, dict) and cwd_in_payload is not None:
         stdin = json.dumps({**payload, "cwd": str(cwd_in_payload)})
@@ -319,8 +323,19 @@ def test_hook_finds_the_repo_from_a_deep_subfolder_by_payload_cwd(
     assert "running as role: scout" in result.stdout
 
 
+def test_codex_hook_uses_role_repo_over_payload_cwd(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MB_ROLE_REPO", str(repo))
+    monkeypatch.setenv(roles.ROLE_ENV, "scout")
+    payload = json.dumps({"source": "startup", "cwd": str(tmp_path)})
+    result = runner.invoke(app, ["role", "hook", "--runtime", "codex"], input=payload)
+    assert "running as role: scout" in result.output
+    assert "ZEBRA-42" in result.output
+
+
 def test_hook_works_in_a_git_worktree_where_dot_git_is_a_file(repo: Path, tmp_path: Path) -> None:
-    (repo / ".git").rmdir()
+    shutil.rmtree(repo / ".git")
     (repo / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
     sub = repo / "state"
     path_dir = _shim(tmp_path / "bin", tmp_path / "ran")
@@ -343,6 +358,29 @@ def test_hook_is_silent_and_never_starts_mb_with_no_cards(tmp_path: Path) -> Non
     result = _run(plain, path_dir, {"source": "startup"})
     assert result.returncode == 0 and result.stdout == "" and result.stderr == ""
     assert not marker.exists()
+
+
+def test_installed_hook_calls_mb_with_role_repo_from_no_card_cwd(
+    repo: Path, tmp_path: Path
+) -> None:
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / ".git").mkdir()
+    marker = tmp_path / "ran"
+    path_dir = _shim(tmp_path / "bin", marker)
+    result = _run(plain, path_dir, {"source": "startup"}, role_repo=repo)
+    assert result.returncode == 0 and result.stderr == ""
+    assert "running as role: scout" in result.stdout
+    assert marker.exists()
+
+
+def test_installed_hook_refuses_if_mb_missing_with_role_repo(repo: Path, tmp_path: Path) -> None:
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / ".git").mkdir()
+    result = _run(plain, tmp_path / "empty-bin", {"source": "startup"}, role_repo=repo)
+    assert result.returncode == 0 and result.stderr == ""
+    assert "MAIN BRANCH ROLE CHECK FAILED" in result.stdout
 
 
 def test_hook_does_not_climb_past_a_git_root_into_a_parent_repo(repo: Path, tmp_path: Path) -> None:

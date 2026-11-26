@@ -76,6 +76,31 @@ MB_ROLE=scout claude
 The role is never guessed from the repo, the directory, or the only card
 present.
 
+## Agents that work in a code repo
+
+Set `MB_ROLE_REPO` to the business repo when an agent works from a separate code
+repo. The path must be absolute, point to a git root, and contain `core/roles/`.
+For agents launched with `mb agent up`, set the
+[`role_repo` policy field](agent-policy.md#fields) on the agent row.
+`mb role hook`, `mb role list`, `mb role show`, and `mb role check` read cards
+there; an explicit `--repo` on a command takes precedence. For example:
+
+```bash
+MB_ROLE=scout MB_ROLE_REPO=/home/ada/my-business claude
+```
+
+The checkpoint path in the card is resolved within that business repo. An
+invalid `MB_ROLE_REPO` produces a refusal that names the problem.
+
+`MB_ROLE_REPO` has the same trust as `MB_ROLE` and the folder a session starts
+in: whoever launches the agent sets it. The path checks, including asking git for
+the repo's top level, catch a wrong or stale path. They do not protect against
+someone who can already change the agent's environment or `PATH`, or write into
+the business repo, because that person already controls what the agent reads. The installed
+Codex shell hook calls `mb role hook --runtime codex` whenever `MB_ROLE_REPO` is
+set, including from a code repo with no cards. If `mb` is unavailable, it prints
+a refusal.
+
 ## The SessionStart hook
 
 The Main Branch plugin ships `hooks/hooks.json`, which runs `mb role hook` on
@@ -84,7 +109,8 @@ adds the hook's stdout to the model's context.
 
 | Situation | What the hook prints |
 |---|---|
-| No cards in `core/roles/` | Nothing. Existing businesses see no change. |
+| No cards in `core/roles/` and `MB_ROLE` unset | Nothing. |
+| No cards in `core/roles/` and `MB_ROLE` set | A refusal naming the missing card. |
 | Cards exist, `MB_ROLE` unset, fresh `startup` | A refusal: stop, tell the owner, ask which role. |
 | Cards exist, `MB_ROLE` unset, `resume`, `clear`, `compact` or `fork` | One warning line, no stop. It is informational, not enforcement. |
 | `MB_ROLE` invalid, card missing, or card invalid | The same refusal with the reason. |
@@ -146,7 +172,8 @@ keep repo folders off `PATH`. Replacing `mb` needs no new review.
 
 The hook walks up from the session folder to the git root looking for
 `core/roles`, so a session in a subfolder or a git worktree finds its repo. In a
-folder with no `core/roles` it exits at once without starting `mb`. Codex hands the
+folder with no `core/roles` it exits at once without starting `mb`, unless
+`MB_ROLE_REPO` is set. Codex hands the
 hook its session folder on stdin and sets no project variable, so the Codex route
 never reads `CLAUDE_PROJECT_DIR`.
 

@@ -255,6 +255,17 @@ def sid_of(run: dict[str, Any]) -> str:
 # --- the happy path, and what the runtime receives ---------------------------------------
 
 
+def test_launch_sets_role_repo_from_policy(u: Up) -> None:
+    plain = u.mkdir(u.home / "plain")
+    u.write({"version": 1, "agents": [u.row(cwd=str(plain), role_repo=str(u.biz))]})
+    code, _, _ = u.up()
+    assert code == 0
+    recorded = u.last()["env_set"]["MB_ROLE_REPO"]
+    assert recorded == str(u.biz)
+    launched = u.runs()[0]["env"]["MB_ROLE_REPO"]
+    assert launched == str(u.biz)
+
+
 def test_first_launch_runs_the_fixture_with_the_planned_argv_env_cwd_and_fds(u: Up) -> None:
     code, out, err = u.up()
     assert (code, out, err) == (0, "", "")

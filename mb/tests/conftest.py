@@ -20,6 +20,14 @@ def tmp_repo(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
+def no_role_from_the_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An agent running the suite has its own MB_ROLE; tests set role variables themselves."""
+
+    monkeypatch.delenv("MB_ROLE", raising=False)
+    monkeypatch.delenv("MB_ROLE_REPO", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def isolated_state_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep every test's ``mb feedback`` writes out of the real user state dir.
 
