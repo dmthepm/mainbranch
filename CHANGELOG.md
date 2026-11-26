@@ -11,6 +11,8 @@ PyPI distribution `mainbranch` tracks the same version sequence.
 
 ## [Unreleased]
 
+## [0.6.29] - 2026-11-26
+
 ### Added
 
 - `MB_ROLE_REPO` lets role commands read a business repo's cards while the agent works in another repo. An agent policy row can set `role_repo` to pass it at launch.
