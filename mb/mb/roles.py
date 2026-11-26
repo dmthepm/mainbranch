@@ -144,7 +144,7 @@ def role_repo(explicit: str | None, fallback: str | Path) -> tuple[str | Path, s
             git_root = False
     except OSError:
         git_root = False
-    if not git_root:
+    if not git_root or _git_toplevel(root) != root:
         return fallback, f"{ROLE_REPO_ENV} path {safe!r} is not a git root."
     if not (root / ROLES_DIR).is_dir():
         return fallback, f"{ROLE_REPO_ENV} path {safe!r} has no {ROLES_DIR}/ directory."
@@ -157,6 +157,25 @@ def _safe_relative(value: str) -> bool:
     if re.match(r"^[A-Za-z]:", value):
         return False
     return ".." not in Path(value.replace("\\", "/")).parts
+
+
+def _git_toplevel(root: Path) -> Path | None:
+    """Git's own top level for ``root``, or None. GIT_* from the caller cannot redirect it."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+            env=env,
+        )
+        if result.returncode != 0:
+            return None
+        return Path(result.stdout.strip()).resolve()
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
 
 
 def _git_ignored(root: Path, relative: str) -> bool:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -206,10 +207,22 @@ def test_hook_with_selected_role_and_no_cards_refuses(repo: Path) -> None:
     assert _hook(repo / "missing-repo", role=None) == ""
 
 
+_GIT_ID = {
+    "GIT_AUTHOR_NAME": "Fixture",
+    "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+    "GIT_COMMITTER_NAME": "Fixture",
+    "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+}
+
+
+def _git_init(path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(path)], check=True)
+
+
 def test_role_repo_override_reads_card_and_checkpoint_from_other_cwd(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (repo / ".git").mkdir()
+    _git_init(repo)
     _card(repo)
     (repo / "state" / "scout-checkpoint.md").write_text("BIZ-CHECKPOINT", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
@@ -223,7 +236,9 @@ def test_role_repo_override_reads_card_and_checkpoint_from_other_cwd(
             assert "BIZ-CHECKPOINT" in result.output
 
 
-@pytest.mark.parametrize("marker", ["symlink", "empty", "invalid", "worktree"])
+@pytest.mark.parametrize(
+    "marker", ["symlink", "empty", "invalid", "fake_dir", "bad_gitdir", "worktree"]
+)
 def test_role_repo_requires_a_git_root_marker(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, marker: str
 ) -> None:
@@ -236,8 +251,21 @@ def test_role_repo_requires_a_git_root_marker(
         git.write_text("")
     elif marker == "invalid":
         git.write_text("metadata\n")
-    else:
+    elif marker == "fake_dir":
+        git.mkdir()
+    elif marker == "bad_gitdir":
         git.write_text("gitdir: /fixture/worktree\n")
+    else:
+        main = tmp_path / "main"
+        _git_init(main)
+        subprocess.run(
+            ["git", "-C", str(main), "commit", "-q", "--allow-empty", "-m", "init"],
+            check=True,
+            env={**os.environ, **_GIT_ID},
+        )
+        shutil.rmtree(repo)
+        subprocess.run(["git", "-C", str(main), "worktree", "add", "-q", str(repo)], check=True)
+        (repo / "core" / "roles").mkdir(parents=True)
     monkeypatch.setenv("MB_ROLE_REPO", str(repo))
     selected, problem = roles.role_repo(None, tmp_path)
     if marker == "worktree":
@@ -251,7 +279,7 @@ def test_role_repo_requires_a_git_root_marker(
 def test_role_repo_override_refuses_bad_path(
     repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, problem: str
 ) -> None:
-    (repo / ".git").mkdir()
+    _git_init(repo)
     target = {
         "relative": "biz",
         "missing": str(tmp_path / "missing"),
@@ -259,7 +287,7 @@ def test_role_repo_override_refuses_bad_path(
         "no_roles": str(repo),
     }[problem]
     if problem == "not_git":
-        (repo / ".git").rmdir()
+        shutil.rmtree(repo / ".git")
     if problem == "no_roles":
         (repo / "core" / "roles").rmdir()
     monkeypatch.setenv("MB_ROLE_REPO", target)
@@ -280,7 +308,7 @@ def test_role_repo_override_refuses_bad_path(
 def test_role_repo_override_without_selected_role_refuses(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (repo / ".git").mkdir()
+    _git_init(repo)
     _card(repo)
     monkeypatch.setenv("MB_ROLE_REPO", str(repo))
     result = runner.invoke(app, ["role", "hook"])

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -55,7 +56,7 @@ def repo(tmp_path: Path) -> Path:
     (root / "state").mkdir()
     (root / "core" / "roles" / "scout.md").write_text(CARD, encoding="utf-8")
     (root / "state" / "scout-checkpoint.md").write_text("ZEBRA-42 open\n", encoding="utf-8")
-    (root / ".git").mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
     return root
 
 
@@ -334,7 +335,7 @@ def test_codex_hook_uses_role_repo_over_payload_cwd(
 
 
 def test_hook_works_in_a_git_worktree_where_dot_git_is_a_file(repo: Path, tmp_path: Path) -> None:
-    (repo / ".git").rmdir()
+    shutil.rmtree(repo / ".git")
     (repo / ".git").write_text("gitdir: /nowhere\n", encoding="utf-8")
     sub = repo / "state"
     path_dir = _shim(tmp_path / "bin", tmp_path / "ran")
